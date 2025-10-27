@@ -1,0 +1,56 @@
+[user]
+	name = Somto M.Ugeh
+	email = smugeh@gmail.com
+[pull]
+  rebase = true
+[branch]
+  autosetuprebase = always
+[core]
+	pager = delta
+	excludesfile = /Users/somtougeh/.gitignore_global
+	ignorecase = false
+[alias]
+	a = add
+	c = commit
+	p = push
+	l = log
+  rh = reset --hard HEAD
+  b = checkout -b
+  co = checkout
+  ca = commit -a --verbose
+  cp = cherry-pick
+  amend = commit -a --amend --no-edit
+  undo = reset --soft HEAD^
+  cdiff = "!git diff $1 $1^"
+[push]
+  default = current
+[interactive]
+  diffFilter = delta --color-only
+[color]
+	ui = true
+[delta]
+  navigate = true
+  dark = true
+[merge]
+  conflictstyle = zdiff3
+[color "diff-highlight"]
+	oldNormal = red bold
+	oldHighlight = red bold 52
+	newNormal = green bold
+	newHighlight = green bold 22
+[color "diff"]
+	meta = 11
+	frag = magenta bold
+	commit = yellow bold
+	old = red bold
+	new = green bold
+	whitespace = red reverse
+[init]
+	defaultBranch = main
+[filter "lfs"]
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+	required = true
+[coderabbit]
+	machineId = cli/4d2eda88efc84220b6b7cea3f373ae45

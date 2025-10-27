@@ -1,0 +1,74 @@
+{
+  "icon_theme": "Colored Zed Icons Theme Light",
+  "agent_buffer_font_size": 12.0,
+  "inlay_hints": {
+    "enabled": false
+  },
+  "theme": "Ayu Dark",
+  "agent": {
+    "default_model": {
+      "provider": "zed.dev",
+      "model": "claude-sonnet-4-5"
+    },
+    "inline_assistant_model": {
+      "provider": "zed.dev",
+      "model": "claude-sonnet-4-5"
+    },
+    "default_width": 600.0,
+    "dock": "left",
+    "play_sound_when_agent_done": true,
+    "model_parameters": []
+  },
+  "terminal": {
+    "toolbar": {
+      "breadcrumbs": false
+    }
+  },
+  "project_panel": {
+    "entry_spacing": "comfortable",
+    "dock": "right"
+  },
+  "pane_split_direction_vertical": "right",
+  "use_system_window_tabs": true,
+  "bottom_dock_layout": "contained",
+  "tabs": {
+    "git_status": true
+  },
+  "title_bar": {
+    "show_menus": true
+  },
+  "search": {
+    "include_ignored": true,
+    "regex": true
+  },
+  "use_smartcase_search": true,
+  "agent_ui_font_size": 14.0,
+  "ui_font_weight": 350.0,
+  "ui_font_size": 14.0,
+  "buffer_font_weight": 350.0,
+  "buffer_font_size": 13.0,
+  "context_servers": {
+    "posthog": {
+      "enabled": true,
+      "source": "custom",
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote@latest",
+        "https://mcp.posthog.com/sse",
+        "--header",
+        "Authorization:${POSTHOG_AUTH_HEADER}"
+      ],
+      "env": {
+        "POSTHOG_AUTH_HEADER": "Bearer phx_9ioGsNSCoyhiGlLs5QHspoQot3nIT2uyAqAhnCbfmAkM3HZ"
+      }
+    }
+  },
+  "lsp": {
+    "biome": {
+      "settings": {
+        "require_config_file": true
+      }
+    }
+  }
+}

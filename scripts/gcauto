@@ -1,0 +1,18 @@
+#!/bin/zsh
+
+# Check if there are staged changes
+if ! git diff --cached --quiet; then
+  echo "Generating commit message..."
+  COMMIT_MSG=$(/Users/somtougeh/.claude/local/claude -p "Look at the staged git changes and create a summarizing git commit title. Only respond with the title and no affirmation.")
+  
+  if [ $? -eq 0 ] && [ -n "$COMMIT_MSG" ]; then
+    echo "Committing with message: $COMMIT_MSG"
+    git commit -m "$COMMIT_MSG"
+  else
+    echo "Failed to generate commit message"
+    exit 1
+  fi
+else
+  echo "No staged changes to commit. Use 'git add' first."
+  exit 1
+fi

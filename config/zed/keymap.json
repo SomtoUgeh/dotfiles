@@ -1,0 +1,63 @@
+[
+  // Toggle terminal (VS Code: cmd+t)
+  {
+    "bindings": {
+      "cmd-t": "terminal_panel::Toggle"
+    }
+  },
+  // Split terminal when focused (VS Code: cmd+/ in terminal)
+  {
+    "context": "Terminal",
+    "bindings": {
+      "cmd-/": "pane::SplitDown"
+    }
+  },
+  // Copy line down (VS Code: shift+down in editor)
+  {
+    "context": "Editor",
+    "bindings": {
+      "shift-down": "editor::DuplicateLineDown"
+    }
+  },
+  // Copy line up (VS Code: shift+up in editor)
+  {
+    "context": "Editor",
+    "bindings": {
+      "shift-up": "editor::DuplicateLineUp"
+    }
+  },
+  // Move line up (VS Code: alt+up in editor)
+  {
+    "context": "Editor",
+    "bindings": {
+      "alt-up": "editor::MoveLineUp"
+    }
+  },
+  // Delete line (VS Code: alt+d)
+  {
+    "context": "Editor",
+    "bindings": {
+      "alt-d": "editor::DeleteLine"
+    }
+  },
+  // Expand selection - emmet balance out (VS Code: ctrl+alt+b)
+  {
+    "context": "Editor",
+    "bindings": {
+      "ctrl-alt-b": "editor::SelectLargerSyntaxNode"
+    }
+  },
+  // Shrink selection - emmet balance in (VS Code: ctrl+alt+v)
+  {
+    "context": "Editor",
+    "bindings": {
+      "ctrl-alt-v": "editor::SelectSmallerSyntaxNode"
+    }
+  },
+  // Quick text search (VS Code: cmd+q cmd+f)
+  {
+    "bindings": {
+      "cmd-q cmd-f": "project_search::ToggleFocus"
+    }
+  }
+]

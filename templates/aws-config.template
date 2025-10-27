@@ -1,0 +1,24 @@
+# AWS Configuration Template
+# Copy these files to ~/.aws/ and fill in your credentials
+
+# ~/.aws/config
+[default]
+region = us-east-1
+output = json
+
+# Add additional profiles as needed
+# [profile dev]
+# region = us-west-2
+# output = json
+
+# ~/.aws/credentials
+[default]
+aws_access_key_id = YOUR_ACCESS_KEY_ID
+aws_secret_access_key = YOUR_SECRET_ACCESS_KEY
+
+# Add additional profile credentials as needed
+# [dev]
+# aws_access_key_id = YOUR_DEV_ACCESS_KEY_ID
+# aws_secret_access_key = YOUR_DEV_SECRET_ACCESS_KEY
+
+# IMPORTANT: Never commit actual credentials to version control!

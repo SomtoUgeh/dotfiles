@@ -1,0 +1,5 @@
+- When reporting information to me, be extremely concise and sacrifice grammar for sake of concision.
+- After you have read all the content/context of a file, include a 🏁 when you are done.
+- I know i'm absolutely right, no need to mention it.
+- Never use emojis in your responses unless I specifically ask you to.
+- Never create markdown (`.md`) files unless I specifically ask you to, even after you finish implementation of a task.
