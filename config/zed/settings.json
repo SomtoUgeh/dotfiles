@@ -1,10 +1,26 @@
+// Zed settings
+//
+// For information on how to configure Zed, see the Zed
+// documentation: https://zed.dev/docs/configuring-zed
+//
+// To see all of Zed's default settings without changing your
+// custom settings, run `zed: open default settings` from the
+// command palette (cmd-shift-p / ctrl-shift-p)
 {
-  "icon_theme": "Colored Zed Icons Theme Light",
-  "agent_buffer_font_size": 12.0,
+  "icon_theme": "Catppuccin Mocha",
+  "git": {
+    "inline_blame": {
+      "show_commit_summary": true
+    }
+  },
   "inlay_hints": {
     "enabled": false
   },
-  "theme": "Ayu Dark",
+  "terminal": {
+    "toolbar": {
+      "breadcrumbs": false
+    }
+  },
   "agent": {
     "default_model": {
       "provider": "zed.dev",
@@ -14,55 +30,45 @@
       "provider": "zed.dev",
       "model": "claude-sonnet-4-5"
     },
+    "play_sound_when_agent_done": true,
     "default_width": 600.0,
     "dock": "left",
-    "play_sound_when_agent_done": true,
     "model_parameters": []
   },
-  "terminal": {
-    "toolbar": {
-      "breadcrumbs": false
-    }
+  "notification_panel": {
+    "dock": "right"
   },
   "project_panel": {
     "entry_spacing": "comfortable",
+    "default_width": 250.0,
     "dock": "right"
   },
   "pane_split_direction_vertical": "right",
   "use_system_window_tabs": true,
   "bottom_dock_layout": "contained",
   "tabs": {
+    "file_icons": true,
     "git_status": true
   },
   "title_bar": {
-    "show_menus": true
-  },
-  "search": {
-    "include_ignored": true,
-    "regex": true
+    "show_menus": true,
+    "show_branch_icon": true
   },
   "use_smartcase_search": true,
+  "diagnostics": {
+    "inline": {
+      "enabled": true
+    }
+  },
   "agent_ui_font_size": 14.0,
   "ui_font_weight": 350.0,
-  "ui_font_size": 14.0,
   "buffer_font_weight": 350.0,
+  "ui_font_size": 15.0,
   "buffer_font_size": 13.0,
-  "context_servers": {
-    "posthog": {
-      "enabled": true,
-      "source": "custom",
-      "command": "npx",
-      "args": [
-        "-y",
-        "mcp-remote@latest",
-        "https://mcp.posthog.com/sse",
-        "--header",
-        "Authorization:${POSTHOG_AUTH_HEADER}"
-      ],
-      "env": {
-        "POSTHOG_AUTH_HEADER": "Bearer phx_9ioGsNSCoyhiGlLs5QHspoQot3nIT2uyAqAhnCbfmAkM3HZ"
-      }
-    }
+  "theme": {
+    "mode": "system",
+    "light": "Ayu Light",
+    "dark": "Ayu Dark"
   },
   "lsp": {
     "biome": {

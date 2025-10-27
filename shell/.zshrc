@@ -1,123 +1,73 @@
-# Amazon Q pre block. Keep at the top of this file.
-[[ -f "${HOME}/Library/Application Support/amazon-q/shell/zshrc.pre.zsh" ]] && builtin source "${HOME}/Library/Application Support/amazon-q/shell/zshrc.pre.zsh"
-# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
-# Initialization code that may require console input (password prompts, [y/n]
-# confirmations, etc.) must go above this block; everything else may go below.
-if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
-  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
-fi
-
-
+#!/bin/bash
 
 # ============================================================================
-# PATH SETUP - Order matters! Most specific first
+# SHELL CONFIGURATION
 # ============================================================================
 
-# Custom scripts
-export PATH="$HOME/bin:$PATH"
+export TERM=xterm-256color
+export CLICOLOR=1
+export LSCOLORS=Fafacxdxbxegedabagacad
 
-# uv - Python package manager
-export PATH="$HOME/.local/bin:$PATH"
+# allow substitution in PS1
+setopt promptsubst
 
-# Node.js version manager (n) - HIGHEST PRIORITY for Node
-export N_PREFIX="$HOME/n"
-export PATH="$N_PREFIX/bin:$PATH"
+# history configuration
+HISTSIZE=5000
+HISTFILESIZE=10000
+SAVEHIST=5000
+setopt EXTENDED_HISTORY
+HISTFILE=${ZDOTDIR:-$HOME}/.zsh_history
+setopt SHARE_HISTORY      # share history across multiple zsh sessions
+setopt APPEND_HISTORY     # append to history
+setopt INC_APPEND_HISTORY # adds commands as they are typed, not at shell exit
+setopt HIST_IGNORE_DUPS   # do not store duplications
 
-# npm global packages
-export PATH="$HOME/.npm-global/bin:$PATH"
-
-# bun
-export BUN_INSTALL="$HOME/.bun"
-export PATH="$BUN_INSTALL/bin:$PATH"
-
-# pnpm
-export PNPM_HOME="/Users/somtougeh/Library/pnpm"
-case ":$PATH:" in
-  *":$PNPM_HOME:"*) ;;
-  *) export PATH="$PNPM_HOME:$PATH" ;;
-esac
+# CDPATH configuration
+CDPATH=.:$HOME:$HOME/code:$HOME/Desktop
 
 # ============================================================================
-# OH-MY-ZSH CONFIGURATION
+# PATH SETUP (Order matters!)
 # ============================================================================
 
-# Path to your oh-my-zsh installation.
-export ZSH="$HOME/.oh-my-zsh"
+# Homebrew
+PATH="/opt/homebrew/bin:$PATH"
+PATH="/usr/local/bin:$PATH"
 
-ZSH_THEME="powerlevel10k/powerlevel10k"
+# Custom bins
+PATH="$PATH:$HOME/bin:$HOME/.bin:$HOME/.local/bin"
 
-# Enable Zsh completions
-autoload -Uz compinit && compinit
-
-# Homebrew completions (includes eza)
-if type brew &>/dev/null; then
-    FPATH="$(brew --prefix)/share/zsh/site-functions:${FPATH}"
-    autoload -Uz compinit
-    compinit
-fi
-
-zstyle ':omz:update' mode auto
-plugins=(git zsh-syntax-highlighting fast-syntax-highlighting)
-
-source $ZSH/oh-my-zsh.sh
-
-# Enhanced completion options
-zstyle ':completion:*' menu select
-zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
-zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
+# node_modules (fast local bin access)
+PATH="$PATH:./node_modules/.bin:../node_modules/.bin:../../node_modules/.bin:../../../node_modules/.bin:../../../../node_modules/.bin:../../../../../node_modules/.bin:../../../../../../node_modules/.bin:../../../../../../../node_modules/.bin"
 
 # ============================================================================
-# CUSTOM FUNCTIONS
+# ENVIRONMENT VARIABLES
 # ============================================================================
 
-# Function to run server and install tools
-function start_browser_tools() {
-  echo "Starting browser tools server..."
-  npx @agentdeskai/browser-tools-server@latest &
-  sleep 3
-  echo "Installing latest browser tools..."
-  npx @agentdeskai/browser-tools-mcp@latest
-}
+export RIPGREP_CONFIG_PATH=$HOME/.ripgreprc
+export SCARF_ANALYTICS=false
 
-function google() {
-  gemini -p "Search google for <query>$1</query> and summarize the results"
-}
-
-# Agent guides installation function
-source /Users/somtougeh/code/agent-guides/install-agent-guides.sh
-
-# n (Node version manager) wrapper - auto-refresh hash after version change
-function n() {
-  # Run the actual n command
-  command n "$@"
-  local n_exit_code=$?
-  
-  # If n succeeded and arguments were provided (version change), refresh hash
-  if [[ $n_exit_code -eq 0 && $# -gt 0 ]]; then
-    hash -r 2>/dev/null || true
-    echo "✓ Node version changed to $(node --version)"
-  fi
-  
-  return $n_exit_code
-}
+# Claude
+export ENABLE_BACKGROUND_TASKS=1
+export FORCE_AUTO_BACKGROUND_TASKS=1
+export CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1
 
 # ============================================================================
-# ALIASES
+# ALIASES - Editor & Navigation
 # ============================================================================
 
-# Development
-alias code="\"/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code\""
-alias git="hub"
-alias gpf="git push --force-with-lease --force-if-includes"
-alias gt="gittower ."
-
-# Navigation
-alias ..="cd ../"
-alias ..l="cd ../ && ll"
+alias code="\"/Applications/Cursor.app/Contents/Resources/app/bin/cursor\""
+alias vz="vim ~/.zshrc"
+alias cz="cursor ~/.zshrc"
+alias sz="source ~/.zshrc"
 alias de="cd ~/Desktop"
 alias d="cd ~/code"
+alias ..="cd ../"
+alias ..l="cd ../ && ll"
 
-# eza - Modern replacement for ls
+# ============================================================================
+# ALIASES - eza (Modern ls replacement)
+# ============================================================================
+
 alias ls="eza --icons=auto --group-directories-first"
 alias ll="eza -l --icons=auto --group-directories-first --time-style=relative"
 alias la="eza -a --icons=auto --group-directories-first"
@@ -130,82 +80,165 @@ alias lsize="eza -l --icons=auto --sort=size --reverse"
 alias ltime="eza -l --icons=auto --sort=modified --reverse"
 alias ldot="eza -ld --icons=auto .*"
 
-# Utilities
-alias pg="echo 'Pinging Google' && ping www.google.com"
-alias oz="open ~/.zshrc"
-alias vz="vi ~/.zshrc"
-alias sz="source ~/.zshrc"
-alias rm="trash"
-alias yolo="claude --dangerously-skip-permissions"
-alias yoloc='codex -m gpt-5-codex -c model_reasoning_effort="high"'
-alias gcauto="~/bin/gcauto"
+# ============================================================================
+# ALIASES - Git
+# ============================================================================
 
-# Package Management
-alias npm-update="npx npm-check-updates --dep prod,dev --upgrade"
-alias yarn-update="yarn upgrade-interactive --latest"
-alias bts="npx @agentdeskai/browser-tools-server@1.2.0"
-alias iag='install_agent_guides'
+alias git=hub
+alias gs="git status"
+alias gp="git pull"
+alias gf="git fetch"
+alias gpush="git push"
+alias gpf="git push --force-with-lease --force-if-includes"
+alias gd="git diff"
+alias ga="git add ."
 
-# ast-grep aliases
-alias sg="ast-grep"  # Short alias for ast-grep
-alias sgs="ast-grep scan"  # Scan with rules from config
-alias sgr="ast-grep run"  # Run pattern search/rewrite
-alias sgl="ast-grep scan"  # Lint with rules (scan is used for linting)
-alias sgi="ast-grep run -i"  # Interactive mode
-alias sgn="ast-grep new"  # Create new rule
-alias sgt="ast-grep test"  # Test rules
-# Helper functions for common patterns
-sgp() { ast-grep run --pattern "$1" --lang "${2:-tsx}" "${3:-.}"; }  # Pattern search
-sgf() { ast-grep run --pattern "$1" --lang "${2:-tsx}" . --json | jq '.'; }  # JSON output
+# ============================================================================
+# ALIASES - Bun (Primary package manager)
+# ============================================================================
 
-# Python Environment (managed by uv)
+alias bi="bun install"
+alias bun-update-i="bun update -i"
+
+# ============================================================================
+# ALIASES - Python/uv
+# ============================================================================
+
 alias make-python-env="uv venv"
 alias go-to-python-env="source .venv/bin/activate"
 alias install-pd="uv pip install -r requirements.txt"
-alias uvs="uv sync"  # Sync dependencies from pyproject.toml
-alias uva="uv add"  # Add a package
-alias uvr="uv remove"  # Remove a package
-alias uvup="uv self update"  # Update uv itself
-alias python="uv run python"  # Use uv's Python
-alias pip="uv pip"  # Use uv's pip replacement
+alias python="uv run python"
+alias pip="uv pip"
 
 # ============================================================================
-# CLAUDE CONFIGURATION
+# ALIASES - ast-grep
 # ============================================================================
 
-export ENABLE_BACKGROUND_TASKS=1
-export FORCE_AUTO_BACKGROUND_TASKS=1
-export CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1
+alias sg="ast-grep"
+alias sgs="ast-grep scan"
+alias sgr="ast-grep run"
+alias sgl="ast-grep scan"
+alias sgi="ast-grep run -i"
+alias sgn="ast-grep new"
+alias sgt="ast-grep test"
 
+# ============================================================================
+# ALIASES - Utilities
+# ============================================================================
+
+alias pg="echo 'Pinging Google' && ping www.google.com"
+alias rm="trash"
+alias showFiles='defaults write com.apple.finder AppleShowAllFiles YES; killall Finder /System/Library/CoreServices/Finder.app'
+alias hideFiles='defaults write com.apple.finder AppleShowAllFiles NO; killall Finder /System/Library/CoreServices/Finder.app'
+alias deleteDSFiles="find . -name '.DS_Store' -type f -delete"
+alias flushdns="sudo dscacheutil -flushcache;sudo killall -HUP mDNSResponder"
+alias dont_index_node_modules='find . -type d -name "node_modules" -exec touch "{}/.metadata_never_index" \;'
+
+# ============================================================================
+# ALIASES - AI/Dev Tools
+# ============================================================================
+
+alias yolo="claude --dangerously-skip-permissions"
+alias yoloc='codex -m gpt-5-codex -c model_reasoning_effort="high"'
+alias iag='install_agent_guides'
+
+# ============================================================================
+# FUNCTIONS
+# ============================================================================
+
+# Cursor shortcut
+c() { cursor ${@:-.}; }
+
+# Git commit
+gc() { git commit -m "$@"; }
+
+# Git diff
+dif() { git diff --color --no-index "$1" "$2" | diff-so-fancy; }
+cdiff() { cursor --diff "$1" "$2"; }
+
+# ast-grep helpers
+sgp() { ast-grep run --pattern "$1" --lang "${2:-tsx}" "${3:-.}"; }
+sgf() { ast-grep run --pattern "$1" --lang "${2:-tsx}" . --json | jq '.'; }
+
+# Directory helpers
+mg() { mkdir "$@" && cd "$@" || exit; }
+cdl() { cd "$@" && ll; }
+
+# npm helper
+npm-latest() { npm info "$1" | grep latest; }
+
+# Kill process on port
+killport() { lsof -i tcp:"$*" | awk 'NR!=1 {print $2}' | xargs kill -9; }
+
+# Quit macOS app
+quit() {
+  if [ -z "$1" ]; then
+    echo "Usage: quit appname"
+  else
+    for appname in $1; do
+      osascript -e 'quit app "'$appname'"'
+    done
+  fi
+}
+
+# Convert video to GIF
+gif() {
+  ffmpeg -i "$1" -vf "fps=25,scale=iw/2:ih/2:flags=lanczos,palettegen" -y "/tmp/palette.png"
+  ffmpeg -i "$1" -i "/tmp/palette.png" -lavfi "fps=25,scale=iw/2:ih/2:flags=lanczos [x]; [x][1:v] paletteuse" -f image2pipe -vcodec ppm - | convert -delay 4 -layers Optimize -loop 0 - "${1%.*}.gif"
+}
 
 # ============================================================================
 # COMPLETIONS
 # ============================================================================
 
-# bun completions
-[ -s "/Users/somtougeh/.bun/_bun" ] && source "/Users/somtougeh/.bun/_bun"
+autoload -Uz compinit && compinit
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
 
 # ============================================================================
-# ENSURE N-MANAGED NODE TAKES PRECEDENCE
-# ============================================================================
-# Reset command location cache to ensure correct node/npm is used
-hash -r 2>/dev/null || true
-
-# ============================================================================
-# THEME CONFIGURATION
+# TOOL INTEGRATIONS
 # ============================================================================
 
-# To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
-[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+# fnm (Fast Node Manager)
+FNM_PATH="/opt/homebrew/opt/fnm/bin"
+if [ -d "$FNM_PATH" ]; then
+  eval "$(fnm env)"
+fi
 
-# Amazon Q post block. Keep at the bottom of this file.
-[[ -f "${HOME}/Library/Application Support/amazon-q/shell/zshrc.post.zsh" ]] && builtin source "${HOME}/Library/Application Support/amazon-q/shell/zshrc.post.zsh"
+# bun
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
+[ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
 
+# pnpm
+export PNPM_HOME="$HOME/Library/pnpm"
+case ":$PATH:" in
+  *":$PNPM_HOME:"*) ;;
+  *) export PATH="$PNPM_HOME:$PATH" ;;
+esac
 
-typeset -g POWERLEVEL9K_INSTANT_PROMPT=quiet
-alias cc_usage='npx ccusage@latest'
+# uv - Python package manager
+export PATH="$HOME/.local/bin:$PATH"
 
-# Added by LM Studio CLI (lms)
-export PATH="$PATH:/Users/somtougeh/.lmstudio/bin"
-# End of LM Studio CLI section
+# PostgreSQL
+export PATH="/opt/homebrew/opt/postgresql@16/bin:$PATH"
 
+# LM Studio CLI
+export PATH="$PATH:$HOME/.lmstudio/bin"
+
+# OrbStack
+source ~/.orbstack/shell/init.zsh 2>/dev/null || :
+
+# Agent guides
+[ -f "$HOME/code/agent-guides/install-agent-guides.sh" ] && source "$HOME/code/agent-guides/install-agent-guides.sh"
+
+# ============================================================================
+# PRIVATE CONFIG
+# ============================================================================
+
+[ -f ~/.zshrc.private ] && source ~/.zshrc.private
+
+# ============================================================================
+# PROMPT INITIALIZATION (Keep at end)
+# ============================================================================
+
+eval "$(starship init zsh)"

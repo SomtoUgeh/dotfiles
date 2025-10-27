@@ -47,7 +47,7 @@
       "ctrl-alt-b": "editor::SelectLargerSyntaxNode"
     }
   },
-  // Shrink selection - emmet balance in (VS Code: ctrl+alt+v)
+  // Shrink selection - emmet balance in (VS Code: ctrl+alt-v)
   {
     "context": "Editor",
     "bindings": {

@@ -3,8 +3,8 @@
 # Check if there are staged changes
 if ! git diff --cached --quiet; then
   echo "Generating commit message..."
-  COMMIT_MSG=$(/Users/somtougeh/.claude/local/claude -p "Look at the staged git changes and create a summarizing git commit title. Only respond with the title and no affirmation.")
-  
+  COMMIT_MSG=$(claude -p "Look at the staged git changes and create a summarizing git commit title. Only respond with the title and no affirmation.")
+
   if [ $? -eq 0 ] && [ -n "$COMMIT_MSG" ]; then
     echo "Committing with message: $COMMIT_MSG"
     git commit -m "$COMMIT_MSG"
