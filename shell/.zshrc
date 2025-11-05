@@ -7,7 +7,7 @@
 export ZSH="$HOME/.oh-my-zsh"
 ZSH_THEME=""  # Using Starship instead
 
-plugins=(git fzf-tab zsh-autosuggestions fast-syntax-highlighting)
+plugins=(fzf-tab zsh-autosuggestions fast-syntax-highlighting)
 
 source $ZSH/oh-my-zsh.sh
 
@@ -134,7 +134,6 @@ alias ltime="eza -l --icons=auto --sort=modified --reverse"
 alias ldot="eza -ld --icons=auto .*"
 
 # Git
-alias git=hub
 alias gs="git status"
 alias gp="git pull"
 alias gf="git fetch"
@@ -210,6 +209,9 @@ npm-latest() { npm info "$1" | grep latest; }
 
 # Kill process on port
 killport() { lsof -i tcp:"$*" | awk 'NR!=1 {print $2}' | xargs kill -9; }
+
+# Git alias (after functions to avoid parse errors)
+alias git=hub
 
 # Quit macOS app
 quit() {
