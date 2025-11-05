@@ -1,4 +1,15 @@
-#!/bin/bash
+#!/bin/zsh
+
+# ============================================================================
+# OH MY ZSH SETUP
+# ============================================================================
+
+export ZSH="$HOME/.oh-my-zsh"
+ZSH_THEME=""  # Using Starship instead
+
+plugins=(git fzf-tab zsh-autosuggestions fast-syntax-highlighting)
+
+source $ZSH/oh-my-zsh.sh
 
 # ============================================================================
 # SHELL CONFIGURATION
@@ -8,25 +19,24 @@ export TERM=xterm-256color
 export CLICOLOR=1
 export LSCOLORS=Fafacxdxbxegedabagacad
 
-# allow substitution in PS1
 setopt promptsubst
 
-# history configuration
+# History
 HISTSIZE=5000
 HISTFILESIZE=10000
 SAVEHIST=5000
-setopt EXTENDED_HISTORY
 HISTFILE=${ZDOTDIR:-$HOME}/.zsh_history
-setopt SHARE_HISTORY      # share history across multiple zsh sessions
-setopt APPEND_HISTORY     # append to history
-setopt INC_APPEND_HISTORY # adds commands as they are typed, not at shell exit
-setopt HIST_IGNORE_DUPS   # do not store duplications
+setopt EXTENDED_HISTORY
+setopt SHARE_HISTORY
+setopt APPEND_HISTORY
+setopt INC_APPEND_HISTORY
+setopt HIST_IGNORE_DUPS
 
 # CDPATH configuration
 CDPATH=.:$HOME:$HOME/code:$HOME/Desktop
 
 # ============================================================================
-# PATH SETUP (Order matters!)
+# PATH SETUP
 # ============================================================================
 
 # Homebrew
@@ -38,6 +48,43 @@ PATH="$PATH:$HOME/bin:$HOME/.bin:$HOME/.local/bin"
 
 # node_modules (fast local bin access)
 PATH="$PATH:./node_modules/.bin:../node_modules/.bin:../../node_modules/.bin:../../../node_modules/.bin:../../../../node_modules/.bin:../../../../../node_modules/.bin:../../../../../../node_modules/.bin:../../../../../../../node_modules/.bin"
+
+# ============================================================================
+# TOOL INTEGRATIONS
+# ============================================================================
+
+# fnm (Fast Node Manager)
+FNM_PATH="/opt/homebrew/opt/fnm/bin"
+if [ -d "$FNM_PATH" ]; then
+  eval "$(fnm env)"
+fi
+
+# bun
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
+[ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
+
+# pnpm
+export PNPM_HOME="$HOME/Library/pnpm"
+case ":$PATH:" in
+  *":$PNPM_HOME:"*) ;;
+  *) export PATH="$PNPM_HOME:$PATH" ;;
+esac
+
+# uv - Python package manager
+export PATH="$HOME/.local/bin:$PATH"
+
+# PostgreSQL
+export PATH="/opt/homebrew/opt/postgresql@16/bin:$PATH"
+
+# LM Studio CLI
+export PATH="$PATH:$HOME/.lmstudio/bin"
+
+# OrbStack
+source ~/.orbstack/shell/init.zsh 2>/dev/null || :
+
+# Agent guides
+[ -f "$HOME/code/agent-guides/install-agent-guides.sh" ] && source "$HOME/code/agent-guides/install-agent-guides.sh"
 
 # ============================================================================
 # ENVIRONMENT VARIABLES
@@ -52,22 +99,28 @@ export FORCE_AUTO_BACKGROUND_TASKS=1
 export CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1
 
 # ============================================================================
-# ALIASES - Editor & Navigation
+# COMPLETIONS
 # ============================================================================
 
+autoload -Uz compinit && compinit
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
+
+# ============================================================================
+# ALIASES
+# ============================================================================
+
+# Editor & Navigation
 alias code="\"/Applications/Cursor.app/Contents/Resources/app/bin/cursor\""
 alias vz="vim ~/.zshrc"
 alias cz="cursor ~/.zshrc"
+alias zz="z ~/.zshrc"
 alias sz="source ~/.zshrc"
 alias de="cd ~/Desktop"
 alias d="cd ~/code"
 alias ..="cd ../"
 alias ..l="cd ../ && ll"
 
-# ============================================================================
-# ALIASES - eza (Modern ls replacement)
-# ============================================================================
-
+# eza (Modern ls)
 alias ls="eza --icons=auto --group-directories-first"
 alias ll="eza -l --icons=auto --group-directories-first --time-style=relative"
 alias la="eza -a --icons=auto --group-directories-first"
@@ -80,10 +133,7 @@ alias lsize="eza -l --icons=auto --sort=size --reverse"
 alias ltime="eza -l --icons=auto --sort=modified --reverse"
 alias ldot="eza -ld --icons=auto .*"
 
-# ============================================================================
-# ALIASES - Git
-# ============================================================================
-
+# Git
 alias git=hub
 alias gs="git status"
 alias gp="git pull"
@@ -93,27 +143,18 @@ alias gpf="git push --force-with-lease --force-if-includes"
 alias gd="git diff"
 alias ga="git add ."
 
-# ============================================================================
-# ALIASES - Bun (Primary package manager)
-# ============================================================================
-
+# Bun
 alias bi="bun install"
 alias bun-update-i="bun update -i"
 
-# ============================================================================
-# ALIASES - Python/uv
-# ============================================================================
-
+# Python/uv
 alias make-python-env="uv venv"
 alias go-to-python-env="source .venv/bin/activate"
 alias install-pd="uv pip install -r requirements.txt"
 alias python="uv run python"
 alias pip="uv pip"
 
-# ============================================================================
-# ALIASES - ast-grep
-# ============================================================================
-
+# ast-grep
 alias sg="ast-grep"
 alias sgs="ast-grep scan"
 alias sgr="ast-grep run"
@@ -122,10 +163,7 @@ alias sgi="ast-grep run -i"
 alias sgn="ast-grep new"
 alias sgt="ast-grep test"
 
-# ============================================================================
-# ALIASES - Utilities
-# ============================================================================
-
+# Utilities
 alias pg="echo 'Pinging Google' && ping www.google.com"
 alias rm="trash"
 alias showFiles='defaults write com.apple.finder AppleShowAllFiles YES; killall Finder /System/Library/CoreServices/Finder.app'
@@ -133,11 +171,9 @@ alias hideFiles='defaults write com.apple.finder AppleShowAllFiles NO; killall F
 alias deleteDSFiles="find . -name '.DS_Store' -type f -delete"
 alias flushdns="sudo dscacheutil -flushcache;sudo killall -HUP mDNSResponder"
 alias dont_index_node_modules='find . -type d -name "node_modules" -exec touch "{}/.metadata_never_index" \;'
+alias cat="bat"
 
-# ============================================================================
-# ALIASES - AI/Dev Tools
-# ============================================================================
-
+# AI/Dev Tools
 alias yolo="claude --dangerously-skip-permissions"
 alias yoloc='codex -m gpt-5-codex -c model_reasoning_effort="high"'
 alias iag='install_agent_guides'
@@ -148,6 +184,11 @@ alias iag='install_agent_guides'
 
 # Cursor shortcut
 c() { cursor ${@:-.}; }
+
+# Zed shortcut
+z() {
+  /Applications/Zed.app/Contents/MacOS/cli ${@:-.} > /dev/null 2>&1 &!
+}
 
 # Git commit
 gc() { git commit -m "$@"; }
@@ -188,57 +229,13 @@ gif() {
 }
 
 # ============================================================================
-# COMPLETIONS
-# ============================================================================
-
-autoload -Uz compinit && compinit
-zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
-
-# ============================================================================
-# TOOL INTEGRATIONS
-# ============================================================================
-
-# fnm (Fast Node Manager)
-FNM_PATH="/opt/homebrew/opt/fnm/bin"
-if [ -d "$FNM_PATH" ]; then
-  eval "$(fnm env)"
-fi
-
-# bun
-export BUN_INSTALL="$HOME/.bun"
-export PATH="$BUN_INSTALL/bin:$PATH"
-[ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
-
-# pnpm
-export PNPM_HOME="$HOME/Library/pnpm"
-case ":$PATH:" in
-  *":$PNPM_HOME:"*) ;;
-  *) export PATH="$PNPM_HOME:$PATH" ;;
-esac
-
-# uv - Python package manager
-export PATH="$HOME/.local/bin:$PATH"
-
-# PostgreSQL
-export PATH="/opt/homebrew/opt/postgresql@16/bin:$PATH"
-
-# LM Studio CLI
-export PATH="$PATH:$HOME/.lmstudio/bin"
-
-# OrbStack
-source ~/.orbstack/shell/init.zsh 2>/dev/null || :
-
-# Agent guides
-[ -f "$HOME/code/agent-guides/install-agent-guides.sh" ] && source "$HOME/code/agent-guides/install-agent-guides.sh"
-
-# ============================================================================
 # PRIVATE CONFIG
 # ============================================================================
 
 [ -f ~/.zshrc.private ] && source ~/.zshrc.private
 
 # ============================================================================
-# PROMPT INITIALIZATION (Keep at end)
+# PROMPT (Keep at end)
 # ============================================================================
 
 eval "$(starship init zsh)"
