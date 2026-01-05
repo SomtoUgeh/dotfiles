@@ -12,7 +12,7 @@
     "mcp-server-exa-search": {
       "enabled": true,
       "settings": {
-        "exa_api_key": "27bc74d1-e810-438f-80eb-e1959addda1d",
+        "exa_api_key": "{api_key_here}",
       },
     },
   },
