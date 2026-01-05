@@ -7,58 +7,70 @@
 // custom settings, run `zed: open default settings` from the
 // command palette (cmd-shift-p / ctrl-shift-p)
 {
+  "colorize_brackets": true,
+  "context_servers": {
+    "mcp-server-exa-search": {
+      "enabled": true,
+      "settings": {
+        "exa_api_key": "27bc74d1-e810-438f-80eb-e1959addda1d",
+      },
+    },
+  },
+  "git_panel": {
+    "sort_by_path": false,
+  },
   "icon_theme": "Catppuccin Mocha",
   "git": {
     "inline_blame": {
-      "show_commit_summary": true
-    }
+      "show_commit_summary": true,
+    },
   },
   "inlay_hints": {
-    "enabled": false
+    "enabled": false,
   },
   "terminal": {
     "toolbar": {
-      "breadcrumbs": false
-    }
+      "breadcrumbs": false,
+    },
   },
   "agent": {
     "default_model": {
-      "provider": "zed.dev",
-      "model": "claude-sonnet-4-5"
+      "provider": "anthropic",
+      "model": "claude-opus-4-5-latest",
     },
     "inline_assistant_model": {
       "provider": "zed.dev",
-      "model": "claude-sonnet-4-5"
+      "model": "claude-sonnet-4-5",
     },
     "play_sound_when_agent_done": true,
     "default_width": 600.0,
     "dock": "left",
-    "model_parameters": []
+    "model_parameters": [],
   },
   "notification_panel": {
-    "dock": "right"
+    "dock": "right",
   },
   "project_panel": {
     "entry_spacing": "comfortable",
     "default_width": 250.0,
-    "dock": "right"
+    "dock": "right",
   },
   "pane_split_direction_vertical": "right",
   "use_system_window_tabs": true,
   "bottom_dock_layout": "contained",
   "tabs": {
     "file_icons": true,
-    "git_status": true
+    "git_status": true,
   },
   "title_bar": {
     "show_menus": true,
-    "show_branch_icon": true
+    "show_branch_icon": true,
   },
   "use_smartcase_search": true,
   "diagnostics": {
     "inline": {
-      "enabled": true
-    }
+      "enabled": true,
+    },
   },
   "agent_ui_font_size": 14.0,
   "ui_font_weight": 350.0,
@@ -68,13 +80,13 @@
   "theme": {
     "mode": "system",
     "light": "Ayu Light",
-    "dark": "Ayu Dark"
+    "dark": "Syntax",
   },
   "lsp": {
     "biome": {
       "settings": {
-        "require_config_file": true
-      }
-    }
-  }
+        "require_config_file": true,
+      },
+    },
+  },
 }
