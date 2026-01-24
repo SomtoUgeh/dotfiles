@@ -47,7 +47,7 @@ curl -fsSL "https://animations.dev/api/activate-design-engineering?email=${ANIMA
 # === Plugin Marketplaces ===
 echo "Adding plugin marketplaces..."
 claude plugin marketplace add https://github.com/anthropics/claude-plugins 2>/dev/null || true
-claude plugin marketplace add https://github.com/somto-dev/somto-dev-toolkit 2>/dev/null || true
+claude plugin marketplace add https://github.com/somtougeh/somto-dev-toolkit 2>/dev/null || true
 claude plugin marketplace add https://github.com/EveryInc/compound-engineering-plugin 2>/dev/null || true
 
 # === Plugins ===
