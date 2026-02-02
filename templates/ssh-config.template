@@ -1,23 +1,13 @@
-# SSH Configuration Template
-# Copy this to ~/.ssh/config and customize as needed
-
-# Default settings for all hosts
-Host *
-    AddKeysToAgent yes
-    UseKeychain yes
-    IdentityFile ~/.ssh/id_ed25519
-
-# Example host configuration
-# Host myserver
-#     HostName example.com
-#     User username
-#     Port 22
-#     IdentityFile ~/.ssh/custom_key
-
-# GitHub
+# Work account (default)
 Host github.com
-    HostName github.com
-    User git
-    IdentityFile ~/.ssh/id_ed25519
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/id_ed25519
+  IdentitiesOnly yes
 
-# Add your custom host configurations below
+# Personal account (SomtoUgeh)
+Host github-personal
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/id_ed25519_personal
+  IdentitiesOnly yes
