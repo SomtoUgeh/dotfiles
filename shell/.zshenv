@@ -1,1 +1,2 @@
-. "$HOME/.cargo/env"
+# Rust/Cargo (if installed)
+[ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"

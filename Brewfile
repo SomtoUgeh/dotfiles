@@ -2,8 +2,6 @@
 # Install with: brew bundle install
 
 # Taps
-tap "homebrew/bundle"
-tap "homebrew/cask-fonts"
 tap "ngrok/ngrok"
 
 # =============================================================================
@@ -42,6 +40,9 @@ brew "rclone"                 # Cloud storage CLI
 
 # Database
 brew "postgresql@16"
+
+# Python
+brew "uv"                     # Fast Python package manager
 
 # Shell
 brew "zsh"
