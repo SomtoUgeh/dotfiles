@@ -8,14 +8,8 @@
 // command palette (cmd-shift-p / ctrl-shift-p)
 {
   "colorize_brackets": true,
-  "context_servers": {
-    "mcp-server-exa-search": {
-      "enabled": true,
-      "settings": {
-        "exa_api_key": "{api_key_here}",
-      },
-    },
-  },
+  // Note: Context servers with API keys should be configured in
+  // ~/.config/zed/settings.json.local (not tracked in dotfiles)
   "git_panel": {
     "sort_by_path": false,
   },

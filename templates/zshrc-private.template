@@ -1,0 +1,52 @@
+# Private Zsh Configuration
+# Copy this to ~/.zshrc.private and fill in your values
+# This file is sourced by .zshrc and should NOT be committed
+
+# =============================================================================
+# AI/LLM API Keys
+# =============================================================================
+
+# Google Gemini
+export GEMINI_API_KEY=""
+
+# OpenAI (if used)
+# export OPENAI_API_KEY=""
+
+# Anthropic (if used)
+# export ANTHROPIC_API_KEY=""
+
+# =============================================================================
+# Development Tools
+# =============================================================================
+
+# OpenCode Web (local dev server)
+export OPENCODE_SERVER_USERNAME=""
+export OPENCODE_SERVER_PASSWORD=""
+
+# GitHub (for CLI access beyond gh auth)
+# export GITHUB_TOKEN=""
+
+# =============================================================================
+# Cloud Services
+# =============================================================================
+
+# AWS
+# export AWS_ACCESS_KEY_ID=""
+# export AWS_SECRET_ACCESS_KEY=""
+# export AWS_DEFAULT_REGION="us-east-1"
+
+# Vercel
+# export VERCEL_TOKEN=""
+
+# Cloudflare
+# export CLOUDFLARE_API_TOKEN=""
+
+# =============================================================================
+# Local Development
+# =============================================================================
+
+# Database URLs
+# export DATABASE_URL="postgresql://localhost:5432/mydb"
+
+# Redis
+# export REDIS_URL="redis://localhost:6379"

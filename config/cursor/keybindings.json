@@ -1,0 +1,72 @@
+[
+  {
+    "key": "cmd+t",
+    "command": "workbench.action.terminal.toggleTerminal"
+  },
+  {
+    "key": "ctrl+`",
+    "command": "-workbench.action.terminal.toggleTerminal"
+  },
+  {
+    "key": "cmd+/",
+    "command": "workbench.action.terminal.split",
+    "when": "terminalFocus"
+  },
+  {
+    "key": "cmd+\\",
+    "command": "-workbench.action.terminal.split",
+    "when": "terminalFocus"
+  },
+  {
+    "key": "shift+down",
+    "command": "editor.action.copyLinesDownAction",
+    "when": "editorFocus"
+  },
+  {
+    "key": "shift+cmd+d",
+    "command": "-editor.action.copyLinesDownAction",
+    "when": "editorFocus"
+  },
+  {
+    "key": "shift+up",
+    "command": "editor.action.copyLinesUpAction",
+    "when": "editorTextFocus && !editorReadonly"
+  },
+  {
+    "key": "shift+alt+up",
+    "command": "-editor.action.copyLinesUpAction",
+    "when": "editorTextFocus && !editorReadonly"
+  },
+  {
+    "key": "alt+up",
+    "command": "editor.action.moveLinesUpAction",
+    "when": "editorTextFocus"
+  },
+  {
+    "key": "ctrl+cmd+up",
+    "command": "-editor.action.moveLinesUpAction",
+    "when": "editorTextFocus"
+  },
+  {
+    "key": "alt+d",
+    "command": "editor.action.deleteLines",
+    "when": "textInputFocus && !editorReadonly"
+  },
+  {
+    "key": "shift+cmd+k",
+    "command": "-editor.action.deleteLines",
+    "when": "textInputFocus && !editorReadonly"
+  },
+  {
+    "key": "ctrl+alt+b",
+    "command": "editor.emmet.action.balanceOut"
+  },
+  {
+    "key": "ctrl+alt+v",
+    "command": "editor.emmet.action.balanceIn"
+  },
+  {
+    "key": "cmd+q cmd+f",
+    "command": "workbench.action.quickTextSearch"
+  }
+]

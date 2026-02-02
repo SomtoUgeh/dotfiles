@@ -13,7 +13,8 @@ end
 # <<< conda initialize <<<
 
 
-# Added by LM Studio CLI (lms)
-set -gx PATH $PATH /Users/somtougeh/.lmstudio/bin
-# End of LM Studio CLI section
+# LM Studio CLI (if installed)
+if test -d "$HOME/.lmstudio/bin"
+    set -gx PATH $PATH $HOME/.lmstudio/bin
+end
 

@@ -1,17 +1,16 @@
 #!/usr/bin/env bash
 
 # Dotfiles Installation Script
-# This script creates symlinks from the home directory to dotfiles in this repo
+# Creates symlinks from home directory to dotfiles in this repo
 
 set -e
 
-# Colors for output
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Get the directory where this script is located
 DOTFILES_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 echo "================================================"
@@ -20,25 +19,43 @@ echo "================================================"
 echo "Installing from: $DOTFILES_DIR"
 echo ""
 
+# =============================================================================
+# Create directory structure
+# =============================================================================
+echo "Setting up directory structure..."
+
+# Main directories
+mkdir -p "$HOME/code"              # All code projects
+mkdir -p "$HOME/bin"               # Custom scripts
+mkdir -p "$HOME/Pictures/Screenshots"  # Screenshots location
+
+# Config directories
+mkdir -p "$HOME/.config"
+mkdir -p "$HOME/.ssh"
+chmod 700 "$HOME/.ssh"
+
+echo -e "${GREEN}✓${NC} Directory structure ready"
+echo ""
+
 # Function to create symlink with backup
 create_symlink() {
     local source="$1"
     local target="$2"
 
-    # Create parent directory if it doesn't exist
+    # Create parent directory if needed
     local target_dir=$(dirname "$target")
     if [ ! -d "$target_dir" ]; then
         echo -e "${YELLOW}Creating directory: $target_dir${NC}"
         mkdir -p "$target_dir"
     fi
 
-    # If target exists and is not a symlink, back it up
+    # Back up existing file (not symlink)
     if [ -e "$target" ] && [ ! -L "$target" ]; then
-        echo -e "${YELLOW}Backing up existing file: $target${NC}"
+        echo -e "${YELLOW}Backing up: $target${NC}"
         mv "$target" "$target.backup.$(date +%Y%m%d_%H%M%S)"
     fi
 
-    # Remove existing symlink if it points to wrong location
+    # Remove outdated symlink
     if [ -L "$target" ]; then
         current_link=$(readlink "$target")
         if [ "$current_link" != "$source" ]; then
@@ -47,7 +64,7 @@ create_symlink() {
         fi
     fi
 
-    # Create symlink if it doesn't exist
+    # Create symlink
     if [ ! -e "$target" ]; then
         echo -e "${GREEN}Linking: $target -> $source${NC}"
         ln -s "$source" "$target"
@@ -65,10 +82,6 @@ echo "Setting up shell configurations..."
 create_symlink "$DOTFILES_DIR/shell/.zshrc" "$HOME/.zshrc"
 create_symlink "$DOTFILES_DIR/shell/.zshenv" "$HOME/.zshenv"
 create_symlink "$DOTFILES_DIR/shell/.zprofile" "$HOME/.zprofile"
-create_symlink "$DOTFILES_DIR/shell/.bashrc" "$HOME/.bashrc"
-create_symlink "$DOTFILES_DIR/shell/.bash_profile" "$HOME/.bash_profile"
-create_symlink "$DOTFILES_DIR/shell/.profile" "$HOME/.profile"
-create_symlink "$DOTFILES_DIR/shell/.p10k.zsh" "$HOME/.p10k.zsh"
 
 # =============================================================================
 # Git configurations
@@ -85,7 +98,9 @@ create_symlink "$DOTFILES_DIR/git/.gitignore_global" "$HOME/.gitignore_global"
 echo ""
 echo "Setting up npm configuration..."
 
-create_symlink "$DOTFILES_DIR/npm/.npmrc" "$HOME/.npmrc"
+if [ -f "$DOTFILES_DIR/npm/.npmrc" ]; then
+    create_symlink "$DOTFILES_DIR/npm/.npmrc" "$HOME/.npmrc"
+fi
 
 # =============================================================================
 # Claude Code configurations
@@ -93,12 +108,90 @@ create_symlink "$DOTFILES_DIR/npm/.npmrc" "$HOME/.npmrc"
 echo ""
 echo "Setting up Claude Code configurations..."
 
+mkdir -p "$HOME/.claude"
 create_symlink "$DOTFILES_DIR/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 create_symlink "$DOTFILES_DIR/claude/settings.json" "$HOME/.claude/settings.json"
-create_symlink "$DOTFILES_DIR/claude/statusline.ts" "$HOME/.claude/statusline.ts"
-create_symlink "$DOTFILES_DIR/claude/statusline-command.sh" "$HOME/.claude/statusline-command.sh"
-create_symlink "$DOTFILES_DIR/claude/commands" "$HOME/.claude/commands"
-create_symlink "$DOTFILES_DIR/claude/agents" "$HOME/.claude/agents"
+
+if [ -f "$DOTFILES_DIR/claude/statusline.ts" ]; then
+    create_symlink "$DOTFILES_DIR/claude/statusline.ts" "$HOME/.claude/statusline.ts"
+fi
+if [ -f "$DOTFILES_DIR/claude/statusline-command.sh" ]; then
+    create_symlink "$DOTFILES_DIR/claude/statusline-command.sh" "$HOME/.claude/statusline-command.sh"
+fi
+if [ -d "$DOTFILES_DIR/claude/commands" ]; then
+    create_symlink "$DOTFILES_DIR/claude/commands" "$HOME/.claude/commands"
+fi
+if [ -d "$DOTFILES_DIR/claude/agents" ]; then
+    create_symlink "$DOTFILES_DIR/claude/agents" "$HOME/.claude/agents"
+fi
+
+# =============================================================================
+# Starship prompt
+# =============================================================================
+echo ""
+echo "Setting up Starship configuration..."
+
+create_symlink "$DOTFILES_DIR/config/starship/starship.toml" "$HOME/.config/starship.toml"
+
+# =============================================================================
+# Fish shell (if used)
+# =============================================================================
+if [ -d "$DOTFILES_DIR/config/fish" ]; then
+    echo ""
+    echo "Setting up Fish configuration..."
+    mkdir -p "$HOME/.config/fish/conf.d"
+    create_symlink "$DOTFILES_DIR/config/fish/config.fish" "$HOME/.config/fish/config.fish"
+fi
+
+# =============================================================================
+# Ghostty terminal
+# =============================================================================
+echo ""
+echo "Setting up Ghostty configuration..."
+
+GHOSTTY_CONFIG_DIR="$HOME/Library/Application Support/com.mitchellh.ghostty"
+mkdir -p "$GHOSTTY_CONFIG_DIR"
+create_symlink "$DOTFILES_DIR/config/ghostty/config" "$GHOSTTY_CONFIG_DIR/config"
+
+# =============================================================================
+# Zed editor
+# =============================================================================
+echo ""
+echo "Setting up Zed configuration..."
+
+ZED_CONFIG_DIR="$HOME/.config/zed"
+mkdir -p "$ZED_CONFIG_DIR"
+create_symlink "$DOTFILES_DIR/config/zed/settings.json" "$ZED_CONFIG_DIR/settings.json"
+create_symlink "$DOTFILES_DIR/config/zed/keymap.json" "$ZED_CONFIG_DIR/keymap.json"
+
+# =============================================================================
+# Cursor/VSCode
+# =============================================================================
+echo ""
+echo "Setting up Cursor configuration..."
+
+CURSOR_CONFIG_DIR="$HOME/Library/Application Support/Cursor/User"
+mkdir -p "$CURSOR_CONFIG_DIR"
+create_symlink "$DOTFILES_DIR/config/cursor/settings.json" "$CURSOR_CONFIG_DIR/settings.json"
+create_symlink "$DOTFILES_DIR/config/cursor/keybindings.json" "$CURSOR_CONFIG_DIR/keybindings.json"
+
+# Also link to VSCode if installed
+VSCODE_CONFIG_DIR="$HOME/Library/Application Support/Code/User"
+if [ -d "$VSCODE_CONFIG_DIR" ]; then
+    echo "Setting up VSCode configuration..."
+    create_symlink "$DOTFILES_DIR/config/cursor/settings.json" "$VSCODE_CONFIG_DIR/settings.json"
+    create_symlink "$DOTFILES_DIR/config/cursor/keybindings.json" "$VSCODE_CONFIG_DIR/keybindings.json"
+fi
+
+# =============================================================================
+# GitHub CLI
+# =============================================================================
+echo ""
+echo "Setting up GitHub CLI configuration..."
+
+if [ -d "$DOTFILES_DIR/config/gh" ]; then
+    create_symlink "$DOTFILES_DIR/config/gh" "$HOME/.config/gh"
+fi
 
 # =============================================================================
 # Custom scripts
@@ -111,32 +204,13 @@ mkdir -p "$HOME/bin"
 for script in "$DOTFILES_DIR/scripts/"*; do
     if [ -f "$script" ]; then
         script_name=$(basename "$script")
-        create_symlink "$script" "$HOME/bin/$script_name"
-        chmod +x "$HOME/bin/$script_name" 2>/dev/null || true
+        # Skip .DS_Store
+        if [ "$script_name" != ".DS_Store" ]; then
+            create_symlink "$script" "$HOME/bin/$script_name"
+            chmod +x "$HOME/bin/$script_name" 2>/dev/null || true
+        fi
     fi
 done
-
-# =============================================================================
-# Config directory
-# =============================================================================
-echo ""
-echo "Setting up application configs..."
-
-# Note: We'll selectively link config directories to avoid conflicts
-# Only link the most important configs
-
-if [ -d "$DOTFILES_DIR/config/gh" ]; then
-    create_symlink "$DOTFILES_DIR/config/gh" "$HOME/.config/gh"
-fi
-
-if [ -d "$DOTFILES_DIR/config/raycast" ]; then
-    create_symlink "$DOTFILES_DIR/config/raycast" "$HOME/.config/raycast"
-fi
-
-# For other configs, we'll just note that they're available
-echo -e "${YELLOW}Note: Other application configs are available in $DOTFILES_DIR/config/${NC}"
-echo -e "${YELLOW}Link them manually if needed:${NC}"
-echo -e "  ln -s $DOTFILES_DIR/config/[app] ~/.config/[app]"
 
 # =============================================================================
 # Homebrew packages
@@ -162,20 +236,14 @@ echo -e "${GREEN}Installation complete!${NC}"
 echo "================================================"
 echo ""
 echo "Next steps:"
-echo "1. Review templates/ directory for sensitive file configurations"
-echo "2. Install Oh My Zsh (if not already installed):"
-echo "   sh -c \"\$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)\""
 echo ""
-echo "3. Install Powerlevel10k theme:"
-echo "   git clone --depth=1 https://github.com/romkatv/powerlevel10k.git \${ZSH_CUSTOM:-\$HOME/.oh-my-zsh/custom}/themes/powerlevel10k"
+echo "1. Copy private configuration template:"
+echo "   cp templates/zshrc-private.template ~/.zshrc.private"
+echo "   # Then edit ~/.zshrc.private with your API keys"
 echo ""
-echo "4. Install zsh plugins:"
-echo "   git clone https://github.com/zsh-users/zsh-syntax-highlighting.git \${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting"
-echo "   git clone https://github.com/zdharma-continuum/fast-syntax-highlighting.git \${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/fast-syntax-highlighting"
-echo ""
-echo "5. Apply macOS system preferences:"
+echo "2. Apply macOS system preferences:"
 echo "   ./macos/defaults.sh"
 echo ""
-echo "6. Restart your terminal or run: exec zsh"
+echo "3. Restart your terminal or run: exec zsh"
 echo ""
 echo "For detailed instructions, see README.md"
