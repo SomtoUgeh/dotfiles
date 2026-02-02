@@ -1,0 +1,21 @@
+# Ghostty Configuration
+# https://ghostty.org/docs/config
+
+# Keybindings
+keybind = shift+enter=text:\x1b\r
+keybind = super+k=clear_screen
+keybind = super+shift+n=new_window
+keybind = super+t=new_tab
+keybind = super+w=close_surface
+
+# Font
+font-family = JetBrains Mono
+font-size = 14
+
+# Window
+window-padding-x = 8
+window-padding-y = 6
+
+# Behavior
+copy-on-select = clipboard
+shell-integration = zsh

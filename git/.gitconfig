@@ -24,7 +24,7 @@
 	autoSetupRemote = true
 [core]
 	pager = delta
-	excludesfile = /Users/somto/.gitignore_global
+	excludesfile = ~/.gitignore_global
 	ignorecase = false
 [interactive]
 	diffFilter = delta --color-only
@@ -47,8 +47,22 @@
 	dark = true
 [merge]
 	conflictstyle = zdiff3
+[rerere]
+	enabled = true
+	autoUpdate = true
+[rebase]
+	autoStash = true
+	autoSquash = true
+[fetch]
+	prune = true
+	pruneTags = true
+[diff]
+	algorithm = histogram
+	colorMoved = default
 [init]
 	defaultBranch = main
+[column]
+	ui = auto
 [filter "lfs"]
 	clean = git-lfs clean -- %f
 	smudge = git-lfs smudge -- %f

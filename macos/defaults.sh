@@ -18,14 +18,25 @@ defaults write NSGlobalDomain AppleShowAllExtensions -bool true
 # Disable minimizing windows on double-click
 defaults write NSGlobalDomain AppleMiniaturizeOnDoubleClick -bool false
 
-# Enable full keyboard access for all controls (e.g. enable Tab in modal dialogs)
+# Enable full keyboard access for all controls (Tab in modal dialogs)
 defaults write NSGlobalDomain AppleKeyboardUIMode -int 2
 
 # Disable swipe navigation
 defaults write NSGlobalDomain AppleEnableSwipeNavigateWithScrolls -bool false
 
-# Set key repeat rate (15 = fastest)
+# =============================================================================
+# Keyboard Speed (IMPORTANT for coding)
+# =============================================================================
+
+# Key repeat rate: 1 = fastest (15ms between repeats)
+defaults write NSGlobalDomain KeyRepeat -int 1
+
+# Delay until repeat: 15 = shortest delay before key starts repeating
 defaults write NSGlobalDomain InitialKeyRepeat -int 15
+
+# =============================================================================
+# Locale
+# =============================================================================
 
 # Use British English locale
 defaults write NSGlobalDomain AppleLocale -string "en_GB"
@@ -72,7 +83,7 @@ defaults write com.apple.dock show-recents -bool false
 mkdir -p "${HOME}/Pictures/Screenshots"
 defaults write com.apple.screencapture location -string "${HOME}/Pictures/Screenshots"
 
-# Save screenshots in PNG format (other options: BMP, GIF, JPG, PDF, TIFF)
+# Save screenshots in PNG format
 defaults write com.apple.screencapture type -string "png"
 
 # Disable shadow in screenshots
@@ -85,25 +96,32 @@ defaults write com.apple.screencapture disable-shadow -bool true
 # Disable automatic system sleep
 sudo pmset -a sleep 0
 
-# Disable display sleep (adjust as needed)
+# Display sleep after 15 minutes
 sudo pmset -a displaysleep 15
 
 # =============================================================================
-# Terminal & iTerm2
+# Terminal
 # =============================================================================
 
 # Only use UTF-8 in Terminal.app
 defaults write com.apple.terminal StringEncodings -array 4
 
 # =============================================================================
+# Trackpad
+# =============================================================================
+
+# Enable tap to click
+defaults write com.apple.driver.AppleBluetoothMultitouch.trackpad Clicking -bool true
+defaults -currentHost write NSGlobalDomain com.apple.mouse.tapBehavior -int 1
+
+# =============================================================================
 # Restart affected applications
 # =============================================================================
 
-echo "Done! Some changes require a logout/restart to take effect."
-echo "You may want to restart the following applications:"
-echo "  - Finder"
-echo "  - Dock"
-echo "  - SystemUIServer"
 echo ""
-echo "To restart them now, run:"
+echo "Done! Some changes require a logout/restart to take effect."
+echo ""
+echo "To apply keyboard settings immediately, you may need to log out and back in."
+echo ""
+echo "To restart Finder and Dock now, run:"
 echo "  killall Finder Dock SystemUIServer"
