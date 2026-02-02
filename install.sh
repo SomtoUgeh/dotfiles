@@ -146,15 +146,33 @@ echo ""
 echo "Setting up Claude Code configurations..."
 
 mkdir -p "$HOME/.claude"
+mkdir -p "$HOME/.claude/hooks"
+
 create_symlink "$DOTFILES_DIR/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 create_symlink "$DOTFILES_DIR/claude/settings.json" "$HOME/.claude/settings.json"
 
-if [ -f "$DOTFILES_DIR/claude/statusline.ts" ]; then
-    create_symlink "$DOTFILES_DIR/claude/statusline.ts" "$HOME/.claude/statusline.ts"
+# Statusline and file suggestion scripts
+if [ -f "$DOTFILES_DIR/claude/statusline.sh" ]; then
+    create_symlink "$DOTFILES_DIR/claude/statusline.sh" "$HOME/.claude/statusline.sh"
+    chmod +x "$HOME/.claude/statusline.sh" 2>/dev/null || true
 fi
-if [ -f "$DOTFILES_DIR/claude/statusline-command.sh" ]; then
-    create_symlink "$DOTFILES_DIR/claude/statusline-command.sh" "$HOME/.claude/statusline-command.sh"
+if [ -f "$DOTFILES_DIR/claude/file-suggestion.sh" ]; then
+    create_symlink "$DOTFILES_DIR/claude/file-suggestion.sh" "$HOME/.claude/file-suggestion.sh"
+    chmod +x "$HOME/.claude/file-suggestion.sh" 2>/dev/null || true
 fi
+
+# Hooks
+if [ -d "$DOTFILES_DIR/claude/hooks" ]; then
+    for hook in "$DOTFILES_DIR/claude/hooks/"*; do
+        if [ -f "$hook" ]; then
+            hook_name=$(basename "$hook")
+            create_symlink "$hook" "$HOME/.claude/hooks/$hook_name"
+            chmod +x "$HOME/.claude/hooks/$hook_name" 2>/dev/null || true
+        fi
+    done
+fi
+
+# Commands and agents
 if [ -d "$DOTFILES_DIR/claude/commands" ]; then
     create_symlink "$DOTFILES_DIR/claude/commands" "$HOME/.claude/commands"
 fi
