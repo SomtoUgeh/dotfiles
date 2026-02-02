@@ -212,11 +212,11 @@ mkdir -p "$CURSOR_CONFIG_DIR"
 create_symlink "$DOTFILES_DIR/config/cursor/settings.json" "$CURSOR_CONFIG_DIR/settings.json"
 create_symlink "$DOTFILES_DIR/config/cursor/keybindings.json" "$CURSOR_CONFIG_DIR/keybindings.json"
 
-# Also link to VSCode if installed
+# Also link to VSCode if installed (separate settings for different font)
 VSCODE_CONFIG_DIR="$HOME/Library/Application Support/Code/User"
 if [ -d "$VSCODE_CONFIG_DIR" ]; then
     echo "Setting up VSCode configuration..."
-    create_symlink "$DOTFILES_DIR/config/cursor/settings.json" "$VSCODE_CONFIG_DIR/settings.json"
+    create_symlink "$DOTFILES_DIR/config/vscode-settings.json" "$VSCODE_CONFIG_DIR/settings.json"
     create_symlink "$DOTFILES_DIR/config/cursor/keybindings.json" "$VSCODE_CONFIG_DIR/keybindings.json"
 fi
 
