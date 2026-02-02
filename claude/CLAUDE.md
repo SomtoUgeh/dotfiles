@@ -1,30 +1,70 @@
-- In all interactions and commit messages, be extremely concise and sacrifice grammar for the sake of concision.
-- After you have read all the content/context of a file, include a 🏁 when you are done.
-- I know I'm absolutely right, no need to mention it.
-- Never use emojis in your responses unless I specifically ask you to.
-- Never create markdown (`.md`) files unless I specifically ask you to, even after you finish implementation of a task.
-- Your primary method for interacting with GitHub should be the GitHub CLI.
+<philosophy>
+This codebase/folder will outlive you. Every shortcut becomes someone else's burden. Every hack compounds into technical debt that slows the whole team down.
+You are not just writing code. You are shaping the future of this project. The patterns you establish will be copied. The corners you cut will be cut again.
+Fight entropy. Leave the codebase better than you found it.
+</philosophy>
 
-## Plans
+<core>
+- Extremely concise; sacrifice grammar for sake of concision
+- After reading all file content/context, include a 🏁
+- I know I'm absolutely right, NO NEED TO MENTION IT
+- Never use emojis unless specifically asked
+- Never create markdown files unless specifically asked
+- Primary GitHub interaction via gh CLI
+</core>
 
-- At the end of each plan, give me a list of unresolved questions to answer, if any. Make the questions extremely concise. Sacrifice grammar for the sake of concision.
+<code-quality>
+- Make minimal, surgical changes
+- Never compromise on type safety: No `any`, no null assertions (`!`), no `unknown` without type guards, no type assertions (`as`)
+- Prefer inferring types rather than making new ones
+- Abstraction: Consciously constrained, pragmatically parameterised, doggedly documented
+</code-quality>
 
-## Typescript
+<python>
+  Use uv for everything python: uv run, uv pip, uv venv.
+</python>
 
-- Prefer inferring types rather than making new ones.
+<plans>
+- Make your plans concise, sacrifice grammar for sake of concision
+- End each plan with unresolved questions via AskUserQuestionTool (keep questions extremely concise)
+</plans>
 
-## React
+<testing>
+- Design for testability using "functional core, imperative shell": keep pure business logic separate from code that does IO.
+</testing>
 
-**Before using `useEffect`, read:** [You Might Not Need an Effect](https://react.dev/learn/you-might-not-need-an-effect)
+<react>
+Before using `useEffect`, read: https://react.dev/learn/you-might-not-need-an-effect
 
-Common cases where `useEffect` is NOT needed:
-
-- Transforming data for rendering (use variables or useMemo instead)
-- Handling user events (use event handlers instead)
+NOT needed:
+- Transforming data for rendering (use variables or useMemo)
+- Handling user events (use event handlers)
 - Resetting state when props change (use key prop or calculate during render)
 - Updating state based on props/state changes (calculate during render)
 
-Only use `useEffect` for:
+Only use for:
+- Synchronizing with external systems (APIs, DOM, third-party libs)
+- Cleanup on unmount
+</react>
 
-- Synchronizing with external systems (APIs, DOM, third-party libraries)
-- Cleanup that must happen when component unmounts
+<git>
+- Do not use --no-verify, always attempt to fix every issue that addresses, or ask for clarity
+</git>
+
+<bash>
+- Avoid pipes that buffer: no `| head`, `| tail`, `| less`, `| more` when monitoring output
+- Use command-specific flags instead: `git log -n 10` not `git log | head -10`
+- Let commands complete fully; read files directly rather than piping through filters
+</bash>
+
+<pr-descriptions>
+Keep simple and direct. No headings like "Summary", "Test Changes", "Files Updated", "Key Changes". No emojis. Start with brief sentence, then bullet points.
+
+Example:
+```
+This PR removes obsolete type declarations and unused dependencies:
+
+- **Removed `packages/@types` directory**: React 18 and react-datepicker 8.8.0 now ship with built-in TypeScript definitions
+- **Removed unused `posthog-node` dependency**: The `posthog.ts` provider was using this but was never imported or used in the codebase
+```
+</pr-descriptions>

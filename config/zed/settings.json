@@ -7,9 +7,15 @@
 // custom settings, run `zed: open default settings` from the
 // command palette (cmd-shift-p / ctrl-shift-p)
 {
-  "colorize_brackets": true,
   // Note: Context servers with API keys should be configured in
   // ~/.config/zed/settings.json.local (not tracked in dotfiles)
+  "buffer_font_family": "JetBrains Mono",
+  "buffer_font_size": 13.0,
+  "buffer_font_weight": 350.0,
+  "ui_font_family": "JetBrains Mono",
+  "ui_font_size": 15.0,
+  "ui_font_weight": 350.0,
+  "colorize_brackets": true,
   "git_panel": {
     "sort_by_path": false,
   },
@@ -23,6 +29,7 @@
     "enabled": false,
   },
   "terminal": {
+    "dock": "bottom",
     "toolbar": {
       "breadcrumbs": false,
     },
@@ -67,10 +74,6 @@
     },
   },
   "agent_ui_font_size": 14.0,
-  "ui_font_weight": 350.0,
-  "buffer_font_weight": 350.0,
-  "ui_font_size": 15.0,
-  "buffer_font_size": 13.0,
   "theme": {
     "mode": "system",
     "light": "Ayu Light",
