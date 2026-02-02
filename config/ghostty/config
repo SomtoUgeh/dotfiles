@@ -8,8 +8,8 @@ keybind = super+shift+n=new_window
 keybind = super+t=new_tab
 keybind = super+w=close_surface
 
-# Font
-font-family = JetBrains Mono
+# Font (Nerd Font for icons in terminal)
+font-family = JetBrainsMono NFP
 font-size = 14
 
 # Window
