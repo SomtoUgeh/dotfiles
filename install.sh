@@ -180,13 +180,32 @@ if [ -d "$DOTFILES_DIR/claude/agents" ]; then
     create_symlink "$DOTFILES_DIR/claude/agents" "$HOME/.claude/agents"
 fi
 
-# =============================================================================
-# Starship prompt
-# =============================================================================
-echo ""
-echo "Setting up Starship configuration..."
+# Skills
+if [ -d "$DOTFILES_DIR/claude/skills" ]; then
+    mkdir -p "$HOME/.claude/skills"
+    for skill in "$DOTFILES_DIR/claude/skills/"*/; do
+        if [ -d "$skill" ]; then
+            skill_name=$(basename "$skill")
+            create_symlink "$skill" "$HOME/.claude/skills/$skill_name"
+        fi
+    done
+fi
 
-create_symlink "$DOTFILES_DIR/config/starship/starship.toml" "$HOME/.config/starship.toml"
+# Plugins (install if claude CLI available)
+if [ -f "$DOTFILES_DIR/claude/plugins.txt" ] && command -v claude &> /dev/null; then
+    echo "Installing Claude Code plugins..."
+    while IFS= read -r plugin || [ -n "$plugin" ]; do
+        # Skip comments and empty lines
+        [[ "$plugin" =~ ^#.*$ || -z "$plugin" ]] && continue
+        echo "  Installing plugin: $plugin"
+        claude plugins install "${plugin}@claude-plugins-official" 2>/dev/null || true
+    done < "$DOTFILES_DIR/claude/plugins.txt"
+else
+    if [ -f "$DOTFILES_DIR/claude/plugins.txt" ]; then
+        echo -e "${YELLOW}Claude CLI not found. Skipping plugin installation.${NC}"
+        echo "  Run manually after installing Claude: claude plugins install <plugin>@claude-plugins-official"
+    fi
+fi
 
 # =============================================================================
 # Fish shell (if used)

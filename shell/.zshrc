@@ -83,9 +83,6 @@ export PATH="$PATH:$HOME/.lmstudio/bin"
 # OrbStack
 source ~/.orbstack/shell/init.zsh 2>/dev/null || :
 
-# Agent guides
-[ -f "$HOME/code/agent-guides/install-agent-guides.sh" ] && source "$HOME/code/agent-guides/install-agent-guides.sh"
-
 # ============================================================================
 # ENVIRONMENT VARIABLES
 # ============================================================================
@@ -110,9 +107,7 @@ zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
 # ============================================================================
 
 # Editor & Navigation
-alias code="\"/Applications/Cursor.app/Contents/Resources/app/bin/cursor\""
 alias vz="vim ~/.zshrc"
-alias cz="cursor ~/.zshrc"
 alias zz="z ~/.zshrc"
 alias sz="source ~/.zshrc"
 alias de="cd ~/Desktop"
@@ -174,15 +169,10 @@ alias cat="bat"
 
 # AI/Dev Tools
 alias yolo="claude --dangerously-skip-permissions"
-alias yoloc='codex -m gpt-5-codex -c model_reasoning_effort="high"'
-alias iag='install_agent_guides'
 
 # ============================================================================
 # FUNCTIONS
 # ============================================================================
-
-# Cursor shortcut
-c() { cursor ${@:-.}; }
 
 # Zed shortcut
 z() {
@@ -240,4 +230,17 @@ gif() {
 # PROMPT (Keep at end)
 # ============================================================================
 
+export STARSHIP_CONFIG="$HOME/code/dotfiles/config/starship/starship.toml"
 eval "$(starship init zsh)"
+
+# bun completions
+[ -s "/Users/swissblock/.bun/_bun" ] && source "/Users/swissblock/.bun/_bun"
+export PATH="$HOME/.npm-global/bin:$PATH"
+
+# pnpm
+export PNPM_HOME="/Users/swissblock/Library/pnpm"
+case ":$PATH:" in
+  *":$PNPM_HOME:"*) ;;
+  *) export PATH="$PNPM_HOME:$PATH" ;;
+esac
+# pnpm end

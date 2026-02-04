@@ -1,0 +1,9 @@
+# Claude Code Plugins
+# Install with: claude plugins install <plugin>@<marketplace>
+# Marketplace: claude-plugins-official
+
+context7
+pr-review-toolkit
+explanatory-output-style
+learning-output-style
+playground

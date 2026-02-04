@@ -68,5 +68,9 @@
   {
     "key": "cmd+q cmd+f",
     "command": "workbench.action.quickTextSearch"
+  },
+  {
+    "key": "cmd+i",
+    "command": "composerMode.agent"
   }
 ]
