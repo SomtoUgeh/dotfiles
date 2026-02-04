@@ -180,13 +180,15 @@ if [ -d "$DOTFILES_DIR/claude/agents" ]; then
     create_symlink "$DOTFILES_DIR/claude/agents" "$HOME/.claude/agents"
 fi
 
-# Skills
+# Skills (symlink to both ~/.claude/skills and ~/.agents/skills for compatibility)
 if [ -d "$DOTFILES_DIR/claude/skills" ]; then
     mkdir -p "$HOME/.claude/skills"
+    mkdir -p "$HOME/.agents/skills"
     for skill in "$DOTFILES_DIR/claude/skills/"*/; do
         if [ -d "$skill" ]; then
             skill_name=$(basename "$skill")
             create_symlink "$skill" "$HOME/.claude/skills/$skill_name"
+            create_symlink "$skill" "$HOME/.agents/skills/$skill_name"
         fi
     done
 fi
