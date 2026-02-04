@@ -48,7 +48,6 @@
     "sound": "on"
   },
   "breadcrumbs.enabled": true,
-  "cSpell.diagnosticLevel": "Hint",
   "diffEditor.diffAlgorithm": "advanced",
   "diffEditor.ignoreTrimWhitespace": false,
   "diffEditor.renderSideBySide": true,
@@ -256,5 +255,8 @@
   "update.releaseTrack": "prerelease",
   "zenMode.centerLayout": false,
   "debug.toolBarLocation": "commandCenter",
-  "workbench.colorTheme": "Monokai Pirokai - Beach Sunset"
+  "workbench.colorTheme": "Monokai Pirokai - Beach Sunset",
+  "gitlens.ai.model": "vscode",
+  "gitlens.ai.vscode.model": "copilot:gpt-4.1",
+  "redhat.telemetry.enabled": true
 }

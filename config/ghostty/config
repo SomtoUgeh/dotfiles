@@ -9,7 +9,7 @@ keybind = super+t=new_tab
 keybind = super+w=close_surface
 
 # Font (Nerd Font for icons in terminal)
-font-family = JetBrainsMono NFP
+font-family = JetBrainsMono NFM
 font-size = 14
 
 # Window

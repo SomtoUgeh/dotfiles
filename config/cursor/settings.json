@@ -256,5 +256,6 @@
   "update.releaseTrack": "prerelease",
   "zenMode.centerLayout": false,
   "debug.toolBarLocation": "commandCenter",
-  "workbench.colorTheme": "Monokai Pirokai - Beach Sunset"
+  "workbench.colorTheme": "Monokai Pirokai - Beach Sunset",
+  "window.commandCenter": true
 }
