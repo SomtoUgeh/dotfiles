@@ -27,7 +27,7 @@ Key development tools installed via Homebrew:
 
 ### Programming Languages & Runtimes
 - `go` - Go programming language
-- Node.js (via `n` version manager)
+- Node.js (via `fnm` version manager)
 - Bun runtime
 - pnpm package manager
 
@@ -53,8 +53,6 @@ Key development tools installed via Homebrew:
 
 ### Productivity
 - `1password-cli` - Password manager CLI
-- `todoist`
-- `todoist-app`
 - `slack`
 - `discord`
 
@@ -72,7 +70,7 @@ Key development tools installed via Homebrew:
 - fast-syntax-highlighting plugin
 
 ### Node.js Version Manager
-- `n` - Simple Node.js version management
+- `fnm` - Simple Node.js version management
 
 ## Additional Tools Installed
 
