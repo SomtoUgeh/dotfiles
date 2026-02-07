@@ -5,9 +5,7 @@
   },
   "includeCoAuthoredBy": false,
   "permissions": {
-    "allow": [
-      "Bash(find:*)"
-    ],
+    "allow": ["Bash(find:*)"],
     "deny": [],
     "defaultMode": "dontAsk"
   },
@@ -32,10 +30,15 @@
     "padding": 0
   },
   "enabledPlugins": {
+    "agent-sdk-dev@claude-plugins-official": true,
+    "claude-code-setup@claude-plugins-official": true,
+    "claude-md-management@claude-plugins-official": true,
     "context7@claude-plugins-official": true,
-    "pr-review-toolkit@claude-plugins-official": true,
     "explanatory-output-style@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true,
+    "hookify@claude-plugins-official": true,
     "learning-output-style@claude-plugins-official": true,
-    "playground@claude-plugins-official": true
+    "playground@claude-plugins-official": true,
+    "pr-review-toolkit@claude-plugins-official": true
   }
 }

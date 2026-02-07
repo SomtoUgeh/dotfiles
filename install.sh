@@ -303,6 +303,11 @@ echo ""
 echo "Installing Homebrew packages..."
 
 if command -v brew &> /dev/null; then
+    BREW_PREFIX="$(brew --prefix)"
+    if [ ! -w "$BREW_PREFIX" ]; then
+        echo -e "${YELLOW}Fixing Homebrew permissions...${NC}"
+        sudo chown -R "$(whoami)" "$BREW_PREFIX"
+    fi
     echo "Running brew bundle install..."
     cd "$DOTFILES_DIR"
     brew bundle install
