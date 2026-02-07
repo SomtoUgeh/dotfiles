@@ -130,13 +130,15 @@ create_symlink "$DOTFILES_DIR/git/.gitconfig" "$HOME/.gitconfig"
 create_symlink "$DOTFILES_DIR/git/.gitignore_global" "$HOME/.gitignore_global"
 
 # =============================================================================
-# npm configuration
+# Claude Code CLI
 # =============================================================================
 echo ""
-echo "Setting up npm configuration..."
+echo "Installing Claude Code CLI..."
 
-if [ -f "$DOTFILES_DIR/npm/.npmrc" ]; then
-    create_symlink "$DOTFILES_DIR/npm/.npmrc" "$HOME/.npmrc"
+if command -v claude &> /dev/null; then
+    echo "✓ Claude Code already installed"
+else
+    curl -fsSL https://claude.ai/install.sh | bash
 fi
 
 # =============================================================================
@@ -172,12 +174,26 @@ if [ -d "$DOTFILES_DIR/claude/hooks" ]; then
     done
 fi
 
-# Commands and agents
+# Commands (symlink individual entries to preserve existing files in ~/.claude/commands)
 if [ -d "$DOTFILES_DIR/claude/commands" ]; then
-    create_symlink "$DOTFILES_DIR/claude/commands" "$HOME/.claude/commands"
+    mkdir -p "$HOME/.claude/commands"
+    for entry in "$DOTFILES_DIR/claude/commands/"*; do
+        if [ -e "$entry" ]; then
+            entry_name=$(basename "$entry")
+            create_symlink "$entry" "$HOME/.claude/commands/$entry_name"
+        fi
+    done
 fi
+
+# Agents
 if [ -d "$DOTFILES_DIR/claude/agents" ]; then
-    create_symlink "$DOTFILES_DIR/claude/agents" "$HOME/.claude/agents"
+    mkdir -p "$HOME/.claude/agents"
+    for entry in "$DOTFILES_DIR/claude/agents/"*; do
+        if [ -e "$entry" ]; then
+            entry_name=$(basename "$entry")
+            create_symlink "$entry" "$HOME/.claude/agents/$entry_name"
+        fi
+    done
 fi
 
 # Skills (symlink to both ~/.claude/skills and ~/.agents/skills for compatibility)
@@ -210,16 +226,6 @@ else
 fi
 
 # =============================================================================
-# Fish shell (if used)
-# =============================================================================
-if [ -d "$DOTFILES_DIR/config/fish" ]; then
-    echo ""
-    echo "Setting up Fish configuration..."
-    mkdir -p "$HOME/.config/fish/conf.d"
-    create_symlink "$DOTFILES_DIR/config/fish/config.fish" "$HOME/.config/fish/config.fish"
-fi
-
-# =============================================================================
 # Ghostty terminal
 # =============================================================================
 echo ""
@@ -241,23 +247,25 @@ create_symlink "$DOTFILES_DIR/config/zed/settings.json" "$ZED_CONFIG_DIR/setting
 create_symlink "$DOTFILES_DIR/config/zed/keymap.json" "$ZED_CONFIG_DIR/keymap.json"
 
 # =============================================================================
-# Cursor/VSCode
+# VSCode
 # =============================================================================
 echo ""
-echo "Setting up Cursor configuration..."
 
-CURSOR_CONFIG_DIR="$HOME/Library/Application Support/Cursor/User"
-mkdir -p "$CURSOR_CONFIG_DIR"
-create_symlink "$DOTFILES_DIR/config/cursor/settings.json" "$CURSOR_CONFIG_DIR/settings.json"
-create_symlink "$DOTFILES_DIR/config/cursor/keybindings.json" "$CURSOR_CONFIG_DIR/keybindings.json"
-
-# Also link to VSCode if installed (separate settings for different font)
 VSCODE_CONFIG_DIR="$HOME/Library/Application Support/Code/User"
 if [ -d "$VSCODE_CONFIG_DIR" ]; then
     echo "Setting up VSCode configuration..."
-    create_symlink "$DOTFILES_DIR/config/vscode-settings.json" "$VSCODE_CONFIG_DIR/settings.json"
-    create_symlink "$DOTFILES_DIR/config/cursor/keybindings.json" "$VSCODE_CONFIG_DIR/keybindings.json"
+    create_symlink "$DOTFILES_DIR/config/vscode/vscode-settings.json" "$VSCODE_CONFIG_DIR/settings.json"
+    create_symlink "$DOTFILES_DIR/config/vscode/vscode-keybindings.json" "$VSCODE_CONFIG_DIR/keybindings.json"
 fi
+
+# =============================================================================
+# Starship prompt
+# =============================================================================
+echo ""
+echo "Setting up Starship configuration..."
+
+mkdir -p "$HOME/.config"
+create_symlink "$DOTFILES_DIR/config/starship/starship.toml" "$HOME/.config/starship.toml"
 
 # =============================================================================
 # GitHub CLI
@@ -301,6 +309,24 @@ if command -v brew &> /dev/null; then
 else
     echo -e "${RED}Homebrew not found. Please install Homebrew first:${NC}"
     echo '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+fi
+
+# =============================================================================
+# Claude session sync (daily cron → qmd)
+# =============================================================================
+echo ""
+echo "Setting up Claude session sync..."
+
+if [ -f "$DOTFILES_DIR/scripts/setup-session-sync.sh" ]; then
+    chmod +x "$DOTFILES_DIR/scripts/setup-session-sync.sh"
+    chmod +x "$DOTFILES_DIR/scripts/scheduled-session-sync.sh"
+    chmod +x "$DOTFILES_DIR/scripts/sync-sessions-to-qmd.sh"
+    if command -v qmd &> /dev/null; then
+        bash "$DOTFILES_DIR/scripts/setup-session-sync.sh"
+    else
+        echo -e "${YELLOW}qmd not found. Skipping session sync setup.${NC}"
+        echo "  Install qmd, then run: scripts/setup-session-sync.sh"
+    fi
 fi
 
 # =============================================================================
