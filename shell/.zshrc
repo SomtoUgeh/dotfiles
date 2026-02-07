@@ -233,14 +233,9 @@ gif() {
 export STARSHIP_CONFIG="$HOME/code/dotfiles/config/starship/starship.toml"
 eval "$(starship init zsh)"
 
-# bun completions
-[ -s "/Users/swissblock/.bun/_bun" ] && source "/Users/swissblock/.bun/_bun"
-export PATH="$HOME/.npm-global/bin:$PATH"
+# opencode
+export PATH=/Users/somto/.opencode/bin:$PATH
 
-# pnpm
-export PNPM_HOME="/Users/swissblock/Library/pnpm"
-case ":$PATH:" in
-  *":$PNPM_HOME:"*) ;;
-  *) export PATH="$PNPM_HOME:$PATH" ;;
-esac
-# pnpm end
+# Added by LM Studio CLI (lms)
+export PATH="$PATH:/Users/somto/.lmstudio/bin"
+# End of LM Studio CLI section
