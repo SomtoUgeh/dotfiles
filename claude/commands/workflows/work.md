@@ -233,12 +233,14 @@ while (executable stories remain):
      - Run relevant tests
      - If UI work, verify against design
 
-  7. RUN validation agents (if any):
-     - Check story.validation_agents array
-     - Run each agent in parallel:
+  7. RUN validation agents (MANDATORY — runs after every story):
+     - **Always run** these default agents in parallel:
        ```
-       Task [agent-name]: "Review implementation of story #[id]: [title]"
+       Task code-reviewer: "Review implementation of story #[id]: [title]"
+       Task code-simplifier: "Review implementation of story #[id]: [title]"
        ```
+     - **Additionally run** any agents from story.validation_agents array (if present)
+     - Do NOT skip this step. These agents are part of the acceptance criteria for every story.
 
   7a. HANDLE validation findings:
 
@@ -276,18 +278,22 @@ while (executable stories remain):
      }
      ```
 
-  8. COMMIT (if logical unit complete AND no unresolved P1s):
+  8. COMMIT (MANDATORY per story — every completed story gets its own commit):
+     - Do NOT defer or batch commits. Each story = one commit.
+     - Only exception: unresolved P1 findings from step 7a (fix first, then commit).
      ```bash
      git add <files for this story>
      git commit -m "type(scope): [story title]"
      ```
      Capture commit SHA
 
-  9. UPDATE prd.json + Task system (write back in same schema variant):
+  9. UPDATE prd.json + Task system (MANDATORY — ALWAYS runs after commit):
+     - This step is NOT optional. Every completed story must be marked done immediately.
      - If full schema: set story.status = "completed", story.completed_at = ISO8601 now, story.commit = SHA
      - If lightweight schema: set story.passes = true
      - If prd.json has "log" array: append { timestamp, story_id, action: "status_change", from: "in_progress", to: "completed" }
      - TaskUpdate({ taskId: "[mapped_task_id]", status: "completed" })
+     - **Verify update:** Re-read prd.json to confirm the status change persisted
 
   10. ANNOUNCE completion:
      "Completed story #[id]: [title]"
@@ -331,16 +337,17 @@ If a story becomes blocked during implementation:
 4. Move to next unblocked story
 5. Report to user what's blocked and why
 
-#### 3.5 Incremental Commits
+#### 3.5 Commit Policy
 
-| Commit when... | Don't commit when... |
-|----------------|---------------------|
-| Story complete with passing tests | Story partially done |
-| Logical unit complete (model, service, component) | Tests failing |
-| About to switch contexts (backend → frontend) | Would need "WIP" message |
-| About to attempt risky/uncertain changes | Purely scaffolding |
+**Default: One commit per completed story.** Every story that passes verification (step 6) and agent review (step 7) gets committed immediately.
 
-**Heuristic:** "Can I write a commit message describing a complete, valuable change? If yes, commit."
+| Extra commits OK when... | Do NOT commit when... |
+|--------------------------|----------------------|
+| Logical sub-unit complete within a large story | Story partially done |
+| About to attempt risky/uncertain changes | Tests failing |
+| About to switch contexts (backend → frontend) | Unresolved P1 findings |
+
+**Heuristic:** Story done + agents passed + tests green = commit. No exceptions.
 
 ### Phase 3.5: Swarm Mode (--swarm flag)
 
@@ -415,11 +422,13 @@ For each independent story:
    # Examples: npm run lint, pnpm lint, eslint ., etc.
    ```
 
-2. **Consider Reviewer Agents** (for complex/risky changes)
+2. **Consider Additional Reviewer Agents** (for complex/risky changes)
 
-   - **code-simplicity-reviewer**: Check for unnecessary complexity
-   - **performance-oracle**: Check for performance issues
-   - **security-sentinel**: Scan for security vulnerabilities
+   Note: code-reviewer and code-simplifier already ran per-story in step 7.
+   These are cross-cutting agents that benefit from seeing the full changeset:
+
+   - **performance-oracle**: Check for performance issues across stories
+   - **security-sentinel**: Scan for security vulnerabilities across stories
 
    Run in parallel with Task tool if needed.
 
