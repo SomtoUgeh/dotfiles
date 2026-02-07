@@ -12,6 +12,7 @@ Generate technical SVG diagrams with consistent styling for blog posts and docum
 2. Read `references/svg-patterns.md` for templates and color palette
 3. Generate SVG using the established patterns
 4. Save to target directory with descriptive filename
+5. Export to PNG (via `agent-browser`) or WebP (via `cairosvg`) as needed
 </quick_start>
 
 <design_system>
@@ -178,20 +179,51 @@ Diagram is complete when:
 - [ ] Labels are clear and properly positioned
 - [ ] Bottom summary note included
 - [ ] SVG is valid and renders correctly
+- [ ] Exported to PNG or WebP if raster output requested
 </success_criteria>
 
-<export_to_webp>
-## Convert SVG to WebP
+<export>
+## Export Formats
 
-After creating the SVG, convert to WebP for universal compatibility.
+After creating the SVG, export to raster formats as needed.
 
-**Using uv (cross-platform, recommended):**
+### PNG via agent-browser (recommended)
+
+Uses a real browser engine for pixel-perfect rendering. Requires the `agent-browser` skill.
+
+**Step 1: Create HTML wrapper**
+```bash
+bun run scripts/create-html.ts --svg diagram.svg --output diagram.html
+```
+
+Options:
+- `--padding <px>` — padding around SVG (default: 40)
+- `--background <color>` — override auto-detected background
+
+**Step 2: Capture high-resolution PNG**
+```bash
+agent-browser set viewport 3840 2160
+agent-browser open "file://$(pwd)/diagram.html"
+agent-browser wait 1000
+agent-browser screenshot --full diagram.png
+agent-browser close
+```
+
+**Step 3: Clean up**
+```bash
+rm diagram.html
+```
+
+### WebP via cairosvg
+
+Lightweight, no browser needed. Best when agent-browser is unavailable.
+
 ```bash
 uvx --from cairosvg cairosvg diagram.svg -o diagram.png --output-width 1600
 uvx --with pillow python -c "from PIL import Image; Image.open('diagram.png').save('diagram.webp', 'WEBP', lossless=True)"
 rm diagram.png
 ```
-Note: `lossless=True` is best for diagrams - smaller than lossy AND perfect quality.
+Note: `lossless=True` is best for diagrams — smaller than lossy AND perfect quality.
 
 **Alternative tools (if available):**
 ```bash
@@ -205,5 +237,4 @@ rsvg-convert -w 1600 diagram.svg -o diagram.png && cwebp diagram.png -o diagram.
 **Platform notes:**
 - macOS: `brew install cairo` if cairosvg fails
 - Linux: `apt install libcairo2-dev` if needed
-- Windows: uv works natively; or use WSL for other tools
-</export_to_webp>
+</export>
