@@ -11,6 +11,7 @@ Fight entropy. Leave the codebase better than you found it.
 - Never use emojis unless specifically asked
 - Never create markdown files unless specifically asked
 - Primary GitHub interaction via gh CLI
+- Always confirm the user's exact problem statement before investigating. Ask clarifying questions upfront rather than exploring broadly and guessing which component is failing.
 </core>
 
 <code-quality>
@@ -49,6 +50,8 @@ Only use for:
 
 <git>
 - Do not use --no-verify, always attempt to fix every issue that addresses, or ask for clarity
+- Always verify ALL modified files are staged before pushing. Run `git status` after staging and before committing to catch missed files.
+- When user asks about a recent branch/commit, search by date first (`git log --since='yesterday'`, `git branch --sort=-committerdate`). Verify recency — don't assume first matching name is correct.
 </git>
 
 <bash>
@@ -68,3 +71,8 @@ This PR removes obsolete type declarations and unused dependencies:
 - **Removed unused `posthog-node` dependency**: The `posthog.ts` provider was using this but was never imported or used in the codebase
 ```
 </pr-descriptions>
+
+<known-gotchas>
+- `cd` in Bash tool calls does NOT persist between calls. In git worktrees, always use absolute paths or `cd /path && command` in a single Bash call.
+- Skills and global Claude configs belong in `~/.claude/skills/` (global) or `.claude/skills/` (project-local). Do NOT create skills inside plugin directories unless explicitly told to.
+</known-gotchas>

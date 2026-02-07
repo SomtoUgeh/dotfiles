@@ -41,14 +41,14 @@ First, determine the review target type and set up the code for analysis.
 - [ ] Detect review target type
 - [ ] Check current git branch
 - [ ] If on target branch → proceed with analysis
-- [ ] If different branch → offer worktree: `skill: git-worktree`
+- [ ] If different branch → offer worktree: `gwt new <branch>` (use absolute paths after)
 - [ ] Fetch PR metadata: `gh pr view --json title,body,files,baseRefName`
 - [ ] If plan folder provided → read prd.json for story context
 
 ### 2. Discover Review Agents & Skills
 
 <thinking>
-Dynamically discover all available review agents and relevant skills from filesystem.
+Dynamically discover all available review agents and relevant skills from filesystem. Pay attention to the pr-review-toolkit agents (6) and kieran-typescript-reviewer agent
 </thinking>
 
 **Discover Review Agents:**
