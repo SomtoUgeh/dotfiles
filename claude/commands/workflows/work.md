@@ -1,7 +1,8 @@
 ---
 name: workflows:work
 description: Execute work plans efficiently while maintaining quality and finishing features
-argument-hint: "[plan folder path, e.g., docs/plans/2026-01-30-feat-user-auth/]"
+argument-hint: "[plan folder path, e.g., docs/plans/2026-01-30-feat-user-auth/] [--swarm]"
+allowed-tools: ["Read", "Write", "Edit", "Glob", "Grep", "Bash", "Task", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet", "Skill", "AskUserQuestion"]
 ---
 
 # Work Plan Execution Command
@@ -14,11 +15,13 @@ This command takes a plan folder (containing spec.md and prd.json) and executes 
 
 ## Input
 
-<input_path> #$ARGUMENTS </input_path>
+<input> #$ARGUMENTS </input>
 
-**If the input path is empty, ask the user:** "Which plan would you like to work on? Provide the folder path (e.g., `docs/plans/2026-01-30-feat-user-auth/`)."
+**Parse input:** Split arguments into `<path>` and optional flags (`--swarm`).
 
-**If input is a folder:** Look for prd.json inside
+**If the path is empty, ask the user:** "Which plan would you like to work on? Provide the folder path (e.g., `docs/plans/2026-01-30-feat-user-auth/`)."
+
+**If input is a folder:** Look for prd.json insides
 **If input is a file:** Check if it's prd.json or spec.md, find sibling files
 
 ## Execution Workflow
@@ -40,10 +43,35 @@ Read both files:
 - Fall back to legacy mode (use spec.md + TodoWrite)
 - Suggest running `/workflows:plan` to generate prd.json
 
-#### 1.2 Parse PRD and Display Summary
+#### 1.2 Parse PRD and Normalize Schema
 
-Read prd.json and display current state:
+PRDs come in two variants. Detect and normalize before proceeding:
 
+**Schema detection:**
+```
+If stories[0] has "passes" field (boolean):
+  → Lightweight schema: passes=true means completed, passes=false means pending
+  → depends_on may be missing (default to [])
+  → acceptance_criteria may be missing (fall back to steps[])
+  → log/completed_at/commit may be missing (initialize as needed)
+
+If stories[0] has "status" field (string):
+  → Full schema from /workflows:plan — use as-is
+```
+
+**Normalize each story to working state:**
+```
+For each story:
+  story._effective_status =
+    if story.status exists → story.status
+    else if story.passes === true → "completed"
+    else → "pending"
+
+  story._effective_deps = story.depends_on ?? []
+  story._effective_criteria = story.acceptance_criteria ?? story.steps ?? []
+```
+
+**Display current state:**
 ```
 Plan: [title]
 Stories: [total] ([pending] pending, [in_progress] in progress, [completed] completed)
@@ -56,7 +84,41 @@ Blocked stories:
   #[id] [title] - blocked by #[depends_on]
 ```
 
-#### 1.3 Clarify and Confirm
+**Initialize log if missing:**
+If prd.json has no top-level `log` array, treat it as `[]`. Only append log entries if the PRD already has one (don't bloat lightweight PRDs).
+
+#### 1.3 Sync Stories to Task System
+
+Create a TaskCreate entry for **every** story in prd.json (mirrors full state to Ctrl+T):
+
+```
+For each story in prd.json.stories:
+  TaskCreate({
+    subject: "Story #[id]: [title]",
+    description: "[category] | Priority: [priority]\n\nSteps:\n- [step1]\n- [step2]...\n\nAcceptance Criteria:\n- [criteria]",
+    activeForm: "Implementing story #[id]: [title]",
+    metadata: { story_id: [id], prd_path: "[path/to/prd.json]", category: "[category]" }
+  })
+```
+
+**After creating all tasks, set up dependencies:**
+```
+For each story with depends_on:
+  TaskUpdate({
+    taskId: "[task_id]",
+    addBlockedBy: [task_ids of depends_on stories]
+  })
+```
+
+**For already-completed stories** (resuming a partial run):
+```
+If story._effective_status === "completed":
+  TaskUpdate({ taskId: "[task_id]", status: "completed" })
+```
+
+Store the story_id → task_id mapping for use during execution.
+
+#### 1.4 Clarify and Confirm
 
 - Review spec.md for context and technical approach
 - Read any referenced files from the spec
@@ -116,8 +178,9 @@ Use a meaningful name based on the work (e.g., `feat/user-authentication`, `fix/
 
 **Option B: Use a worktree (recommended for parallel development)**
 ```bash
-skill: git-worktree
-# The skill will create a new branch from the default branch in an isolated worktree
+gwt new feature-branch-name
+# Creates worktree in ~/code/worktrees/{repo}--{branch}, copies .env files
+# Use absolute paths for all subsequent commands: cd $(gwt go feature-branch-name) && ...
 ```
 
 **Option C: Continue on the default branch**
@@ -129,9 +192,9 @@ skill: git-worktree
 
 #### 3.1 Story Selection
 
-Get next executable story:
-1. Filter stories where `status === "pending"`
-2. Filter stories where all `depends_on` IDs have `status === "completed"`
+Get next executable story (using normalized fields from Phase 1.2):
+1. Filter stories where `_effective_status === "pending"`
+2. Filter stories where all `_effective_deps` story IDs have `_effective_status === "completed"`
 3. Sort by `priority` ascending
 4. Take first story
 
@@ -144,9 +207,11 @@ while (executable stories remain):
 
   1. SELECT next story (lowest priority, unblocked)
 
-  2. UPDATE prd.json:
-     - Set status: "in_progress"
-     - Add log entry: { timestamp, story_id, action: "status_change", from: "pending", to: "in_progress" }
+  2. UPDATE prd.json + Task system:
+     - If full schema (has "status" field): set story.status = "in_progress"
+     - If lightweight schema (has "passes" field): no prd.json change (passes is boolean, no "in_progress" equivalent)
+     - If prd.json has "log" array: append { timestamp, story_id, action: "status_change", from: "pending", to: "in_progress" }
+     - TaskUpdate({ taskId: "[mapped_task_id]", status: "in_progress" })
 
   3. ANNOUNCE to user:
      "Starting story #[id]: [title]"
@@ -218,11 +283,11 @@ while (executable stories remain):
      ```
      Capture commit SHA
 
-  9. UPDATE prd.json:
-     - Set status: "completed"
-     - Set completed_at: current ISO8601 timestamp
-     - Set commit: SHA from step 8 (or null if part of larger commit)
-     - Add log entry: { timestamp, story_id, action: "status_change", from: "in_progress", to: "completed" }
+  9. UPDATE prd.json + Task system (write back in same schema variant):
+     - If full schema: set story.status = "completed", story.completed_at = ISO8601 now, story.commit = SHA
+     - If lightweight schema: set story.passes = true
+     - If prd.json has "log" array: append { timestamp, story_id, action: "status_change", from: "in_progress", to: "completed" }
+     - TaskUpdate({ taskId: "[mapped_task_id]", status: "completed" })
 
   10. ANNOUNCE completion:
      "Completed story #[id]: [title]"
@@ -231,25 +296,21 @@ while (executable stories remain):
 
 #### 3.3 PRD Update Format
 
-When updating prd.json, use atomic edits:
+When updating prd.json, use atomic edits. Write back in the **same schema variant** as the source:
 
-**Status change:**
+**Full schema (from /workflows:plan):**
 ```json
-{
-  "status": "in_progress"
-}
+{ "status": "in_progress" }
+{ "status": "completed", "completed_at": "2026-01-30T14:30:00Z", "commit": "abc123def" }
 ```
 
-**Completion:**
+**Lightweight schema (hand-written):**
 ```json
-{
-  "status": "completed",
-  "completed_at": "2026-01-30T14:30:00Z",
-  "commit": "abc123def"
-}
+{ "passes": true }
 ```
+No "in_progress" state — only flip `passes` to `true` on completion.
 
-**Log entry:**
+**Log entry (only if prd.json already has a `log` array):**
 ```json
 {
   "timestamp": "2026-01-30T14:30:00Z",
@@ -264,10 +325,11 @@ When updating prd.json, use atomic edits:
 
 If a story becomes blocked during implementation:
 
-1. Update status to "blocked"
-2. Add log entry explaining why
-3. Move to next unblocked story
-4. Report to user what's blocked and why
+1. If full schema: set story.status = "blocked". If lightweight: leave passes as false (no blocked state).
+2. If prd.json has "log" array: add entry explaining why
+3. TaskUpdate({ taskId: "[mapped_task_id]", description: "BLOCKED: [reason]" })
+4. Move to next unblocked story
+5. Report to user what's blocked and why
 
 #### 3.5 Incremental Commits
 
@@ -279,6 +341,67 @@ If a story becomes blocked during implementation:
 | About to attempt risky/uncertain changes | Purely scaffolding |
 
 **Heuristic:** "Can I write a commit message describing a complete, valuable change? If yes, commit."
+
+### Phase 3.5: Swarm Mode (--swarm flag)
+
+**Only when `--swarm` is present in arguments.** Replaces the sequential loop in Phase 3.2 with parallel subagent execution.
+
+#### When Swarm Mode Activates
+
+| Use Swarm when... | Stay Sequential when... |
+|---|---|
+| 5+ independent (unblocked) stories | Linear dependency chain |
+| Stories touch different parts of codebase | Stories modify same files |
+| User explicitly requests `--swarm` | Simple/small plans |
+
+#### Swarm Execution
+
+1. **Identify independent stories** — stories with no unresolved `_effective_deps`
+2. **Fan out parallel Task subagents** — one per independent story:
+
+```
+For each independent story:
+  Task({
+    description: "Implement story #[id]",
+    subagent_type: "general-purpose",
+    prompt: "You are implementing story #[id]: [title] from [prd_path].
+
+      Context: [paste relevant spec.md sections]
+
+      Steps:
+      - [step1]
+      - [step2]
+
+      Acceptance criteria:
+      - [criteria]
+
+      Instructions:
+      1. Read the codebase patterns for similar implementations
+      2. Implement following existing conventions
+      3. Write tests for new functionality
+      4. Run tests to verify
+      5. When done, report files changed and test results
+
+      Do NOT commit. Do NOT modify prd.json. Only implement and test.",
+    run_in_background: true
+  })
+```
+
+3. **Monitor completion** — check each background task's output
+4. **After each subagent completes:**
+   - Review its output for correctness
+   - Stage and commit if tests pass
+   - Update prd.json (full schema: status → "completed"; lightweight: passes → true)
+   - TaskUpdate({ taskId: "[mapped_task_id]", status: "completed" })
+5. **Once current wave completes**, check if newly unblocked stories exist → fan out next wave
+6. **Repeat** until all stories complete or only blocked stories remain
+
+#### Swarm Safety Rules
+
+- Subagents do NOT commit or modify prd.json — only the coordinator does
+- If two stories touch overlapping files, run them sequentially, not in parallel
+- If a subagent fails, log the error and fall back to sequential for that story
+- Always review subagent output before committing
 
 ### Phase 4: Quality Check
 
@@ -301,7 +424,7 @@ If a story becomes blocked during implementation:
    Run in parallel with Task tool if needed.
 
 3. **Final Validation**
-   - All prd.json stories have status "completed"
+   - All prd.json stories completed (status="completed" or passes=true)
    - All tests pass
    - Linting passes
    - Code follows existing patterns
@@ -327,9 +450,9 @@ If a story becomes blocked during implementation:
 2. **Update PRD Final State**
 
    Ensure prd.json reflects:
-   - All stories completed
-   - All commits recorded
-   - Log has full execution history
+   - All stories completed (status="completed" or passes=true)
+   - Full schema: commits recorded, log has execution history
+   - Lightweight schema: all passes=true is sufficient
 
 3. **Notify User**
    - Summarize what was completed
@@ -342,29 +465,33 @@ If a story becomes blocked during implementation:
 ### Reading Current State
 
 ```bash
-# Get story statuses
-cat docs/plans/<folder>/prd.json | jq '.stories[] | {id, title, status, priority}'
+# Full schema — get story statuses
+cat <prd_path> | jq '.stories[] | {id, title, status, priority}'
 
-# Get blocked stories
-cat docs/plans/<folder>/prd.json | jq '.stories[] | select(.status == "pending") | select(.depends_on | length > 0)'
+# Lightweight schema — get story pass/fail
+cat <prd_path> | jq '.stories[] | {id, title, passes, priority}'
 
-# Get execution log
-cat docs/plans/<folder>/prd.json | jq '.log'
+# Get blocked stories (works for both — depends_on may not exist)
+cat <prd_path> | jq '.stories[] | select(.status == "pending" or .passes == false) | select((.depends_on // []) | length > 0)'
+
+# Get execution log (may not exist in lightweight PRDs)
+cat <prd_path> | jq '.log // empty'
 ```
 
 ### Status Transitions
 
+**Full schema** (has `status` string):
 ```
 pending → in_progress → completed
                 ↓
              blocked → in_progress → completed
 ```
 
-Valid transitions:
-- `pending` → `in_progress` (starting work)
-- `in_progress` → `completed` (finished)
-- `in_progress` → `blocked` (hit blocker)
-- `blocked` → `in_progress` (blocker resolved)
+**Lightweight schema** (has `passes` boolean):
+```
+passes: false → passes: true
+```
+No intermediate states. The Task system (Ctrl+T) tracks in_progress/blocked for lightweight PRDs.
 
 ### Skills Integration
 
@@ -393,6 +520,12 @@ If the input doesn't have prd.json:
 
 ## Key Principles
 
+### prd.json is Source of Truth, Tasks are the View Layer
+- **prd.json** is the authoritative state — it persists across sessions, has full history
+- **Task system** (Ctrl+T) is the live visibility layer — shows progress, enables swarm
+- Always update prd.json FIRST, then sync to Task system
+- If they diverge, prd.json wins
+
 ### Start Fast, Execute Faster
 - Get clarification once at start, then execute
 - The goal is to **finish the feature**, not create perfect process
@@ -419,16 +552,14 @@ If the input doesn't have prd.json:
 
 ## Quality Checklist
 
-Before creating PR:
-
 - [ ] Current branch matches prd.json `branch` field
-- [ ] All prd.json stories have status "completed"
+- [ ] All prd.json stories completed (status="completed" or passes=true)
 - [ ] All acceptance criteria verified
 - [ ] Tests pass
 - [ ] Linting passes
 - [ ] Code follows existing patterns
 - [ ] Commits follow conventional format
-- [ ] prd.json has complete execution log
+- [ ] Full schema: prd.json has complete execution log
 
 ## Common Pitfalls
 
