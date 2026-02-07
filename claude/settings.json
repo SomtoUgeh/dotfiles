@@ -5,7 +5,9 @@
   },
   "includeCoAuthoredBy": false,
   "permissions": {
-    "allow": ["Bash(find:*)"],
+    "allow": [
+      "Bash(find:*)"
+    ],
     "deny": [],
     "defaultMode": "dontAsk"
   },
@@ -40,5 +42,6 @@
     "learning-output-style@claude-plugins-official": true,
     "playground@claude-plugins-official": true,
     "pr-review-toolkit@claude-plugins-official": true
-  }
+  },
+  "fastMode": true
 }
