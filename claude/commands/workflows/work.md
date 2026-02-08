@@ -233,14 +233,18 @@ while (executable stories remain):
      - Run relevant tests
      - If UI work, verify against design
 
-  7. RUN validation agents (MANDATORY — runs after every story):
-     - **Always run** these default agents in parallel:
-       ```
-       Task code-reviewer: "Review implementation of story #[id]: [title]"
-       Task code-simplifier: "Review implementation of story #[id]: [title]"
-       ```
-     - **Additionally run** any agents from story.validation_agents array (if present)
-     - Do NOT skip this step. These agents are part of the acceptance criteria for every story.
+  7. RUN validation agents:
+     - **For stories with code changes** (new/modified source files beyond prd.json):
+       - **Always run** these default agents in parallel:
+         ```
+         Task code-reviewer: "Review implementation of story #[id]: [title]"
+         Task code-simplifier: "Review implementation of story #[id]: [title]"
+         ```
+       - **Additionally run** any agents from story.validation_agents array (if present)
+       - Do NOT skip this step for code stories.
+     - **For operational stories** (deploys, verifications, config-only — no source code changes beyond prd.json):
+       - Skip default code-reviewer/code-simplifier (nothing meaningful to review)
+       - Still run any story-specific validation_agents if present
 
   7a. HANDLE validation findings:
 
@@ -281,6 +285,7 @@ while (executable stories remain):
   8. COMMIT (MANDATORY per story — every completed story gets its own commit):
      - Do NOT defer or batch commits. Each story = one commit.
      - Only exception: unresolved P1 findings from step 7a (fix first, then commit).
+     - **Operational stories** (deploys, verifications) still produce a committable artifact: the prd.json status update. "No source code changes" is never a reason to skip — prd.json IS the change.
      ```bash
      git add <files for this story>
      git commit -m "type(scope): [story title]"
@@ -289,6 +294,7 @@ while (executable stories remain):
 
   9. UPDATE prd.json + Task system (MANDATORY — ALWAYS runs after commit):
      - This step is NOT optional. Every completed story must be marked done immediately.
+     - Update prd.json FIRST, then sync to Task system. Steps 8 and 9 are atomic per story — complete both before moving to the next story.
      - If full schema: set story.status = "completed", story.completed_at = ISO8601 now, story.commit = SHA
      - If lightweight schema: set story.passes = true
      - If prd.json has "log" array: append { timestamp, story_id, action: "status_change", from: "in_progress", to: "completed" }
@@ -578,3 +584,4 @@ If the input doesn't have prd.json:
 - **Not updating prd.json** - Track progress or lose state
 - **Testing at the end** - Test per-story
 - **80% done syndrome** - Finish all stories
+- **Skipping commits on operational stories** - Deploys and verifications still change prd.json. Commit it. Steps 8+9 are atomic per story — never batch across stories.
