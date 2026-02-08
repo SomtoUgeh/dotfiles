@@ -80,6 +80,9 @@ export PATH="/opt/homebrew/opt/postgresql@16/bin:$PATH"
 # LM Studio CLI
 export PATH="$PATH:$HOME/.lmstudio/bin"
 
+# direnv
+eval "$(direnv hook zsh)"
+
 # OrbStack
 source ~/.orbstack/shell/init.zsh 2>/dev/null || :
 
@@ -239,3 +242,6 @@ export PATH=/Users/somto/.opencode/bin:$PATH
 # Added by LM Studio CLI (lms)
 export PATH="$PATH:/Users/somto/.lmstudio/bin"
 # End of LM Studio CLI section
+
+# bun completions
+[ -s "/Users/somto/.bun/_bun" ] && source "/Users/somto/.bun/_bun"
