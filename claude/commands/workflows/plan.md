@@ -143,7 +143,7 @@ Examples:
 - `HAW-1456-fix-checkout-race-condition`
 - `HAW-890-refactor-api-client`
 
-If no ticket: use `no-ticket-[description-kebab-case]`
+If no ticket: use `type/description-kebab-case` (e.g., `feat/user-authentication`, `fix/checkout-race-condition`)
 
 **Folder & Title:**
 
@@ -527,7 +527,7 @@ Each story must have exactly one category:
 | Field | Type | Description |
 |-------|------|-------------|
 | `ticket` | string\|null | Jira ticket number (e.g., `HAW-1222`), null if none |
-| `branch` | string | Git branch name: `[ticket]-[description]` or `no-ticket-[description]` |
+| `branch` | string | Git branch name: `[ticket]-[description]` or `type/description` |
 | `id` | number | Unique integer, starts at 1 |
 | `title` | string | Single action, imperative, no "and" |
 | `category` | string | One of: functional, ui, integration, edge-case, performance |
