@@ -2,6 +2,9 @@
   "[css]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
+  "[cucumber]": {
+    "editor.defaultFormatter": "CucumberOpen.cucumber-official"
+  },
   "[html]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
@@ -47,7 +50,15 @@
   "accessibility.signals.terminalBell": {
     "sound": "on"
   },
+  "biome.requireConfiguration": true,
+  "biome.suggestInstallingGlobally": false,
   "breadcrumbs.enabled": true,
+  "chat.useNestedAgentsMdFiles": true,
+  "cursor.composer.cmdPFilePicker2": true,
+  "cursor.composer.shouldChimeAfterChatFinishes": true,
+  "cursor.cpp.disabledLanguages": ["scminput"],
+  "cursor.preferNotificationsSameAsChat": true,
+  "debug.toolBarLocation": "commandCenter",
   "diffEditor.diffAlgorithm": "advanced",
   "diffEditor.ignoreTrimWhitespace": false,
   "diffEditor.renderSideBySide": true,
@@ -174,15 +185,25 @@
   "files.trimTrailingWhitespace": true,
   "git.autofetch": true,
   "git.confirmSync": false,
+  "git.enableSmartCommit": true,
   "git.ignoreMissingGitWarning": true,
   "git.ignoreRebaseWarning": true,
   "git.openRepositoryInParentFolders": "always",
   "git.untrackedChanges": "separate",
-  "git.enableSmartCommit": true,
+  "github.copilot.chat.agent.autoFix": true,
+  "github.copilot.chat.anthropic.contextEditing.enabled": true,
+  "github.copilot.chat.anthropic.tools.websearch.enabled": true,
+  "github.copilot.chat.claudeAgent.allowDangerouslySkipPermissions": true,
+  "github.copilot.chat.claudeAgent.enabled": false,
+  "github.copilot.chat.codesearch.enabled": true,
+  "github.copilot.chat.copilotMemory.enabled": true,
+  "github.copilot.nextEditSuggestions.enabled": true,
   "githubPullRequests.pullBranch": "never",
   "gitlens.advanced.messages": {
     "suppressLineUncommittedWarning": true
   },
+  "gitlens.ai.model": "vscode",
+  "gitlens.ai.vscode.model": "copilot:gpt-4.1",
   "html.format.enable": true,
   "html.format.preserveNewLines": true,
   "javascript.updateImportsOnFileMove.enabled": "always",
@@ -192,6 +213,8 @@
   "prettier.printWidth": 80,
   "prettier.singleQuote": true,
   "prettier.useTabs": true,
+  "redhat.telemetry.enabled": true,
+  "search.useGlobalIgnoreFiles": true,
   "security.promptForLocalFileProtocolHandling": false,
   "security.workspace.trust.untrustedFiles": "open",
   "terminal.integrated.copyOnSelection": true,
@@ -215,6 +238,7 @@
   ],
   "typescript.preferences.importModuleSpecifier": "non-relative",
   "typescript.updateImportsOnFileMove.enabled": "always",
+  "update.releaseTrack": "prerelease",
   "window.clickThroughInactive": false,
   "window.closeWhenEmpty": true,
   "window.nativeTabs": true,
@@ -233,6 +257,7 @@
     "editorBracketMatch.background": "#FFFFFF10",
     "editorBracketMatch.border": "#FFFFFF00"
   },
+  "workbench.colorTheme": "Monokai Pirokai - Beach Sunset",
   "workbench.editor.closeEmptyGroups": false,
   "workbench.editor.enablePreviewFromQuickOpen": true,
   "workbench.editor.revealIfOpen": true,
@@ -243,20 +268,7 @@
   "workbench.sideBar.location": "right",
   "workbench.startupEditor": "welcomePage",
   "workbench.statusBar.visible": true,
-  "workbench.tree.indent": 16,
   "workbench.tree.enableStickyScroll": true,
-  "search.useGlobalIgnoreFiles": true,
-  "cursor.cpp.disabledLanguages": ["scminput"],
-  "cursor.composer.shouldChimeAfterChatFinishes": true,
-  "biome.suggestInstallingGlobally": false,
-  "biome.requireConfiguration": true,
-  "cursor.composer.cmdPFilePicker2": true,
-  "cursor.preferNotificationsSameAsChat": true,
-  "update.releaseTrack": "prerelease",
-  "zenMode.centerLayout": false,
-  "debug.toolBarLocation": "commandCenter",
-  "workbench.colorTheme": "Monokai Pirokai - Beach Sunset",
-  "gitlens.ai.model": "vscode",
-  "gitlens.ai.vscode.model": "copilot:gpt-4.1",
-  "redhat.telemetry.enabled": true
+  "workbench.tree.indent": 16,
+  "zenMode.centerLayout": false
 }
