@@ -26,6 +26,10 @@ Context is your most important resource. Prefer using subagents (Task tool) so t
 - Never create markdown files unless specifically asked
 - Primary GitHub interaction via gh CLI
 - Always confirm the user's exact problem statement before investigating. Ask clarifying questions upfront rather than exploring broadly and guessing which component is failing.
+- Do not push to github except you are explicitly told to push to github
+- For commits, always make sure to go in format `type(ticket-number; like HAW-1234): description`
+- When i ask you for a pull request review, never make a comment to the PR, just explain it to me properly
+- if a folder/file is ignored, dont force commit it - ever
 </core>
 
 <development>
@@ -43,9 +47,9 @@ When writing new code, keep in mind:
 
 <code-quality>
 - Make minimal, surgical changes
-- Never compromise on type safety: No `any`, no null assertions (`!`), no `unknown` without type guards, no type assertions (`as`)
-- Prefer inferring types rather than making new ones
 - Abstraction: Consciously constrained, pragmatically parameterised, doggedly documented
+- Prefer inferring types rather than making new ones
+- Never compromise on type safety: No `any`, no null assertions (`!`), no `unknown` without type guards, no type assertions (`as`)
 </code-quality>
 
 <plans>
@@ -53,12 +57,25 @@ When writing new code, keep in mind:
 - End each plan with unresolved questions via AskUserQuestionTool (keep questions extremely concise)
 </plans>
 
+<git>
+- For branch naming, use a consistent format like `feature/HAW-1234-feature-name`
+- Do not use --no-verify, always attempt to fix every issue that addresses, or ask for clarity
+- Always verify ALL modified files are staged before pushing. Run `git status` after staging and before committing to catch missed files.
+- When user asks about a recent branch/commit, search by date first (`git log --since='yesterday'`, `git branch --sort=-committerdate`). Verify recency — don't assume first matching name is correct.
+</git>
+
 <testing>
 - Design for testability using "functional core, imperative shell": keep pure business logic separate from code that does IO.
 </testing>
 
+<bash>
+- Avoid pipes that buffer: no `| head`, `| tail`, `| less`, `| more` when monitoring output
+- Use command-specific flags instead: `git log -n 10` not `git log | head -10`
+- Let commands complete fully; read files directly rather than piping through filters
+</bash>
+
 <python>
-  Use uv for everything python: uv run, uv pip, uv venv.
+- Use uv for everything python: uv run, uv pip, uv venv.
 </python>
 
 <react>
@@ -75,28 +92,20 @@ Only use for:
 - Cleanup on unmount
 </react>
 
-<bash>
-- Avoid pipes that buffer: no `| head`, `| tail`, `| less`, `| more` when monitoring output
-- Use command-specific flags instead: `git log -n 10` not `git log | head -10`
-- Let commands complete fully; read files directly rather than piping through filters
-</bash>
-
-<git>
-- Do not use --no-verify, always attempt to fix every issue that addresses, or ask for clarity
-- Always verify ALL modified files are staged before pushing. Run `git status` after staging and before committing to catch missed files.
-- When user asks about a recent branch/commit, search by date first (`git log --since='yesterday'`, `git branch --sort=-committerdate`). Verify recency — don't assume first matching name is correct.
-</git>
-
 <pr-descriptions>
 Keep simple and direct. No headings like "Summary", "Test Changes", "Files Updated", "Key Changes". No emojis. Start with brief sentence, then bullet points.
 
-Example:
-```
-This PR removes obsolete type declarations and unused dependencies:
+Title:
+    Format
+        [ticket-number]: [ticket-title/description of work]
+    Description
+      Example:
+        ```
+        This PR removes obsolete type declarations and unused dependencies:
 
-- **Removed `packages/@types` directory**: React 18 and react-datepicker 8.8.0 now ship with built-in TypeScript definitions
-- **Removed unused `posthog-node` dependency**: The `posthog.ts` provider was using this but was never imported or used in the codebase
-```
+        - **Removed `packages/@types` directory**: React 18 and react-datepicker 8.8.0 now ship with built-in TypeScript definitions
+        - **Removed unused `posthog-node` dependency**: The `posthog.ts` provider was using this but was never imported or used in the codebase
+        ```
 </pr-descriptions>
 
 <multi-github-accounts>
