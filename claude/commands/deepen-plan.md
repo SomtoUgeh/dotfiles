@@ -121,6 +121,10 @@ For story in prd.stories:
   if story.category == "edge-case":
     matched_agents += ["silent-failure-hunter"]
 
+  # Match by breadboard presence
+  if spec_has_breadboard:
+    matched_agents += ["breadboard-reflection"]
+
   # Match by keywords in title/acceptance_criteria
   keywords = extract_keywords(story.title + story.acceptance_criteria)
 
@@ -158,6 +162,22 @@ skill: [skill-name]
 ```
 
 Extract concrete recommendations for the plan.
+
+### 5.5. Breadboard Validation (Conditional)
+
+**Gate:** Only run if spec.md contains breadboard affordance tables (UI Affordances, Code Affordances).
+
+**Validation checks:**
+
+- [ ] Every UI affordance (U) has at least one prd.json story covering it
+- [ ] Every Code affordance (N) is referenced or implied by a story
+- [ ] Every prd.json story maps to at least one breadboard affordance
+- [ ] **Flag gaps:** affordances with no story coverage (missing from plan)
+- [ ] **Flag horizontal stories:** stories with no affordance mapping (story may be horizontal, not vertical)
+
+**Output:** Add validation results to spec.md Enhancement Summary section.
+
+**Also:** Add `breadboard-reflection` to the agent discovery registry so it can be matched to stories that reference breadboard affordances.
 
 ### 6. Query Framework Documentation
 
