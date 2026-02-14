@@ -41,9 +41,19 @@ ls -la docs/plans/*/spec.md 2>/dev/null
 **If a relevant brainstorm exists:**
 1. Read the brainstorm document
 2. Announce: "Found brainstorm from [date]: [topic]. Using as context for planning."
-3. Extract key decisions, chosen approach, and open questions
-4. **Skip the idea refinement questions below** - the brainstorm already answered WHAT to build
-5. Use brainstorm decisions as input to the research phase
+3. **Check for shaping format** — look for `shaping: true` in frontmatter, R table, shapes, fit check
+4. **Skip the idea refinement questions below** — the brainstorm already answered WHAT to build
+
+**If shaping format detected:**
+- Extract R table → primary source for acceptance criteria
+- Extract selected shape + parts table → technical approach structure
+- Extract flagged unknowns (⚠️) → open questions / spike candidates
+- Extract Frame (Source, Problem, Outcome) → spec problem statement
+- Use R table as input to SpecFlow and story generation
+
+**If standard brainstorm format:**
+- Extract key decisions, chosen approach, and open questions
+- Use brainstorm decisions as input to the research phase
 
 **If multiple brainstorms could match:**
 Use **AskUserQuestion tool** to ask which brainstorm to use, or whether to proceed without one.
@@ -183,6 +193,40 @@ After planning the structure, run SpecFlow Analyzer to validate and refine the f
 - [ ] Review SpecFlow analysis results
 - [ ] Incorporate any identified gaps or edge cases
 - [ ] Update acceptance criteria based on SpecFlow findings
+
+### 3.5. Breadboard (Conditional)
+
+**Gate:** Only run if the selected shape has **3+ parts**. Skip for simple shapes.
+
+**Trigger:** Shaping-format brainstorm with a selected shape containing enough parts to warrant detailed affordance mapping.
+
+When breadboarding:
+
+1. Load the `/breadboarding` skill as methodology reference
+2. Take the selected shape's parts table as input
+3. Produce affordance tables:
+   - **Places table** — bounded contexts of interaction
+   - **UI Affordances table** — things users see and interact with
+   - **Code Affordances table** — methods, handlers, data stores
+   - **Data Stores table** — state that persists and is read/written
+4. Optionally produce Mermaid visualization
+
+**Slicing:**
+
+After breadboarding, slice into vertical increments (V1-V9 max):
+
+| # | Slice | Mechanism | Demo |
+|---|-------|-----------|------|
+| V1 | [name] | [part refs] | "[demo statement]" |
+| V2 | [name] | [part refs] | "[demo statement]" |
+
+Each slice must have:
+- Name describing the increment
+- Mechanism refs (which shape parts it demonstrates)
+- Affordances list (which U/N/S are added)
+- Demo statement (what can be shown to a stakeholder)
+
+Add breadboard tables + slice summary as a section in spec.md.
 
 ### 4. Choose Spec Detail Level
 
@@ -451,6 +495,17 @@ Break the spec into atomic, executable stories. This is the document machines re
 </thinking>
 
 After writing spec.md, generate prd.json with executable story breakdown.
+
+**Story Source Selection:**
+
+If breadboard slices exist (from Step 3.5), use them to generate stories:
+- Each slice V1-V9 → one story (or story group if slice is large)
+- Slice demo statement → acceptance criteria
+- Slice mechanism refs → story title context
+- Slice affordance list → implementation guidance in story description
+- Slice ordering (V1 first) → story priority + depends_on
+
+If no breadboard (simple shapes or non-shaping brainstorm), extract stories from spec as usual.
 
 **Story Extraction Rules:**
 

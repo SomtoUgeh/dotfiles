@@ -48,7 +48,7 @@ First, determine the review target type and set up the code for analysis.
 ### 2. Discover Review Agents & Skills
 
 <thinking>
-Dynamically discover all available review agents and relevant skills from filesystem. Pay attention to the pr-review-toolkit agents (6) and kieran-typescript-reviewer agent
+Dynamically discover all available review agents and relevant skills from filesystem. Pay attention to the pr-review-toolkit agents (6), code-simplifier agent and kieran-typescript-reviewer agent
 </thinking>
 
 **Discover Review Agents:**
@@ -132,6 +132,16 @@ Task pattern-recognition-specialist: "Review PR for anti-patterns"
 | Error handling code | `silent-failure-hunter` |
 | Test files | `pr-test-analyzer` |
 | Comments added | `comment-analyzer` |
+| Plan folder has breadboard | `breadboard-reflection` |
+
+**Breadboard-Reflection Agent (when plan folder has breadboard):**
+
+Load the `/breadboard-reflection` skill and run these checks against the implementation:
+- Trace user stories through implementation code
+- Run naming test: can each function be named with one idiomatic verb?
+- Check for wiring mismatches: does code call chain match breadboard Wires Out?
+- Check for stale affordances: breadboard shows something that doesn't exist in code
+- Check for missing affordances: code has paths not in the breadboard
 
 **Research Agent:**
 
