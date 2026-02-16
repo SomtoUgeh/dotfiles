@@ -270,5 +270,11 @@
   "workbench.statusBar.visible": true,
   "workbench.tree.enableStickyScroll": true,
   "workbench.tree.indent": 16,
-  "zenMode.centerLayout": false
+  "zenMode.centerLayout": false,
+  "chat.viewSessions.orientation": "stacked",
+  "chat.tools.terminal.autoApprove": {
+    "git add": true,
+    "git commit": true
+  },
+  "claudeCode.preferredLocation": "panel"
 }
