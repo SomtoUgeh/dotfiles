@@ -9,6 +9,7 @@ ZSH_THEME=""  # Using Starship instead
 
 plugins=(fzf-tab zsh-autosuggestions fast-syntax-highlighting)
 
+ZSH_DISABLE_COMPFIX=true
 source $ZSH/oh-my-zsh.sh
 
 # ============================================================================
@@ -102,7 +103,7 @@ export CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1
 # COMPLETIONS
 # ============================================================================
 
-autoload -Uz compinit && compinit
+autoload -Uz compinit && compinit -u
 zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
 
 # ============================================================================

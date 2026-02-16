@@ -5,6 +5,9 @@ description: |
   PR reviews, or isolated work. Triggers on "worktree", "gwt", "parallel branch",
   "isolated review", "new worktree", "switch worktree", "work on multiple branches",
   "review PR in isolation", "parallel development".
+author: Somto Odera
+version: 1.2.0
+date: 2026-02-13
 ---
 
 # Git Worktree Manager (gwt)
@@ -36,6 +39,63 @@ Naming: `{repo-name}--{branch-name}` (double dash separator, slashes become dash
 - Always use absolute paths -- `cd` does not persist between Bash calls
 - Display worktree name as directory basename for statusline
 - Prefer `gwt` commands over raw `git worktree`
+- **CRITICAL: `gwt new <branch>` without `[from]` creates from HEAD** — this is almost always wrong for remote branches. Always specify the starting point for remote work.
+- **Never use `git reset --hard` or `git checkout .` to fix a wrongly-created worktree** — user hooks may block destructive commands. Instead: `gwt rm` + recreate.
+
+### Creating worktrees for remote branches
+
+Any time you create a worktree for a branch that exists on a remote (PR review, checking out someone's branch, etc.), you MUST:
+
+1. **Fetch first**: `git fetch origin <branch>` — the ref may not exist locally
+2. **Specify `[from]`**: `gwt new <branch> origin/<branch>`
+3. **Verify**: `cd "$WT" && git log --oneline -1` — confirm HEAD matches expected commit
+
+```bash
+# CORRECT — remote branch worktree
+git fetch origin feat/auth
+gwt new feat/auth origin/feat/auth
+
+# WRONG — creates from current HEAD, not the remote branch
+gwt new feat/auth
+```
+
+### PR review workflow
+
+When the user asks to review a PR or create a worktree for one, **always infer the branch automatically**. The user may provide:
+- A PR URL: `https://github.com/org/repo/pull/728`
+- A PR number: `728`
+- A conversational reference with a URL/number in the message
+
+In all cases, extract the branch name via `gh pr view` — never ask the user for the branch name if you have a PR URL or number.
+
+```bash
+# 1. Extract branch name (works with URL or number)
+BRANCH=$(gh pr view <url-or-number> --json headRefName --jq '.headRefName')
+
+# 2. Fetch + create from remote ref
+git fetch origin "$BRANCH"
+gwt new "$BRANCH" "origin/$BRANCH"
+
+# 3. Verify and get path
+WT=$(gwt go "$BRANCH")
+cd "$WT" && git log --oneline -1
+```
+
+If the user says "review this PR" without a number, check the conversation for a URL. If none found, ask for the PR number/URL.
+
+### Error recovery
+
+If a worktree was created from the wrong starting point:
+- Do NOT attempt `git reset --hard` or `git checkout` — hooks may block these
+- Instead, remove and recreate:
+
+```bash
+gwt rm <branch>
+git fetch origin <branch>
+gwt new <branch> origin/<branch>
+```
+
+This is idempotent and hook-safe.
 
 ## When to Use
 
@@ -202,7 +262,7 @@ gh pr create --title "My feature"  # Creates PR against main repo
 2. If ALREADY on target branch (PR branch or requested branch) → stay, no worktree needed
 3. If DIFFERENT branch → offer worktree:
    "Use worktree for isolated review? (y/n)"
-   - yes → gwt new pr-123-feature-name
+   - yes → git fetch origin <branch> && gwt new <branch> origin/<branch>
    - no → proceed with PR diff on current branch
 ```
 
