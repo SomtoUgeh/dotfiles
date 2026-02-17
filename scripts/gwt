@@ -6,6 +6,7 @@ set -euo pipefail
 
 VERSION="1.0.0"
 SEPARATOR="--"
+CLAUDE_WT_DIR="$HOME/.claude-worktrees"
 
 # Colors
 RED='\033[0;31m'
@@ -115,19 +116,25 @@ find_worktree_by_branch() {
 
   # List all worktrees and find matching one
   local matches=()
+  local claude_repo_dir="$CLAUDE_WT_DIR/$repo_name"
+
   while IFS= read -r line; do
     local path branch
     path=$(echo "$line" | awk '{print $1}')
     branch=$(echo "$line" | awk '{print $3}' | tr -d '[]')
 
-    # Check if this worktree belongs to our repo (sibling pattern)
     local dir_name
     dir_name=$(basename "$path")
 
+    # gwt-managed worktree (sibling pattern)
     if [[ "$dir_name" == "${repo_name}${SEPARATOR}"* ]]; then
-      # Extract branch suffix
       local suffix="${dir_name#${repo_name}${SEPARATOR}}"
       if [[ "$suffix" == *"$search"* || "$branch" == *"$search"* ]]; then
+        matches+=("$path")
+      fi
+    # Claude-created worktree
+    elif [[ -d "$claude_repo_dir" && "$path" == "$claude_repo_dir/"* ]]; then
+      if [[ "$dir_name" == *"$search"* || "$branch" == *"$search"* ]]; then
         matches+=("$path")
       fi
     fi
@@ -140,10 +147,15 @@ find_worktree_by_branch() {
   else
     # Multiple matches, prefer exact match
     for m in "${matches[@]}"; do
-      local suffix
-      suffix=$(basename "$m")
-      suffix="${suffix#${repo_name}${SEPARATOR}}"
-      if [[ "$suffix" == "$search" ]]; then
+      local dir_name
+      dir_name=$(basename "$m")
+      # Check gwt pattern exact match
+      if [[ "$dir_name" == "${repo_name}${SEPARATOR}${search}" ]]; then
+        echo "$m"
+        return
+      fi
+      # Check claude worktree exact match
+      if [[ "$m" == "$claude_repo_dir/"* && "$dir_name" == "$search" ]]; then
         echo "$m"
         return
       fi
@@ -203,6 +215,9 @@ cmd_ls() {
   local repo_name
   repo_name=$(get_repo_name)
 
+  local claude_repo_dir="$CLAUDE_WT_DIR/$repo_name"
+
+  # worktrees format: name|path|branch|source
   local worktrees=()
   local main_path=""
 
@@ -219,13 +234,14 @@ cmd_ls() {
     local dir_name
     dir_name=$(basename "$path")
 
-    # Check if this is our repo's worktree or main repo
     if [[ "$dir_name" == "$repo_name" ]]; then
       main_path="$path"
-      worktrees+=("main|$path|$branch")
+      worktrees+=("main|$path|$branch|gwt")
     elif [[ "$dir_name" == "${repo_name}${SEPARATOR}"* ]]; then
       local suffix="${dir_name#${repo_name}${SEPARATOR}}"
-      worktrees+=("$suffix|$path|$branch")
+      worktrees+=("$suffix|$path|$branch|gwt")
+    elif [[ -d "$claude_repo_dir" && "$path" == "$claude_repo_dir/"* ]]; then
+      worktrees+=("$dir_name|$path|$branch|claude")
     fi
   done < <(git worktree list 2>/dev/null)
 
@@ -233,10 +249,10 @@ cmd_ls() {
     echo "["
     local first=true
     for w in "${worktrees[@]}"; do
-      IFS='|' read -r name path branch <<< "$w"
+      IFS='|' read -r name path branch source <<< "$w"
       [[ "$first" == "true" ]] || echo ","
       first=false
-      echo "  {\"name\": \"$name\", \"path\": \"$path\", \"branch\": \"$branch\"}"
+      echo "  {\"name\": \"$name\", \"path\": \"$path\", \"branch\": \"$branch\", \"source\": \"$source\"}"
     done
     echo "]"
   else
@@ -248,12 +264,15 @@ cmd_ls() {
     echo "Worktrees for $repo_name:"
     echo ""
     for w in "${worktrees[@]}"; do
-      IFS='|' read -r name path branch <<< "$w"
-      local current=""
+      IFS='|' read -r name path branch source <<< "$w"
+      local suffix=""
       if [[ "$path" == "$(git rev-parse --show-toplevel 2>/dev/null)" ]]; then
-        current=" ${GREEN}(current)${NC}"
+        suffix=" ${GREEN}(current)${NC}"
       fi
-      echo -e "  ${BLUE}$name${NC} → $branch$current"
+      if [[ "$source" == "claude" ]]; then
+        suffix="${suffix} ${YELLOW}(claude)${NC}"
+      fi
+      echo -e "  ${BLUE}$name${NC} → $branch$suffix"
       echo "    $path"
     done
   fi
@@ -324,6 +343,8 @@ cmd_here() {
 
   local is_main="false"
   local worktree_name=""
+  local source="gwt"
+  local claude_repo_dir="$CLAUDE_WT_DIR/$repo_name"
 
   if [[ "$toplevel" == "$main_dir" ]]; then
     is_main="true"
@@ -333,17 +354,22 @@ cmd_here() {
     dir_name=$(basename "$toplevel")
     if [[ "$dir_name" == "${repo_name}${SEPARATOR}"* ]]; then
       worktree_name="${dir_name#${repo_name}${SEPARATOR}}"
+    elif [[ "$toplevel" == "$claude_repo_dir/"* ]]; then
+      worktree_name="$dir_name"
+      source="claude"
     fi
   fi
 
   if [[ "$JSON_OUTPUT" == "true" ]]; then
-    echo "{\"path\": \"$toplevel\", \"branch\": \"$branch\", \"is_main\": $is_main, \"name\": \"$worktree_name\"}"
+    echo "{\"path\": \"$toplevel\", \"branch\": \"$branch\", \"is_main\": $is_main, \"name\": \"$worktree_name\", \"source\": \"$source\"}"
   else
     echo "Repository: $repo_name"
     echo "Branch: $branch"
     echo "Path: $toplevel"
     if [[ "$is_main" == "true" ]]; then
       echo "Type: main repository"
+    elif [[ "$source" == "claude" ]]; then
+      echo "Type: worktree ($worktree_name, claude)"
     else
       echo "Type: worktree ($worktree_name)"
     fi
@@ -384,7 +410,7 @@ Usage: gwt <command> [options] [arguments]
 
 Commands:
   new <branch> [from]   Create worktree from branch (or create new branch)
-  ls                    List worktrees for current repo
+  ls                    List worktrees (includes claude-created worktrees)
   go <branch>           Output path (use: cd \$(gwt go feat))
   path <branch>         Alias for 'go'
   switch <branch>       Copy "cd <path> && claude" to clipboard for new session
