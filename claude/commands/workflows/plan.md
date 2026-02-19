@@ -60,7 +60,7 @@ Use **AskUserQuestion tool** to ask which brainstorm to use, or whether to proce
 
 **If no brainstorm found (or not relevant), run idea refinement:**
 
-Refine the idea through collaborative dialogue using the **AskUserQuestion tool**:
+Refine the idea through collaborative dialogue using the **AskUserQuestion tool**; making sure to interview me relentlessly until we reach a shared understanding - walk down each branch of the design tree, resolving dependencies between decisions one-by-one.
 
 - Ask questions one at a time to understand the idea fully
 - Prefer multiple choice questions when natural options exist

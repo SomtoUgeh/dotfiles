@@ -3,15 +3,15 @@
     "type": "command",
     "command": "~/.claude/file-suggestion.sh"
   },
+  "env": {
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-sonnet-4-6",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-4-6"
+  },
   "includeCoAuthoredBy": false,
   "permissions": {
     "allow": ["Bash(find:*)"],
     "deny": [],
     "defaultMode": "dontAsk"
-  },
-  "model": "opus",
-  "env": {
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-sonnet-4-5-20250929[1m]"
   },
   "hooks": {
     "PreToolUse": [

@@ -1,7 +1,6 @@
 ---
 name: lint-judge
 description: Evaluate review findings and propose deterministic lint rules that permanently catch the same patterns. Use after code review to turn recurring issues into automated checks. Triggers on "lint rule", "automate this check", "make this permanent", "add lint rule for".
-allowed-tools: Read Grep Glob Bash
 ---
 
 # Lint Judge

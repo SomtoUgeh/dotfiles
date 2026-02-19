@@ -5,9 +5,6 @@ description: |
   PR reviews, or isolated work. Triggers on "worktree", "gwt", "parallel branch",
   "isolated review", "new worktree", "switch worktree", "work on multiple branches",
   "review PR in isolation", "parallel development".
-author: Somto Odera
-version: 1.1.0
-date: 2026-02-01
 ---
 
 # Git Worktree Manager (gwt)

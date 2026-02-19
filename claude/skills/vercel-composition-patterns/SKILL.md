@@ -6,10 +6,6 @@ description:
   designing reusable APIs. Triggers on tasks involving compound components,
   render props, context providers, or component architecture. Includes React 19
   API changes.
-license: MIT
-metadata:
-  author: vercel
-  version: '1.0.0'
 ---
 
 # React Composition Patterns
