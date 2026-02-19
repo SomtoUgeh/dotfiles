@@ -1,9 +1,6 @@
 ---
 name: qmd-search
 description: qmd - Search local markdown notes, documentation, and Claude session history. Use when user says "qmd", "search notes", "find docs", "search sessions", "local search", "knowledge base search", or needs to retrieve markdown files.
-allowed-tools:
-  - Bash
-  - Read
 ---
 
 # qmd - Quick Markdown Search

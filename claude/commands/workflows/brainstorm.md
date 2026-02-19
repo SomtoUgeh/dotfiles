@@ -47,7 +47,7 @@ Focus on: similar features, established patterns, CLAUDE.md guidance.
 
 #### 1.2 Collaborative Framing
 
-Use the **AskUserQuestion tool** to gather the Frame — one question at a time.
+Use the **AskUserQuestion tool** to gather the Frame — one question at a time; interview me relentlessly until we reach a shared understanding. Walk down each branch of the design tree, resolving dependencies between decisions one-by-one
 
 **Capture verbatim:**
 - **Source** — Original requests, quotes, or material that prompted the work (preserve exact wording)

@@ -42,30 +42,37 @@ if [ -d "$current_dir" ] && git -C "$current_dir" rev-parse --git-dir >/dev/null
   git_branch=$(git -C "$current_dir" branch --show-current 2>/dev/null || git -C "$current_dir" rev-parse --short HEAD 2>/dev/null)
 fi
 
-# ---- worktree detection (run from current_dir context) ----
+# ---- worktree detection (gwt-managed only: ~/code/worktrees/) ----
 in_worktree=0
 worktree_name=""
 main_repo_name=""
 worktree_count=0
+gwt_dir="$HOME/code/worktrees"
 
 if [ -d "$current_dir" ] && git -C "$current_dir" rev-parse --git-dir >/dev/null 2>&1; then
-  # Get the toplevel of current repo
   toplevel=$(git -C "$current_dir" rev-parse --show-toplevel 2>/dev/null)
 
-  # Check if we're in a worktree (not the main repo)
-  git_common_dir=$(git -C "$current_dir" rev-parse --git-common-dir 2>/dev/null)
-  git_dir=$(git -C "$current_dir" rev-parse --git-dir 2>/dev/null)
+  # Only detect as worktree if under gwt-managed directory
+  case "$toplevel" in
+    "$gwt_dir"/*)
+      in_worktree=1
+      wt_basename=$(basename "$toplevel")
+      # gwt naming: {repo}--{branch}, extract repo name (before --)
+      main_repo_name="${wt_basename%%--*}"
+      # Extract branch part (after --), convert dashes back for display
+      worktree_name="${wt_basename#*--}"
+      ;;
+  esac
 
-  if [ "$git_common_dir" != "$git_dir" ] && [ "$git_common_dir" != ".git" ]; then
-    # We're in a worktree
-    in_worktree=1
-    main_repo_dir=$(dirname "$git_common_dir")
-    main_repo_name=$(basename "$main_repo_dir")
-    worktree_name=$(basename "$toplevel")  # current worktree folder
+  # Count gwt-managed worktrees for this repo only
+  repo_name=$(basename "$toplevel")
+  [ "$in_worktree" -eq 1 ] && repo_name="$main_repo_name"
+  if [ -d "$gwt_dir" ]; then
+    worktree_count=0
+    for d in "$gwt_dir"/"${repo_name}"--*; do
+      [ -d "$d" ] && worktree_count=$((worktree_count + 1))
+    done
   fi
-
-  # Count total worktrees (excluding main)
-  worktree_count=$(git -C "$current_dir" worktree list 2>/dev/null | tail -n +2 | wc -l | tr -d ' ')
 fi
 
 # ---- render statusline ----

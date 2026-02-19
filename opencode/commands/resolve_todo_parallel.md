@@ -1,0 +1,33 @@
+---
+description: Resolve all pending CLI todos using parallel processing
+---
+
+Resolve all TODO comments using parallel processing.
+
+## Workflow
+
+### 1. Analyze
+
+Get all unresolved TODOs from the /todos/\*.md directory
+
+### 2. Plan
+
+Create a todowrite list of all unresolved items grouped by type. Make sure to look at dependencies that might occur and prioritize the ones needed by others. For example, if you need to change a name, you must wait to do the others. Output a mermaid flow diagram showing how we can do this. Can we do everything in parallel? Do we need to do one first that leads to others in parallel? I'll put the to-dos in the mermaid diagram flow‑wise so the agent knows how to proceed in order.
+
+### 3. Implement (PARALLEL)
+
+Spawn a general-purpose agent for each unresolved todo in parallel.
+
+So if there are 3 todos, it will spawn 3 agents in parallel like this:
+
+1. Task general-purpose(todo1)
+2. Task general-purpose(todo2)
+3. Task general-purpose(todo3)
+
+Always run all in parallel subagents/Tasks for each Todo item.
+
+### 4. Commit & Resolve
+
+- Commit changes
+- Rename the todo file from `*-ready-*` to `*-complete-*` and update frontmatter status
+- Push to remote
