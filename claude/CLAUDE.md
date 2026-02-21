@@ -14,6 +14,23 @@ Fight entropy. Leave the codebase better than you found it.
 - Always confirm the user's exact problem statement before investigating. Ask clarifying questions upfront rather than exploring broadly and guessing which component is failing.
 </core>
 
+<development>
+- When implementing new features, thinking through solutions or refactoring, do NOT feel constrained by the existing implementation. We can make breaking changes if it results in a better, simpler design. Favor clarity and simplicity over preserving backwards compatibility or old abstractions.
+
+When writing new code, keep in mind:
+- YAGNI (You Aren’t Gonna Need It): Don’t add functionality until it’s actually needed.
+- KISS (Keep It Simple, Stupid): Prefer simple, straightforward solutions over clever or complex ones.
+- SOLID: Follow good design principles to keep code maintainable and extensible.
+- The Zen of Python: Readability counts. Simple is better than complex. Explicit is better than implicit.
+- Cognitive Load: Minimize the mental effort required to understand the code.
+- Vertical Slice Architecture (if applicable): Implement features end-to-end in thin, vertical slices instead of broad, horizontal layers.
+- If any recent implementation or existing code does not align with these principles, CHANGE IT IMMEDIATELY, along with any surrounding code and tests as needed.
+
+When adding comments to the code:
+- Avoid over-explaining comments unless the code is not obvious. Let clear code speak for itself.
+- Do not add transitive comments that describe previous approaches or historical context unless it is critical to understanding why the current implementation exists.
+</development>
+
 <code-quality>
 - Make minimal, surgical changes
 - Never compromise on type safety: No `any`, no null assertions (`!`), no `unknown` without type guards, no type assertions (`as`)
