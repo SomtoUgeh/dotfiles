@@ -686,14 +686,16 @@ After writing spec.md and prd.json, use the **AskUserQuestion tool**:
 1. **Review spec** - Open spec.md in editor
 2. **Review PRD** - Show prd.json story breakdown
 3. **Run `/deepen-plan`** - Enhance spec with parallel research agents
-4. **Start `/workflows:work`** - Begin implementing stories locally
-5. **Start `/workflows:work` on remote** - Begin in Claude Code web (background)
-6. **Simplify** - Reduce detail level or story count
+4. **Run `/codex-review`** - Independent cross-model review via Codex CLI
+5. **Start `/workflows:work`** - Begin implementing stories locally
+6. **Start `/workflows:work` on remote** - Begin in Claude Code web (background)
+7. **Simplify** - Reduce detail level or story count
 
 **Based on selection:**
 - **Review spec** → Run `open docs/plans/<folder>/spec.md`
 - **Review PRD** → Display prd.json contents formatted
 - **`/deepen-plan`** → Call /deepen-plan with spec path
+- **`/codex-review`** → Call /codex-review with folder path. Iterative review loop: Codex reviews plan, Claude revises, repeat until approved.
 - **`/workflows:work`** → Call /workflows:work with folder path
 - **`/workflows:work` on remote** → Run `/workflows:work docs/plans/<folder>/ &`
 - **Simplify** → Ask "What should I simplify?" then regenerate
