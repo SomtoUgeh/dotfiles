@@ -4,6 +4,20 @@ You are not just writing code. You are shaping the future of this project. The p
 Fight entropy. Leave the codebase better than you found it.
 </philosophy>
 
+<context>
+Context is your most important resource. Prefer using subagents (Task tool) so that exploration, research, and verbose work happen outside the main conversation.
+
+**Default to spawning subagents for:**
+- Codebase exploration where the primary work is *reading* (e.g. 3+ files or multi‑file flows)
+- Research tasks (web searches, doc lookups, “how does X work?” investigations)
+- Code review, refactors, or analysis that will generate long, detailed output
+- Any investigation where only a short summary or decision is needed in the main thread
+
+**Rules of thumb:**
+- If a task will read more than ~3 files, or its output doesn’t need to be shown verbatim, delegate it to a subagent and return a concise summary.
+- Avoid pulling entire repos or large documents into the main thread; use subagents to explore, then compress their findings aggressively before replying.
+</context>
+
 <core>
 - Extremely concise; sacrifice grammar for sake of concision
 - After reading all file content/context, include a 🏁
@@ -25,10 +39,6 @@ When writing new code, keep in mind:
 - Cognitive Load: Minimize the mental effort required to understand the code.
 - Vertical Slice Architecture (if applicable): Implement features end-to-end in thin, vertical slices instead of broad, horizontal layers.
 - If any recent implementation or existing code does not align with these principles, CHANGE IT IMMEDIATELY, along with any surrounding code and tests as needed.
-
-When adding comments to the code:
-- Avoid over-explaining comments unless the code is not obvious. Let clear code speak for itself.
-- Do not add transitive comments that describe previous approaches or historical context unless it is critical to understanding why the current implementation exists.
 </development>
 
 <code-quality>
