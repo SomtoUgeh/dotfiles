@@ -217,9 +217,13 @@ while (executable stories remain):
      "Starting story #[id]: [title]"
      Display acceptance criteria
 
-  4. LOAD relevant skills:
-     - Check story.skills array
-     - Load each skill for implementation guidance
+  4. LOAD relevant skills (MANDATORY if story.skills is non-empty):
+     ```
+     For each skill_name in story.skills:
+       skill: [skill_name]
+     ```
+     This calls the Skill tool for each entry. Do NOT skip — skills provide
+     critical implementation guidance (design systems, framework patterns, etc).
 
   5. IMPLEMENT:
      - Read referenced files from spec.md
@@ -510,17 +514,14 @@ No intermediate states. The Task system (Ctrl+T) tracks in_progress/blocked for 
 
 ### Skills Integration
 
-When a story has skills listed:
+Stories may include a `skills` array in prd.json:
 
 ```json
 "skills": ["frontend-design", "vercel-react-best-practices"]
 ```
 
-Load those skills before implementation:
-```
-skill: frontend-design
-skill: vercel-react-best-practices
-```
+These are loaded via the Skill tool in Phase 3, Step 4 — one `skill: [name]` call per entry.
+This is mandatory and must happen before implementation begins.
 
 This provides relevant guidance for the implementation.
 
