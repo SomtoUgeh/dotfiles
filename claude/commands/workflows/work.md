@@ -217,13 +217,16 @@ while (executable stories remain):
      "Starting story #[id]: [title]"
      Display acceptance criteria
 
-  4. LOAD relevant skills (MANDATORY if story.skills is non-empty):
+  4. LOAD ALL skills (MANDATORY if story.skills is non-empty):
+     Call the Skill tool once per entry — load ALL of them, not just 1 or 2:
      ```
-     For each skill_name in story.skills:
-       skill: [skill_name]
+     # Example: story.skills = ["frontend-design", "vercel-react-best-practices", "emil-design-engineering"]
+     skill: frontend-design
+     skill: vercel-react-best-practices
+     skill: emil-design-engineering
      ```
-     This calls the Skill tool for each entry. Do NOT skip — skills provide
-     critical implementation guidance (design systems, framework patterns, etc).
+     Every skill in the array MUST be loaded before implementation starts.
+     Do NOT partially load — each skill provides distinct guidance.
 
   5. IMPLEMENT:
      - Read referenced files from spec.md
