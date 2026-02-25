@@ -194,11 +194,9 @@ After planning the structure, run SpecFlow Analyzer to validate and refine the f
 - [ ] Incorporate any identified gaps or edge cases
 - [ ] Update acceptance criteria based on SpecFlow findings
 
-### 3.5. Breadboard (Conditional)
+### 3.5. Breadboard
 
-**Gate:** Only run if the selected shape has **3+ parts**. Skip for simple shapes.
-
-**Trigger:** Shaping-format brainstorm with a selected shape containing enough parts to warrant detailed affordance mapping.
+**Gate:** Run when a shaping-format brainstorm exists (detected by `shaping: true` frontmatter and a selected shape).
 
 When breadboarding:
 
@@ -227,6 +225,18 @@ Each slice must have:
 - Demo statement (what can be shown to a stakeholder)
 
 Add breadboard tables + slice summary as a section in spec.md.
+
+### 3.6. Breadboard Reflection
+
+**Gate:** Run after Step 3.5 produces breadboard tables.
+
+1. Load the `/breadboard-reflection` skill as methodology reference
+2. Trace each key user story through the wiring — does the path tell a coherent story?
+3. Apply the naming test to each affordance — one idiomatic verb per affordance
+4. Flag smells: incoherent wiring, missing paths, bundled affordances, naming resistance
+5. Fix any issues found: split affordances, correct wiring, update tables
+
+If changes are made, re-render the breadboard tables and update the slice summary before proceeding.
 
 ### 4. Choose Spec Detail Level
 
