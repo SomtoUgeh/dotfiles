@@ -1,10 +1,5 @@
 {
   "mcpServers": {
-    "exa": {
-      "type": "http",
-      "url": "https://mcp.exa.ai/mcp",
-      "headers": {}
-    },
     "cloudflare-docs": {
       "command": "npx",
       "args": ["mcp-remote", "https://docs.mcp.cloudflare.com/mcp"]
@@ -16,6 +11,21 @@
     "ultracite": {
       "command": "npx",
       "args": ["-y", "mcp-remote", "https://www.ultracite.ai/api/mcp/mcp"]
+    },
+    "figma-remote-mcp": {
+      "type": "http",
+      "url": "https://mcp.figma.com/mcp"
+    },
+    "posthog": {
+      "type": "http",
+      "url": "https://mcp-eu.posthog.com/mcp"
+    },
+    "exa": {
+      "type": "http",
+      "url": "https://mcp.exa.ai/mcp",
+      "args": [
+        "--tools=get_code_context_exa,web_search_exa,web_search_advanced_exa,deep_researcher_start,deep_researcher_check"
+      ]
     }
   }
 }
