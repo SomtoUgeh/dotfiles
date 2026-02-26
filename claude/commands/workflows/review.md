@@ -45,6 +45,25 @@ First, determine the review target type and set up the code for analysis.
 - [ ] Fetch PR metadata: `gh pr view --json title,body,files,baseRefName`
 - [ ] If plan folder provided → read prd.json for story context
 
+### 1b. Deslop Pre-pass
+
+<thinking>
+Before running review agents, clean AI-generated slop from the changeset. This removes noise so agents focus on real issues instead of flagging slop.
+</thinking>
+
+Run `/deslop` against the changed files. This removes unnecessary comments, defensive over-engineering, type hacks, style inconsistencies, and over-abstraction.
+
+- If reviewing a PR/branch: deslop all changed files
+- If reviewing a plan folder: skip (no code to deslop)
+
+If deslop makes changes, note them before proceeding:
+
+```markdown
+**Deslop pre-pass:** [summary of what was cleaned]
+```
+
+If no slop found, proceed silently.
+
 ### 2. Discover Review Agents & Skills
 
 <thinking>
