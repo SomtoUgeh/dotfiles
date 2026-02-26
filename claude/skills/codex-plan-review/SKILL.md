@@ -1,5 +1,5 @@
 ---
-name: codex-review
+name: codex-plan-review
 description: Independent cross-model plan review via Codex CLI. Codex reviews spec.md + prd.json, Claude revises them directly, user controls the loop. Use after /workflows:plan or /deepen-plan, before /workflows:work.
 user_invocable: true
 argument-hint: "[plan folder path] [model override, e.g., o4-mini]"
