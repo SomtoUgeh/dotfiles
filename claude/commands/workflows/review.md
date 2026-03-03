@@ -64,6 +64,31 @@ If deslop makes changes, note them before proceeding:
 
 If no slop found, proceed silently.
 
+### 1c. Simplify Pass
+
+<thinking>
+After deslop removes noise, run /simplify to tighten logic, find reuse opportunities, and improve efficiency. This is a fast pass before heavier agent analysis.
+</thinking>
+
+Run `/simplify` on the changed files. This catches different issues than deslop:
+- **Deslop** removes AI slop (comments, defensive code, type hacks)
+- **Simplify** reviews for reuse, quality, and efficiency — then fixes
+
+```
+skill: simplify
+```
+
+- If reviewing a PR/branch: simplify all changed files
+- If reviewing a plan folder: skip (no code to simplify)
+
+If simplify makes changes, note them:
+
+```markdown
+**Simplify pass:** [summary of what was improved]
+```
+
+If no improvements found, proceed silently.
+
 ### 2. Discover Review Agents & Skills
 
 <thinking>
