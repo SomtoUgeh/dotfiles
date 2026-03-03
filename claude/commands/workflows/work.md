@@ -240,6 +240,12 @@ while (executable stories remain):
      - Run relevant tests
      - If UI work, verify against design
 
+  6b. SIMPLIFY (fast pass before agents):
+     - Run `/simplify` on files changed in this story
+     - This is a quick, focused cleanup: reuse opportunities, quality, efficiency
+     - Runs BEFORE heavier validation agents to reduce noise they review
+     - If simplify makes changes, re-run tests to verify nothing broke
+
   7. RUN validation agents:
      - **For stories with code changes** (new/modified source files beyond prd.json):
        - **Always run** these default agents in parallel:
