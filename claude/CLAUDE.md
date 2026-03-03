@@ -58,7 +58,7 @@ When writing new code, keep in mind:
 </plans>
 
 <git>
-- For branch naming, use a consistent format like `feature/HAW-1234-feature-name`
+- For branch naming, use a consistent format like `feature/[ticket]-feature-name`
 - Do not use --no-verify, always attempt to fix every issue that addresses, or ask for clarity
 - Always verify ALL modified files are staged before pushing. Run `git status` after staging and before committing to catch missed files.
 - When user asks about a recent branch/commit, search by date first (`git log --since='yesterday'`, `git branch --sort=-committerdate`). Verify recency — don't assume first matching name is correct.

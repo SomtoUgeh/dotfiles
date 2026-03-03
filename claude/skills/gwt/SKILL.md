@@ -12,12 +12,6 @@ date: 2026-02-13
 
 # Git Worktree Manager (gwt)
 
-## Problem
-
-Nested worktree directories cause Next.js Turbopack to detect multiple lockfiles, IDE file watchers to get confused, and build tools to traverse into nested worktrees. Sibling worktrees clutter the code directory.
-
-## Solution
-
 Use a **centralized `worktrees/` folder** to keep all worktrees organized and your main code directory clean.
 
 ## Directory Structure
