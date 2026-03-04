@@ -140,18 +140,18 @@ Think like a product manager - what would make this spec clear and actionable? C
 
 First, extract or ask for the ticket number:
 
-- [ ] Check if feature description contains a Jira URL (e.g., `https://swissblocktech.atlassian.net/browse/HAW-1222`)
-- [ ] If URL found, extract ticket number (e.g., `HAW-1222`)
-- [ ] If no URL/ticket, use **AskUserQuestion tool**: "Is there a Jira ticket for this work? (e.g., HAW-1234, or 'none')"
+- [ ] Check if feature description contains a ticket URL (e.g., `https://yourorg.atlassian.net/browse/PROJ-1222`)
+- [ ] If URL found, extract ticket number (e.g., `PROJ-1222`)
+- [ ] If no URL/ticket, use **AskUserQuestion tool**: "Is there a ticket for this work? (e.g., PROJ-1234, or 'none')"
 
 **Branch Naming Convention:**
 
 Format: `[ticket-number]-[description-kebab-case]`
 
 Examples:
-- `HAW-1222-user-authentication`
-- `HAW-1456-fix-checkout-race-condition`
-- `HAW-890-refactor-api-client`
+- `PROJ-1222-user-authentication`
+- `PROJ-1456-fix-checkout-race-condition`
+- `PROJ-890-refactor-api-client`
 
 If no ticket: use `type/description-kebab-case` (e.g., `feat/user-authentication`, `fix/checkout-race-condition`)
 
@@ -165,7 +165,7 @@ If no ticket: use `type/description-kebab-case` (e.g., `feat/user-authentication
 
 **Create Branch:**
 
-- [ ] Derive branch name: `[ticket]-[kebab-description]` (e.g., `HAW-1222-user-authentication`)
+- [ ] Derive branch name: `[ticket]-[kebab-description]` (e.g., `PROJ-1222-user-authentication`)
 - [ ] Check if branch exists: `git branch --list [branch-name]`
 - [ ] If not exists, create and checkout: `git checkout -b [branch-name]`
 - [ ] If exists, confirm with user before switching
@@ -538,8 +538,8 @@ Each story must have exactly one category:
 ```json
 {
   "title": "feature-name",
-  "ticket": "HAW-1222",
-  "branch": "HAW-1222-feature-name",
+  "ticket": "PROJ-1222",
+  "branch": "PROJ-1222-feature-name",
   "spec_path": "docs/plans/YYYY-MM-DD-<type>-<name>/spec.md",
   "created_at": "2026-01-30T12:00:00Z",
   "stories": [
@@ -591,7 +591,7 @@ Each story must have exactly one category:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `ticket` | string\|null | Jira ticket number (e.g., `HAW-1222`), null if none |
+| `ticket` | string\|null | Ticket number (e.g., `PROJ-1222`), null if none |
 | `branch` | string | Git branch name: `[ticket]-[description]` or `type/description` |
 | `id` | number | Unique integer, starts at 1 |
 | `title` | string | Single action, imperative, no "and" |

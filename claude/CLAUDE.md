@@ -27,7 +27,7 @@ Context is your most important resource. Prefer using subagents (Task tool) so t
 - Primary GitHub interaction via gh CLI
 - Always confirm the user's exact problem statement before investigating. Ask clarifying questions upfront rather than exploring broadly and guessing which component is failing.
 - Do not push to github except you are explicitly told to push to github
-- For commits, always make sure to go in format `type(ticket-number; like HAW-1234): description`
+- For commits, always make sure to go in format `type(ticket-number; like PROJ-1234): description`
 - When i ask you for a pull request review, never make a comment to the PR, just explain it to me properly
 - if a folder/file is ignored, dont force commit it - ever
 </core>
