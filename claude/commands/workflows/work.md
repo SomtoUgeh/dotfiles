@@ -217,16 +217,19 @@ while (executable stories remain):
      "Starting story #[id]: [title]"
      Display acceptance criteria
 
-  4. LOAD ALL skills (MANDATORY if story.skills is non-empty):
-     Call the Skill tool once per entry — load ALL of them, not just 1 or 2:
-     ```
-     # Example: story.skills = ["frontend-design", "vercel-react-best-practices", "emil-design-engineering"]
-     skill: frontend-design
-     skill: vercel-react-best-practices
-     skill: emil-design-engineering
-     ```
-     Every skill in the array MUST be loaded before implementation starts.
-     Do NOT partially load — each skill provides distinct guidance.
+  4. LOAD SKILLS (hard gate — blocks Step 5):
+     If story.skills is non-empty, load every skill before writing any code.
+     Implementation MUST NOT begin until all skills are loaded.
+
+     For each skill in story.skills:
+       -> Call the Skill tool: skill: [name]
+
+     This is a prerequisite, not a suggestion. Skills discovered during
+     /deepen-plan encode domain expertise (design patterns, security
+     practices, framework idioms) that directly shape implementation.
+     Skipping them means building without the knowledge the plan assumed.
+
+     Verify: count of Skill tool calls == len(story.skills). If mismatch, stop and load missing skills.
 
   5. IMPLEMENT:
      - Read referenced files from spec.md
