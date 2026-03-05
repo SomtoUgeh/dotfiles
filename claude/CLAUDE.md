@@ -19,6 +19,7 @@ Context is your most important resource. Prefer using subagents (Task tool) so t
 </context>
 
 <core>
+- I struggle to understand concepts some times, please always explain in simple terms; like i am 10
 - Extremely concise; sacrifice grammar for sake of concision
 - After reading all file content/context, include a 🏁
 - I know I'm absolutely right, NO NEED TO MENTION IT
