@@ -98,6 +98,7 @@ export SCARF_ANALYTICS=false
 export ENABLE_BACKGROUND_TASKS=1
 export FORCE_AUTO_BACKGROUND_TASKS=1
 export CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1
+export CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=1
 
 # ============================================================================
 # COMPLETIONS
