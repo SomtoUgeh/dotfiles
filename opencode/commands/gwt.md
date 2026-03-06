@@ -55,7 +55,8 @@ Manage git worktrees using a centralized `worktrees/` folder to keep the main co
 
 - Worktrees are created in a centralized `worktrees/` folder (sibling to code projects)
 - This avoids Turbopack/IDE conflicts with multiple lockfiles
-- .env files are automatically copied from main repo
+- `.env*` and `.dev.vars` are automatically copied from main repo
+- Set `GWT_EXTRA_FILES` for additional file patterns (space-separated)
 - `GWT_WORKTREE_DIR` env var overrides the worktrees directory
 
 ## Success Criteria
