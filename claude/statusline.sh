@@ -1,6 +1,6 @@
 #!/bin/bash
 # Custom Claude Code statusline with worktree awareness
-# Features: directory, git, worktree, model, version
+# Features: directory, git, worktree, model, version, context window
 
 input=$(cat)
 
@@ -13,6 +13,10 @@ dir_color() { if [ "$use_color" -eq 1 ]; then printf '\033[38;5;117m'; fi; }    
 model_color() { if [ "$use_color" -eq 1 ]; then printf '\033[38;5;147m'; fi; }    # light purple
 cc_version_color() { if [ "$use_color" -eq 1 ]; then printf '\033[38;5;249m'; fi; } # light gray
 worktree_color() { if [ "$use_color" -eq 1 ]; then printf '\033[38;5;214m'; fi; } # amber/orange
+ctx_low_color() { if [ "$use_color" -eq 1 ]; then printf '\033[38;5;150m'; fi; }   # green (<50%)
+ctx_mid_color() { if [ "$use_color" -eq 1 ]; then printf '\033[38;5;214m'; fi; }   # amber (50-79%)
+ctx_high_color() { if [ "$use_color" -eq 1 ]; then printf '\033[38;5;203m'; fi; }  # red (80%+)
+ctx_dim_color() { if [ "$use_color" -eq 1 ]; then printf '\033[38;5;240m'; fi; }   # dim gray (unfilled bar)
 rst() { if [ "$use_color" -eq 1 ]; then printf '\033[0m'; fi; }
 
 # ---- JSON extraction (bash only, no jq dependency) ----
@@ -75,8 +79,46 @@ if [ -d "$current_dir" ] && git -C "$current_dir" rev-parse --git-dir >/dev/null
   fi
 fi
 
+# ---- context window ----
+ctx_used_pct=$(echo "$input" | grep -o '"used_percentage"[[:space:]]*:[[:space:]]*[0-9.]*' | sed 's/.*:[[:space:]]*//')
+ctx_window_size=$(echo "$input" | grep -o '"context_window_size"[[:space:]]*:[[:space:]]*[0-9]*' | sed 's/.*:[[:space:]]*//')
+# total_input_tokens is cumulative API calls, not context fill — derive from pct instead
+
+# Build visual bar: 10 segments
+ctx_bar=""
+ctx_color_fn=""
+if [ -n "$ctx_used_pct" ] && [ -n "$ctx_window_size" ]; then
+  pct_int=${ctx_used_pct%.*}
+  [ -z "$pct_int" ] && pct_int=0
+
+  # Pick color based on usage
+  if [ "$pct_int" -ge 80 ]; then
+    ctx_color_fn="ctx_high_color"
+  elif [ "$pct_int" -ge 50 ]; then
+    ctx_color_fn="ctx_mid_color"
+  else
+    ctx_color_fn="ctx_low_color"
+  fi
+
+  # Bar: 10 chars, each = 10%
+  filled=$((pct_int / 10))
+  empty=$((10 - filled))
+  bar_filled=""
+  bar_empty=""
+  i=0; while [ "$i" -lt "$filled" ]; do bar_filled="${bar_filled}━"; i=$((i + 1)); done
+  i=0; while [ "$i" -lt "$empty" ]; do bar_empty="${bar_empty}─"; i=$((i + 1)); done
+
+  # Derive used tokens from percentage (total_input_tokens doesn't reflect context fill)
+  used_k=$(( (pct_int * ctx_window_size / 100) / 1000 ))
+  total_k=$((ctx_window_size / 1000))
+
+  ctx_bar=$(printf '%s%s%s%s%s %s%s%%  %sk/%sk' \
+    "$($ctx_color_fn)" "$bar_filled" "$(ctx_dim_color)" "$bar_empty" "$(rst)" \
+    "$($ctx_color_fn)" "$pct_int" "$used_k" "$total_k")
+fi
+
 # ---- render statusline ----
-# Format: 📁 repo  🌿 branch  🪵 worktree  🤖 model  📟 version
+# Format: 📁 repo  🌿 branch  🪵 worktree  🤖 model  📟 version  📊 context
 
 # Show main repo name when in worktree, otherwise current folder
 if [ "$in_worktree" -eq 1 ] && [ -n "$main_repo_name" ]; then
@@ -86,22 +128,24 @@ else
 fi
 
 if [ -n "$git_branch" ]; then
-  printf '  🌿 %s%s%s' "$(git_color)" "$git_branch" "$(rst)"
+  printf '\n🌿 %s%s%s' "$(git_color)" "$git_branch" "$(rst)"
 fi
 
 # Worktree indicator
 if [ "$in_worktree" -eq 1 ]; then
-  # Inside a worktree: show worktree name
   printf '  🪵 %s%s%s' "$(worktree_color)" "$worktree_name" "$(rst)"
 elif [ "$worktree_count" -gt 0 ]; then
-  # In main repo with active worktrees: show count
   printf '  🪵 %s+%s%s' "$(worktree_color)" "$worktree_count" "$(rst)"
 fi
 
-printf '  🤖 %s%s%s' "$(model_color)" "$model_name" "$(rst)"
+printf '\n🤖 %s%s%s' "$(model_color)" "$model_name" "$(rst)"
 
 if [ -n "$cc_version" ] && [ "$cc_version" != "null" ]; then
   printf '  📟 %sv%s%s' "$(cc_version_color)" "$cc_version" "$(rst)"
+fi
+
+if [ -n "$ctx_bar" ]; then
+  printf '  %s' "$ctx_bar"
 fi
 
 printf '\n'
