@@ -88,23 +88,34 @@ get_worktree_path() {
   echo "${parent_dir}/${repo_name}${SEPARATOR}${sanitized_branch}"
 }
 
-# Copy .env files from main repo to worktree
+# Copy env/secret files from main repo to worktree
 copy_env_files() {
   local main_dir="$1"
   local worktree_dir="$2"
 
+  # Default patterns: .env*, .dev.vars
+  local patterns=(".env*" ".dev.vars")
+
+  # Add extra patterns from GWT_EXTRA_FILES (space-separated)
+  if [[ -n "${GWT_EXTRA_FILES:-}" ]]; then
+    read -ra extra <<< "$GWT_EXTRA_FILES"
+    patterns+=("${extra[@]}")
+  fi
+
   local count=0
-  for env_file in "$main_dir"/.env*; do
-    if [[ -f "$env_file" ]]; then
-      local basename
-      basename=$(basename "$env_file")
-      cp "$env_file" "$worktree_dir/$basename"
-      ((count++))
-    fi
+  for pattern in "${patterns[@]}"; do
+    for file in "$main_dir"/$pattern; do
+      if [[ -f "$file" ]]; then
+        local basename
+        basename=$(basename "$file")
+        cp "$file" "$worktree_dir/$basename"
+        ((count++))
+      fi
+    done
   done
 
   if [[ $count -gt 0 ]]; then
-    info "Copied $count .env file(s)"
+    info "Copied $count env/secret file(s)"
   fi
 }
 
@@ -430,6 +441,10 @@ Examples:
   gwt switch auth             Copy switch command to clipboard
   gwt ls --json               List worktrees as JSON
   gwt rm auth --keep-branch   Remove worktree but keep branch
+
+Environment:
+  GWT_EXTRA_FILES   Extra file patterns to copy (space-separated)
+                    e.g. GWT_EXTRA_FILES=".secret.yaml config.local.json"
 EOF
 }
 
