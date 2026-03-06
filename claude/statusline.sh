@@ -1,6 +1,7 @@
 #!/bin/bash
 # Custom Claude Code statusline with worktree awareness
 # Features: directory, git, worktree, model, version, context window
+# Requires: jq, git
 
 input=$(cat)
 
@@ -19,23 +20,16 @@ ctx_high_color() { if [ "$use_color" -eq 1 ]; then printf '\033[38;5;203m'; fi; 
 ctx_dim_color() { if [ "$use_color" -eq 1 ]; then printf '\033[38;5;240m'; fi; }   # dim gray (unfilled bar)
 rst() { if [ "$use_color" -eq 1 ]; then printf '\033[0m'; fi; }
 
-# ---- JSON extraction (bash only, no jq dependency) ----
-# Extract current_dir from workspace object
-current_dir=$(echo "$input" | grep -o '"workspace"[[:space:]]*:[[:space:]]*{[^}]*"current_dir"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*"current_dir"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' | sed 's/\\\\/\//g')
-if [ -z "$current_dir" ] || [ "$current_dir" = "null" ]; then
-  current_dir=$(echo "$input" | grep -o '"cwd"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*"cwd"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' | sed 's/\\\\/\//g')
-fi
-[ -z "$current_dir" ] && current_dir="unknown"
-
-# Extract folder basename only
+# ---- JSON extraction (single jq call for speed) ----
+eval "$(echo "$input" | jq -r '
+  @sh "current_dir=\(.workspace.current_dir // .cwd // "unknown")",
+  @sh "model_name=\(.model.display_name // "Claude")",
+  @sh "cc_version=\(.version // "")",
+  @sh "ctx_window_size=\(.context_window.context_window_size // "")",
+  @sh "transcript_path=\(.transcript_path // "")",
+  @sh "fallback_pct=\(.context_window.used_percentage // 0)"
+')"
 folder_name=$(basename "$current_dir")
-
-# Extract model name
-model_name=$(echo "$input" | grep -o '"model"[[:space:]]*:[[:space:]]*{[^}]*"display_name"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*"display_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
-[ -z "$model_name" ] && model_name="Claude"
-
-# Extract CC version
-cc_version=$(echo "$input" | grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
 
 # ---- git colors ----
 git_color() { if [ "$use_color" -eq 1 ]; then printf '\033[38;5;150m'; fi; }  # soft green
@@ -79,17 +73,37 @@ if [ -d "$current_dir" ] && git -C "$current_dir" rev-parse --git-dir >/dev/null
   fi
 fi
 
-# ---- context window ----
-ctx_used_pct=$(echo "$input" | grep -o '"used_percentage"[[:space:]]*:[[:space:]]*[0-9.]*' | sed 's/.*:[[:space:]]*//')
-ctx_window_size=$(echo "$input" | grep -o '"context_window_size"[[:space:]]*:[[:space:]]*[0-9]*' | sed 's/.*:[[:space:]]*//')
-# total_input_tokens is cumulative API calls, not context fill — derive from pct instead
+# ---- context window (via transcript parsing for accuracy) ----
+# used_percentage from JSON undercounts (excludes tool results).
+# Parsing the transcript JSONL gives accurate numbers matching /context.
+ctx_used_tokens=0
+if [ -n "$transcript_path" ] && [ -f "$transcript_path" ]; then
+  # Usage lives at .message.usage (assistant entries) or .toolUseResult.usage (subagent results)
+  # Use tail -r (macOS) or tac (Linux) to read file in reverse
+  reverse_cmd="tail -r"
+  command -v tac >/dev/null 2>&1 && reverse_cmd="tac"
+  last_usage=$($reverse_cmd "$transcript_path" 2>/dev/null | grep -m1 '"input_tokens"' | jq -r '(.message.usage // .toolUseResult.usage // empty)' 2>/dev/null)
+  if [ -n "$last_usage" ] && [ "$last_usage" != "null" ]; then
+    eval "$(echo "$last_usage" | jq -r '
+      @sh "input_tok=\(.input_tokens // 0)",
+      @sh "cache_read=\(.cache_read_input_tokens // 0)",
+      @sh "cache_create=\(.cache_creation_input_tokens // 0)"
+    ')"
+    ctx_used_tokens=$((input_tok + cache_read + cache_create))
+  fi
+fi
+
+# Fallback to used_percentage if transcript parsing fails
+if [ "$ctx_used_tokens" -eq 0 ] && [ -n "$ctx_window_size" ]; then
+  ctx_used_tokens=$((fallback_pct * ctx_window_size / 100))
+fi
 
 # Build visual bar: 10 segments
 ctx_bar=""
 ctx_color_fn=""
-if [ -n "$ctx_used_pct" ] && [ -n "$ctx_window_size" ]; then
-  pct_int=${ctx_used_pct%.*}
-  [ -z "$pct_int" ] && pct_int=0
+if [ -n "$ctx_window_size" ] && [ "$ctx_window_size" -gt 0 ]; then
+  pct_int=$((ctx_used_tokens * 100 / ctx_window_size))
+  [ "$pct_int" -gt 100 ] && pct_int=100
 
   # Pick color based on usage
   if [ "$pct_int" -ge 80 ]; then
@@ -108,8 +122,7 @@ if [ -n "$ctx_used_pct" ] && [ -n "$ctx_window_size" ]; then
   i=0; while [ "$i" -lt "$filled" ]; do bar_filled="${bar_filled}━"; i=$((i + 1)); done
   i=0; while [ "$i" -lt "$empty" ]; do bar_empty="${bar_empty}─"; i=$((i + 1)); done
 
-  # Derive used tokens from percentage (total_input_tokens doesn't reflect context fill)
-  used_k=$(( (pct_int * ctx_window_size / 100) / 1000 ))
+  used_k=$((ctx_used_tokens / 1000))
   total_k=$((ctx_window_size / 1000))
 
   ctx_bar=$(printf '%s%s%s%s%s %s%s%%  %sk/%sk' \
