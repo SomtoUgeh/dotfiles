@@ -98,11 +98,14 @@ if [ "$ctx_used_tokens" -eq 0 ] && [ -n "$ctx_window_size" ]; then
   ctx_used_tokens=$((fallback_pct * ctx_window_size / 100))
 fi
 
-# Build visual bar: 10 segments
+# Build visual bar: 10 segments, scaled to usable window (minus auto-compact buffer)
+autocompact_buffer=33000
+usable_window=$((ctx_window_size - autocompact_buffer))
+
 ctx_bar=""
 ctx_color_fn=""
-if [ -n "$ctx_window_size" ] && [ "$ctx_window_size" -gt 0 ]; then
-  pct_int=$((ctx_used_tokens * 100 / ctx_window_size))
+if [ -n "$ctx_window_size" ] && [ "$usable_window" -gt 0 ]; then
+  pct_int=$((ctx_used_tokens * 100 / usable_window))
   [ "$pct_int" -gt 100 ] && pct_int=100
 
   # Pick color based on usage
@@ -123,11 +126,11 @@ if [ -n "$ctx_window_size" ] && [ "$ctx_window_size" -gt 0 ]; then
   i=0; while [ "$i" -lt "$empty" ]; do bar_empty="${bar_empty}─"; i=$((i + 1)); done
 
   used_k=$((ctx_used_tokens / 1000))
-  total_k=$((ctx_window_size / 1000))
+  usable_k=$((usable_window / 1000))
 
   ctx_bar=$(printf '%s%s%s%s%s %s%s%%  %sk/%sk' \
     "$($ctx_color_fn)" "$bar_filled" "$(ctx_dim_color)" "$bar_empty" "$(rst)" \
-    "$($ctx_color_fn)" "$pct_int" "$used_k" "$total_k")
+    "$($ctx_color_fn)" "$pct_int" "$used_k" "$usable_k")
 fi
 
 # ---- render statusline ----
