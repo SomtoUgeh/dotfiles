@@ -125,12 +125,9 @@ if [ -n "$ctx_window_size" ] && [ "$usable_window" -gt 0 ]; then
   i=0; while [ "$i" -lt "$filled" ]; do bar_filled="${bar_filled}━"; i=$((i + 1)); done
   i=0; while [ "$i" -lt "$empty" ]; do bar_empty="${bar_empty}─"; i=$((i + 1)); done
 
-  used_k=$((ctx_used_tokens / 1000))
-  usable_k=$((usable_window / 1000))
-
-  ctx_bar=$(printf '%s%s%s%s%s %s%s%%  %sk/%sk' \
+  ctx_bar=$(printf '%s%s%s%s%s %s%s%%' \
     "$($ctx_color_fn)" "$bar_filled" "$(ctx_dim_color)" "$bar_empty" "$(rst)" \
-    "$($ctx_color_fn)" "$pct_int" "$used_k" "$usable_k")
+    "$($ctx_color_fn)" "$pct_int")
 fi
 
 # ---- render statusline ----
