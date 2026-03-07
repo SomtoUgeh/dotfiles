@@ -88,7 +88,7 @@ get_worktree_path() {
   echo "${parent_dir}/${repo_name}${SEPARATOR}${sanitized_branch}"
 }
 
-# Copy env/secret files from main repo to worktree
+# Copy env/secret files from main repo to worktree (recursive)
 copy_env_files() {
   local main_dir="$1"
   local worktree_dir="$2"
@@ -104,14 +104,13 @@ copy_env_files() {
 
   local count=0
   for pattern in "${patterns[@]}"; do
-    for file in "$main_dir"/$pattern; do
-      if [[ -f "$file" ]]; then
-        local basename
-        basename=$(basename "$file")
-        cp "$file" "$worktree_dir/$basename"
-        ((count++))
-      fi
-    done
+    while IFS= read -r -d '' file; do
+      local rel_path="${file#$main_dir/}"
+      local target_dir="$worktree_dir/$(dirname "$rel_path")"
+      mkdir -p "$target_dir"
+      cp "$file" "$target_dir/$(basename "$file")"
+      count=$((count + 1))
+    done < <(find "$main_dir" -name "$pattern" -not -path "*/node_modules/*" -not -path "*/.git/*" -not -path "*/dist/*" -not -path "*/tmp/*" -print0 2>/dev/null)
   done
 
   if [[ $count -gt 0 ]]; then
