@@ -40,37 +40,40 @@ if [ -d "$current_dir" ] && git -C "$current_dir" rev-parse --git-dir >/dev/null
   git_branch=$(git -C "$current_dir" branch --show-current 2>/dev/null || git -C "$current_dir" rev-parse --short HEAD 2>/dev/null)
 fi
 
-# ---- worktree detection (gwt-managed only: ~/code/worktrees/) ----
+# ---- worktree detection (gwt + codex) ----
 in_worktree=0
 worktree_name=""
 main_repo_name=""
 worktree_count=0
 gwt_dir="$HOME/code/worktrees"
+codex_wt_dir="$HOME/.codex/worktrees"
 
 if [ -d "$current_dir" ] && git -C "$current_dir" rev-parse --git-dir >/dev/null 2>&1; then
   toplevel=$(git -C "$current_dir" rev-parse --show-toplevel 2>/dev/null)
 
-  # Only detect as worktree if under gwt-managed directory
+  # Detect gwt worktree (~/code/worktrees/{repo}--{branch})
   case "$toplevel" in
     "$gwt_dir"/*)
       in_worktree=1
       wt_basename=$(basename "$toplevel")
-      # gwt naming: {repo}--{branch}, extract repo name (before --)
       main_repo_name="${wt_basename%%--*}"
-      # Extract branch part (after --), convert dashes back for display
       worktree_name="${wt_basename#*--}"
+      ;;
+    "$codex_wt_dir"/*)
+      in_worktree=1
+      worktree_name=$(basename "$toplevel")
+      # Resolve main repo name from git common dir
+      common_dir=$(git -C "$current_dir" rev-parse --git-common-dir 2>/dev/null)
+      if [ -n "$common_dir" ] && [ "$common_dir" != ".git" ]; then
+        main_repo_name=$(basename "$(dirname "$common_dir")")
+      fi
       ;;
   esac
 
-  # Count gwt-managed worktrees for this repo only
-  repo_name=$(basename "$toplevel")
-  [ "$in_worktree" -eq 1 ] && repo_name="$main_repo_name"
-  if [ -d "$gwt_dir" ]; then
-    worktree_count=0
-    for d in "$gwt_dir"/"${repo_name}"--*; do
-      [ -d "$d" ] && worktree_count=$((worktree_count + 1))
-    done
-  fi
+  # Count all non-main worktrees via git (covers gwt + codex + any others)
+  total_wt=$(git -C "$current_dir" worktree list 2>/dev/null | wc -l | tr -d ' ')
+  worktree_count=$((total_wt - 1))
+  [ "$worktree_count" -lt 0 ] && worktree_count=0
 fi
 
 # ---- context window (via transcript parsing for accuracy) ----
