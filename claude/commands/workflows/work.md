@@ -2,7 +2,7 @@
 name: workflows:work
 description: Execute work plans efficiently while maintaining quality and finishing features
 argument-hint: "[plan folder path, e.g., docs/plans/2026-01-30-feat-user-auth/] [--swarm]"
-allowed-tools: ["Read", "Write", "Edit", "Glob", "Grep", "Bash", "Task", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet", "Skill", "AskUserQuestion"]
+allowed-tools: ["Read", "Write", "Edit", "Glob", "Grep", "Bash", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet", "TaskOutput", "TaskStop", "Skill", "AskUserQuestion"]
 ---
 
 # Work Plan Execution Command
