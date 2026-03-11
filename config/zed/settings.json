@@ -17,7 +17,8 @@
   "ui_font_weight": 350.0,
   "colorize_brackets": true,
   "git_panel": {
-    "sort_by_path": false,
+    "tree_view": true,
+    "sort_by_path": true,
   },
   "icon_theme": "Catppuccin Mocha",
   "git": {
