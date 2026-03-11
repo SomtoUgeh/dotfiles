@@ -247,7 +247,6 @@ export PATH="$PATH:/Users/somto/.lmstudio/bin"
 
 # bun completions
 [ -s "/Users/somto/.bun/_bun" ] && source "/Users/somto/.bun/_bun"
-export CONTEXT7_API_KEY="ctx7sk-cbd93e41-f485-4a23-866c-469983827437"
 
 # claude-warden env
 source "$HOME/.claude/.warden/warden.env.sh"
