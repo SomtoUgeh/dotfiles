@@ -1,8 +1,8 @@
 ---
 name: codex-plan-review
-description: Independent cross-model plan review via Codex CLI. Codex reviews spec.md + prd.json, Claude revises them directly, user controls the loop. Use after /sm-plan or /deepen-plan, before /sm-work.
+description: Independent cross-model plan review via Codex CLI. Codex reviews spec.md + prd.json, Claude revises them directly, user controls the loop. Use after /workflows:plan or /deepen-plan, before /workflows:work.
 user_invocable: true
-argument-hint: "[plan folder path] [model override, e.g., o4-mini]"
+argument-hint: "[plan folder path] [model override, e.g., gpt-5.4]"
 ---
 
 # Codex Plan Review
@@ -11,7 +11,7 @@ Independent cross-model review of implementation plans. Codex reviews, Claude re
 
 ## When to Use
 
-- After `/sm-plan` or `/deepen-plan`, before `/sm-work`
+- After `/workflows:plan` or `/deepen-plan`, before `/workflows:work`
 - High-stakes plans: auth, payments, data models, multi-service coordination
 - Plans that will take days to implement
 - When you want a genuinely independent perspective (not same-model echo chamber)
@@ -30,7 +30,7 @@ Codex CLI: `npm install -g @openai/codex`
 
 Parse `$ARGUMENTS` for:
 1. **Plan folder path** — e.g., `docs/plans/2026-01-30-feat-user-auth/`
-2. **Model override** — e.g., `o4-mini` (default: `gpt-5.3-codex`)
+2. **Model override** — e.g., `gpt-5.4` (default: `gpt-5.4`)
 
 If no path provided, check `ls docs/plans/` sorted by date and ask user which plan to review.
 
@@ -57,12 +57,57 @@ If spec.md or prd.json missing, inform user and abort.
 
 ### Step 3: Send to Codex
 
+Write the structured output schema:
+
+```bash
+cat > /tmp/codex-plan-schema-${REVIEW_ID}.json <<'SCHEMA'
+{
+  "type": "object",
+  "properties": {
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "severity": { "enum": ["critical", "high", "medium", "low"] },
+          "category": { "enum": ["correctness", "architecture", "security", "data-model", "edge-case", "story-breakdown", "feasibility"] },
+          "description": { "type": "string" },
+          "suggestion": { "type": "string" }
+        },
+        "required": ["severity", "category", "description", "suggestion"],
+        "additionalProperties": false
+      }
+    },
+    "summary": {
+      "type": "object",
+      "properties": {
+        "total": { "type": "number" },
+        "critical": { "type": "number" },
+        "high": { "type": "number" },
+        "medium": { "type": "number" },
+        "low": { "type": "number" }
+      },
+      "required": ["total", "critical", "high", "medium", "low"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["issues", "summary"],
+  "additionalProperties": false
+}
+SCHEMA
+```
+
+Send plan to Codex with structured output and here-doc prompt:
+
 ```bash
 codex exec \
-  -m ${MODEL:-gpt-5.3-codex} \
+  -m ${MODEL:-gpt-5.4} \
   -s read-only \
-  -o /tmp/codex-review-${REVIEW_ID}.md \
-  "You are reviewing an implementation plan before any code is written.
+  -c model_reasoning_effort=high \
+  --output-schema /tmp/codex-plan-schema-${REVIEW_ID}.json \
+  -o /tmp/codex-review-${REVIEW_ID}.json \
+  <<EOF
+You are reviewing an implementation plan before any code is written.
 
 Read these files in the repo:
 - ${PLAN_FOLDER}/spec.md
@@ -79,16 +124,9 @@ Review for:
 6. **Story Breakdown** — Stories atomic? Dependencies correct? Anything missing?
 7. **Feasibility** — Unrealistic assumptions or missing prerequisites?
 
-For each issue, provide:
-- **Severity:** critical / high / medium / low
-- **Category:** correctness, architecture, security, data-model, edge-case, story-breakdown, feasibility
-- **Description:** What's wrong
-- **Suggestion:** How to fix it
-
-End with a summary: total issues, breakdown by severity."
+For each issue, provide severity, category, description, and suggestion.
+EOF
 ```
-
-Capture the Codex session ID from output (line containing `session id: <uuid>`). Store as `CODEX_SESSION_ID`.
 
 **Fail-open:** If codex is not installed or the command fails:
 - Self-review spec.md and prd.json against the same 7 categories
@@ -97,14 +135,14 @@ Capture the Codex session ID from output (line containing `session id: <uuid>`).
 
 ### Step 4: Present Feedback
 
-Read `/tmp/codex-review-${REVIEW_ID}.md` (round 1) or captured stdout (subsequent rounds).
+Read `/tmp/codex-review-${REVIEW_ID}.json` and parse the structured output.
 
 Present to user:
 
 ```markdown
-## Codex Review -- Round N (model: gpt-5.3-codex)
+## Codex Review -- Round N (model: gpt-5.4)
 
-[Codex's feedback]
+[Codex's feedback, formatted from JSON]
 
 ---
 Issues: X total (Y critical, Z high, ...)
@@ -134,7 +172,7 @@ For critical/high issues that map to specific stories, add to that story's `revi
 {
   "severity": "high",
   "category": "security",
-  "agent": "codex-gpt-5.3-codex",
+  "agent": "codex-gpt-5.4",
   "finding": "No auth on agent write endpoints",
   "suggestion": "Add per-agent API keys with ACL",
   "status": "resolved",
@@ -169,31 +207,42 @@ If **Undo**:
   → `git checkout -- ${PLAN_FOLDER}/spec.md ${PLAN_FOLDER}/prd.json`
   → Re-ask from the previous round's state
 
-### Step 6b: Re-submit to Codex
+### Step 6b: Re-submit to Codex (Round 2+)
 
-Resume existing session for context continuity:
+Use fresh `codex exec` with structured output and here-doc (session resume does not support `-o` or `--output-schema`):
 
 ```bash
-codex exec resume ${CODEX_SESSION_ID} \
-  "The plan has been revised based on your feedback. Re-read:
+codex exec \
+  -m ${MODEL:-gpt-5.4} \
+  -s read-only \
+  -c model_reasoning_effort=high \
+  --output-schema /tmp/codex-plan-schema-${REVIEW_ID}.json \
+  -o /tmp/codex-review-${REVIEW_ID}.json \
+  <<EOF
+You are re-reviewing an implementation plan after revisions. This is round N.
+
+Read these files in the repo:
 - ${PLAN_FOLDER}/spec.md
 - ${PLAN_FOLDER}/prd.json
+- ${PLAN_FOLDER}/brainstorm.md (if exists)
+
+Previous round found these issues:
+[List prior findings]
 
 Changes made:
-[List specific changes]
+[List specific revisions]
 
 Skipped (with rationale):
 [List skipped items and why]
 
-Re-review. Focus on whether previous issues were addressed and any new issues introduced.
+Re-review. Focus on:
+1. Whether previous issues were addressed
+2. Any new issues introduced by revisions
+3. Anything missed in prior passes
 
-Provide findings in the same format: severity, category, description, suggestion.
-End with summary." 2>&1
+Review categories: correctness, architecture, security, data-model, edge-case, story-breakdown, feasibility.
+EOF
 ```
-
-**Note:** `codex exec resume` does NOT support `-o`. Capture full stdout.
-
-**If resume fails** (session expired): fall back to fresh `codex exec` with prior round context in the prompt.
 
 Return to Step 4.
 
@@ -206,7 +255,7 @@ Add review summary to prd.json `log` array:
   "timestamp": "2026-01-30T14:30:00Z",
   "action": "codex_review",
   "review_id": "REVIEW_ID",
-  "model": "gpt-5.3-codex",
+  "model": "gpt-5.4",
   "rounds": 3,
   "issues_found": 14,
   "issues_resolved": 12,
@@ -217,7 +266,7 @@ Add review summary to prd.json `log` array:
 Clean up:
 
 ```bash
-rm -f /tmp/codex-review-${REVIEW_ID}.md
+rm -f /tmp/codex-review-${REVIEW_ID}.json /tmp/codex-plan-schema-${REVIEW_ID}.json
 ```
 
 Present summary:
@@ -235,7 +284,7 @@ Then use **AskUserQuestion tool**:
 **Question:** "Plan reviewed and updated. What next?"
 
 **Options:**
-1. **Start `/sm-work`** — Begin implementing stories
+1. **Start `/workflows:work`** — Begin implementing stories
 2. **Run `/deepen-plan`** — Further enrich with skill/agent discovery
 3. **Review final plan** — Read updated spec.md
 4. **Done for now** — Come back later
@@ -244,7 +293,7 @@ Then use **AskUserQuestion tool**:
 
 - Claude **actively revises spec.md and prd.json** between rounds — the real files, not copies
 - **User controls the loop** — Codex doesn't decide when to stop, you do
-- Default model: `gpt-5.3-codex`. Accept override from arguments.
+- Default model: `gpt-5.4`. Accept override from arguments.
 - Always use read-only sandbox — Codex reads the codebase but never writes
 - Max 5 rounds as safety cap (user warned, can override)
 - Show user each round's feedback and revisions transparently
@@ -254,3 +303,8 @@ Then use **AskUserQuestion tool**:
 - Findings written in prd.json `review_findings` format for downstream consumption
 - **No temp plan file** — Codex reads the real spec.md and prd.json from the repo
 - **Undo is always available** — files are in git, user can revert any round
+- **Always pass `-c model_reasoning_effort=high`** — deeper analysis for plan review
+- **Use `--output-schema` for structured JSON output** — deterministic parsing, no markdown guessing
+- **Use here-doc for prompts** — avoids shell escaping issues with long, multi-line prompts
+- **Round 2+ uses fresh `codex exec`** — session resume does not support `-o` or `--output-schema`
+- **Do NOT use `--ephemeral`** — silently breaks session resume (creates new session instead)
