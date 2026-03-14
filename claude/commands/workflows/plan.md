@@ -81,11 +81,7 @@ Refine the idea through collaborative dialogue using the **AskUserQuestion tool*
 
 ### 1. Local Research (Always Runs - Parallel)
 
-<thinking>
-First, I need to understand the project's conventions, existing patterns, and any documented learnings. This is fast and local - it informs whether external research is needed.
-</thinking>
-
-Run this agent to gather local context:
+You MUST run this agent to gather local context. Do not skip:
 
 - Task repo-research-analyst(feature_description)
 
@@ -128,13 +124,24 @@ After all research steps complete, consolidate findings:
 - List related PRs discovered
 - Capture CLAUDE.md conventions
 
-**Optional validation:** Briefly summarize findings and ask if anything looks off or missing before proceeding to planning.
+**Briefly summarize findings to the user and ask if anything looks off or missing before proceeding to planning.**
+
+### 1.7. Choose Detail Level
+
+Use the **AskUserQuestion tool** to determine how comprehensive the spec should be. This decision affects how much work goes into subsequent steps.
+
+**Question:** "What level of detail do you want for this spec?"
+
+**Options:**
+1. **MINIMAL** — Quick spec. Problem + solution + acceptance criteria. Best for simple bugs, small improvements, clear features.
+2. **STANDARD** — Most features. Adds background, technical considerations, success metrics, dependencies/risks.
+3. **COMPREHENSIVE** — Major features, architectural changes. Produces 5 documents: ADR, backend spec, DTO contract, UI design spec, frontend spec. Uses a decision cascade model where you make key architectural decisions and everything else derives automatically.
+
+**Default recommendation:** STANDARD unless the feature is trivially small (MINIMAL) or involves major architecture, multiple system layers, or complex integrations (COMPREHENSIVE).
+
+**If user picks COMPREHENSIVE:** The planning steps below still run, but Step 4 will trigger an extended collaborative decision-making process that produces 5 spec documents instead of a single spec.md.
 
 ### 2. Planning & Structure
-
-<thinking>
-Think like a product manager - what would make this spec clear and actionable? Consider multiple perspectives
-</thinking>
 
 **Ticket & Branch:**
 
@@ -238,9 +245,9 @@ Add breadboard tables + slice summary as a section in spec.md.
 
 If changes are made, re-render the breadboard tables and update the slice summary before proceeding.
 
-### 4. Choose Spec Detail Level
+### 4. Generate Spec(s) by Detail Level
 
-Select how comprehensive the spec should be. Simpler is mostly better.
+Use the detail level chosen in Step 1.7. Simpler is mostly better.
 
 #### MINIMAL (Quick Spec)
 
@@ -349,116 +356,53 @@ date: YYYY-MM-DD
 
 #### COMPREHENSIVE (Major Features)
 
-**Best for:** Major features, architectural changes, complex integrations
+**Best for:** Major features, architectural changes, complex integrations spanning backend + frontend
 
-**Includes everything from STANDARD plus:**
+**Produces 5 documents** instead of a single spec.md:
 
-- Detailed implementation phases
-- Alternative approaches considered
-- Extensive technical specifications
-- Risk mitigation strategies
+1. **adr.md** — Architecture Decision Record: every significant decision, who made it, why, alternatives rejected
+2. **backend.md** — Backend Tech Spec: data model, API design, business logic, security, testing
+3. **dtos.md** — DTO Contract Spec: shared + feature-specific request/response types with example payloads
+4. **ui-design.md** — UI Design Tech Spec: page layouts, component inventory, responsive behavior, accessibility
+5. **frontend.md** — Frontend Tech Spec: routing, state management, data fetching, forms, error handling, testing
 
-**Structure:**
+**Decision Cascade Model:**
 
-```markdown
----
-title: [Title]
-type: [feat|fix|refactor]
-date: YYYY-MM-DD
----
+Every decision falls into one of three categories:
 
-# [Title]
+- **USER DECIDES** — Requires judgment, taste, or domain knowledge. Present 2-4 options with pros/cons tied to specific requirements, a recommendation with concrete rationale. Use **AskUserQuestion tool**, one decision at a time. Wait for answer before proceeding.
+- **LLM DERIVES** — Cascades automatically from user decisions. Document what cascaded from which decision. Example: user picks "cursor-based pagination" → derive query parameter names, response envelope shape, cursor encoding, default/max page sizes, UI pagination component props.
+- **LLM DECIDES** — Universal best practices (security, accessibility, error handling, performance). Apply silently, document in specs.
 
-## Overview
+**Decision Queue** (ask in dependency order, skip what codebase already answers):
 
-[Executive summary]
+1. Data model shape and entity relationships
+2. Status/enum definitions and state machines
+3. API design (style, URL structure, endpoints)
+4. Auth and permissions model for this feature
+5. Frontend state management boundaries
+6. Component architecture and granularity
+7. Data fetching and cache strategy
+8. Form management approach
+9. UI interaction patterns (modals vs pages vs drawers)
+10. Business logic placement (validation split, computation location)
+11. Infrastructure decisions (background jobs, file storage, caching)
 
-## Problem Statement
+**Before asking questions:** Summarize conventions found in codebase, decisions already answered by existing patterns, decisions that don't apply, and roughly how many questions remain.
 
-[Detailed problem analysis]
+**After each decision:** Record it for ADR, derive cascading details immediately, confirm cascades briefly: "Got it — [choice]. That means I'll [cascade 1], [cascade 2]. Moving on to [next]."
 
-## Proposed Solution
+**After all decisions:** Confirm full set of choices, then write all 5 docs.
 
-[Comprehensive solution design]
-
-## Technical Approach
-
-### Architecture
-
-[Detailed technical design]
-
-### Implementation Phases
-
-#### Phase 1: [Foundation]
-
-- Tasks and deliverables
-- Success criteria
-
-#### Phase 2: [Core Implementation]
-
-- Tasks and deliverables
-- Success criteria
-
-#### Phase 3: [Polish & Optimization]
-
-- Tasks and deliverables
-- Success criteria
-
-## Alternative Approaches Considered
-
-[Other solutions evaluated and why rejected]
-
-## Acceptance Criteria
-
-### Functional Requirements
-
-- [ ] Detailed functional criteria
-
-### Non-Functional Requirements
-
-- [ ] Performance targets
-- [ ] Security requirements
-- [ ] Accessibility standards
-
-## Success Metrics
-
-[Detailed KPIs and measurement methods]
-
-## Dependencies & Prerequisites
-
-[Detailed dependency analysis]
-
-## Risk Analysis & Mitigation
-
-[Comprehensive risk assessment]
-
-## Future Considerations
-
-[Extensibility and long-term vision]
-
-## References
-
-### Internal
-
-- Architecture: `src/core/architecture.ts:15`
-- Similar feature: `src/features/example.ts:42`
-
-### External
-
-- Framework docs: [url]
-- Best practices: [url]
-
-### Related Work
-
-- PR: #[pr_number]
-- Design doc: [link]
-```
+**Cross-reference before finalizing:**
+- Every API endpoint has corresponding DTOs
+- Every DTO is referenced by backend endpoint + frontend query/mutation
+- Every component in UI design has wiring in frontend spec
+- Every data field displayed in UI comes from a response DTO
+- Every validation rule appears in both backend and frontend specs
+- Every decision in ADR is reflected in specs
 
 ### 5. Spec Formatting
-
-<thinking>
-Focus on human readability and decision context. This is the document humans read to understand WHY.
-</thinking>
 
 **Content Quality:**
 
@@ -500,11 +444,7 @@ Error details here...
 
 ### 6. PRD Generation
 
-<thinking>
-Break the spec into atomic, executable stories. This is the document machines read to track progress.
-</thinking>
-
-After writing spec.md, generate prd.json with executable story breakdown.
+After writing spec.md, you MUST generate prd.json with executable story breakdown.
 
 **Story Source Selection:**
 
@@ -653,6 +593,22 @@ Each story must have exactly one category:
 - [ ] Initial completed_at and commit are always null
 - [ ] Initial log is always empty array
 
+### 6.5. Mandatory Diagrams
+
+No non-trivial flow goes undiagrammed. Use ASCII art inline while thinking through flows, then produce Mermaid diagrams for the final spec.md.
+
+**Produce all that apply:**
+1. **System architecture** — new components and their relationships to existing ones
+2. **Data flow** — including shadow paths (nil, empty, error)
+3. **State machine** — for every new stateful object, include invalid transitions
+4. **Processing pipeline** — for background jobs, queues, multi-step transforms
+5. **Decision tree** — for complex branching logic
+6. **Dependency graph** — what depends on what, build/deploy order
+
+Use `skill: beautiful-mermaid` to render final diagrams as SVG/PNG when needed.
+
+Drawing forces thinking. If you can't diagram it, you don't understand it yet.
+
 ### 7. Final Review
 
 **Pre-write Checklist:**
@@ -662,17 +618,29 @@ Each story must have exactly one category:
 - [ ] prd.json stories cover all acceptance criteria
 - [ ] Dependencies are correctly mapped
 - [ ] Code references use file:line format
-- [ ] ERD mermaid diagram included if new models introduced
+- [ ] Mandatory diagrams included (architecture, data flow, state machines as applicable)
 
 ## Output Structure
 
 **Folder:** `docs/plans/YYYY-MM-DD-<type>-<descriptive-name>/`
 
-**Contents:**
+**Contents (MINIMAL / STANDARD):**
 ```
 docs/plans/2026-01-30-feat-user-authentication/
   brainstorm.md    # optional, if created via /workflows:brainstorm
   spec.md          # human-readable plan
+  prd.json         # machine-executable stories
+```
+
+**Contents (COMPREHENSIVE):**
+```
+docs/plans/2026-01-30-feat-user-authentication/
+  brainstorm.md    # optional, if created via /workflows:brainstorm
+  adr.md           # architecture decision record
+  backend.md       # backend tech spec
+  dtos.md          # DTO contract spec (shared + feature-specific types)
+  ui-design.md     # UI design tech spec
+  frontend.md      # frontend tech spec
   prd.json         # machine-executable stories
 ```
 
@@ -688,12 +656,12 @@ docs/plans/2026-01-30-feat-user-authentication/
 
 ## Post-Generation Options
 
-After writing spec.md and prd.json, use the **AskUserQuestion tool**:
+After writing spec(s) and prd.json, use the **AskUserQuestion tool**:
 
 **Question:** "Plan ready at `docs/plans/YYYY-MM-DD-<type>-<name>/`. What would you like to do next?"
 
 **Options:**
-1. **Review spec** - Open spec.md in editor
+1. **Review specs** - Open spec.md (or list 5 docs for COMPREHENSIVE)
 2. **Review PRD** - Show prd.json story breakdown
 3. **Run `/deepen-plan`** - Enhance spec with parallel research agents
 4. **Run `/codex-plan-review`** - Independent cross-model review via Codex CLI
@@ -702,7 +670,7 @@ After writing spec.md and prd.json, use the **AskUserQuestion tool**:
 7. **Simplify** - Reduce detail level or story count
 
 **Based on selection:**
-- **Review spec** → Run `open docs/plans/<folder>/spec.md`
+- **Review specs** → For MINIMAL/STANDARD: `open docs/plans/<folder>/spec.md`. For COMPREHENSIVE: list all 5 docs and open the one user picks.
 - **Review PRD** → Display prd.json contents formatted
 - **`/deepen-plan`** → Call /deepen-plan with spec path
 - **`/codex-plan-review`** → Call /codex-plan-review with folder path. Iterative review loop: Codex reviews plan, Claude revises, repeat until approved.

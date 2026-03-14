@@ -248,5 +248,5 @@ export PATH="$PATH:/Users/somto/.lmstudio/bin"
 # bun completions
 [ -s "/Users/somto/.bun/_bun" ] && source "/Users/somto/.bun/_bun"
 
-# claude-warden env
-source "$HOME/.claude/.warden/warden.env.sh"
+
+export PATH="$HOME/.resend/bin:$PATH"

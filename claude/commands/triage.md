@@ -27,7 +27,7 @@ For each finding, present in this format:
 ---
 Issue #X: [Brief Title]
 
-Severity: 🔴 P1 (CRITICAL) / 🟡 P2 (IMPORTANT) / 🔵 P3 (NICE-TO-HAVE)
+Severity: P1 (CRITICAL) / P2 (IMPORTANT) / P3 (NICE-TO-HAVE)
 
 Category: [Security/Performance/Architecture/Bug/Feature/etc.]
 
@@ -71,9 +71,9 @@ Do you want to add this to the todo list?
 
    Priority mapping:
 
-   - 🔴 P1 (CRITICAL) → `p1`
-   - 🟡 P2 (IMPORTANT) → `p2`
-   - 🔵 P3 (NICE-TO-HAVE) → `p3`
+   - P1 (CRITICAL) → `p1`
+   - P2 (IMPORTANT) → `p2`
+   - P3 (NICE-TO-HAVE) → `p3`
 
    Example: `042-ready-p1-transaction-boundaries.md`
 
@@ -143,7 +143,7 @@ Do you want to add this to the todo list?
    Source: Triage session on {date}
    ```
 
-4. **Confirm approval:** "✅ Approved: `{new_filename}` (Issue #{issue_id}) - Status: **ready** → Ready to work on"
+4. **Confirm approval:** "Approved: `{new_filename}` (Issue #{issue_id}) - Status: **ready** → Ready to work on"
 
 **When user says "next":**
 
@@ -202,7 +202,7 @@ During triage, the following status updates occurred:
 2. Start work on approved items:
 
    ```bash
-   /resolve_todo_parallel  # Work on multiple approved items efficiently
+   /resolve-todo-parallel  # Work on multiple approved items efficiently
    ```
 
 3. Or pick individual items to work on
@@ -221,7 +221,7 @@ During triage, the following status updates occurred:
 
 Issue #5: Missing Transaction Boundaries for Multi-Step Operations
 
-Severity: 🔴 P1 (CRITICAL)
+Severity: P1 (CRITICAL)
 
 Category: Data Integrity / Security
 
@@ -267,7 +267,7 @@ Do you want to add this to the todo list?
 1. Rename file: `{id}-pending-{priority}-{desc}.md` → `{id}-ready-{priority}-{desc}.md`
 2. Update YAML frontmatter: `status: pending` → `status: ready`
 3. Update Work Log with triage approval entry
-4. Confirm: "✅ Approved: `{filename}` (Issue #{issue_id}) - Status: **ready**"
+4. Confirm: "Approved: `{filename}` (Issue #{issue_id}) - Status: **ready**"
 
 **When "next" is selected:**
 1. Delete the todo file from todos/ directory
@@ -290,12 +290,12 @@ Progress: 3/10 completed | Estimated time: ~2 minutes remaining
 
 ### Do Not Code During Triage
 
-- ✅ Present findings
-- ✅ Make yes/next/custom decisions
-- ✅ Update todo files (rename, frontmatter, work log)
-- ❌ Do NOT implement fixes or write code
-- ❌ Do NOT add detailed implementation details
-- ❌ That's for /resolve_todo_parallel phase
+- Present findings
+- Make yes/next/custom decisions
+- Update todo files (rename, frontmatter, work log)
+- Do NOT implement fixes or write code
+- Do NOT add detailed implementation details
+- That's for /resolve-todo-parallel phase
 ```
 
 When done give these options
@@ -303,7 +303,7 @@ When done give these options
 ```markdown
 What would you like to do next?
 
-1. run /resolve_todo_parallel to resolve the todos
+1. run /resolve-todo-parallel to resolve the todos
 2. commit the todos
 3. nothing, go chill
 ```
