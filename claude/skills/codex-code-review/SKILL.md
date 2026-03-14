@@ -102,42 +102,25 @@ If diff is empty, inform user and abort.
 - Suggest reviewing in chunks by directory or file group
 - Ask user to proceed with full review or select specific paths
 
-### Step 3: Send to Codex
+### Step 3: Send to Codex (Round 1)
+
+Use the dedicated `codex exec review` subcommand — produces structured comments with P1-P4 severity, file paths, and line ranges out of the box:
 
 ```bash
-codex exec \
+codex exec review \
+  --base ${BASE_BRANCH} \
   -m ${MODEL:-gpt-5.3-codex} \
-  -s read-only \
-  -o /tmp/codex-code-review-${REVIEW_ID}.md \
-  "You are reviewing code changes before merge. This is a code review, not a plan review.
-
-Read the diff at /tmp/codex-diff-${REVIEW_ID}.diff
-Read the changed files list at /tmp/codex-files-${REVIEW_ID}.txt
-
-Then read the full source of each changed file in the repo to understand context beyond the diff.
-
-Review for:
-
-1. **Correctness** — Does the code do what it's supposed to? Logic errors, off-by-ones, wrong conditions, missing returns?
-2. **Security** — Injection risks, auth gaps, data exposure, OWASP top 10, hardcoded secrets?
-3. **Architecture** — Sound structural choices? Proper separation of concerns? Leaky abstractions? Wrong layer for the logic? Breaking established patterns?
-4. **Performance** — N+1 queries, unnecessary re-renders, missing indexes, expensive operations in hot paths, memory leaks?
-5. **Error Handling** — Silent failures, swallowed exceptions, missing error boundaries, inadequate fallbacks?
-6. **Testing** — Missing test coverage for critical paths, untested edge cases, brittle tests?
-7. **Maintainability** — Unclear naming, unnecessary complexity, duplicated logic, poor abstractions, dead code?
-8. **Type Safety** — Any types, unsafe casts, missing null checks, implicit any?
-
-For each issue, provide:
-- **Severity:** critical / high / medium / low
-- **Category:** correctness, security, architecture, performance, error-handling, testing, maintainability, type-safety
-- **File:** exact file path and line number(s)
-- **Description:** What's wrong and why it matters
-- **Suggestion:** Concrete fix (show code when possible)
-
-End with a summary: total issues, breakdown by severity, and an overall assessment (merge-ready, needs-fixes, needs-rework)."
+  -c model_reasoning_effort=high \
+  -o /tmp/codex-code-review-${REVIEW_ID}.md
 ```
 
-Capture the Codex session ID from output (line containing `session id: <uuid>`). Store as `CODEX_SESSION_ID`.
+**Target mapping:**
+
+| Skill input | `codex exec review` flag |
+|-------------|--------------------------|
+| PR number / branch | `--base ${BASE_BRANCH}` |
+| `staged` | `--uncommitted` |
+| Specific commit | `--commit ${SHA}` |
 
 **Fail-open:** If codex is not installed or the command fails:
 - Self-review the diff against the same 8 categories
@@ -146,14 +129,16 @@ Capture the Codex session ID from output (line containing `session id: <uuid>`).
 
 ### Step 4: Present Feedback
 
-Read `/tmp/codex-code-review-${REVIEW_ID}.md` (round 1) or captured stdout (subsequent rounds).
+**Round 1:** Read `/tmp/codex-code-review-${REVIEW_ID}.md` (built-in review format, P1-P4 severity).
+
+**Round 2+:** Read `/tmp/codex-rereview-${REVIEW_ID}.json` (structured JSON per output schema).
 
 Present to user:
 
 ```markdown
 ## Codex Code Review — Round N (model: gpt-5.3-codex)
 
-[Codex's feedback]
+[Codex's feedback, normalized to consistent format]
 
 ---
 Issues: X total (Y critical, Z high, ...)
@@ -204,15 +189,69 @@ If **Undo**:
   → `git checkout -- [files modified in this round]`
   → Re-ask from the previous round's state
 
-### Step 6b: Re-submit to Codex
+### Step 6b: Re-submit to Codex (Round 2+)
 
-Resume existing session for context continuity:
+Write the structured output schema for re-review findings:
 
 ```bash
-codex exec resume ${CODEX_SESSION_ID} \
-  "The code has been revised based on your feedback. Re-read the changed files:
+cat > /tmp/codex-review-schema-${REVIEW_ID}.json <<'SCHEMA'
+{
+  "type": "object",
+  "properties": {
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "severity": { "enum": ["critical", "high", "medium", "low"] },
+          "category": { "enum": ["correctness", "security", "architecture", "performance", "error-handling", "testing", "maintainability", "type-safety"] },
+          "file": { "type": "string" },
+          "line": { "type": "string" },
+          "description": { "type": "string" },
+          "suggestion": { "type": "string" }
+        },
+        "required": ["severity", "category", "file", "description", "suggestion"],
+        "additionalProperties": false
+      }
+    },
+    "summary": {
+      "type": "object",
+      "properties": {
+        "total": { "type": "number" },
+        "critical": { "type": "number" },
+        "high": { "type": "number" },
+        "medium": { "type": "number" },
+        "low": { "type": "number" },
+        "assessment": { "enum": ["merge-ready", "needs-fixes", "needs-rework"] }
+      },
+      "required": ["total", "critical", "high", "medium", "low", "assessment"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["issues", "summary"],
+  "additionalProperties": false
+}
+SCHEMA
+```
 
-$(cat /tmp/codex-files-${REVIEW_ID}.txt)
+Use fresh `codex exec` with structured output and here-doc input (session resume does not support `-o` or `--output-schema`):
+
+```bash
+codex exec \
+  -m ${MODEL:-gpt-5.3-codex} \
+  -s read-only \
+  -c model_reasoning_effort=high \
+  --output-schema /tmp/codex-review-schema-${REVIEW_ID}.json \
+  -o /tmp/codex-rereview-${REVIEW_ID}.json \
+  <<EOF
+You are re-reviewing code changes after fixes were applied. This is round N.
+
+Read the diff at /tmp/codex-diff-${REVIEW_ID}.diff
+Read the changed files list at /tmp/codex-files-${REVIEW_ID}.txt
+Then read the full source of each changed file for context.
+
+Previous round found these issues:
+[List prior findings]
 
 Changes made:
 [List specific fixes]
@@ -223,15 +262,11 @@ Skipped (with rationale):
 Re-review. Focus on:
 1. Whether previous issues were actually fixed
 2. Any new issues introduced by the fixes
-3. Anything you missed in the first pass
+3. Anything missed in prior passes
 
-Provide findings in the same format: severity, category, file, description, suggestion.
-End with summary and updated assessment." 2>&1
+Review categories: correctness, security, architecture, performance, error-handling, testing, maintainability, type-safety.
+EOF
 ```
-
-**Note:** `codex exec resume` does NOT support `-o`. Capture full stdout.
-
-**If resume fails** (session expired): fall back to fresh `codex exec` with prior round context in the prompt.
 
 Return to Step 4.
 
@@ -240,7 +275,11 @@ Return to Step 4.
 Clean up temp files:
 
 ```bash
-rm -f /tmp/codex-code-review-${REVIEW_ID}.md /tmp/codex-diff-${REVIEW_ID}.diff /tmp/codex-files-${REVIEW_ID}.txt
+rm -f /tmp/codex-code-review-${REVIEW_ID}.md \
+  /tmp/codex-diff-${REVIEW_ID}.diff \
+  /tmp/codex-files-${REVIEW_ID}.txt \
+  /tmp/codex-review-schema-${REVIEW_ID}.json \
+  /tmp/codex-rereview-${REVIEW_ID}.json
 ```
 
 Present summary:
@@ -274,7 +313,12 @@ Then use **AskUserQuestion tool**:
 - **Fail-open:** on any error, fall back gracefully. Never trap the user.
 - If a fix contradicts user's explicit intent, skip it and note why
 - Review ID validated against `^[0-9]{8}-[0-9]{6}-[0-9a-f]{6}$`
+- **Round 1 uses `codex exec review`** — built-in structured review with P1-P4 severity
+- **Round 2+ uses `codex exec` with `--output-schema`** — custom 8-category review as structured JSON
+- **Always pass `-c model_reasoning_effort=high`** — deeper analysis for review tasks
+- **Use here-doc for prompts** — avoids shell escaping issues with long, multi-line prompts
 - **Diff-first approach** — Codex reads the diff, then the full files for context
 - **Undo is always available** — files are in git, user can revert any round
 - For PRs, include PR metadata (title, description) in the Codex prompt for intent context
 - Never commit on behalf of the user unless explicitly asked in Step 7
+- **Do NOT use `--ephemeral`** — silently breaks session resume (creates new session instead)
