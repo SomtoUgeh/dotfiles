@@ -41,7 +41,7 @@ Read both files:
 
 **If prd.json doesn't exist:**
 - Fall back to legacy mode (use spec.md + TodoWrite)
-- Suggest running `/workflows:plan` to generate prd.json
+- Suggest running `/sm-plan` to generate prd.json
 
 #### 1.2 Parse PRD and Normalize Schema
 
@@ -56,7 +56,7 @@ If stories[0] has "passes" field (boolean):
   → log/completed_at/commit may be missing (initialize as needed)
 
 If stories[0] has "status" field (string):
-  → Full schema from /workflows:plan — use as-is
+  → Full schema from /sm-plan — use as-is
 ```
 
 **Normalize each story to working state:**
@@ -326,7 +326,7 @@ while (executable stories remain):
 
 When updating prd.json, use atomic edits. Write back in the **same schema variant** as the source:
 
-**Full schema (from /workflows:plan):**
+**Full schema (from /sm-plan):**
 ```json
 { "status": "in_progress" }
 { "status": "completed", "completed_at": "2026-01-30T14:30:00Z", "commit": "abc123def" }
@@ -444,15 +444,15 @@ For each independent story:
    # Examples: npm run lint, pnpm lint, eslint ., etc.
    ```
 
-2. **Consider Additional Reviewer Agents** (for complex/risky changes)
+2. **Run Cross-Cutting Review Agents**
 
-   Note: code-reviewer and code-simplifier already ran per-story in step 7.
-   These are cross-cutting agents that benefit from seeing the full changeset:
+   code-reviewer and code-simplifier already ran per-story in step 7.
+   These agents MUST run against the full changeset to catch cross-story issues:
 
-   - **performance-oracle**: Check for performance issues across stories
-   - **security-sentinel**: Scan for security vulnerabilities across stories
+   - Task performance-oracle("Review full changeset for performance issues across all stories")
+   - Task security-sentinel("Scan full changeset for security vulnerabilities across all stories")
 
-   Run in parallel with Task tool if needed.
+   Launch both in parallel. Do not skip.
 
 3. **Final Validation**
    - All prd.json stories completed (status="completed" or passes=true)
@@ -544,7 +544,7 @@ If the input doesn't have prd.json:
 1. Read spec.md or plan file
 2. Use TodoWrite to break into tasks
 3. Execute using TodoWrite tracking
-4. Suggest running `/workflows:plan` to generate prd.json for future work
+4. Suggest running `/sm-plan` to generate prd.json for future work
 
 ## Key Principles
 

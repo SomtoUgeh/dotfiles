@@ -22,10 +22,6 @@ Perform exhaustive code reviews using multi-agent analysis, dynamic skill/agent 
 
 ### 1. Determine Review Target & Setup
 
-<thinking>
-First, determine the review target type and set up the code for analysis.
-</thinking>
-
 **Target Detection:**
 
 | Input | Type | Action |
@@ -47,10 +43,6 @@ First, determine the review target type and set up the code for analysis.
 
 ### 1b. Deslop Pre-pass
 
-<thinking>
-Before running review agents, clean AI-generated slop from the changeset. This removes noise so agents focus on real issues instead of flagging slop.
-</thinking>
-
 Run `/deslop` against the changed files. This removes unnecessary comments, defensive over-engineering, type hacks, style inconsistencies, and over-abstraction.
 
 - If reviewing a PR/branch: deslop all changed files
@@ -65,10 +57,6 @@ If deslop makes changes, note them before proceeding:
 If no slop found, proceed silently.
 
 ### 1c. Simplify Pass
-
-<thinking>
-After deslop removes noise, run /simplify to tighten logic, find reuse opportunities, and improve efficiency. This is a fast pass before heavier agent analysis.
-</thinking>
 
 Run `/simplify` on the changed files. This catches different issues than deslop:
 - **Deslop** removes AI slop (comments, defensive code, type hacks)
@@ -89,17 +77,17 @@ If simplify makes changes, note them:
 
 If no improvements found, proceed silently.
 
-### 2. Discover Review Agents & Skills
+### 2. Discover & Launch ALL Review Agents
 
-<thinking>
-Dynamically discover all available review agents and relevant skills from filesystem. Pay attention to the pr-review-toolkit agents (6), code-simplifier agent and kieran-typescript-reviewer agent
-</thinking>
+You MUST discover and run agents. This is not optional. Do not skip agents. Do not rationalize running fewer agents.
 
 **Discover Review Agents:**
 
 ```bash
-# Find all review agents
+# Core and auxiliary agents
 find ~/.claude/agents/review -name "*.md" 2>/dev/null
+
+# Plugin agents (pr-review-toolkit and others)
 find ~/.claude/plugins -path "*/agents/*.md" 2>/dev/null
 ```
 
@@ -113,15 +101,15 @@ for agent in $(find ~/.claude/agents ~/.claude/plugins -path "*/agents/*.md" 2>/
 done
 ```
 
-**Agent Categories:**
+**Agent sources:**
 
-| Category | Agents | Use For |
-|----------|--------|---------|
-| `review/` | security-sentinel, performance-oracle, architecture-strategist, code-simplicity-reviewer, kieran-typescript-reviewer, pattern-recognition-specialist | Code quality, security, performance |
-| `design/` | design-implementation-reviewer, figma-design-sync | UI reviews |
-| `research/` | git-history-analyzer | Historical context |
-| Plugin (review) | code-reviewer, silent-failure-hunter, type-design-analyzer, pr-test-analyzer, comment-analyzer | PR-specific reviews |
-| Plugin (refactor) | code-simplifier | Active code simplification |
+| Source | Agents | Purpose |
+|--------|--------|---------|
+| `~/.claude/agents/review/` | security-sentinel, performance-oracle, architecture-strategist, code-simplicity-reviewer, kieran-typescript-reviewer, pattern-recognition-specialist | Core review |
+| `~/.claude/agents/design/` | design-implementation-reviewer, figma-design-sync | UI review |
+| `~/.claude/agents/research/` | git-history-analyzer | Historical context |
+| pr-review-toolkit plugin | code-reviewer, silent-failure-hunter, type-design-analyzer, pr-test-analyzer, comment-analyzer | PR-specific review |
+| pr-review-toolkit plugin | code-simplifier | Active code simplification |
 
 **Simplification Agents - Different Roles:**
 
@@ -150,33 +138,30 @@ find ~/.claude/plugins -path "*/skills/*/SKILL.md" 2>/dev/null
 | `web-design-guidelines` | UX, accessibility |
 | `stripe-best-practices` | Payment code |
 
-### 3. Run Parallel Agent Analysis
-
-<thinking>
-Launch all relevant review agents in parallel for maximum coverage and speed.
-</thinking>
-
 **Core Review Agents (always run):**
 
-```
-Task security-sentinel: "Review PR for security vulnerabilities"
-Task performance-oracle: "Review PR for performance issues"
-Task architecture-strategist: "Review PR for architectural concerns"
-Task code-simplicity-reviewer: "Review PR for unnecessary complexity"
-Task pattern-recognition-specialist: "Review PR for anti-patterns"
-```
+- Task security-sentinel("Review these changed files for security vulnerabilities: <changed_files>")
+- Task performance-oracle("Review these changed files for performance issues: <changed_files>")
+- Task architecture-strategist("Review these changed files for architectural concerns: <changed_files>")
+- Task code-simplicity-reviewer("Review these changed files for unnecessary complexity: <changed_files>")
+- Task pattern-recognition-specialist("Review these changed files for anti-patterns: <changed_files>")
+- Task code-reviewer("Review these changed files for code quality issues: <changed_files>")
+
+Every single one. No exceptions.
 
 **Conditional Agents:**
 
-| Condition | Agent |
-|-----------|-------|
-| TypeScript files | `kieran-typescript-reviewer` |
-| UI components | `design-implementation-reviewer` |
-| New types defined | `type-design-analyzer` |
-| Error handling code | `silent-failure-hunter` |
-| Test files | `pr-test-analyzer` |
-| Comments added | `comment-analyzer` |
-| Plan folder has breadboard | `breadboard-reflection` |
+| Condition | Agent | Source |
+|-----------|-------|--------|
+| TypeScript files | `kieran-typescript-reviewer` | `~/.claude/agents/review/` |
+| UI components | `design-implementation-reviewer` | `~/.claude/agents/design/` |
+| New types defined | `type-design-analyzer` | pr-review-toolkit plugin |
+| Error handling code | `silent-failure-hunter` | pr-review-toolkit plugin |
+| Test files | `pr-test-analyzer` | pr-review-toolkit plugin |
+| Comments added | `comment-analyzer` | pr-review-toolkit plugin |
+| Plan folder has breadboard | `breadboard-reflection` | skill |
+
+If a conditional agent's trigger exists in the changeset, you MUST launch it. Do not skip.
 
 **Breadboard-Reflection Agent (when plan folder has breadboard):**
 
@@ -193,11 +178,11 @@ Load the `/breadboard-reflection` skill and run these checks against the impleme
 Task git-history-analyzer: "Analyze historical context for changed files"
 ```
 
-### 4. Apply Relevant Skills
+### 3. Wait for ALL agents, then proceed
 
-<thinking>
-Load skills that match the PR content for specialized guidance.
-</thinking>
+Do NOT move to the next step until every launched agent has returned findings. Collect all results before synthesizing.
+
+### 4. Apply Relevant Skills
 
 **For React/Next.js PRs:**
 ```
@@ -225,10 +210,6 @@ skill: web-design-guidelines
 
 ### 5. Stakeholder Perspective Analysis
 
-<thinking>
-Put yourself in each stakeholder's shoes. What matters to them? What are their pain points?
-</thinking>
-
 **Developer Perspective:**
 - How easy is this to understand and modify?
 - Are the APIs intuitive?
@@ -255,10 +236,6 @@ Put yourself in each stakeholder's shoes. What matters to them? What are their p
 
 ### 6. Scenario Exploration
 
-<thinking>
-Explore edge cases and failure scenarios. What could go wrong? How does the system behave under stress?
-</thinking>
-
 **Scenario Checklist:**
 
 - [ ] **Happy Path**: Normal operation with valid inputs
@@ -273,10 +250,6 @@ Explore edge cases and failure scenarios. What could go wrong? How does the syst
 - [ ] **Cascading Failures**: Downstream service issues
 
 ### 7. Synthesize Findings
-
-<thinking>
-Consolidate all agent reports into categorized findings. Remove duplicates, prioritize by severity.
-</thinking>
 
 **Synthesis Tasks:**
 
@@ -418,7 +391,7 @@ EOF
 
 **For all findings:**
 1. Triage: `/triage`
-2. Fix approved items: `/resolve_todo_parallel`
+2. Fix approved items: `/resolve-todo-parallel`
 3. Track progress in todo files or prd.json
 ```
 
@@ -440,11 +413,11 @@ EOF
 ~/.claude/plugins/**/skills/*/SKILL.md
 ```
 
-### Integration with /workflows:work
+### Integration with /sm-work
 
 When reviewing a plan folder:
 1. Read prd.json stories
 2. Map findings to specific stories
 3. Update story with `review_findings` array
 4. Add review event to log
-5. `/workflows:work` can then address findings per-story
+5. `/sm-work` can then address findings per-story

@@ -10,7 +10,7 @@ argument-hint: "[feature idea or problem to explore]"
 
 Shaping answers **WHAT** to build through structured R/S/fit-check dialogue. It precedes `/workflows:plan`, which answers **HOW** to build it.
 
-Load the `/shaping` skill as methodology reference throughout this workflow.
+You MUST load `skill: shaping` as methodology reference throughout this workflow.
 
 ## Feature Description
 
@@ -39,9 +39,10 @@ Use **AskUserQuestion tool** to suggest: "Your requirements seem detailed enough
 
 #### 1.1 Repository Research (Lightweight)
 
-Run a quick repo scan to understand existing patterns:
+You MUST run a repo scan to understand existing patterns before proceeding:
 
 - Task repo-research-analyst("Understand existing patterns related to: <feature_description>")
+Do not skip this.
 
 Focus on: similar features, established patterns, CLAUDE.md guidance.
 
@@ -67,16 +68,42 @@ Gather requirements via **AskUserQuestion tool**, one at a time.
 - Each R gets a description and status: Core goal, Must-have, Nice-to-have, Undecided, Out
 - Max 9 top-level Rs — chunk with sub-reqs (R3.1, R3.2) if exceeding
 - **R states the need, NOT the solution** — satisfaction is shown in fit check
+- Requirements MUST be testable — no vague verbs like "manage", "handle", "support" without specifics
+
+**Requirement types** (use these IDs where they add clarity):
+- **FR** — Functional requirements (what the system does)
+- **BR** — Business rules (invariants, constraints, calculations)
+- **NFR** — Non-functional requirements (security, performance, compatibility)
+
+These supplement the R table — use them when the requirement fits a clear type. Not every R needs a type prefix.
 
 **Exit condition:** Continue until user says "proceed" or requirements feel complete.
 
 Display the full R table after each addition:
 
 ```markdown
-| ID | Requirement | Status |
-|----|-------------|--------|
-| R0 | ... | Core goal |
-| R1 | ... | Must-have |
+| ID | Requirement | Type | Status |
+|----|-------------|------|--------|
+| R0 | ... | FR | Core goal |
+| R1 | ... | BR | Must-have |
+```
+
+#### 2.1 Separate Confirmed vs Assumed vs Open
+
+After gathering requirements, explicitly separate:
+
+- **Confirmed** — Directly stated by the user or source material
+- **Assumptions** — Reasonable defaults you're using. Label clearly: "Assumed: [X] unless told otherwise"
+- **Open Questions** — Things that need answers before planning. Flag whether they're blocking or non-blocking
+
+```markdown
+## Assumptions
+- A1: [assumption] — reasonable default, confirm before implementation
+- A2: [assumption]
+
+## Open Questions
+- Q1: [question] — BLOCKING (cannot plan without answer)
+- Q2: [question] — non-blocking (can proceed with assumption)
 ```
 
 ### Phase 3: Sketch Shapes
@@ -87,7 +114,8 @@ Propose **2-3 shapes** (A, B, C) with parts tables.
 - Each shape gets a short descriptive title
 - Each part = mechanism (what we BUILD), not intention
 - Parts should be vertical slices, not horizontal layers
-- Flag unknowns with ⚠️ in the Flag column
+- Flag unknowns with ! in the Flag column
+- **You MUST diagram each shape's data flow** — ASCII inline while discussing, Mermaid in the final doc. Drawing exposes gaps that prose hides. If you can't diagram it, you don't understand it yet.
 
 **Format per shape:**
 
@@ -97,18 +125,18 @@ Propose **2-3 shapes** (A, B, C) with parts tables.
 | Part | Mechanism | Flag |
 |------|-----------|:----:|
 | A1 | [concrete mechanism] | |
-| A2 | [mechanism with unknown] | ⚠️ |
+| A2 | [mechanism with unknown] | ! |
 ```
 
 Lead with your recommendation and explain why.
 
 ### Phase 4: Fit Check
 
-Build a single R x S matrix — binary ✅/❌ only.
+Build a single R x S matrix — binary pass/fail only.
 
 **Rules:**
 - Always show full requirement text, never abbreviate
-- Flagged unknowns (⚠️) → ❌ in fit check (can't claim what you don't know)
+- Flagged unknowns (!) → fail in fit check (can't claim what you don't know)
 - No inline commentary in shape columns — explanations go in Notes
 - If shape passes all checks but feels wrong → missing R, add it
 
@@ -117,8 +145,8 @@ Build a single R x S matrix — binary ✅/❌ only.
 
 | Req | Requirement | Status | A | B | C |
 |-----|-------------|--------|---|---|---|
-| R0 | [full text] | Core goal | ✅ | ✅ | ✅ |
-| R1 | [full text] | Must-have | ✅ | ❌ | ✅ |
+| R0 | [full text] | Core goal | pass | pass | pass |
+| R1 | [full text] | Must-have | pass | fail | pass |
 
 **Notes:**
 - B fails R1: [brief explanation]
@@ -134,7 +162,7 @@ Use **AskUserQuestion tool** to pick winning shape based on fit check.
 - Refine further before deciding
 
 **After selection:**
-- Call out remaining flagged unknowns (⚠️) in the selected shape
+- Call out remaining flagged unknowns (!) in the selected shape
 - Suggest spikes if unknowns need investigation before planning
 
 ### Phase 6: Folder Name
@@ -147,6 +175,20 @@ Before writing the brainstorm document, determine the plan folder name:
   - Keep it descriptive (3-5 words) so plans are findable by context
 
 This folder will later contain spec.md and prd.json when `/workflows:plan` runs.
+
+### Phase 6.5: Requirements Quality Gate
+
+Before writing the document, review all requirements critically. Check for:
+
+- Vague verbs ("manage", "handle", "support") without concrete specifics
+- Hidden implementation details disguised as requirements
+- Missing permissions / ownership rules (who can do what?)
+- Missing edge cases and failure scenarios
+- Missing acceptance criteria
+- Contradictions between requirements
+- Requirements that are really design decisions (belongs in shapes, not R table)
+
+Revise any issues found before proceeding.
 
 ### Phase 7: Capture the Shaping
 
@@ -186,11 +228,19 @@ status: brainstorm
 
 ## Requirements (R)
 
-| ID | Requirement | Status |
-|----|-------------|--------|
-| R0 | [requirement text] | Core goal |
-| R1 | [requirement text] | Must-have |
-| R2 | [requirement text] | Nice-to-have |
+| ID | Requirement | Type | Status |
+|----|-------------|------|--------|
+| R0 | [requirement text] | FR | Core goal |
+| R1 | [requirement text] | BR | Must-have |
+| R2 | [requirement text] | NFR | Nice-to-have |
+
+## Assumptions
+
+- A1: [assumption] — reasonable default, confirm before implementation
+
+## Open Questions
+
+- Q1: [question] — BLOCKING / non-blocking
 
 ## Shapes
 
@@ -199,7 +249,7 @@ status: brainstorm
 | Part | Mechanism | Flag |
 |------|-----------|:----:|
 | A1 | [mechanism] | |
-| A2 | [mechanism] | ⚠️ |
+| A2 | [mechanism] | ! |
 
 ### B: [Descriptive Title]
 
@@ -211,8 +261,8 @@ status: brainstorm
 
 | Req | Requirement | Status | A | B |
 |-----|-------------|--------|---|---|
-| R0 | [full text] | Core goal | ✅ | ✅ |
-| R1 | [full text] | Must-have | ✅ | ❌ |
+| R0 | [full text] | Core goal | pass | pass |
+| R1 | [full text] | Must-have | pass | fail |
 
 **Notes:**
 - B fails R1: [brief explanation]
@@ -222,7 +272,7 @@ status: brainstorm
 > **Shape [X]: [Title]** selected based on fit check.
 
 **Unresolved:**
-- [Any remaining ⚠️ flagged unknowns]
+- [Any remaining ! flagged unknowns]
 - [Suggested spikes if needed]
 
 ## Open Questions

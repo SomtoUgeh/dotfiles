@@ -1,6 +1,6 @@
 ---
 name: codex-plan-review
-description: Independent cross-model plan review via Codex CLI. Codex reviews spec.md + prd.json, Claude revises them directly, user controls the loop. Use after /workflows:plan or /deepen-plan, before /workflows:work.
+description: Independent cross-model plan review via Codex CLI. Codex reviews spec.md + prd.json, Claude revises them directly, user controls the loop. Use after /sm-plan or /deepen-plan, before /sm-work.
 user_invocable: true
 argument-hint: "[plan folder path] [model override, e.g., o4-mini]"
 ---
@@ -11,7 +11,7 @@ Independent cross-model review of implementation plans. Codex reviews, Claude re
 
 ## When to Use
 
-- After `/workflows:plan` or `/deepen-plan`, before `/workflows:work`
+- After `/sm-plan` or `/deepen-plan`, before `/sm-work`
 - High-stakes plans: auth, payments, data models, multi-service coordination
 - Plans that will take days to implement
 - When you want a genuinely independent perspective (not same-model echo chamber)
@@ -235,7 +235,7 @@ Then use **AskUserQuestion tool**:
 **Question:** "Plan reviewed and updated. What next?"
 
 **Options:**
-1. **Start `/workflows:work`** — Begin implementing stories
+1. **Start `/sm-work`** — Begin implementing stories
 2. **Run `/deepen-plan`** — Further enrich with skill/agent discovery
 3. **Review final plan** — Read updated spec.md
 4. **Done for now** — Come back later
