@@ -2,6 +2,7 @@
 name: workflows:plan
 description: Transform feature descriptions into well-structured specs and executable PRDs
 argument-hint: "[feature description, bug report, or improvement idea]"
+effort: max
 ---
 
 # Create a plan for a new feature or bug fix

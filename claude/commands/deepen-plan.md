@@ -2,6 +2,7 @@
 name: deepen-plan
 description: Enhance a plan with dynamic skill/agent discovery and targeted research
 argument-hint: "[path to plan folder, e.g., docs/plans/2026-01-30-feat-user-auth/]"
+effort: max
 ---
 
 # Deepen Plan

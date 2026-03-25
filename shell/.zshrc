@@ -174,6 +174,7 @@ alias cat="bat"
 
 # AI/Dev Tools
 alias yolo="claude --dangerously-skip-permissions"
+alias yolo-tg="claude --dangerously-skip-permissions --channels plugin:telegram@claude-plugins-official"
 
 # ============================================================================
 # FUNCTIONS
@@ -181,7 +182,7 @@ alias yolo="claude --dangerously-skip-permissions"
 
 # Zed shortcut
 z() {
-  /Applications/Zed.app/Contents/MacOS/cli ${@:-.} > /dev/null 2>&1 &!
+  /Applications/Zed.app/Contents/MacOS/cli ${@:-.} > /dev/null 2>&1 & disown
 }
 
 # Git commit
@@ -223,6 +224,66 @@ quit() {
 gif() {
   ffmpeg -i "$1" -vf "fps=25,scale=iw/2:ih/2:flags=lanczos,palettegen" -y "/tmp/palette.png"
   ffmpeg -i "$1" -i "/tmp/palette.png" -lavfi "fps=25,scale=iw/2:ih/2:flags=lanczos [x]; [x][1:v] paletteuse" -f image2pipe -vcodec ppm - | convert -delay 4 -layers Optimize -loop 0 - "${1%.*}.gif"
+}
+
+# Remote terminal (ttyd + caddy + ngrok)
+remote-session() {
+  stop-remote-session 2>/dev/null
+
+  local user="terminal"
+  local pass="${1:-terminal}"
+  local hashed=$(caddy hash-password --plaintext "$pass")
+
+  ttyd -W -p 7681 tmux new -A -s remote > /dev/null 2>&1 &
+  echo $! > /tmp/ttyd.pid
+
+  local caddyfile=$(mktemp)
+  printf '{\n  admin off\n}\n:7682 {\n  basic_auth {\n    %s %s\n  }\n  reverse_proxy localhost:7681\n}\n' \
+    "$user" "$hashed" > "$caddyfile"
+  caddy run --config "$caddyfile" --adapter caddyfile > /tmp/caddy.log 2>&1 &
+  echo $! > /tmp/caddy.pid
+
+  local j=0
+  while (( j++ < 10 )); do
+    curl -s -o /dev/null http://localhost:7682 2>/dev/null && break
+    sleep 0.5
+  done
+  if ! curl -s -o /dev/null http://localhost:7682 2>/dev/null; then
+    echo "Caddy failed to start. Log: /tmp/caddy.log"
+    stop-remote-session
+    return 1
+  fi
+
+  ngrok http 7682 --log=false > /dev/null 2>&1 &
+  echo $! > /tmp/ngrok.pid
+
+  local url="" i=0
+  while [[ -z "$url" ]] && (( i++ < 20 )); do
+    sleep 0.5
+    url=$(curl -s http://localhost:4040/api/tunnels 2>/dev/null | grep -o '"public_url":"https://[^"]*"' | cut -d'"' -f4)
+  done
+
+  if [[ -z "$url" ]]; then
+    echo "Failed to get ngrok URL"
+    stop-remote-session
+    return 1
+  fi
+
+  printf 'URL:  %s\nUser: %s\nPass: %s\n' "$url" "$user" "$pass" > /tmp/remote-session.txt
+  qrencode -t UTF8 "$url" >> /tmp/remote-session.txt
+  echo ""
+  cat /tmp/remote-session.txt
+  echo ""
+}
+
+stop-remote-session() {
+  for pidfile in /tmp/ttyd.pid /tmp/caddy.pid /tmp/ngrok.pid; do
+    [[ -f "$pidfile" ]] && kill -9 "$(cat "$pidfile")" 2>/dev/null && command rm "$pidfile"
+  done
+  pkill -f "ttyd -W -p 7681" 2>/dev/null
+  pkill -f "ngrok http 7682" 2>/dev/null
+  tmux kill-session -t remote 2>/dev/null
+  command rm /tmp/remote-session.txt 2>/dev/null
 }
 
 # ============================================================================

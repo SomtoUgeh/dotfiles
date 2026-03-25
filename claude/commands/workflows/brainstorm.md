@@ -2,6 +2,7 @@
 name: workflows:brainstorm
 description: Shape a feature through collaborative R/S/fit-check dialogue before planning implementation
 argument-hint: "[feature idea or problem to explore]"
+effort: max
 ---
 
 # Shape a Feature or Improvement
