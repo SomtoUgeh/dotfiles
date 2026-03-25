@@ -9,9 +9,7 @@
   },
   "includeCoAuthoredBy": false,
   "permissions": {
-    "allow": [
-      "Bash(find:*)"
-    ],
+    "allow": ["Bash(find:*)"],
     "deny": [],
     "defaultMode": "dontAsk"
   },

@@ -2,6 +2,7 @@
 name: workflows:review
 description: Perform exhaustive code reviews using multi-agent analysis and dynamic skill discovery
 argument-hint: "[PR number, GitHub URL, branch name, or plan folder path]"
+effort: max
 ---
 
 # Review Command
@@ -41,42 +42,6 @@ Perform exhaustive code reviews using multi-agent analysis, dynamic skill/agent 
 - [ ] Fetch PR metadata: `gh pr view --json title,body,files,baseRefName`
 - [ ] If plan folder provided → read prd.json for story context
 
-### 1b. Deslop Pre-pass
-
-Run `/deslop` against the changed files. This removes unnecessary comments, defensive over-engineering, type hacks, style inconsistencies, and over-abstraction.
-
-- If reviewing a PR/branch: deslop all changed files
-- If reviewing a plan folder: skip (no code to deslop)
-
-If deslop makes changes, note them before proceeding:
-
-```markdown
-**Deslop pre-pass:** [summary of what was cleaned]
-```
-
-If no slop found, proceed silently.
-
-### 1c. Simplify Pass
-
-Run `/simplify` on the changed files. This catches different issues than deslop:
-- **Deslop** removes AI slop (comments, defensive code, type hacks)
-- **Simplify** reviews for reuse, quality, and efficiency — then fixes
-
-```
-skill: simplify
-```
-
-- If reviewing a PR/branch: simplify all changed files
-- If reviewing a plan folder: skip (no code to simplify)
-
-If simplify makes changes, note them:
-
-```markdown
-**Simplify pass:** [summary of what was improved]
-```
-
-If no improvements found, proceed silently.
-
 ### 2. Discover & Launch ALL Review Agents
 
 You MUST discover and run agents. This is not optional. Do not skip agents. Do not rationalize running fewer agents.
@@ -110,6 +75,7 @@ done
 | `~/.claude/agents/research/` | git-history-analyzer | Historical context |
 | pr-review-toolkit plugin | code-reviewer, silent-failure-hunter, type-design-analyzer, pr-test-analyzer, comment-analyzer | PR-specific review |
 | pr-review-toolkit plugin | code-simplifier | Active code simplification |
+| code-review plugin | code-review | Active code review |
 
 **Simplification Agents - Different Roles:**
 
@@ -329,26 +295,6 @@ Examples:
 - Proposed Solutions: 2-3 options with pros/cons
 - Acceptance Criteria: Testable checklist
 
-#### Option C: PR Comments (for quick reviews)
-
-Post findings directly to PR:
-
-```bash
-gh pr comment <pr_number> --body "$(cat <<'EOF'
-## Code Review Findings
-
-### P1 - Critical (Blocks Merge)
-- [ ] **Security**: SQL injection in `src/api/users.ts:42`
-
-### P2 - Important
-- [ ] **Performance**: N+1 query in `src/services/posts.ts:87`
-
-### P3 - Nice-to-have
-- [ ] **Quality**: Unused import in `src/utils/helpers.ts:3`
-EOF
-)"
-```
-
 ### 9. Summary Report
 
 ```markdown
@@ -391,7 +337,7 @@ EOF
 
 **For all findings:**
 1. Triage: `/triage`
-2. Fix approved items: `/resolve-todo-parallel`
+2. Fix, validate, ship: `/workflows:finalize`
 3. Track progress in todo files or prd.json
 ```
 
@@ -413,11 +359,12 @@ EOF
 ~/.claude/plugins/**/skills/*/SKILL.md
 ```
 
-### Integration with /sm-work
+### Integration with workflows
 
 When reviewing a plan folder:
 1. Read prd.json stories
 2. Map findings to specific stories
 3. Update story with `review_findings` array
 4. Add review event to log
-5. `/sm-work` can then address findings per-story
+5. `/workflows:work` can then address findings per-story
+6. `/workflows:finalize` can fix, validate, and ship
