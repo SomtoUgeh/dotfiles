@@ -118,6 +118,7 @@ Before any review work, gather context.
 2. Read prd.json for story breakdown
 3. Read brainstorm.md if exists (R table, shapes, fit check)
 4. Read design.md if exists (from /office-hours)
+5. **COMPREHENSIVE detection:** If spec.md has `type: comprehensive` in frontmatter, also read all documents listed in the `documents` field (adr.md, backend.md, dtos.md, ui-design.md, frontend.md). The spec.md is a consolidating overview — the detailed docs contain the full specs needed for thorough review.
 
 ### Codebase Audit
 
