@@ -314,6 +314,7 @@ export CONTEXT7_API_KEY="ctx7sk-cbd93e41-f485-4a23-866c-469983827437"
 # npm global bin
 export PATH="$HOME/.npm-global/bin:$PATH"
 
-# claude-warden env
-source "$HOME/.claude/.warden/warden.env.sh"
 export PATH="$HOME/.resend/bin:$PATH"
+
+# Pass unmatched globs as literal strings (prevents [HAW-1234] from being interpreted)
+setopt NO_NOMATCH

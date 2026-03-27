@@ -2,7 +2,6 @@
 name: product
 description: Founder-mode product review — challenge premises, find gaps, ensure quality before implementation
 argument-hint: "[plan folder path, PR number, or feature description]"
-user-invocable: true
 effort: max
 ---
 

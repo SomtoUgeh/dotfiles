@@ -5,75 +5,11 @@
   },
   "env": {
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-sonnet-4-6",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-4-6",
-    "OTEL_METRICS_EXPORTER": "otlp",
-    "OTEL_LOGS_EXPORTER": "otlp",
-    "OTEL_EXPORTER_OTLP_PROTOCOL": "grpc",
-    "OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4317",
-    "OTEL_METRIC_EXPORT_INTERVAL": "60000",
-    "OTEL_LOGS_EXPORT_INTERVAL": "50000",
-    "OTEL_LOG_TOOL_DETAILS": "1",
-    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
-    "DISABLE_TELEMETRY": "0",
-    "DISABLE_ERROR_REPORTING": "1",
-    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "29000",
-    "CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS": "25000",
-    "MAX_THINKING_TOKENS": "25999",
-    "MAX_MCP_OUTPUT_TOKENS": "20000",
-    "BASH_MAX_OUTPUT_LENGTH": "25000",
-    "TASK_MAX_OUTPUT_LENGTH": "25000",
-    "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "1",
-    "DISABLE_COST_WARNINGS": "1",
-    "MCP_TIMEOUT": "60000",
-    "MCP_TOOL_TIMEOUT": "60000",
-    "CLAUDE_CODE_GLOB_TIMEOUT_SECONDS": "8",
-    "CLAUDE_CODE_BUBBLEWRAP": "1",
-    "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "1",
-    "CLAUDE_CODE_GLOB_HIDDEN": "0"
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-4-6"
   },
   "includeCoAuthoredBy": false,
   "permissions": {
     "allow": [
-      "Bash(ast-grep:*)",
-      "Bash(basename:*)",
-      "Bash(bat:*)",
-      "Bash(chmod +x:*)",
-      "Bash(chmod 600:*)",
-      "Bash(date:*)",
-      "Bash(diff:*)",
-      "Bash(dirname:*)",
-      "Bash(dust:*)",
-      "Bash(eza:*)",
-      "Bash(fd:*)",
-      "Bash(file:*)",
-      "Bash(find:*)",
-      "Bash(git branch:*)",
-      "Bash(git diff:*)",
-      "Bash(git log:*)",
-      "Bash(git ls-files:*)",
-      "Bash(git remote:*)",
-      "Bash(git rev-parse:*)",
-      "Bash(git show:*)",
-      "Bash(git stash list:*)",
-      "Bash(git status:*)",
-      "Bash(git tag:*)",
-      "Bash(id:*)",
-      "Bash(jq:*)",
-      "Bash(md5sum:*)",
-      "Bash(pwd:*)",
-      "Bash(readlink:*)",
-      "Bash(realpath:*)",
-      "Bash(rg:*)",
-      "Bash(sha256sum:*)",
-      "Bash(stat:*)",
-      "Bash(strings:*)",
-      "Bash(tokei:*)",
-      "Bash(tree:*)",
-      "Bash(uname:*)",
-      "Bash(uv:*)",
-      "Bash(wc:*)",
-      "Bash(which:*)",
-      "Bash(xxd:*)",
       "Bash(find:*)"
     ],
     "deny": [],
@@ -81,16 +17,6 @@
   },
   "hooks": {
     "PreToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/pre-tool-use",
-            "timeout": 30
-          }
-        ]
-      },
       {
         "matcher": "Bash",
         "hooks": [
@@ -100,49 +26,9 @@
             "timeout": 5
           }
         ]
-      },
-      {
-        "matcher": "Read",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/read-guard",
-            "timeout": 10
-          }
-        ]
       }
     ],
     "PostToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/post-tool-use",
-            "timeout": 10
-          }
-        ]
-      },
-      {
-        "matcher": "Read",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/read-compress",
-            "timeout": 7
-          }
-        ]
-      },
-      {
-        "matcher": "mcp__*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/mcp-output-compress",
-            "timeout": 10
-          }
-        ]
-      },
       {
         "matcher": "Write|Edit",
         "hooks": [
@@ -153,169 +39,23 @@
           }
         ]
       }
-    ],
-    "PermissionRequest": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/permission-request",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/stop",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "SubagentStart": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/subagent-start",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/subagent-stop",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "SessionStart": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/session-start",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "PostToolUseFailure": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/tool-error",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "SessionEnd": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/session-end",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "ConfigChange": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/config-change",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "PreCompact": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/pre-compact",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "Elicitation": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/elicitation",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "ElicitationResult": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/elicitation-result",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "InstructionsLoaded": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/instructions-loaded",
-            "timeout": 10
-          }
-        ]
-      }
     ]
   },
   "statusLine": {
     "type": "command",
-    "command": "$HOME/.claude/statusline.sh",
+    "command": "~/.claude/statusline.sh",
     "padding": 0
   },
   "enabledPlugins": {
     "agent-sdk-dev@claude-plugins-official": true,
     "claude-code-setup@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true,
-    "context7@claude-plugins-official": true,
     "explanatory-output-style@claude-plugins-official": true,
     "frontend-design@claude-plugins-official": true,
     "hookify@claude-plugins-official": true,
     "learning-output-style@claude-plugins-official": true,
     "playground@claude-plugins-official": true,
-    "pr-review-toolkit@claude-plugins-official": true,
-    "context-mode@context-mode": true
+    "pr-review-toolkit@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "context-mode": {
