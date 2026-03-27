@@ -2,7 +2,6 @@
 name: resolve-pr-parallel
 description: Resolve all PR comments using parallel processing, then extract reusable conventions
 argument-hint: "[optional: PR number or current PR]"
-disable-model-invocation: true
 ---
 
 # Resolve PR Parallel

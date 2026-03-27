@@ -2,7 +2,6 @@
 name: resolve-todo-parallel
 description: Resolve all pending CLI todos using parallel processing
 argument-hint: "[optional: specific todo ID or pattern]"
-disable-model-invocation: true
 ---
 
 # Resolve Todo Parallel

@@ -2,7 +2,7 @@
 name: workflows:plan
 description: Transform feature descriptions into well-structured specs and executable PRDs
 argument-hint: "[feature description, bug report, or improvement idea]"
-disable-model-invocation: true
+effort: max
 ---
 
 # Plan
