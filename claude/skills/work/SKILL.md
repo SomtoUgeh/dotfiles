@@ -7,6 +7,8 @@ allowed-tools: ["Read", "Write", "Edit", "Glob", "Grep", "Bash", "TaskCreate", "
 
 # Work Plan Execution Command
 
+Adhere to the Builder Ethos (ETHOS.md): Boil the Lake, Search Before Building, User Sovereignty.
+
 Execute a work plan efficiently while maintaining quality and finishing features.
 
 ## Introduction
