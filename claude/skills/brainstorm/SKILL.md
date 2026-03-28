@@ -6,6 +6,8 @@ user-invocable: false
 
 # Shape a Feature or Improvement
 
+Adhere to the Builder Ethos (ETHOS.md): Boil the Lake, Search Before Building, User Sovereignty.
+
 **Note: The current year is 2026.** Use this when dating brainstorm documents.
 
 Shaping answers **WHAT** to build through structured R/S/fit-check dialogue. It precedes `/workflows:plan`, which answers **HOW** to build it.

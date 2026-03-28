@@ -1,8 +1,11 @@
-<philosophy>
-This codebase/folder will outlive you. Every shortcut becomes someone else's burden. Every hack compounds into technical debt that slows the whole team down.
-You are not just writing code. You are shaping the future of this project. The patterns you establish will be copied. The corners you cut will be cut again.
-Fight entropy. Leave the codebase better than you found it.
-</philosophy>
+<ethos>
+Three principles govern all work (see ETHOS.md for anti-patterns and detail):
+1. **Boil the Lake** — completeness is cheap with AI. Do the complete thing. Always. Lakes (boilable scope) vs. oceans (unbounded scope).
+2. **Search Before Building** — check what exists before designing from scratch. Three layers: tried-and-true, new-and-popular (scrutinize), first-principles (most valuable).
+3. **User Sovereignty** — AI recommends, user decides. Present recommendations + what context you might be missing, then ask. Never act on changes that alter the user's stated direction.
+
+This codebase will outlive you. The patterns you establish will be copied. The corners you cut will be cut again. Fight entropy.
+</ethos>
 
 <context>
 Context is your most important resource. Prefer using subagents (Task tool) so that exploration, research, and verbose work happen outside the main conversation.
@@ -34,16 +37,12 @@ Context is your most important resource. Prefer using subagents (Task tool) so t
 </core>
 
 <development>
-- When implementing new features, thinking through solutions or refactoring, do NOT feel constrained by the existing implementation. We can make breaking changes if it results in a better, simpler design. Favor clarity and simplicity over preserving backwards compatibility or old abstractions.
-
-When writing new code, keep in mind:
-- YAGNI (You Aren’t Gonna Need It): Don’t add functionality until it’s actually needed.
-- KISS (Keep It Simple, Stupid): Prefer simple, straightforward solutions over clever or complex ones.
-- SOLID: Follow good design principles to keep code maintainable and extensible.
-- The Zen of Python: Readability counts. Simple is better than complex. Explicit is better than implicit.
-- Cognitive Load: Minimize the mental effort required to understand the code.
-- Vertical Slice Architecture (if applicable): Implement features end-to-end in thin, vertical slices instead of broad, horizontal layers.
-- If any recent implementation or existing code does not align with these principles, CHANGE IT IMMEDIATELY, along with any surrounding code and tests as needed.
+- Breaking changes are fine if the result is simpler. Favor clarity over backwards compatibility.
+- SOLID: maintainable, extensible design.
+- Cognitive Load: minimize mental effort to understand code.
+- Vertical Slice Architecture (if applicable): end-to-end in thin vertical slices, not broad horizontal layers.
+- Readability counts. Simple > complex. Explicit > implicit.
+- If existing code violates these principles, fix it immediately.
 </development>
 
 <code-quality>
@@ -133,6 +132,28 @@ gh CLI (API operations):
 - Run `direnv allow` after creating `.envrc`
 - direnv hook must be in `~/.zshrc`: `eval "$(direnv hook zsh)"`
 </multi-github-accounts>
+
+<architecture>
+This is a dotfiles repo. `claude/` is symlinked to `~/.claude/`.
+
+```
+claude/
+  CLAUDE.md          # root instructions (this file)
+  ETHOS.md           # builder principles — referenced by skills
+  settings.json      # Claude Code settings + permissions
+  mcp.json           # MCP server config
+  skills/*/SKILL.md  # portable skills (flat: skills/<name>/SKILL.md)
+  agents/{category}/*.md  # subagents (review/, research/, workflow/)
+  commands/*.md      # standalone commands
+  commands/workflows/*.md # interactive workflow commands (/workflows:*)
+  hooks/             # git/Claude hooks
+```
+
+- Skills = self-contained, some fork (`context: fork`). Invoked via `skill:` tool.
+- Agents = spawned via Agent tool, can't be skills.
+- Commands = colon-separated (`/workflows:plan`), workflow commands are interactive.
+- Naming: hyphens, not underscores.
+</architecture>
 
 <known-gotchas>
 - `cd` in Bash tool calls does NOT persist between calls. In git worktrees, always use absolute paths or `cd /path && command` in a single Bash call.

@@ -6,6 +6,8 @@ user-invocable: false
 
 # Create a plan for a new feature or bug fix
 
+Adhere to the Builder Ethos (ETHOS.md): Boil the Lake, Search Before Building, User Sovereignty.
+
 ## Introduction
 
 **Note: The current year is 2026.** Use this when dating plans and searching for recent documentation.

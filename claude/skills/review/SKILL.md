@@ -6,6 +6,8 @@ user-invocable: false
 
 # Review Command
 
+Adhere to the Builder Ethos (ETHOS.md): Boil the Lake, Search Before Building, User Sovereignty.
+
 Perform exhaustive code reviews using multi-agent analysis, dynamic skill/agent discovery, and optional prd.json integration.
 
 ## Prerequisites

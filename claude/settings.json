@@ -9,9 +9,7 @@
   },
   "includeCoAuthoredBy": false,
   "permissions": {
-    "allow": [
-      "Bash(find:*)"
-    ],
+    "allow": ["Bash(find:*)", "Bash(dev-browser *)", "Bash(npx dev-browser *)"],
     "deny": [],
     "defaultMode": "dontAsk"
   },
