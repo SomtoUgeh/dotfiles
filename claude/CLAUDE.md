@@ -133,28 +133,6 @@ gh CLI (API operations):
 - direnv hook must be in `~/.zshrc`: `eval "$(direnv hook zsh)"`
 </multi-github-accounts>
 
-<architecture>
-This is a dotfiles repo. `claude/` is symlinked to `~/.claude/`.
-
-```
-claude/
-  CLAUDE.md          # root instructions (this file)
-  ETHOS.md           # builder principles — referenced by skills
-  settings.json      # Claude Code settings + permissions
-  mcp.json           # MCP server config
-  skills/*/SKILL.md  # portable skills (flat: skills/<name>/SKILL.md)
-  agents/{category}/*.md  # subagents (review/, research/, workflow/)
-  commands/*.md      # standalone commands
-  commands/workflows/*.md # interactive workflow commands (/workflows:*)
-  hooks/             # git/Claude hooks
-```
-
-- Skills = self-contained, some fork (`context: fork`). Invoked via `skill:` tool.
-- Agents = spawned via Agent tool, can't be skills.
-- Commands = colon-separated (`/workflows:plan`), workflow commands are interactive.
-- Naming: hyphens, not underscores.
-</architecture>
-
 <known-gotchas>
 - `cd` in Bash tool calls does NOT persist between calls. In git worktrees, always use absolute paths or `cd /path && command` in a single Bash call.
 - Skills and global Claude configs belong in `~/.claude/skills/` (global) or `.claude/skills/` (project-local). Do NOT create skills inside plugin directories unless explicitly told to.
