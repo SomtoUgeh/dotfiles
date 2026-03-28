@@ -273,9 +273,8 @@ create_symlink "$DOTFILES_DIR/config/starship/starship.toml" "$HOME/.config/star
 echo ""
 echo "Setting up GitHub CLI configuration..."
 
-if [ -d "$DOTFILES_DIR/config/gh" ]; then
-    create_symlink "$DOTFILES_DIR/config/gh" "$HOME/.config/gh"
-fi
+mkdir -p "$HOME/.config/gh"
+create_symlink "$DOTFILES_DIR/config/gh/config.yml" "$HOME/.config/gh/config.yml"
 
 # =============================================================================
 # Custom scripts

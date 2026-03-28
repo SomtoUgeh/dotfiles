@@ -1,7 +1,3 @@
-[user]
-	name = SomtoUgeh
-	email = smugeh@gmail.com
-
 [pull]
 	rebase = true
 [branch]
@@ -68,3 +64,5 @@
 	smudge = git-lfs smudge -- %f
 	process = git-lfs filter-process
 	required = true
+[include]
+	path = ~/.gitconfig.local
