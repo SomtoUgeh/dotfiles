@@ -1,3 +1,4 @@
 shell/.zprofile
+git/.gitconfig.local
 config/gh/hosts.yml
 npm/
