@@ -1,20 +1,20 @@
 ---
-name: product
-description: Founder-mode product review — challenge premises, find gaps, ensure quality before implementation
+name: plan-review
+description: Founder-mode plan review — stress-test a plan before implementation begins
 argument-hint: "[plan folder path, PR number, or feature description]"
 effort: max
 ---
 
-# Product
+# Plan Review
 
 ## Review Target
 
 <review_target> #$ARGUMENTS </review_target>
 
-Load and execute the plan-ceo-review skill:
+Load and execute the so-plan-review skill:
 
 ```
-skill: plan-ceo-review
+skill: so-plan-review
 ```
 
 Pass the review target above to the skill's "Detect Review Target" step.

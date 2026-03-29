@@ -1,5 +1,5 @@
 ---
-name: plan
+name: so-plan
 description: Transform feature descriptions into well-structured specs and executable PRDs
 user-invocable: false
 ---
@@ -398,7 +398,7 @@ Every decision falls into one of three categories:
 
 **Consolidating spec.md (COMPREHENSIVE only):**
 
-In addition to the 5 detailed docs, always produce a spec.md that serves as the entry point. This is what downstream tools (plan-ceo-review, deepen-plan, workflows:work) read first.
+In addition to the 5 detailed docs, always produce a spec.md that serves as the entry point. This is what downstream tools (so-plan-review, deepen-plan, workflows:work) read first.
 
 ```markdown
 ---

@@ -19,7 +19,7 @@ Product diagnostic that ensures the problem is understood before solutions are p
 ## Where This Fits
 
 ```
-office-hours (WHY) -> brainstorm (WHAT) -> plan (HOW) -> work (DO) -> review (CHECK)
+office-hours (WHY) -> so-brainstorm (WHAT) -> so-plan (HOW) -> so-plan-review (GOOD ENOUGH?) -> so-work (DO) -> so-review (CHECK)
 ```
 
 Run this BEFORE `/workflows:brainstorm`. It answers "should we build this?" — brainstorm answers "what exactly should we build?"

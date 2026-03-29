@@ -12,7 +12,7 @@ effort: max
 Load and execute the review skill:
 
 ```
-skill: review
+skill: so-review
 ```
 
 Pass the review target above to the skill.

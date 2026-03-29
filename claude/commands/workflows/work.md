@@ -12,7 +12,7 @@ effort: max
 Load and execute the work skill:
 
 ```
-skill: work
+skill: so-work
 ```
 
 Pass the input above to the skill.
