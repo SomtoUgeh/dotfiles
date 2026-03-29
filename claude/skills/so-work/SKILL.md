@@ -1,7 +1,6 @@
 ---
 name: so-work
 description: Execute work plans efficiently while maintaining quality and finishing features
-user-invocable: false
 allowed-tools: ["Read", "Write", "Edit", "Glob", "Grep", "Bash", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet", "TaskOutput", "TaskStop", "Skill", "AskUserQuestion"]
 ---
 

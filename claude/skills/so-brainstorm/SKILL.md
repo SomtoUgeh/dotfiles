@@ -1,7 +1,6 @@
 ---
 name: so-brainstorm
 description: Shape a feature through collaborative R/S/fit-check dialogue before planning implementation
-user-invocable: false
 ---
 
 # Shape a Feature or Improvement
