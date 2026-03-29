@@ -12,7 +12,7 @@ effort: max
 Load and execute the plan skill:
 
 ```
-skill: plan
+skill: so-plan
 ```
 
 Pass the feature description above to the skill.

@@ -1,5 +1,5 @@
 ---
-name: finalize
+name: so-finalize
 description: "Ship-readiness pass: review, fix, and validate working copy or PR changes. This skill should be used when asked to finalize, harden, do a final pass, or make code shippable. Runs as a forked subagent."
 context: fork
 ---

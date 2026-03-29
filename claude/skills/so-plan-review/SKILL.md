@@ -1,5 +1,5 @@
 ---
-name: plan-ceo-review
+name: so-plan-review
 description: |
   Founder-mode plan review — stress-test a plan before implementation begins.
   Four modes: EXPAND (dream big), SELECTIVE (hold scope + cherry-pick expansions),
@@ -21,7 +21,7 @@ Founder-mode review that stress-tests a plan before implementation. Not a rubber
 ## Where This Fits
 
 ```
-office-hours (WHY) -> brainstorm (WHAT) -> plan (HOW) -> plan-ceo-review (GOOD ENOUGH?) -> work (DO) -> review (CHECK)
+office-hours (WHY) -> so-brainstorm (WHAT) -> so-plan (HOW) -> so-plan-review (GOOD ENOUGH?) -> so-work (DO) -> so-review (CHECK)
 ```
 
 Run AFTER `/workflows:plan` produces spec.md and prd.json. Run BEFORE `/workflows:work`.
@@ -575,56 +575,29 @@ Tuned for review quality, not doc quality:
 
 ## Outside Voice (Optional)
 
-Independent challenge from a different perspective. Prefer a different model (Codex) when available — two different AI models agreeing is stronger signal than one model reviewing itself.
+Independent cross-model challenge via `codex-plan-review`. Two different AI models agreeing is stronger signal than one model reviewing itself.
 
 ### Offer
 
-Via AskUserQuestion: "Want an outside voice? A different AI model can independently challenge this plan — logical gaps, feasibility risks, blind spots. Recommended for plans with >5 files or new architecture."
+Via AskUserQuestion: "Want an outside voice? Codex can independently review the plan with structured output — categorized issues, severity ratings, and concrete suggestions. Recommended for plans with >5 files or new architecture."
 
 If declined, skip to completion summary.
 
-### Availability Check
-
-```bash
-which codex 2>/dev/null
-```
-
-### Construct Challenge Prompt
-
-Assemble from the review:
-- Plan summary (from spec.md)
-- Mode selected and key scope decisions
-- Error/rescue registry (condensed)
-- Failure modes registry (CRITICAL GAPS only)
-- Top findings by severity
-- Architecture diagram
-
-Truncate at 30KB if needed — prioritize registries and critical gaps.
-
-Challenge prompt: "You are a brutally honest technical reviewer. You have NEVER seen this plan or review before. Read it fresh and find what the review missed: logical gaps, overcomplexity, feasibility risks, missing dependencies or sequencing issues, strategic miscalibration. Be direct. Be terse. No compliments."
-
 ### Execute
 
-**If Codex available:**
-
-```bash
-CODEX_PROMPT_FILE=$(mktemp /tmp/ceo-review-codex-XXXXXXXX.txt)
-# Write challenge prompt + context to file
-codex exec "$(cat "$CODEX_PROMPT_FILE")" -s read-only -c 'model_reasoning_effort="high"'
-```
-
-Present full output verbatim:
+Invoke the codex-plan-review skill, passing the plan folder path:
 
 ```
-OUTSIDE VOICE (Codex):
-[verbatim output]
+skill: codex-plan-review
 ```
 
-**Error handling:** Auth failure, timeout, empty response — all non-blocking. Fall back to Claude subagent.
+This runs structured Codex review (correctness, architecture, security, data-model, edge-cases, story-breakdown, feasibility), revises spec.md/prd.json directly, and loops until the user is satisfied.
 
-**If Codex NOT available (or errored):**
+**If codex-plan-review fails** (Codex not installed, auth error, etc.):
 
-- Task general-purpose("[challenge prompt + context]")
+Fall back to Claude subagent challenge:
+
+- Task general-purpose("You are a brutally honest technical reviewer. You have NEVER seen this plan before. Read [plan folder path]/spec.md and prd.json fresh and find what the review missed: logical gaps, overcomplexity, feasibility risks, missing dependencies or sequencing issues, strategic miscalibration. Be direct. Be terse. No compliments.")
 
 Present under:
 
@@ -696,7 +669,7 @@ Add `review_findings` to each relevant story:
 {
   "severity": "P1",
   "category": "architecture",
-  "agent": "plan-ceo-review",
+  "agent": "so-plan-review",
   "finding": "No rollback plan for migration",
   "file": "docs/plans/.../spec.md",
   "suggestion": "Add explicit rollback steps in deployment section",

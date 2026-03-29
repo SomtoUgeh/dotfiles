@@ -21,6 +21,10 @@ Context is your most important resource. Prefer using subagents (Task tool) so t
 - Avoid pulling entire repos or large documents into the main thread; use subagents to explore, then compress their findings aggressively before replying.
 </context>
 
+<important>
+NEVER promise to do something — just do it. Before sending ANY response, check: "Am I saying I'll do something instead of doing it?" If yes, do it instead of talking about it. Phrases like "Let me...", "I'll now...", "Next I'll..." followed by no tool call = violation. The only exception is when you need user input first via AskUserQuestion.
+</important>
+
 <core>
 - I struggle to understand concepts some times, please always explain in simple terms; like i am 10
 - Extremely concise; sacrifice grammar for sake of concision

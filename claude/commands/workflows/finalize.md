@@ -10,7 +10,7 @@ effort: max
 Load and execute the finalize skill:
 
 ```
-skill: finalize
+skill: so-finalize
 ```
 
 Pass through any arguments from the user (working-copy, pr, both, or infer from context).

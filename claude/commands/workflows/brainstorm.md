@@ -11,7 +11,7 @@ argument-hint: "[feature idea or problem to explore]"
 Load and execute the brainstorm skill:
 
 ```
-skill: brainstorm
+skill: so-brainstorm
 ```
 
 Pass the feature description above to the skill.
