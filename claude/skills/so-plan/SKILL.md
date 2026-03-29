@@ -1,7 +1,6 @@
 ---
 name: so-plan
 description: Transform feature descriptions into well-structured specs and executable PRDs
-user-invocable: false
 ---
 
 # Create a plan for a new feature or bug fix

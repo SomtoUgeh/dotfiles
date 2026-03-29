@@ -1,7 +1,6 @@
 ---
 name: so-review
 description: Perform exhaustive code reviews using multi-agent analysis and dynamic skill discovery
-user-invocable: false
 ---
 
 # Review Command
