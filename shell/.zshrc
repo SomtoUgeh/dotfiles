@@ -99,6 +99,7 @@ export ENABLE_BACKGROUND_TASKS=1
 export FORCE_AUTO_BACKGROUND_TASKS=1
 export CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1
 export CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=1
+export CLAUDE_CODE_NO_FLICKER=1
 
 # ============================================================================
 # COMPLETIONS
@@ -318,3 +319,5 @@ export PATH="$HOME/.resend/bin:$PATH"
 
 # Pass unmatched globs as literal strings (prevents [HAW-1234] from being interpreted)
 setopt NO_NOMATCH
+# CF CLI completions
+[[ -f "/Users/somto/.config/cf/completions/_cf.zsh" ]] && source "/Users/somto/.config/cf/completions/_cf.zsh"

@@ -4,7 +4,7 @@ set -euo pipefail
 # Git Worktree Manager (gwt)
 # Uses sibling directories to avoid Turbopack/IDE conflicts
 
-VERSION="1.0.0"
+VERSION="1.2.0"
 SEPARATOR="--"
 CLAUDE_WT_DIR="$HOME/.claude-worktrees"
 
@@ -45,6 +45,26 @@ warn() {
   if [[ "$JSON_OUTPUT" == "false" ]]; then
     echo -e "${YELLOW}!${NC} $1"
   fi
+}
+
+trim_whitespace() {
+  local value="$1"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  printf '%s' "$value"
+}
+
+list_matching_paths() {
+  local root_dir="$1"
+  local pattern="$2"
+
+  (
+    shopt -s nullglob dotglob globstar
+    cd "$root_dir"
+
+    local matches=( $pattern )
+    printf '%s\n' "${matches[@]}"
+  )
 }
 
 # Get the repo name from directory (not remote, for consistency with filesystem)
@@ -88,8 +108,20 @@ get_worktree_path() {
   echo "${parent_dir}/${repo_name}${SEPARATOR}${sanitized_branch}"
 }
 
-# Copy env/secret files from main repo to worktree (recursive)
-copy_env_files() {
+# Copy one file from the main repo into the worktree, preserving its relative path.
+copy_file_into_worktree() {
+  local source_file="$1"
+  local main_dir="$2"
+  local worktree_dir="$3"
+
+  local rel_path="${source_file#$main_dir/}"
+  local target_dir="$worktree_dir/$(dirname "$rel_path")"
+  mkdir -p "$target_dir"
+  cp "$source_file" "$target_dir/$(basename "$source_file")"
+}
+
+# Copy default env/secret files from main repo to worktree (recursive).
+copy_default_env_files() {
   local main_dir="$1"
   local worktree_dir="$2"
 
@@ -105,10 +137,7 @@ copy_env_files() {
   local count=0
   for pattern in "${patterns[@]}"; do
     while IFS= read -r -d '' file; do
-      local rel_path="${file#$main_dir/}"
-      local target_dir="$worktree_dir/$(dirname "$rel_path")"
-      mkdir -p "$target_dir"
-      cp "$file" "$target_dir/$(basename "$file")"
+      copy_file_into_worktree "$file" "$main_dir" "$worktree_dir"
       count=$((count + 1))
     done < <(find "$main_dir" -name "$pattern" -not -path "*/node_modules/*" -not -path "*/.git/*" -not -path "*/dist/*" -not -path "*/tmp/*" -print0 2>/dev/null)
   done
@@ -116,6 +145,92 @@ copy_env_files() {
   if [[ $count -gt 0 ]]; then
     info "Copied $count env/secret file(s)"
   fi
+}
+
+# Copy files listed in .worktreeinclude from the main repo to the worktree.
+copy_worktreeinclude_files() {
+  local main_dir="$1"
+  local worktree_dir="$2"
+  local include_file="$main_dir/.worktreeinclude"
+
+  local count=0
+  local missing=0
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    local pattern
+    pattern=$(trim_whitespace "$line")
+
+    if [[ -z "$pattern" || "${pattern:0:1}" == "#" ]]; then
+      continue
+    fi
+
+    local matched=false
+    while IFS= read -r rel_path; do
+      [[ -n "$rel_path" ]] || continue
+
+      local source_file="$main_dir/$rel_path"
+      if [[ -f "$source_file" || -L "$source_file" ]]; then
+        copy_file_into_worktree "$source_file" "$main_dir" "$worktree_dir"
+        count=$((count + 1))
+        matched=true
+      fi
+    done < <(list_matching_paths "$main_dir" "$pattern")
+
+    if [[ "$matched" == "false" ]]; then
+      warn "No match for .worktreeinclude entry: $pattern"
+      missing=$((missing + 1))
+    fi
+  done < "$include_file"
+
+  if [[ $count -gt 0 ]]; then
+    info "Copied $count file(s) from .worktreeinclude"
+  fi
+
+  if [[ $count -eq 0 && $missing -eq 0 ]]; then
+    warn ".worktreeinclude exists but has no active entries"
+  fi
+}
+
+# Copy env/secret files from main repo to worktree.
+copy_env_files() {
+  local main_dir="$1"
+  local worktree_dir="$2"
+  local include_file="$main_dir/.worktreeinclude"
+
+  if [[ -f "$include_file" ]]; then
+    copy_worktreeinclude_files "$main_dir" "$worktree_dir"
+    return
+  fi
+
+  copy_default_env_files "$main_dir" "$worktree_dir"
+}
+
+get_repo_script_path() {
+  local main_dir="$1"
+  local script_name="$2"
+  local script_path="$main_dir/scripts/$script_name"
+
+  if [[ -f "$script_path" ]]; then
+    echo "$script_path"
+    return
+  fi
+
+  echo ""
+}
+
+run_repo_script() {
+  local script_path="$1"
+  local main_dir="$2"
+  local worktree_dir="$3"
+  local skip_file_copy="${4:-0}"
+
+  [[ -n "$script_path" ]] || return 1
+
+  info "Running $(basename "$script_path")"
+  CODEX_SOURCE_TREE_PATH="$main_dir" \
+  CODEX_WORKTREE_PATH="$worktree_dir" \
+  GWT_SKIP_FILE_COPY="$skip_file_copy" \
+  "$script_path"
 }
 
 # Find worktree by partial branch match
@@ -203,8 +318,16 @@ cmd_new() {
     git worktree add -b "$branch" "$worktree_path" "$from_ref"
   fi
 
-  # Copy .env files if enabled
-  if [[ "$COPY_ENV" == "true" ]]; then
+  local setup_script
+  setup_script=$(get_repo_script_path "$main_dir" "setup-worktree.sh")
+
+  if [[ -n "$setup_script" ]]; then
+    local skip_file_copy="0"
+    if [[ "$COPY_ENV" != "true" ]]; then
+      skip_file_copy="1"
+    fi
+    run_repo_script "$setup_script" "$main_dir" "$worktree_path" "$skip_file_copy"
+  elif [[ "$COPY_ENV" == "true" ]]; then
     copy_env_files "$main_dir" "$worktree_path"
   fi
 
@@ -215,9 +338,6 @@ cmd_new() {
     echo ""
     echo "To switch:"
     echo "  cd $worktree_path"
-    echo ""
-    echo "Then install dependencies:"
-    echo "  bun install"
   fi
 }
 
@@ -328,6 +448,13 @@ cmd_rm() {
   # Get branch name
   local branch
   branch=$(git -C "$path" branch --show-current 2>/dev/null || echo "")
+  local main_dir cleanup_script
+  main_dir=$(get_main_repo_dir)
+  cleanup_script=$(get_repo_script_path "$main_dir" "cleanup-worktree.sh")
+
+  if [[ -n "$cleanup_script" ]]; then
+    run_repo_script "$cleanup_script" "$main_dir" "$path" "1"
+  fi
 
   info "Removing worktree: $path"
   git worktree remove "$path" --force
@@ -430,7 +557,7 @@ Commands:
 
 Options:
   --json                Machine-readable JSON output
-  --no-env              Skip copying .env files on new
+  --no-env              Skip copying .worktreeinclude or default env files on new
   --keep-branch         Don't delete branch on rm
 
 Examples:
@@ -442,7 +569,7 @@ Examples:
   gwt rm auth --keep-branch   Remove worktree but keep branch
 
 Environment:
-  GWT_EXTRA_FILES   Extra file patterns to copy (space-separated)
+  GWT_EXTRA_FILES   Extra fallback patterns when .worktreeinclude is absent
                     e.g. GWT_EXTRA_FILES=".secret.yaml config.local.json"
 EOF
 }

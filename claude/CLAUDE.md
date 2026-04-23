@@ -1,5 +1,5 @@
 <ethos>
-Three principles govern all work (see ETHOS.md for anti-patterns and detail):
+Three principles govern all work (see ./ETHOS.md for anti-patterns and detail):
 1. **Boil the Lake** — completeness is cheap with AI. Do the complete thing. Always. Lakes (boilable scope) vs. oceans (unbounded scope).
 2. **Search Before Building** — check what exists before designing from scratch. Three layers: tried-and-true, new-and-popular (scrutinize), first-principles (most valuable).
 3. **User Sovereignty** — AI recommends, user decides. Present recommendations + what context you might be missing, then ask. Never act on changes that alter the user's stated direction.
@@ -11,12 +11,14 @@ This codebase will outlive you. The patterns you establish will be copied. The c
 Context is your most important resource. Prefer using subagents (Task tool) so that exploration, research, and verbose work happen outside the main conversation.
 
 **Default to spawning subagents for:**
-- Codebase exploration where the primary work is *reading* (e.g. 3+ files or multi‑file flows)
+
+- Codebase exploration where the primary work is _reading_ (e.g. 3+ files or multi‑file flows)
 - Research tasks (web searches, doc lookups, “how does X work?” investigations)
 - Code review, refactors, or analysis that will generate long, detailed output
 - Any investigation where only a short summary or decision is needed in the main thread
 
 **Rules of thumb:**
+
 - If a task will read more than ~3 files, or its output doesn’t need to be shown verbatim, delegate it to a subagent and return a concise summary.
 - Avoid pulling entire repos or large documents into the main thread; use subagents to explore, then compress their findings aggressively before replying.
 </context>
@@ -38,6 +40,17 @@ NEVER promise to do something — just do it. Before sending ANY response, check
 - For commits, always make sure to go in format `type(ticket-number; like PROJ-1234): description`
 - When i ask you for a pull request review, never make a comment to the PR, just explain it to me properly
 - if a folder/file is ignored, dont force commit it - ever
+
+- Read the full file before editing. Plan all changes, then make ONE complete edit. If you've edited a file 3+ times, stop and re-read the user's requirements.
+- Re-read the user's last message before responding. Follow through on every instruction completely.
+- When the user corrects you, stop and re-read their message. Quote back what they asked for and confirm before proceeding.
+- Every few turns, re-read the original request to make sure you haven't drifted from the goal.
+- After 2 consecutive tool failures, stop and change your approach entirely. Explain what failed and try a different strategy.
+- When stuck, summarize what you've tried and ask the user for guidance instead of retrying the same approach.
+- Double-check your output before presenting it. Verify that your changes actually address what the user asked for.
+- Act sooner. Don't read more than 3-5 files before making a change. Get a basic understanding, make the change, then iterate.
+- Complete the FULL task before stopping. If the user asked for multiple things, implement all of them before presenting results.
+- Work more autonomously. Make reasonable decisions without asking for confirmation on every step.
 </core>
 
 <development>
@@ -86,58 +99,14 @@ NEVER promise to do something — just do it. Before sending ANY response, check
 Before using `useEffect`, read: https://react.dev/learn/you-might-not-need-an-effect
 
 NOT needed:
+
 - Transforming data for rendering (use variables or useMemo)
 - Handling user events (use event handlers)
 - Resetting state when props change (use key prop or calculate during render)
 - Updating state based on props/state changes (calculate during render)
 
 Only use for:
+
 - Synchronizing with external systems (APIs, DOM, third-party libs)
 - Cleanup on unmount
 </react>
-
-<pr-descriptions>
-Keep simple and direct. No headings like "Summary", "Test Changes", "Files Updated", "Key Changes". No emojis. Start with brief sentence, then bullet points.
-
-Title:
-    Format
-        [ticket-number]: [ticket-title/description of work]
-    Description
-      Example:
-        ```
-        This PR removes obsolete type declarations and unused dependencies:
-
-        - **Removed `packages/@types` directory**: React 18 and react-datepicker 8.8.0 now ship with built-in TypeScript definitions
-        - **Removed unused `posthog-node` dependency**: The `posthog.ts` provider was using this but was never imported or used in the codebase
-        ```
-</pr-descriptions>
-
-<multi-github-accounts>
-Pattern for using multiple GitHub accounts on one machine.
-
-SSH (git operations):
-1. Generate key: `ssh-keygen -t ed25519 -C "<account>" -f ~/.ssh/id_ed25519_<alias>`
-2. Add public key to the GitHub account
-3. Add host alias to `~/.ssh/config`:
-   ```
-   Host github.com-<alias>
-     HostName github.com
-     User git
-     AddKeysToAgent yes
-     UseKeychain yes
-     IdentityFile ~/.ssh/id_ed25519_<alias>
-   ```
-4. Use `git@github.com-<alias>:<org>/<repo>.git` as remote URL
-5. `Host *` block with default key handles the primary account
-
-gh CLI (API operations):
-- Primary account stays as default active via `gh auth switch`
-- Secondary accounts: add `.envrc` in repo with `export GH_TOKEN=$(gh auth token --user <account>)`
-- Run `direnv allow` after creating `.envrc`
-- direnv hook must be in `~/.zshrc`: `eval "$(direnv hook zsh)"`
-</multi-github-accounts>
-
-<known-gotchas>
-- `cd` in Bash tool calls does NOT persist between calls. In git worktrees, always use absolute paths or `cd /path && command` in a single Bash call.
-- Skills and global Claude configs belong in `~/.claude/skills/` (global) or `.claude/skills/` (project-local). Do NOT create skills inside plugin directories unless explicitly told to.
-</known-gotchas>
