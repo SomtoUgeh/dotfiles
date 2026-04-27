@@ -2,7 +2,7 @@
 name: codex-plan-review
 description: Independent cross-model plan review via Codex CLI. Codex reviews spec.md + prd.json, Claude revises them directly, user controls the loop. Use after /workflows:plan or /deepen-plan, before /workflows:work.
 user_invocable: true
-argument-hint: "[plan folder path] [model override, e.g., gpt-5.4]"
+argument-hint: "[plan folder path] [model override, e.g., gpt-5.5]"
 ---
 
 # Codex Plan Review
@@ -30,7 +30,7 @@ Codex CLI: `npm install -g @openai/codex`
 
 Parse `$ARGUMENTS` for:
 1. **Plan folder path** — e.g., `docs/plans/2026-01-30-feat-user-auth/`
-2. **Model override** — e.g., `gpt-5.4` (default: `gpt-5.4`)
+2. **Model override** — e.g., `gpt-5.5` (default: `gpt-5.5`)
 
 If no path provided, check `ls docs/plans/` sorted by date and ask user which plan to review.
 
@@ -101,7 +101,7 @@ Send plan to Codex with structured output and here-doc prompt:
 
 ```bash
 codex exec \
-  -m ${MODEL:-gpt-5.4} \
+  -m ${MODEL:-gpt-5.5} \
   -s read-only \
   -c model_reasoning_effort=high \
   --output-schema /tmp/codex-plan-schema-${REVIEW_ID}.json \
@@ -140,7 +140,7 @@ Read `/tmp/codex-review-${REVIEW_ID}.json` and parse the structured output.
 Present to user:
 
 ```markdown
-## Codex Review -- Round N (model: gpt-5.4)
+## Codex Review -- Round N (model: gpt-5.5)
 
 [Codex's feedback, formatted from JSON]
 
@@ -172,7 +172,7 @@ For critical/high issues that map to specific stories, add to that story's `revi
 {
   "severity": "high",
   "category": "security",
-  "agent": "codex-gpt-5.4",
+  "agent": "codex-gpt-5.5",
   "finding": "No auth on agent write endpoints",
   "suggestion": "Add per-agent API keys with ACL",
   "status": "resolved",
@@ -213,7 +213,7 @@ Use fresh `codex exec` with structured output and here-doc (session resume does 
 
 ```bash
 codex exec \
-  -m ${MODEL:-gpt-5.4} \
+  -m ${MODEL:-gpt-5.5} \
   -s read-only \
   -c model_reasoning_effort=high \
   --output-schema /tmp/codex-plan-schema-${REVIEW_ID}.json \
@@ -255,7 +255,7 @@ Add review summary to prd.json `log` array:
   "timestamp": "2026-01-30T14:30:00Z",
   "action": "codex_review",
   "review_id": "REVIEW_ID",
-  "model": "gpt-5.4",
+  "model": "gpt-5.5",
   "rounds": 3,
   "issues_found": 14,
   "issues_resolved": 12,
@@ -293,7 +293,7 @@ Then use **AskUserQuestion tool**:
 
 - Claude **actively revises spec.md and prd.json** between rounds — the real files, not copies
 - **User controls the loop** — Codex doesn't decide when to stop, you do
-- Default model: `gpt-5.4`. Accept override from arguments.
+- Default model: `gpt-5.5`. Accept override from arguments.
 - Always use read-only sandbox — Codex reads the codebase but never writes
 - Max 5 rounds as safety cap (user warned, can override)
 - Show user each round's feedback and revisions transparently
