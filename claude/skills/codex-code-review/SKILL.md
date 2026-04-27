@@ -2,7 +2,7 @@
 name: codex-code-review
 description: Independent cross-model code review via Codex CLI. Codex reviews code changes (PR, branch, or staged files), Claude addresses findings directly, user controls the loop. Use after implementation, before merge.
 user_invocable: true
-argument-hint: "[PR number, branch name, or 'staged'] [model override, e.g., gpt-5.4]"
+argument-hint: "[PR number, branch name, or 'staged'] [model override, e.g., gpt-5.5]"
 ---
 
 # Codex Code Review
@@ -30,7 +30,7 @@ Codex CLI: `npm install -g @openai/codex`
 
 Parse `$ARGUMENTS` for:
 1. **Review target** — PR number (e.g., `123`), branch name (e.g., `feat/auth`), or `staged` for staged changes
-2. **Model override** — e.g., `gpt-5.4` (default: `gpt-5.4`)
+2. **Model override** — e.g., `gpt-5.5` (default: `gpt-5.5`)
 
 If no target provided, detect automatically:
 1. Check for open PR on current branch → use that
@@ -109,7 +109,7 @@ Use the dedicated `codex exec review` subcommand — produces structured comment
 ```bash
 codex exec review \
   --base ${BASE_BRANCH} \
-  -m ${MODEL:-gpt-5.4} \
+  -m ${MODEL:-gpt-5.5} \
   -c model_reasoning_effort=high \
   -o /tmp/codex-code-review-${REVIEW_ID}.md
 ```
@@ -136,7 +136,7 @@ codex exec review \
 Present to user:
 
 ```markdown
-## Codex Code Review — Round N (model: gpt-5.4)
+## Codex Code Review — Round N (model: gpt-5.5)
 
 [Codex's feedback, normalized to consistent format]
 
@@ -238,7 +238,7 @@ Use fresh `codex exec` with structured output and here-doc input (session resume
 
 ```bash
 codex exec \
-  -m ${MODEL:-gpt-5.4} \
+  -m ${MODEL:-gpt-5.5} \
   -s read-only \
   -c model_reasoning_effort=high \
   --output-schema /tmp/codex-review-schema-${REVIEW_ID}.json \
@@ -306,7 +306,7 @@ Then use **AskUserQuestion tool**:
 
 - Claude **actively fixes code** between rounds — the real source files, not copies
 - **User controls the loop** — Codex doesn't decide when to stop, you do
-- Default model: `gpt-5.4`. Accept override from arguments.
+- Default model: `gpt-5.5`. Accept override from arguments.
 - Always use read-only sandbox — Codex reads the codebase but never writes
 - Max 5 rounds as safety cap (user warned, can override)
 - Show user each round's feedback and fixes transparently
