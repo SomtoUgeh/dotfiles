@@ -142,84 +142,65 @@ else
 fi
 
 # =============================================================================
-# Claude Code configurations
+# Agent configurations
 # =============================================================================
 echo ""
-echo "Setting up Claude Code configurations..."
+echo "Setting up agent configurations..."
 
-mkdir -p "$HOME/.claude"
+AGENTS_DIR="$DOTFILES_DIR/agents"
+
+# Shared skills are exposed through both the neutral path and Claude's skill path.
+mkdir -p "$HOME/.agents"
+create_symlink "$AGENTS_DIR/skills" "$HOME/.agents/skills"
+
+# Claude Code
 mkdir -p "$HOME/.claude/hooks"
+mkdir -p "$HOME/.claude/plugins"
+create_symlink "$AGENTS_DIR/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
+create_symlink "$AGENTS_DIR/shared/ETHOS.md" "$HOME/.claude/ETHOS.md"
+create_symlink "$AGENTS_DIR/claude/settings.json" "$HOME/.claude/settings.json"
+create_symlink "$AGENTS_DIR/claude/mcp.json" "$HOME/.claude/mcp.json"
+create_symlink "$AGENTS_DIR/claude/commands" "$HOME/.claude/commands"
+create_symlink "$AGENTS_DIR/claude/agents" "$HOME/.claude/agents"
+create_symlink "$AGENTS_DIR/skills" "$HOME/.claude/skills"
+create_symlink "$AGENTS_DIR/shared/hooks/git_guard.py" "$HOME/.claude/hooks/git_guard.py"
+create_symlink "$AGENTS_DIR/claude/statusline.sh" "$HOME/.claude/statusline.sh"
+create_symlink "$AGENTS_DIR/claude/file-suggestion.sh" "$HOME/.claude/file-suggestion.sh"
+chmod +x "$HOME/.claude/hooks/git_guard.py" "$HOME/.claude/statusline.sh" "$HOME/.claude/file-suggestion.sh" 2>/dev/null || true
 
-create_symlink "$DOTFILES_DIR/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
-create_symlink "$DOTFILES_DIR/claude/settings.json" "$HOME/.claude/settings.json"
-
-# Statusline and file suggestion scripts
-if [ -f "$DOTFILES_DIR/claude/statusline.sh" ]; then
-    create_symlink "$DOTFILES_DIR/claude/statusline.sh" "$HOME/.claude/statusline.sh"
-    chmod +x "$HOME/.claude/statusline.sh" 2>/dev/null || true
-fi
-if [ -f "$DOTFILES_DIR/claude/file-suggestion.sh" ]; then
-    create_symlink "$DOTFILES_DIR/claude/file-suggestion.sh" "$HOME/.claude/file-suggestion.sh"
-    chmod +x "$HOME/.claude/file-suggestion.sh" 2>/dev/null || true
-fi
-
-# Hooks
-if [ -d "$DOTFILES_DIR/claude/hooks" ]; then
-    for hook in "$DOTFILES_DIR/claude/hooks/"*; do
-        if [ -f "$hook" ]; then
-            hook_name=$(basename "$hook")
-            create_symlink "$hook" "$HOME/.claude/hooks/$hook_name"
-            chmod +x "$HOME/.claude/hooks/$hook_name" 2>/dev/null || true
+if [ -d "$AGENTS_DIR/claude/plugins" ]; then
+    for plugin_file in "$AGENTS_DIR/claude/plugins/"*.json; do
+        if [ -f "$plugin_file" ]; then
+            plugin_name=$(basename "$plugin_file")
+            create_symlink "$plugin_file" "$HOME/.claude/plugins/$plugin_name"
         fi
     done
 fi
 
-# Commands (symlink individual entries to preserve existing files in ~/.claude/commands)
-if [ -d "$DOTFILES_DIR/claude/commands" ]; then
-    mkdir -p "$HOME/.claude/commands"
-    for entry in "$DOTFILES_DIR/claude/commands/"*; do
-        if [ -e "$entry" ]; then
-            entry_name=$(basename "$entry")
-            create_symlink "$entry" "$HOME/.claude/commands/$entry_name"
-        fi
-    done
-fi
+# Codex
+mkdir -p "$HOME/.codex"
+create_symlink "$AGENTS_DIR/codex/AGENTS.md" "$HOME/.codex/AGENTS.md"
+create_symlink "$AGENTS_DIR/codex/config.toml" "$HOME/.codex/config.toml"
+create_symlink "$AGENTS_DIR/codex/agents" "$HOME/.codex/agents"
 
-# Agents
-if [ -d "$DOTFILES_DIR/claude/agents" ]; then
-    mkdir -p "$HOME/.claude/agents"
-    for entry in "$DOTFILES_DIR/claude/agents/"*; do
-        if [ -e "$entry" ]; then
-            entry_name=$(basename "$entry")
-            create_symlink "$entry" "$HOME/.claude/agents/$entry_name"
-        fi
-    done
-fi
+# OpenCode
+mkdir -p "$HOME/.config/opencode"
+create_symlink "$AGENTS_DIR/opencode/AGENTS.md" "$HOME/.config/opencode/AGENTS.md"
+create_symlink "$AGENTS_DIR/opencode/opencode.jsonc" "$HOME/.config/opencode/opencode.jsonc"
+create_symlink "$AGENTS_DIR/opencode/agents" "$HOME/.config/opencode/agents"
+create_symlink "$AGENTS_DIR/opencode/commands" "$HOME/.config/opencode/commands"
 
-# Skills (symlink to both ~/.claude/skills and ~/.agents/skills for compatibility)
-if [ -d "$DOTFILES_DIR/claude/skills" ]; then
-    mkdir -p "$HOME/.claude/skills"
-    mkdir -p "$HOME/.agents/skills"
-    for skill in "$DOTFILES_DIR/claude/skills/"*/; do
-        if [ -d "$skill" ]; then
-            skill_name=$(basename "$skill")
-            create_symlink "$skill" "$HOME/.claude/skills/$skill_name"
-            create_symlink "$skill" "$HOME/.agents/skills/$skill_name"
-        fi
-    done
-fi
-
-# Plugins (install if claude CLI available)
-if [ -f "$DOTFILES_DIR/claude/plugins.txt" ] && command -v claude &> /dev/null; then
+# Claude plugins (install if claude CLI available)
+if [ -f "$AGENTS_DIR/claude/plugins.txt" ] && command -v claude &> /dev/null; then
     echo "Installing Claude Code plugins..."
     while IFS= read -r plugin || [ -n "$plugin" ]; do
         # Skip comments and empty lines
         [[ "$plugin" =~ ^#.*$ || -z "$plugin" ]] && continue
         echo "  Installing plugin: $plugin"
         claude plugins install "${plugin}@claude-plugins-official" 2>/dev/null || true
-    done < "$DOTFILES_DIR/claude/plugins.txt"
+    done < "$AGENTS_DIR/claude/plugins.txt"
 else
-    if [ -f "$DOTFILES_DIR/claude/plugins.txt" ]; then
+    if [ -f "$AGENTS_DIR/claude/plugins.txt" ]; then
         echo -e "${YELLOW}Claude CLI not found. Skipping plugin installation.${NC}"
         echo "  Run manually after installing Claude: claude plugins install <plugin>@claude-plugins-official"
     fi
