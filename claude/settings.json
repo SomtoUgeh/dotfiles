@@ -72,7 +72,8 @@
     "last30days@last30days-skill": true,
     "codex@openai-codex": true,
     "shopify-plugin@shopify-ai-toolkit": true,
-    "marketing-skills@marketingskills": true
+    "marketing-skills@marketingskills": true,
+    "cloudflare@cloudflare": true
   },
   "extraKnownMarketplaces": {
     "context-mode": {
@@ -107,6 +108,12 @@
         "repo": "coreyhaines31/marketingskills"
       },
       "autoUpdate": true
+    },
+    "cloudflare": {
+      "source": {
+        "source": "github",
+        "repo": "cloudflare/skills"
+      }
     }
   },
   "effortLevel": "xhigh",
