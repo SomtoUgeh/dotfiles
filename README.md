@@ -99,7 +99,7 @@ dotfiles/
 │   ├── claude/             # Claude Code config, commands, agents, plugins
 │   ├── codex/              # Codex config and agents
 │   ├── opencode/           # OpenCode config, commands, and agents
-│   └── skills/             # Shared SKILL.md packages
+│   └── skills/             # Shared SKILL.md packages via ~/.agents/skills
 ├── scripts/                # Custom scripts (linked to ~/bin)
 │   ├── gwt                 # Git worktree manager
 │   ├── gcauto              # Git commit automation
