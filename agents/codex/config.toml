@@ -1,31 +1,87 @@
 model = "gpt-5.5"
 model_reasoning_effort = "high"
+notify = [
+    "/Users/somto/.codex/plugins/cache/openai-bundled/computer-use/1.0.758/Codex Computer Use.app/Contents/SharedSupport/SkyComputerUseClient.app/Contents/MacOS/SkyComputerUseClient",
+    "turn-ended",
+]
 personality = "pragmatic"
 service_tier = "fast"
 
-notify = ["/Users/somto/.codex/plugins/cache/openai-bundled/computer-use/1.0.758/Codex Computer Use.app/Contents/SharedSupport/SkyComputerUseClient.app/Contents/MacOS/SkyComputerUseClient", "turn-ended"]
-
 [features]
 apps = true
-js_repl = true
-multi_agent = true
-prevent_idle_sleep = true
-memories = true
 chronicle = true
 goals = true
+js_repl = true
+memories = true
+multi_agent = true
+prevent_idle_sleep = true
+
+[marketplaces.openai-bundled]
+last_updated = "2026-05-04T19:39:49Z"
+source_type = "local"
+source = "/Users/somto/.codex/.tmp/bundled-marketplaces/openai-bundled"
+
+[marketplaces.openai-primary-runtime]
+last_updated = "2026-04-30T21:24:51Z"
+source = "/Users/somto/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime"
+source_type = "local"
+
+[marketplaces.claude-plugins-official]
+last_updated = "2026-05-04T19:39:47Z"
+last_revision = "ac45fdae4b7af187b5624599ab054090dedadd94"
+source_type = "git"
+source = "https://github.com/anthropics/claude-plugins-official.git"
+
+[marketplaces.cloudflare]
+last_updated = "2026-05-04T19:39:48Z"
+last_revision = "60147cbb773649eadca89cee92b4e0caf02234b4"
+source_type = "git"
+source = "https://github.com/cloudflare/skills.git"
+
+[marketplaces.last30days-skill]
+last_updated = "2026-05-04T19:27:44Z"
+last_revision = "b1773be8f360b46e45b4b42386c8d041c7ec7bef"
+source_type = "git"
+source = "https://github.com/mvanhorn/last30days-skill.git"
+
+[marketplaces.marketingskills]
+last_updated = "2026-05-04T19:39:50Z"
+last_revision = "1bcff9fc79c64fd7886c3c7aa583f4bd63916ff2"
+source_type = "git"
+source = "https://github.com/coreyhaines31/marketingskills.git"
+
+[marketplaces.openai-codex]
+last_updated = "2026-05-04T19:39:51Z"
+last_revision = "807e03ac9d5aa23bc395fdec8c3767500a86b3cf"
+source_type = "git"
+source = "https://github.com/openai/codex-plugin-cc.git"
+
+[marketplaces.shopify-ai-toolkit]
+last_updated = "2026-05-04T19:39:53Z"
+last_revision = "c5c18d86ce7b2a7ca51ebac7c4b1a4eda00c8e25"
+source_type = "git"
+source = "https://github.com/Shopify/shopify-ai-toolkit.git"
+
+[mcp_servers.cloudflare]
+url = "https://mcp.cloudflare.com/mcp"
+
+[mcp_servers.context7]
+url = "https://mcp.context7.com/mcp"
+
+[mcp_servers.context7.env_http_headers]
+CONTEXT7_API_KEY = "CONTEXT7_API_KEY"
+
+[mcp_servers.exa]
+url = "https://mcp.exa.ai/mcp"
 
 [mcp_servers.figma]
 url = "https://mcp.figma.com/mcp"
 
+[mcp_servers.figma-remote-mcp]
+url = "https://mcp.figma.com/mcp"
+
 [mcp_servers.granola]
 url = "https://mcp.granola.ai/mcp"
-
-[mcp_servers.playwright]
-command = "npx"
-args = ["@playwright/mcp@latest"]
-
-[mcp_servers.paper]
-url = "http://127.0.0.1:29979/mcp"
 
 [mcp_servers.neon]
 url = "https://mcp.neon.tech/mcp"
@@ -33,14 +89,38 @@ url = "https://mcp.neon.tech/mcp"
 [mcp_servers.openaiDeveloperDocs]
 url = "https://developers.openai.com/mcp"
 
-[mcp_servers.context7]
-url = "https://mcp.context7.com/mcp"
-env_http_headers = { "CONTEXT7_API_KEY" = "CONTEXT7_API_KEY" }
+[mcp_servers.paper]
+url = "http://127.0.0.1:29979/mcp"
+
+[mcp_servers.playwright]
+args = ["@playwright/mcp@latest"]
+command = "npx"
+
+[mcp_servers.posthog]
+url = "https://mcp-eu.posthog.com/mcp"
+
+[mcp_servers.postman]
+url = "https://mcp.postman.com/mcp"
+
+[mcp_servers.wiretext]
+args = [
+    "-y",
+    "@wiretext/mcp",
+    "-s",
+    "user",
+]
+command = "npx"
 
 [plugins."canva@openai-curated"]
 enabled = true
 
 [plugins."cloudflare@openai-curated"]
+enabled = true
+
+[plugins."codex-security@openai-curated"]
+enabled = true
+
+[plugins."documents@openai-primary-runtime"]
 enabled = true
 
 [plugins."figma@openai-curated"]
@@ -55,85 +135,79 @@ enabled = true
 [plugins."google-calendar@openai-curated"]
 enabled = true
 
-[plugins."notion@openai-curated"]
-enabled = true
-
-[plugins."slack@openai-curated"]
-enabled = true
-
 [plugins."google-drive@openai-curated"]
-enabled = true
-
-[plugins."superpowers@openai-curated"]
-enabled = true
-
-[plugins."remotion@openai-curated"]
-enabled = true
-
-[plugins."atlassian-rovo@openai-curated"]
 enabled = true
 
 [plugins."granola@openai-curated"]
 enabled = true
 
-[plugins."documents@openai-primary-runtime"]
-enabled = true
-
-[plugins."spreadsheets@openai-primary-runtime"]
-enabled = true
-
-[plugins."presentations@openai-primary-runtime"]
+[plugins."linear@openai-curated"]
 enabled = true
 
 [plugins."neon-postgres@openai-curated"]
 enabled = true
 
-[plugins."codex-security@openai-curated"]
+[plugins."notion@openai-curated"]
+enabled = true
+
+[plugins."presentations@openai-primary-runtime"]
+enabled = true
+
+[plugins."remotion@openai-curated"]
+enabled = true
+
+[plugins."slack@openai-curated"]
+enabled = true
+
+[plugins."spreadsheets@openai-primary-runtime"]
+enabled = true
+
+[plugins."superpowers@openai-curated"]
+enabled = true
+
+[plugins."agent-sdk-dev@claude-plugins-official"]
+enabled = true
+
+[plugins."claude-code-setup@claude-plugins-official"]
+enabled = true
+
+[plugins."claude-md-management@claude-plugins-official"]
+enabled = true
+
+[plugins."code-review@claude-plugins-official"]
+enabled = true
+
+[plugins."context7@claude-plugins-official"]
+enabled = true
+
+[plugins."explanatory-output-style@claude-plugins-official"]
+enabled = true
+
+[plugins."frontend-design@claude-plugins-official"]
+enabled = true
+
+[plugins."hookify@claude-plugins-official"]
+enabled = true
+
+[plugins."playground@claude-plugins-official"]
+enabled = true
+
+[plugins."pr-review-toolkit@claude-plugins-official"]
+enabled = true
+
+[plugins."telegram@claude-plugins-official"]
+enabled = true
+
+[plugins."codex@openai-codex"]
 enabled = true
 
 [plugins."browser-use@openai-bundled"]
-enabled = true
-
-[plugins."linear@openai-curated"]
 enabled = true
 
 [projects."/Users/somto"]
 trust_level = "trusted"
 
 [projects."/Users/somto/.codex/worktrees/11c4/Fair-Let-Inventory-App"]
-trust_level = "trusted"
-
-[projects."/Users/somto/code/Fair-Let-Inventory-App"]
-trust_level = "trusted"
-
-[projects."/Users/somto/code/altschool-web-platforms"]
-trust_level = "trusted"
-
-[projects."/Users/somto/code/library"]
-trust_level = "trusted"
-
-[projects."/Users/somto/code/library/published-pages"]
-trust_level = "trusted"
-
-[projects."/Users/somto/code/library/web-v0"]
-trust_level = "trusted"
-
-[projects."/Users/somto/code/somto-dev-toolkit"]
-trust_level = "trusted"
-
-[projects."/Users/somto/code/universal-shortcuts"]
-trust_level = "trusted"
-
-[projects."/Users/somto/code/life_with_lami"]
-trust_level = "trusted"
-
-[projects."/Users/somto/code"]
-trust_level = "trusted"
-
-[projects."/Users/somto/Library/Mobile Documents/com~apple~CloudDocs/Family/Somto's Corner/JULDS"]
-trust_level = "trusted"
-
-[projects."/Users/somto/Library/Mobile Documents/com~apple~CloudDocs/Family/Somto's Corner/Finances"]
 trust_level = "trusted"
 
 [projects."/Users/somto/Documents/Codex/2026-04-30/https-bizee-com-gl-1-rwpgu"]
@@ -145,19 +219,13 @@ trust_level = "trusted"
 [projects."/Users/somto/Documents/Codex/2026-05-01/how-can-i-use-https-github"]
 trust_level = "trusted"
 
-[projects."/Users/somto/Documents/Codex/2026-05-01/https-group-accor-com-en-finance"]
-trust_level = "trusted"
-
 [projects."/Users/somto/Documents/Codex/2026-05-01/https-blog-cloudflare-com-email-for"]
 trust_level = "trusted"
 
+[projects."/Users/somto/Documents/Codex/2026-05-01/https-group-accor-com-en-finance"]
+trust_level = "trusted"
+
 [projects."/Users/somto/Documents/Codex/2026-05-01/https-openai-com-index-open-source"]
-trust_level = "trusted"
-
-[projects."/Users/somto/Documents/Codex/2026-05-02/https-blog-cloudflare-com-mesh-can"]
-trust_level = "trusted"
-
-[projects."/Users/somto/Documents/Codex/2026-05-02/https-blog-cloudflare-com-managed-oauth"]
 trust_level = "trusted"
 
 [projects."/Users/somto/Documents/Codex/2026-05-02/can-you-read-https-blog-cloudflare"]
@@ -166,19 +234,61 @@ trust_level = "trusted"
 [projects."/Users/somto/Documents/Codex/2026-05-02/can-you-read-https-github-com"]
 trust_level = "trusted"
 
-[projects."/Users/somto/Documents/Codex/2026-05-04/what-have-i-been-doing-very"]
+[projects."/Users/somto/Documents/Codex/2026-05-02/https-blog-cloudflare-com-managed-oauth"]
+trust_level = "trusted"
+
+[projects."/Users/somto/Documents/Codex/2026-05-02/https-blog-cloudflare-com-mesh-can"]
+trust_level = "trusted"
+
+[projects."/Users/somto/Documents/Codex/2026-05-04/in-the-root-folder-of-my"]
 trust_level = "trusted"
 
 [projects."/Users/somto/Documents/Codex/2026-05-04/open-you-let-me-know-if"]
 trust_level = "trusted"
 
-[projects."/Users/somto/code/symphony-workspaces/life_with_lami/JUL-5"]
+[projects."/Users/somto/Documents/Codex/2026-05-04/what-have-i-been-doing-very"]
+trust_level = "trusted"
+
+[projects."/Users/somto/Library/Mobile Documents/com~apple~CloudDocs/Family/Somto's Corner/Finances"]
+trust_level = "trusted"
+
+[projects."/Users/somto/Library/Mobile Documents/com~apple~CloudDocs/Family/Somto's Corner/JULDS"]
+trust_level = "trusted"
+
+[projects."/Users/somto/code"]
+trust_level = "trusted"
+
+[projects."/Users/somto/code/Fair-Let-Inventory-App"]
+trust_level = "trusted"
+
+[projects."/Users/somto/code/altschool-web-platforms"]
 trust_level = "trusted"
 
 [projects."/Users/somto/code/dotfiles"]
 trust_level = "trusted"
 
-[projects."/Users/somto/Documents/Codex/2026-05-04/in-the-root-folder-of-my"]
+[projects."/Users/somto/code/library"]
+trust_level = "trusted"
+
+[projects."/Users/somto/code/library/published-pages"]
+trust_level = "trusted"
+
+[projects."/Users/somto/code/library/web-v0"]
+trust_level = "trusted"
+
+[projects."/Users/somto/code/life_with_lami"]
+trust_level = "trusted"
+
+[projects."/Users/somto/code/somto-dev-toolkit"]
+trust_level = "trusted"
+
+[projects."/Users/somto/code/symphony-workspaces/life_with_lami/JUL-5"]
+trust_level = "trusted"
+
+[projects."/Users/somto/code/universal-shortcuts"]
+trust_level = "trusted"
+
+[projects."/Users/somto/Documents/Codex/2026-05-04/i-have-a-bunch-of-codex"]
 trust_level = "trusted"
 
 [shell_environment_policy]
@@ -231,13 +341,3 @@ status_line = [
 
 [tui.model_availability_nux]
 "gpt-5.5" = 4
-
-[marketplaces.openai-bundled]
-last_updated = "2026-05-04T14:19:17Z"
-source_type = "local"
-source = "/Users/somto/.codex/.tmp/bundled-marketplaces/openai-bundled"
-
-[marketplaces.openai-primary-runtime]
-last_updated = "2026-04-30T21:24:51Z"
-source_type = "local"
-source = "/Users/somto/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime"
