@@ -73,6 +73,25 @@ create_symlink() {
     fi
 }
 
+# Render a machine-local copy of a template file.
+render_agent_file() {
+    local source="$1"
+    local target="$2"
+
+    local target_dir
+    target_dir="$(dirname "$target")"
+    mkdir -p "$target_dir"
+
+    if [ -L "$target" ]; then
+        rm "$target"
+    fi
+
+    sed \
+        -e "s#\\\${HOME}/code/dotfiles#${DOTFILES_DIR}#g" \
+        -e "s#/Users/somto#${HOME}#g" \
+        "$source" > "$target"
+}
+
 # =============================================================================
 # Oh My Zsh
 # =============================================================================
@@ -160,7 +179,8 @@ mkdir -p "$HOME/.claude/hooks"
 mkdir -p "$HOME/.claude/plugins"
 create_symlink "$AGENTS_DIR/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 create_symlink "$AGENTS_DIR/shared/ETHOS.md" "$HOME/.claude/ETHOS.md"
-create_symlink "$AGENTS_DIR/claude/settings.json" "$HOME/.claude/settings.json"
+render_agent_file "$AGENTS_DIR/claude/settings.json" "$HOME/.claude/settings.json"
+chmod 600 "$HOME/.claude/settings.json"
 create_symlink "$AGENTS_DIR/claude/mcp.json" "$HOME/.claude/mcp.json"
 create_symlink "$AGENTS_DIR/claude/commands" "$HOME/.claude/commands"
 create_symlink "$AGENTS_DIR/claude/agents" "$HOME/.claude/agents"
@@ -174,7 +194,10 @@ if [ -d "$AGENTS_DIR/claude/plugins" ]; then
     for plugin_file in "$AGENTS_DIR/claude/plugins/"*.json; do
         if [ -f "$plugin_file" ]; then
             plugin_name=$(basename "$plugin_file")
-            create_symlink "$plugin_file" "$HOME/.claude/plugins/$plugin_name"
+            local_plugin_file="$HOME/.claude/plugins/$plugin_name"
+            render_agent_file "$plugin_file" "$local_plugin_file"
+            chmod 600 "$local_plugin_file"
+            echo -e "${GREEN}✓ Rebuilt local Claude plugin metadata: $local_plugin_file${NC}"
         fi
     done
 fi
@@ -182,7 +205,16 @@ fi
 # Codex
 mkdir -p "$HOME/.codex"
 create_symlink "$AGENTS_DIR/codex/AGENTS.md" "$HOME/.codex/AGENTS.md"
-create_symlink "$AGENTS_DIR/codex/config.toml" "$HOME/.codex/config.toml"
+if [ -f "$AGENTS_DIR/codex/config.toml" ]; then
+    render_agent_file "$AGENTS_DIR/codex/config.toml" "$HOME/.codex/config.toml"
+    chmod 600 "$HOME/.codex/config.toml"
+    echo -e "${GREEN}✓ Rebuilt host-local Codex config: $HOME/.codex/config.toml${NC}"
+fi
+if [ -f "$AGENTS_DIR/codex/hooks.json" ]; then
+    render_agent_file "$AGENTS_DIR/codex/hooks.json" "$HOME/.codex/hooks.json"
+    chmod 600 "$HOME/.codex/hooks.json"
+    echo -e "${GREEN}✓ Rebuilt host-local Codex hooks: $HOME/.codex/hooks.json${NC}"
+fi
 create_symlink "$AGENTS_DIR/codex/agents" "$HOME/.codex/agents"
 
 # OpenCode
@@ -191,6 +223,8 @@ create_symlink "$AGENTS_DIR/opencode/AGENTS.md" "$HOME/.config/opencode/AGENTS.m
 create_symlink "$AGENTS_DIR/opencode/opencode.jsonc" "$HOME/.config/opencode/opencode.jsonc"
 create_symlink "$AGENTS_DIR/opencode/agents" "$HOME/.config/opencode/agents"
 create_symlink "$AGENTS_DIR/opencode/commands" "$HOME/.config/opencode/commands"
+mkdir -p "$HOME/.config/opencode/plugins"
+create_symlink "$AGENTS_DIR/opencode/plugins" "$HOME/.config/opencode/plugins"
 
 # Claude plugins (install if claude CLI available)
 if [ -f "$AGENTS_DIR/claude/plugins.txt" ] && command -v claude &> /dev/null; then

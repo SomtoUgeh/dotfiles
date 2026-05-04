@@ -182,3 +182,12 @@ Log out and back in, or restart the Mac.
 rm ~/.zshrc  # Remove existing file
 ./install.sh  # Re-run install
 ```
+
+## Portable agent configs (Mac -> WSL / other machines)
+
+`install.sh` now builds machine-local copies of agent state files so host-specific paths are resolved from `$HOME`:
+
+- `~/.codex/config.toml` is rendered from `agents/codex/config.toml` with `/Users/<user>` values replaced by `$HOME`.
+- `~/.claude/plugins/*.json` are rendered from `agents/claude/plugins/*.json` with `/Users/<user>` values replaced by `$HOME`.
+
+This keeps the tracked files human-editable in dotfiles while avoiding hardcoded paths when you install on another machine.
