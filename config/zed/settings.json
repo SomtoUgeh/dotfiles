@@ -10,30 +10,28 @@
   // Note: Context servers with API keys should be configured in
   // ~/.config/zed/settings.json.local (not tracked in dotfiles)
   "agent_servers": {
-    "kimi": {
-      "type": "registry"
+    "opencode": {
+      "type": "registry",
     },
     "codex-acp": {
-      "type": "registry"
-    },
-    "opencode": {
-      "type": "registry"
+      "favorite_config_option_values": {
+        "model": ["gpt-5.3-codex-spark", "gpt-5.5"],
+      },
+      "type": "registry",
     },
     "claude-acp": {
       "favorite_config_option_values": {
-        "effort": [
-          "max"
-        ]
+        "effort": ["max"],
       },
-      "type": "registry"
-    }
+      "type": "registry",
+    },
   },
   "cli_default_open_behavior": "existing_window",
   "outline_panel": {
-    "dock": "left"
+    "dock": "left",
   },
   "collaboration_panel": {
-    "dock": "left"
+    "dock": "left",
   },
   "buffer_font_family": ".ZedMono",
   "buffer_font_size": 13.0,
@@ -62,55 +60,29 @@
       "breadcrumbs": false,
     },
   },
+  "language_models": {
+    "opencode": {
+      "show_zen_models": true,
+      "show_go_models": true,
+    },
+  },
   "agent": {
-    "favorite_models": [
-      {
-        "provider": "openai",
-        "model": "gpt-5.4-pro",
-        "enable_thinking": false
-      },
-      {
-        "provider": "openai",
-        "model": "gpt-5.3-codex",
-        "enable_thinking": false
-      },
-      {
-        "provider": "google",
-        "model": "gemini-3.1-pro-preview",
-        "enable_thinking": false
-      },
-      {
-        "provider": "anthropic",
-        "model": "claude-opus-4-6-thinking-latest",
-        "enable_thinking": false
-      },
-      {
-        "provider": "anthropic",
-        "model": "claude-opus-4-6-latest",
-        "enable_thinking": false
-      }
-    ],
     "default_model": {
-      "effort": "max",
-      "enable_thinking": true,
-      "provider": "anthropic",
-      "model": "claude-opus-4-6-latest",
+      "provider": "openai",
+      "model": "gpt-5.5",
     },
     "inline_assistant_model": {
-      "provider": "zed.dev",
-      "model": "claude-sonnet-4-6",
+      "provider": "openai",
+      "model": "gpt-5.5",
     },
     "commit_message_model": {
-      "provider": "anthropic",
-      "model": "claude-sonnet-4-6",
+      "provider": "openai",
+      "model": "gpt-5.3-codex-spark",
     },
-    "play_sound_when_agent_done": true,
+    "play_sound_when_agent_done": "when_hidden",
     "default_width": 600.0,
     "dock": "left",
     "model_parameters": [],
-  },
-  "notification_panel": {
-    "dock": "right",
   },
   "project_panel": {
     "entry_spacing": "comfortable",
@@ -126,7 +98,6 @@
   },
   "title_bar": {
     "show_menus": true,
-    "show_branch_icon": true,
   },
   "use_smartcase_search": true,
   "diagnostics": {
@@ -191,4 +162,5 @@
       "milliseconds": 500,
     },
   },
+  "context_servers": {},
 }
