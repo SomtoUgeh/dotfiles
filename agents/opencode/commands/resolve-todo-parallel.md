@@ -14,8 +14,7 @@ Preferred workflow: `resolve-todo-parallel`
 
 <target> $ARGUMENTS </target>
 
-Use the matching workflow or skill if the active tool exposes one:
+Always load and execute the `resolve-todo-parallel` workflow/skill for this command.
 
-the matching workflow instructions
-
+Do not answer directly from this wrapper; the skill is the command body.
 Pass the target above to the skill.

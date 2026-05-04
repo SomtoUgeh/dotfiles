@@ -5,12 +5,13 @@ argument-hint: "[findings list or source type]"
 
 # Triage
 
-<target> #$ARGUMENTS </target>
+<target> $ARGUMENTS </target>
 
-Load and execute the triage skill:
+Always load and execute the triage skill for this command:
 
 ```
 skill: triage
 ```
 
+Do not answer directly from this wrapper; the skill is the command body.
 Pass the target above to the skill.

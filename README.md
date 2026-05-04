@@ -94,11 +94,12 @@ dotfiles/
 │   ├── starship/           # Starship prompt config
 │   ├── zed/                # Zed editor settings
 │   └── gh/                 # GitHub CLI config
-├── claude/                 # Claude Code configuration
-│   ├── CLAUDE.md
-│   ├── settings.json
-│   ├── commands/
-│   └── agents/
+├── agents/                 # Claude, Codex, OpenCode, and shared skills
+│   ├── shared/             # Shared AGENTS.md, ETHOS.md, hooks, MCP inventory
+│   ├── claude/             # Claude Code config, commands, agents, plugins
+│   ├── codex/              # Codex config and agents
+│   ├── opencode/           # OpenCode config, commands, and agents
+│   └── skills/             # Shared SKILL.md packages
 ├── scripts/                # Custom scripts (linked to ~/bin)
 │   ├── gwt                 # Git worktree manager
 │   ├── gcauto              # Git commit automation
