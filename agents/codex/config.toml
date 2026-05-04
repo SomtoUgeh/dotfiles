@@ -1,7 +1,7 @@
-model = "gpt-5.5"
+model = "gpt-5.3-codex-spark"
 model_reasoning_effort = "high"
 notify = [
-    "/Users/somto/.codex/plugins/cache/openai-bundled/computer-use/1.0.758/Codex Computer Use.app/Contents/SharedSupport/SkyComputerUseClient.app/Contents/MacOS/SkyComputerUseClient",
+    "${HOME}/.codex/plugins/cache/openai-bundled/computer-use/1.0.758/Codex Computer Use.app/Contents/SharedSupport/SkyComputerUseClient.app/Contents/MacOS/SkyComputerUseClient",
     "turn-ended",
 ]
 personality = "pragmatic"
@@ -15,25 +15,26 @@ js_repl = true
 memories = true
 multi_agent = true
 prevent_idle_sleep = true
+codex_hooks = true
 
 [marketplaces.openai-bundled]
-last_updated = "2026-05-04T19:39:49Z"
+last_updated = "2026-05-04T20:23:35Z"
 source_type = "local"
-source = "/Users/somto/.codex/.tmp/bundled-marketplaces/openai-bundled"
+source = "${HOME}/.codex/.tmp/bundled-marketplaces/openai-bundled"
 
 [marketplaces.openai-primary-runtime]
 last_updated = "2026-04-30T21:24:51Z"
-source = "/Users/somto/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime"
+source = "${HOME}/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime"
 source_type = "local"
 
 [marketplaces.claude-plugins-official]
-last_updated = "2026-05-04T19:39:47Z"
+last_updated = "2026-05-04T20:23:33Z"
 last_revision = "ac45fdae4b7af187b5624599ab054090dedadd94"
 source_type = "git"
 source = "https://github.com/anthropics/claude-plugins-official.git"
 
 [marketplaces.cloudflare]
-last_updated = "2026-05-04T19:39:48Z"
+last_updated = "2026-05-04T20:23:34Z"
 last_revision = "60147cbb773649eadca89cee92b4e0caf02234b4"
 source_type = "git"
 source = "https://github.com/cloudflare/skills.git"
@@ -45,19 +46,19 @@ source_type = "git"
 source = "https://github.com/mvanhorn/last30days-skill.git"
 
 [marketplaces.marketingskills]
-last_updated = "2026-05-04T19:39:50Z"
+last_updated = "2026-05-04T20:23:36Z"
 last_revision = "1bcff9fc79c64fd7886c3c7aa583f4bd63916ff2"
 source_type = "git"
 source = "https://github.com/coreyhaines31/marketingskills.git"
 
 [marketplaces.openai-codex]
-last_updated = "2026-05-04T19:39:51Z"
+last_updated = "2026-05-04T20:23:38Z"
 last_revision = "807e03ac9d5aa23bc395fdec8c3767500a86b3cf"
 source_type = "git"
 source = "https://github.com/openai/codex-plugin-cc.git"
 
 [marketplaces.shopify-ai-toolkit]
-last_updated = "2026-05-04T19:39:53Z"
+last_updated = "2026-05-04T20:23:39Z"
 last_revision = "c5c18d86ce7b2a7ca51ebac7c4b1a4eda00c8e25"
 source_type = "git"
 source = "https://github.com/Shopify/shopify-ai-toolkit.git"
@@ -289,6 +290,12 @@ trust_level = "trusted"
 trust_level = "trusted"
 
 [projects."/Users/somto/Documents/Codex/2026-05-04/i-have-a-bunch-of-codex"]
+trust_level = "trusted"
+
+[projects."/Users/somto/Documents/Codex/2026-05-04/do-you-have-access-to-computer"]
+trust_level = "trusted"
+
+[projects."/Users/somto/Documents/Codex/2026-05-04/can-you-install-curl-fssl-https"]
 trust_level = "trusted"
 
 [shell_environment_policy]

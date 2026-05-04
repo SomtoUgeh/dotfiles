@@ -3,7 +3,26 @@ description: Conduct thorough research on repository structure, documentation, p
 mode: subagent
 permission:
   edit: deny
-  bash: allow
+  bash:
+    "*": deny
+    "cat *": allow
+    "find *": allow
+    "git blame *": allow
+    "git branch *": allow
+    "git diff *": allow
+    "git log *": allow
+    "git rev-parse *": allow
+    "git shortlog *": allow
+    "git show *": allow
+    "git status": allow
+    "git status *": allow
+    "grep *": allow
+    "ls": allow
+    "ls *": allow
+    "pwd": allow
+    "rg *": allow
+    "sed -n *": allow
+    "wc *": allow
   webfetch: allow
   task:
     "*": deny

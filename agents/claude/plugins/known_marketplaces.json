@@ -57,5 +57,13 @@
     },
     "installLocation": "/Users/somto/.claude/plugins/marketplaces/cloudflare",
     "lastUpdated": "2026-05-01T21:48:12.739Z"
+  },
+  "plannotator": {
+    "source": {
+      "source": "github",
+      "repo": "backnotprop/plannotator"
+    },
+    "installLocation": "/Users/somto/.claude/plugins/marketplaces/plannotator",
+    "lastUpdated": "2026-05-04T20:12:57.219Z"
   }
 }

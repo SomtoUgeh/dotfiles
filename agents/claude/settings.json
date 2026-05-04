@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "fileSuggestion": {
     "type": "command",
-    "command": "/Users/somto/code/dotfiles/agents/claude/file-suggestion.sh"
+    "command": "\"${HOME}/code/dotfiles/agents/claude/file-suggestion.sh\""
   },
   "env": {
     "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-4-6",
@@ -31,7 +31,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 /Users/somto/code/dotfiles/agents/shared/hooks/git_guard.py",
+            "command": "python3 \"${HOME}/code/dotfiles/agents/shared/hooks/git_guard.py\"",
             "timeout": 5
           }
         ]
@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/skills/shaping/shaping-ripple.sh",
+            "command": "\"${HOME}/code/dotfiles/agents/skills/shaping/shaping-ripple.sh\"",
             "timeout": 5
           }
         ]
@@ -52,7 +52,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "/Users/somto/code/dotfiles/agents/claude/statusline.sh",
+    "command": "\"${HOME}/code/dotfiles/agents/claude/statusline.sh\"",
     "padding": 0
   },
   "enabledPlugins": {
@@ -74,7 +74,8 @@
     "codex@openai-codex": true,
     "shopify-plugin@shopify-ai-toolkit": true,
     "marketing-skills@marketingskills": true,
-    "cloudflare@cloudflare": true
+    "cloudflare@cloudflare": true,
+    "plannotator@plannotator": true
   },
   "extraKnownMarketplaces": {
     "context-mode": {
@@ -114,6 +115,12 @@
       "source": {
         "source": "github",
         "repo": "cloudflare/skills"
+      }
+    },
+    "plannotator": {
+      "source": {
+        "source": "github",
+        "repo": "backnotprop/plannotator"
       }
     }
   },
