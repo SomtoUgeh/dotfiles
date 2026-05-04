@@ -149,7 +149,9 @@ echo "Setting up agent configurations..."
 
 AGENTS_DIR="$DOTFILES_DIR/agents"
 
-# Shared skills are exposed through both the neutral path and Claude's skill path.
+# Shared skills live at the neutral path. Codex and OpenCode discover
+# ~/.agents/skills directly; Claude also gets its native ~/.claude/skills link.
+# Do not replace ~/.codex/skills: Codex may keep local-only skills there.
 mkdir -p "$HOME/.agents"
 create_symlink "$AGENTS_DIR/skills" "$HOME/.agents/skills"
 
