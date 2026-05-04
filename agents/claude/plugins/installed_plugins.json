@@ -1,0 +1,204 @@
+{
+  "version": 2,
+  "plugins": {
+    "frontend-design@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/Users/somto/.claude/plugins/cache/claude-plugins-official/frontend-design/unknown",
+        "version": "unknown",
+        "installedAt": "2026-02-07T13:40:49.912Z",
+        "lastUpdated": "2026-04-29T10:04:56.115Z",
+        "gitCommitSha": "2cd88e7947b7382e045666abee790c7f55f669f3"
+      }
+    ],
+    "context7@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/Users/somto/.claude/plugins/cache/claude-plugins-official/context7/unknown",
+        "version": "unknown",
+        "installedAt": "2026-02-07T13:40:49.917Z",
+        "lastUpdated": "2026-04-29T10:04:56.116Z",
+        "gitCommitSha": "2cd88e7947b7382e045666abee790c7f55f669f3"
+      }
+    ],
+    "pr-review-toolkit@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/Users/somto/.claude/plugins/cache/claude-plugins-official/pr-review-toolkit/unknown",
+        "version": "unknown",
+        "installedAt": "2026-02-07T13:40:49.922Z",
+        "lastUpdated": "2026-04-29T10:04:56.115Z",
+        "gitCommitSha": "2cd88e7947b7382e045666abee790c7f55f669f3"
+      }
+    ],
+    "agent-sdk-dev@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/Users/somto/.claude/plugins/cache/claude-plugins-official/agent-sdk-dev/unknown",
+        "version": "unknown",
+        "installedAt": "2026-02-07T13:40:49.926Z",
+        "lastUpdated": "2026-04-29T10:04:56.116Z",
+        "gitCommitSha": "2cd88e7947b7382e045666abee790c7f55f669f3"
+      }
+    ],
+    "claude-md-management@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/Users/somto/.claude/plugins/cache/claude-plugins-official/claude-md-management/1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2026-02-07T13:40:49.932Z",
+        "lastUpdated": "2026-02-07T13:40:49.932Z",
+        "gitCommitSha": "2cd88e7947b7382e045666abee790c7f55f669f3"
+      }
+    ],
+    "hookify@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/Users/somto/.claude/plugins/cache/claude-plugins-official/hookify/unknown",
+        "version": "unknown",
+        "installedAt": "2026-02-07T13:40:49.940Z",
+        "lastUpdated": "2026-04-29T10:04:56.116Z",
+        "gitCommitSha": "2cd88e7947b7382e045666abee790c7f55f669f3"
+      }
+    ],
+    "claude-code-setup@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/Users/somto/.claude/plugins/cache/claude-plugins-official/claude-code-setup/1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2026-02-07T13:40:49.944Z",
+        "lastUpdated": "2026-02-07T13:40:49.944Z",
+        "gitCommitSha": "2cd88e7947b7382e045666abee790c7f55f669f3"
+      }
+    ],
+    "playground@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/Users/somto/.claude/plugins/cache/claude-plugins-official/playground/unknown",
+        "version": "unknown",
+        "installedAt": "2026-02-07T13:40:49.948Z",
+        "lastUpdated": "2026-04-29T10:04:56.115Z",
+        "gitCommitSha": "2cd88e7947b7382e045666abee790c7f55f669f3"
+      }
+    ],
+    "explanatory-output-style@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/Users/somto/.claude/plugins/cache/claude-plugins-official/explanatory-output-style/1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2026-02-07T13:51:02.455Z",
+        "lastUpdated": "2026-03-29T08:59:43.806Z",
+        "gitCommitSha": "2cd88e7947b7382e045666abee790c7f55f669f3"
+      }
+    ],
+    "learning-output-style@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/Users/somto/.claude/plugins/cache/claude-plugins-official/learning-output-style/1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2026-02-07T13:51:02.455Z",
+        "lastUpdated": "2026-03-29T08:59:43.806Z",
+        "gitCommitSha": "2cd88e7947b7382e045666abee790c7f55f669f3"
+      }
+    ],
+    "context-mode@context-mode": [
+      {
+        "scope": "user",
+        "installPath": "/Users/somto/.claude/plugins/cache/context-mode/context-mode/1.0.18",
+        "version": "1.0.18",
+        "installedAt": "2026-03-10T21:37:38.642Z",
+        "lastUpdated": "2026-03-14T14:14:58.940Z",
+        "gitCommitSha": "abf36f7c36e608647158e00e9f7c6cec89c5ed6d"
+      }
+    ],
+    "code-review@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/Users/somto/.claude/plugins/cache/claude-plugins-official/code-review/unknown",
+        "version": "unknown",
+        "installedAt": "2026-03-20T12:27:07.272Z",
+        "lastUpdated": "2026-04-29T10:04:56.116Z",
+        "gitCommitSha": "b664e152af5742dd11b6a6e5d7a65848a8c5a261"
+      }
+    ],
+    "typescript-lsp@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/Users/somto/.claude/plugins/cache/claude-plugins-official/typescript-lsp/1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2026-03-20T12:27:07.286Z",
+        "lastUpdated": "2026-03-20T12:27:07.286Z",
+        "gitCommitSha": "b664e152af5742dd11b6a6e5d7a65848a8c5a261"
+      }
+    ],
+    "telegram@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/Users/somto/.claude/plugins/cache/claude-plugins-official/telegram/0.0.6",
+        "version": "0.0.6",
+        "installedAt": "2026-03-21T00:53:41.830Z",
+        "lastUpdated": "2026-04-14T20:21:56.848Z",
+        "gitCommitSha": "da61886c07a4773f647b6b277e4efdfb436728cc"
+      }
+    ],
+    "last30days@last30days-skill": [
+      {
+        "scope": "user",
+        "installPath": "/Users/somto/.claude/plugins/cache/last30days-skill/last30days/3.1.1",
+        "version": "3.1.1",
+        "installedAt": "2026-03-25T20:53:49.432Z",
+        "lastUpdated": "2026-04-24T18:44:07.904Z",
+        "gitCommitSha": "4d6224f79aab743052d36248949ca03b24fded26"
+      }
+    ],
+    "codex@openai-codex": [
+      {
+        "scope": "user",
+        "installPath": "/Users/somto/.claude/plugins/cache/openai-codex/codex/1.0.4",
+        "version": "1.0.4",
+        "installedAt": "2026-03-30T20:08:03.140Z",
+        "lastUpdated": "2026-04-20T18:35:26.487Z",
+        "gitCommitSha": "f4d65d9641fadc7632afecd5735daf8e16060c98"
+      }
+    ],
+    "shopify-plugin@shopify-ai-toolkit": [
+      {
+        "scope": "user",
+        "installPath": "/Users/somto/.claude/plugins/cache/shopify-ai-toolkit/shopify-plugin/1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2026-04-16T11:24:52.505Z",
+        "lastUpdated": "2026-04-16T11:24:52.505Z",
+        "gitCommitSha": "adcea731944e274f28a621973237a9d524a86cfe"
+      }
+    ],
+    "marketing-skills@marketingskills": [
+      {
+        "scope": "project",
+        "projectPath": "/Users/somto/code/life_with_lami",
+        "installPath": "/Users/somto/.claude/plugins/cache/marketingskills/marketing-skills/1.9.0",
+        "version": "1.9.0",
+        "installedAt": "2026-04-18T15:44:04.137Z",
+        "lastUpdated": "2026-04-25T16:07:22.273Z",
+        "gitCommitSha": "9125d8216e38945bcca5e712287cec06e9e96523"
+      },
+      {
+        "scope": "user",
+        "installPath": "/Users/somto/.claude/plugins/cache/marketingskills/marketing-skills/1.9.0",
+        "version": "1.9.0",
+        "installedAt": "2026-04-18T15:44:34.574Z",
+        "lastUpdated": "2026-04-25T12:48:08.380Z",
+        "gitCommitSha": "9125d8216e38945bcca5e712287cec06e9e96523"
+      }
+    ],
+    "cloudflare@cloudflare": [
+      {
+        "scope": "user",
+        "installPath": "/Users/somto/.claude/plugins/cache/cloudflare/cloudflare/1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2026-05-01T21:48:29.500Z",
+        "lastUpdated": "2026-05-01T21:48:29.500Z",
+        "gitCommitSha": "7c449def4e0c63daa27212d853094e4c8e37bbe8"
+      }
+    ]
+  }
+}
