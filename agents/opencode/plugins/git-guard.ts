@@ -1,1 +1,0 @@
-../../shared/hooks/opencode/git-guard.ts
