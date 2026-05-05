@@ -1,13 +1,9 @@
-import type { Plugin } from "@opencode-ai/plugin";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { runCommand } from "./shared-hooks";
+import { runCommand } from "./shared-hooks.js";
 
-const PLUGIN_DIR = path.dirname(fileURLToPath(import.meta.url));
-const AGENTS_ROOT = path.resolve(PLUGIN_DIR, "..", "..", "..");
-const SHAPING_RIPPLE = path.resolve(AGENTS_ROOT, "skills", "shaping", "shaping-ripple.sh");
+const AGENTS_ROOT = new URL("../../..", import.meta.url).pathname.replace(/\/$/, "");
+const SHAPING_RIPPLE = new URL("../../../skills/shaping/shaping-ripple.sh", import.meta.url).pathname;
 
-function runShapingRipple(filePath: string): string {
+function runShapingRipple(filePath) {
   const payload = JSON.stringify({
     tool_input: {
       file_path: filePath,
@@ -22,7 +18,7 @@ function runShapingRipple(filePath: string): string {
   return result.stderr || "Shaping reminder triggered";
 }
 
-export const ShapingRipplePlugin: Plugin = async ({ client }) => {
+export const ShapingRipplePlugin = async ({ client }) => {
   await client.app.log({
     body: {
       service: "shared-hooks",

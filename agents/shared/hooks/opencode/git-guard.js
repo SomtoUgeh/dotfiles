@@ -1,14 +1,9 @@
-import type { Plugin } from "@opencode-ai/plugin";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { runCommand } from "./shared-hooks";
+import { runCommand } from "./shared-hooks.js";
 
-const PLUGIN_DIR = path.dirname(fileURLToPath(import.meta.url));
-const AGENTS_ROOT = path.resolve(PLUGIN_DIR, "..", "..", "..");
-const SHARED_HOOKS_DIR = path.resolve(AGENTS_ROOT, "shared", "hooks");
-const GIT_GUARD = path.resolve(SHARED_HOOKS_DIR, "git_guard.py");
+const AGENTS_ROOT = new URL("../../..", import.meta.url).pathname.replace(/\/$/, "");
+const GIT_GUARD = new URL("../git_guard.py", import.meta.url).pathname;
 
-function runGitGuard(command: string): string {
+function runGitGuard(command) {
   const payload = JSON.stringify({
     tool: "bash",
     tool_input: {
@@ -24,7 +19,7 @@ function runGitGuard(command: string): string {
   return result.stderr || "Blocked by git guard";
 }
 
-export const GitGuardPlugin: Plugin = async ({ client }) => {
+export const GitGuardPlugin = async ({ client }) => {
   await client.app.log({
     body: {
       service: "shared-hooks",

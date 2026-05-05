@@ -1,0 +1,1 @@
+../../shared/hooks/opencode/plannotator.js

@@ -1,14 +1,10 @@
-import type { Plugin } from "@opencode-ai/plugin";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { getSessionID, runCommand } from "./shared-hooks";
+import { getSessionID, runCommand } from "./shared-hooks.js";
 
-const PLUGIN_DIR = path.dirname(fileURLToPath(import.meta.url));
-const AGENTS_ROOT = path.resolve(PLUGIN_DIR, "..", "..", "..");
-const PLANNOTATOR = path.resolve(process.env.HOME ?? "", ".local", "bin", "plannotator");
-const STOP_SESSION_IDS = new Set<string>();
+const AGENTS_ROOT = new URL("../../..", import.meta.url).pathname.replace(/\/$/, "");
+const PLANNOTATOR = `${process.env.HOME ?? ""}/.local/bin/plannotator`;
+const STOP_SESSION_IDS = new Set();
 
-function runPlannotator(sessionID: string): string {
+function runPlannotator(sessionID) {
   if (!PLANNOTATOR) {
     return "plannotator path is not configured";
   }
@@ -26,7 +22,7 @@ function runPlannotator(sessionID: string): string {
   return "";
 }
 
-export const PlannotatorPlugin: Plugin = async ({ client }) => {
+export const PlannotatorPlugin = async ({ client }) => {
   await client.app.log({
     body: {
       service: "shared-hooks",
