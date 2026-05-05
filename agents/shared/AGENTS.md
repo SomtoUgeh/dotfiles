@@ -6,7 +6,7 @@ belong in each tool folder. Shared scripts and MCP inventory belong in
 `agents/shared/`.
 
 The builder ethos is included inline here so every tool loads it directly. Keep
-`agents/shared/ETHOS.md` as the standalone reference copy.
+`ETHOS.md` beside this file as the standalone reference copy.
 
 ## Builder Ethos
 
