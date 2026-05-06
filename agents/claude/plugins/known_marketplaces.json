@@ -21,7 +21,7 @@
       "repo": "mvanhorn/last30days-skill"
     },
     "installLocation": "/Users/somto/.claude/plugins/marketplaces/last30days-skill",
-    "lastUpdated": "2026-05-04T14:50:25.068Z",
+    "lastUpdated": "2026-05-05T21:14:39.467Z",
     "autoUpdate": true
   },
   "openai-codex": {
@@ -47,7 +47,7 @@
       "repo": "coreyhaines31/marketingskills"
     },
     "installLocation": "/Users/somto/.claude/plugins/marketplaces/marketingskills",
-    "lastUpdated": "2026-05-04T14:50:22.783Z",
+    "lastUpdated": "2026-05-05T21:14:41.552Z",
     "autoUpdate": true
   },
   "cloudflare": {

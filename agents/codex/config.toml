@@ -18,23 +18,23 @@ prevent_idle_sleep = true
 codex_hooks = true
 
 [marketplaces.openai-bundled]
-last_updated = "2026-05-05T06:50:13Z"
+last_updated = "2026-05-05T21:26:27Z"
 source_type = "local"
 source = "/Users/somto/.codex/.tmp/bundled-marketplaces/openai-bundled"
 
 [marketplaces.openai-primary-runtime]
-last_updated = "2026-04-30T21:24:51Z"
-source = "${HOME}/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime"
+last_updated = "2026-05-05T22:24:42Z"
 source_type = "local"
+source = "/Users/somto/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime"
 
 [marketplaces.claude-plugins-official]
-last_updated = "2026-05-05T06:50:11Z"
+last_updated = "2026-05-05T21:26:24Z"
 last_revision = "ac45fdae4b7af187b5624599ab054090dedadd94"
 source_type = "git"
 source = "https://github.com/anthropics/claude-plugins-official.git"
 
 [marketplaces.cloudflare]
-last_updated = "2026-05-05T06:50:12Z"
+last_updated = "2026-05-05T21:26:26Z"
 last_revision = "60147cbb773649eadca89cee92b4e0caf02234b4"
 source_type = "git"
 source = "https://github.com/cloudflare/skills.git"
@@ -46,19 +46,19 @@ source_type = "git"
 source = "https://github.com/mvanhorn/last30days-skill.git"
 
 [marketplaces.marketingskills]
-last_updated = "2026-05-05T06:50:14Z"
+last_updated = "2026-05-05T21:26:28Z"
 last_revision = "1bcff9fc79c64fd7886c3c7aa583f4bd63916ff2"
 source_type = "git"
 source = "https://github.com/coreyhaines31/marketingskills.git"
 
 [marketplaces.openai-codex]
-last_updated = "2026-05-05T06:50:16Z"
+last_updated = "2026-05-05T21:26:29Z"
 last_revision = "807e03ac9d5aa23bc395fdec8c3767500a86b3cf"
 source_type = "git"
 source = "https://github.com/openai/codex-plugin-cc.git"
 
 [marketplaces.shopify-ai-toolkit]
-last_updated = "2026-05-05T06:50:17Z"
+last_updated = "2026-05-05T21:26:31Z"
 last_revision = "c5c18d86ce7b2a7ca51ebac7c4b1a4eda00c8e25"
 source_type = "git"
 source = "https://github.com/Shopify/shopify-ai-toolkit.git"
