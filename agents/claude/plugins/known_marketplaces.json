@@ -5,15 +5,7 @@
       "repo": "anthropics/claude-plugins-official"
     },
     "installLocation": "/Users/somto/.claude/plugins/marketplaces/claude-plugins-official",
-    "lastUpdated": "2026-04-28T22:24:55.405Z"
-  },
-  "context-mode": {
-    "source": {
-      "source": "github",
-      "repo": "mksglu/claude-context-mode"
-    },
-    "installLocation": "/Users/somto/.claude/plugins/marketplaces/context-mode",
-    "lastUpdated": "2026-03-10T21:37:30.674Z"
+    "lastUpdated": "2026-05-07T18:38:54.465Z"
   },
   "last30days-skill": {
     "source": {
@@ -21,7 +13,7 @@
       "repo": "mvanhorn/last30days-skill"
     },
     "installLocation": "/Users/somto/.claude/plugins/marketplaces/last30days-skill",
-    "lastUpdated": "2026-05-05T21:14:39.467Z",
+    "lastUpdated": "2026-05-07T18:38:54.346Z",
     "autoUpdate": true
   },
   "openai-codex": {
@@ -30,7 +22,7 @@
       "repo": "openai/codex-plugin-cc"
     },
     "installLocation": "/Users/somto/.claude/plugins/marketplaces/openai-codex",
-    "lastUpdated": "2026-05-04T14:36:45.965Z",
+    "lastUpdated": "2026-05-07T18:38:36.662Z",
     "autoUpdate": true
   },
   "shopify-ai-toolkit": {
@@ -39,16 +31,7 @@
       "repo": "Shopify/shopify-ai-toolkit"
     },
     "installLocation": "/Users/somto/.claude/plugins/marketplaces/shopify-ai-toolkit",
-    "lastUpdated": "2026-04-16T11:22:53.810Z"
-  },
-  "marketingskills": {
-    "source": {
-      "source": "github",
-      "repo": "coreyhaines31/marketingskills"
-    },
-    "installLocation": "/Users/somto/.claude/plugins/marketplaces/marketingskills",
-    "lastUpdated": "2026-05-05T21:14:41.552Z",
-    "autoUpdate": true
+    "lastUpdated": "2026-05-07T18:31:23.898Z"
   },
   "cloudflare": {
     "source": {
@@ -56,7 +39,7 @@
       "repo": "cloudflare/skills"
     },
     "installLocation": "/Users/somto/.claude/plugins/marketplaces/cloudflare",
-    "lastUpdated": "2026-05-01T21:48:12.739Z"
+    "lastUpdated": "2026-05-07T18:31:29.789Z"
   },
   "plannotator": {
     "source": {
