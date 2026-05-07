@@ -70,7 +70,7 @@
     "typescript-lsp@claude-plugins-official": true,
     "telegram@claude-plugins-official": true,
     "last30days@last30days-skill": true,
-    "codex@openai-codex": true,
+    "codex@openai-codex": false,
     "plannotator@plannotator": true
   },
   "extraKnownMarketplaces": {
