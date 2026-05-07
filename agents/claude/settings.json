@@ -7,7 +7,7 @@
   "env": {
     "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-4-6",
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-sonnet-4-6",
-    "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "1",
+    "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "true",
     "CLAUDE_CODE_NO_FLICKER": "1",
     "CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING": "1",
     "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "400000"
@@ -66,24 +66,14 @@
     "learning-output-style@claude-plugins-official": false,
     "playground@claude-plugins-official": true,
     "pr-review-toolkit@claude-plugins-official": true,
-    "context-mode@context-mode": false,
     "code-review@claude-plugins-official": true,
     "typescript-lsp@claude-plugins-official": true,
     "telegram@claude-plugins-official": true,
     "last30days@last30days-skill": true,
     "codex@openai-codex": true,
-    "shopify-plugin@shopify-ai-toolkit": true,
-    "marketing-skills@marketingskills": true,
-    "cloudflare@cloudflare": true,
     "plannotator@plannotator": true
   },
   "extraKnownMarketplaces": {
-    "context-mode": {
-      "source": {
-        "source": "github",
-        "repo": "mksglu/claude-context-mode"
-      }
-    },
     "last30days-skill": {
       "source": {
         "source": "github",
@@ -103,13 +93,6 @@
         "source": "github",
         "repo": "Shopify/shopify-ai-toolkit"
       }
-    },
-    "marketingskills": {
-      "source": {
-        "source": "github",
-        "repo": "coreyhaines31/marketingskills"
-      },
-      "autoUpdate": true
     },
     "cloudflare": {
       "source": {

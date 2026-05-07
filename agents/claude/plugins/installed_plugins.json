@@ -101,16 +101,6 @@
         "gitCommitSha": "2cd88e7947b7382e045666abee790c7f55f669f3"
       }
     ],
-    "context-mode@context-mode": [
-      {
-        "scope": "user",
-        "installPath": "/Users/somto/.claude/plugins/cache/context-mode/context-mode/1.0.18",
-        "version": "1.0.18",
-        "installedAt": "2026-03-10T21:37:38.642Z",
-        "lastUpdated": "2026-03-14T14:14:58.940Z",
-        "gitCommitSha": "abf36f7c36e608647158e00e9f7c6cec89c5ed6d"
-      }
-    ],
     "code-review@claude-plugins-official": [
       {
         "scope": "user",
@@ -169,35 +159,6 @@
         "installedAt": "2026-04-16T11:24:52.505Z",
         "lastUpdated": "2026-04-16T11:24:52.505Z",
         "gitCommitSha": "adcea731944e274f28a621973237a9d524a86cfe"
-      }
-    ],
-    "marketing-skills@marketingskills": [
-      {
-        "scope": "project",
-        "projectPath": "/Users/somto/code/life_with_lami",
-        "installPath": "/Users/somto/.claude/plugins/cache/marketingskills/marketing-skills/1.9.0",
-        "version": "1.9.0",
-        "installedAt": "2026-04-18T15:44:04.137Z",
-        "lastUpdated": "2026-04-25T16:07:22.273Z",
-        "gitCommitSha": "9125d8216e38945bcca5e712287cec06e9e96523"
-      },
-      {
-        "scope": "user",
-        "installPath": "/Users/somto/.claude/plugins/cache/marketingskills/marketing-skills/1.9.0",
-        "version": "1.9.0",
-        "installedAt": "2026-04-18T15:44:34.574Z",
-        "lastUpdated": "2026-04-25T12:48:08.380Z",
-        "gitCommitSha": "9125d8216e38945bcca5e712287cec06e9e96523"
-      }
-    ],
-    "cloudflare@cloudflare": [
-      {
-        "scope": "user",
-        "installPath": "/Users/somto/.claude/plugins/cache/cloudflare/cloudflare/1.0.0",
-        "version": "1.0.0",
-        "installedAt": "2026-05-01T21:48:29.500Z",
-        "lastUpdated": "2026-05-01T21:48:29.500Z",
-        "gitCommitSha": "7c449def4e0c63daa27212d853094e4c8e37bbe8"
       }
     ],
     "plannotator@plannotator": [
