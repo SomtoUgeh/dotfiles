@@ -5,7 +5,7 @@ allowed-tools: Bash(plannotator:*)
 
 ## Message Annotations
 
-!`plannotator last`
+!`plannotator annotate-last`
 
 ## Your task
 

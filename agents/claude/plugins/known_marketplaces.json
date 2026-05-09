@@ -13,7 +13,7 @@
       "repo": "mvanhorn/last30days-skill"
     },
     "installLocation": "/Users/somto/.claude/plugins/marketplaces/last30days-skill",
-    "lastUpdated": "2026-05-07T18:38:54.346Z",
+    "lastUpdated": "2026-05-08T14:47:04.162Z",
     "autoUpdate": true
   },
   "openai-codex": {
@@ -22,7 +22,7 @@
       "repo": "openai/codex-plugin-cc"
     },
     "installLocation": "/Users/somto/.claude/plugins/marketplaces/openai-codex",
-    "lastUpdated": "2026-05-07T18:38:36.662Z",
+    "lastUpdated": "2026-05-08T14:47:06.318Z",
     "autoUpdate": true
   },
   "shopify-ai-toolkit": {
