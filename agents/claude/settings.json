@@ -18,9 +18,7 @@
   },
   "includeCoAuthoredBy": false,
   "permissions": {
-    "allow": [
-      "Bash(find:*)"
-    ],
+    "allow": ["Bash(find:*)"],
     "deny": [],
     "defaultMode": "dontAsk"
   },
@@ -66,11 +64,12 @@
     "learning-output-style@claude-plugins-official": false,
     "playground@claude-plugins-official": true,
     "pr-review-toolkit@claude-plugins-official": true,
+    "context-mode@context-mode": false,
     "code-review@claude-plugins-official": true,
     "typescript-lsp@claude-plugins-official": true,
     "telegram@claude-plugins-official": true,
     "last30days@last30days-skill": true,
-    "codex@openai-codex": false,
+    "codex@openai-codex": true,
     "plannotator@plannotator": true
   },
   "extraKnownMarketplaces": {
@@ -98,7 +97,8 @@
       "source": {
         "source": "github",
         "repo": "cloudflare/skills"
-      }
+      },
+      "autoUpdate": true
     },
     "plannotator": {
       "source": {
