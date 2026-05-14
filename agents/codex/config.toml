@@ -15,7 +15,6 @@ js_repl = true
 memories = true
 multi_agent = true
 prevent_idle_sleep = true
-hooks = true
 
 [marketplaces.openai-bundled]
 last_updated = "2026-05-09T09:41:36Z"

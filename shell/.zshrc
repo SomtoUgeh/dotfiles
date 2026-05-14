@@ -81,8 +81,9 @@ export PATH="/opt/homebrew/opt/postgresql@16/bin:$PATH"
 # LM Studio CLI
 export PATH="$PATH:$HOME/.lmstudio/bin"
 
-# direnv
-eval "$(direnv hook zsh)"
+# direnv (guarded — silently skip on machines without direnv installed,
+# matching the OrbStack pattern below)
+command -v direnv >/dev/null && eval "$(direnv hook zsh)"
 
 # OrbStack
 source ~/.orbstack/shell/init.zsh 2>/dev/null || :
@@ -319,3 +320,27 @@ export PATH="$HOME/.resend/bin:$PATH"
 setopt NO_NOMATCH
 # CF CLI completions
 [[ -f "/Users/somto/.config/cf/completions/_cf.zsh" ]] && source "/Users/somto/.config/cf/completions/_cf.zsh"
+
+# ============================================================================
+# OSC 52 CLIPBOARD (works through SSH + tmux via the terminal emulator)
+# ============================================================================
+
+# Pipe stdin to the local clipboard via OSC 52. The terminal emulator
+# (Ghostty on Mac, any OSC 52-aware client elsewhere) interprets the escape
+# and writes to the system clipboard. Works through SSH and tmux when wrapped
+# in DCS passthrough. No reverse tunnel or daemon required.
+#
+# Cross-platform note: `base64 | tr -d '\n'` works on both BSD base64 (macOS)
+# and GNU base64 (Linux). Avoid `base64 -w0` here — that flag is GNU-only and
+# fails on macOS.
+mac-copy() {
+  local data encoded
+  data=$(cat)
+  encoded=$(printf %s "$data" | base64 | tr -d '\n')
+  if [[ -n "$TMUX" ]]; then
+    printf '\ePtmux;\e\e]52;c;%s\a\e\\' "$encoded"
+  else
+    printf '\e]52;c;%s\a' "$encoded"
+  fi
+}
+alias pbcopy='mac-copy'
