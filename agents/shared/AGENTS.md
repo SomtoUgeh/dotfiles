@@ -116,6 +116,23 @@ one-liner.
 - Run `git status` after staging and before committing.
 - When asked about recent branches or commits, search by recency first.
 
+### Pull Request Format
+
+Keep PR titles and descriptions simple and direct. No headings like "Summary",
+"Test Changes", "Files Updated", "Key Changes". No emojis. Start with a brief
+sentence describing the change, then bullet points for specifics.
+
+**Title format:** `[ticket-number]: [ticket-title/description of work]`
+
+**Description example:**
+
+```
+This PR removes obsolete type declarations and unused dependencies:
+
+- **Removed `packages/@types` directory**: React 18 and react-datepicker 8.8.0 now ship with built-in TypeScript definitions
+- **Removed unused `posthog-node` dependency**: The `posthog.ts` provider was using this but was never imported or used in the codebase
+```
+
 ## Shell
 
 - Prefer `rg` and `rg --files` for search when available.
