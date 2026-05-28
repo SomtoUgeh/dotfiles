@@ -122,7 +122,7 @@ Keep PR titles and descriptions simple and direct. No headings like "Summary",
 "Test Changes", "Files Updated", "Key Changes". No emojis. Start with a brief
 sentence describing the change, then bullet points for specifics.
 
-**Title format:** `[ticket-number]: [ticket-title/description of work]`
+**Title format:** `[ticket-number]: [ticket-title/description of work]` - if not ticket then use `[type]: [description]`
 
 **Description example:**
 
