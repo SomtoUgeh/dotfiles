@@ -35,7 +35,7 @@ The install script creates this folder layout:
 ~/
 ├── code/                    # All code projects (CDPATH enabled)
 │   ├── myrepo/              # Main repo
-│   └── myrepo--feature/     # Worktree (created by gwt)
+│   └── myrepo--feature/     # Worktree (git worktree add)
 ├── bin/                     # Custom scripts (in PATH)
 ├── Pictures/Screenshots/    # macOS screenshots location
 ├── .config/                 # XDG config home
@@ -104,9 +104,7 @@ dotfiles/
 │   ├── opencode/           # OpenCode config, commands, and agents
 │   └── skills/             # Shared SKILL.md packages via ~/.agents/skills
 ├── scripts/                # Custom scripts (linked to ~/bin)
-│   ├── gwt                 # Git worktree manager
-│   ├── gcauto              # Git commit automation
-│   └── ...
+│   └── enable_touchid_sudo.sh  # Enable Touch ID for sudo
 ├── macos/
 │   └── defaults.sh         # macOS system preferences
 └── templates/              # Templates for sensitive files

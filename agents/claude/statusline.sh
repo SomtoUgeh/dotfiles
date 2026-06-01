@@ -40,37 +40,25 @@ if [ -d "$current_dir" ] && git -C "$current_dir" rev-parse --git-dir >/dev/null
   git_branch=$(git -C "$current_dir" branch --show-current 2>/dev/null || git -C "$current_dir" rev-parse --short HEAD 2>/dev/null)
 fi
 
-# ---- worktree detection (gwt + codex) ----
+# ---- worktree detection (generic, tool-agnostic) ----
 in_worktree=0
 worktree_name=""
 main_repo_name=""
 worktree_count=0
-gwt_dir="$HOME/code/worktrees"
-codex_wt_dir="$HOME/.codex/worktrees"
 
 if [ -d "$current_dir" ] && git -C "$current_dir" rev-parse --git-dir >/dev/null 2>&1; then
   toplevel=$(git -C "$current_dir" rev-parse --show-toplevel 2>/dev/null)
 
-  # Detect gwt worktree (~/code/worktrees/{repo}--{branch})
-  case "$toplevel" in
-    "$gwt_dir"/*)
-      in_worktree=1
-      wt_basename=$(basename "$toplevel")
-      main_repo_name="${wt_basename%%--*}"
-      worktree_name="${wt_basename#*--}"
-      ;;
-    "$codex_wt_dir"/*)
-      in_worktree=1
-      worktree_name=$(basename "$toplevel")
-      # Resolve main repo name from git common dir
-      common_dir=$(git -C "$current_dir" rev-parse --git-common-dir 2>/dev/null)
-      if [ -n "$common_dir" ] && [ "$common_dir" != ".git" ]; then
-        main_repo_name=$(basename "$(dirname "$common_dir")")
-      fi
-      ;;
-  esac
+  # A linked worktree has a git-common-dir outside its own toplevel.
+  # This covers any worktree (git worktree add, codex, etc.) without hardcoding paths.
+  common_dir=$(git -C "$current_dir" rev-parse --git-common-dir 2>/dev/null)
+  if [ -n "$common_dir" ] && [ "$common_dir" != ".git" ] && [ "$common_dir" != "$toplevel/.git" ]; then
+    in_worktree=1
+    worktree_name=$(basename "$toplevel")
+    main_repo_name=$(basename "$(dirname "$common_dir")")
+  fi
 
-  # Count all non-main worktrees via git (covers gwt + codex + any others)
+  # Count all non-main worktrees via git
   total_wt=$(git -C "$current_dir" worktree list 2>/dev/null | wc -l | tr -d ' ')
   worktree_count=$((total_wt - 1))
   [ "$worktree_count" -lt 0 ] && worktree_count=0

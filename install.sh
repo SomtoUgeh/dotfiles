@@ -341,7 +341,9 @@ if command -v brew &> /dev/null; then
     BREW_PREFIX="$(brew --prefix)"
     if [ ! -w "$BREW_PREFIX" ]; then
         echo -e "${YELLOW}Fixing Homebrew permissions...${NC}"
-        sudo chown -R "$(whoami)" "$BREW_PREFIX"
+        # Non-fatal: a cancelled sudo prompt must not abort the whole install.
+        sudo chown -R "$(whoami)" "$BREW_PREFIX" || \
+            echo -e "${YELLOW}Could not fix Homebrew permissions (skipped). brew bundle may fail.${NC}"
     fi
     echo "Running brew bundle install..."
     cd "$DOTFILES_DIR"
@@ -353,24 +355,6 @@ if command -v brew &> /dev/null; then
 else
     echo -e "${RED}Homebrew not found. Please install Homebrew first:${NC}"
     echo '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
-fi
-
-# =============================================================================
-# Claude session sync (daily cron → qmd)
-# =============================================================================
-echo ""
-echo "Setting up Claude session sync..."
-
-if [ -f "$DOTFILES_DIR/scripts/setup-session-sync.sh" ]; then
-    chmod +x "$DOTFILES_DIR/scripts/setup-session-sync.sh"
-    chmod +x "$DOTFILES_DIR/scripts/scheduled-session-sync.sh"
-    chmod +x "$DOTFILES_DIR/scripts/sync-sessions-to-qmd.sh"
-    if command -v qmd &> /dev/null; then
-        bash "$DOTFILES_DIR/scripts/setup-session-sync.sh"
-    else
-        echo -e "${YELLOW}qmd not found. Skipping session sync setup.${NC}"
-        echo "  Install qmd, then run: scripts/setup-session-sync.sh"
-    fi
 fi
 
 # =============================================================================
