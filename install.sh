@@ -100,7 +100,22 @@ echo "Setting up Homebrew..."
 
 if ! command -v brew &> /dev/null; then
     echo "Installing Homebrew..."
-    NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    # Homebrew needs sudo to create its prefix. In NONINTERACTIVE mode it
+    # REFUSES to prompt for a password — it requires passwordless sudo, which a
+    # normal machine doesn't have. So only force NONINTERACTIVE when there is no
+    # TTY *and* sudo already works without a password (e.g. CI). With a real
+    # terminal, run interactively so Homebrew can prompt for the password once.
+    if [ -t 0 ]; then
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    elif sudo -n true 2>/dev/null; then
+        NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    else
+        echo -e "${RED}Cannot install Homebrew: no TTY for a password prompt and passwordless sudo is unavailable.${NC}"
+        echo -e "${YELLOW}Run this once in a real terminal window, then re-run ./install.sh:${NC}"
+        echo '  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+        echo -e "${YELLOW}(Do NOT use sudo, and do NOT run it via Claude Code’s ! prefix — both lack a TTY.)${NC}"
+        exit 1
+    fi
     # Put brew on PATH for the rest of this script (Apple Silicon + Intel)
     if [ -x /opt/homebrew/bin/brew ]; then
         eval "$(/opt/homebrew/bin/brew shellenv)"
@@ -364,7 +379,14 @@ echo ""
 if [ -f /etc/pam.d/sudo_local ] && grep -q '^auth.*pam_tid.so' /etc/pam.d/sudo_local 2>/dev/null; then
     echo "✓ Touch ID for sudo already enabled"
 elif [ -f "$DOTFILES_DIR/scripts/enable_touchid_sudo.sh" ]; then
-    read -r -p "Enable Touch ID for sudo? (needs your password once) [y/N] " enable_touchid
+    # Only prompt when attached to a terminal. Without a TTY, `read` returns
+    # non-zero on EOF and would abort the whole script under `set -e`.
+    if [ -t 0 ] && read -r -p "Enable Touch ID for sudo? (needs your password once) [y/N] " enable_touchid; then
+        :
+    else
+        enable_touchid=""
+        [ -t 0 ] || echo "  Non-interactive: skipping Touch ID setup. Run later with: enable_touchid_sudo.sh"
+    fi
     if [[ "$enable_touchid" =~ ^[Yy]$ ]]; then
         bash "$DOTFILES_DIR/scripts/enable_touchid_sudo.sh"
     else
