@@ -43,7 +43,7 @@ Perform exhaustive code reviews using multi-agent analysis, dynamic skill/agent 
 - [ ] Detect review target type
 - [ ] Check current git branch
 - [ ] If on target branch → proceed with analysis
-- [ ] If different branch → offer worktree: `gwt new <branch>` (use absolute paths after)
+- [ ] If different branch → offer worktree: `git worktree add ../<branch> <branch>` (use absolute paths after)
 - [ ] Fetch PR metadata: `gh pr view --json title,body,files,baseRefName`
 - [ ] If plan folder provided → read prd.json for story context
 

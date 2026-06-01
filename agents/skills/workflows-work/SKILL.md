@@ -187,9 +187,8 @@ Use a meaningful name based on the work (e.g., `feat/user-authentication`, `fix/
 
 **Option B: Use a worktree (recommended for parallel development)**
 ```bash
-gwt new feature-branch-name
-# Creates worktree in ~/code/worktrees/{repo}--{branch}, copies .env files
-# Use absolute paths for all subsequent commands: cd $(gwt go feature-branch-name) && ...
+git worktree add ../{repo}--feature-branch-name -b feature-branch-name
+# Use absolute paths for all subsequent commands: cd ../{repo}--feature-branch-name && ...
 ```
 
 **Option C: Continue on the default branch**
