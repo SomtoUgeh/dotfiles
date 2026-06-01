@@ -195,6 +195,43 @@ else
 fi
 
 # =============================================================================
+# JavaScript runtimes (bun, pnpm) — official installers, not Homebrew
+# =============================================================================
+# shell/.zshrc already wires both (BUN_INSTALL=~/.bun, PNPM_HOME=~/Library/pnpm).
+# Both installers try to append PATH blocks to the shell rc, and since ~/.zshrc
+# is a symlink to the tracked dotfiles file, that would pollute it with
+# non-portable hardcoded paths. We revert any such edits afterward — but only if
+# the shell configs started clean, so we never clobber real local changes.
+echo ""
+echo "Installing JavaScript runtimes (bun, pnpm)..."
+
+shell_was_clean=0
+git -C "$DOTFILES_DIR" diff --quiet -- shell/ 2>/dev/null && shell_was_clean=1
+
+if command -v bun &> /dev/null || [ -x "$HOME/.bun/bin/bun" ]; then
+    echo "✓ bun already installed"
+else
+    echo "Installing bun..."
+    curl -fsSL https://bun.sh/install | bash || \
+        echo -e "${YELLOW}bun install failed (skipped).${NC}"
+fi
+
+if command -v pnpm &> /dev/null || [ -x "$HOME/Library/pnpm/bin/pnpm" ]; then
+    echo "✓ pnpm already installed"
+else
+    echo "Installing pnpm..."
+    curl -fsSL https://get.pnpm.io/install.sh | sh - || \
+        echo -e "${YELLOW}pnpm install failed (skipped).${NC}"
+fi
+
+# Discard PATH blocks the installers appended to the tracked, symlinked shell
+# configs (only when they started clean — see note above).
+if [ "$shell_was_clean" = "1" ] && ! git -C "$DOTFILES_DIR" diff --quiet -- shell/ 2>/dev/null; then
+    echo -e "${YELLOW}Reverting installer edits to tracked shell configs (already wired in dotfiles).${NC}"
+    git -C "$DOTFILES_DIR" checkout -- shell/
+fi
+
+# =============================================================================
 # Agent configurations
 # =============================================================================
 echo ""
