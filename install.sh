@@ -314,6 +314,7 @@ fi
 # Codex
 mkdir -p "$HOME/.codex"
 create_symlink "$AGENTS_DIR/codex/AGENTS.md" "$HOME/.codex/AGENTS.md"
+create_symlink "$AGENTS_DIR/shared/ETHOS.md" "$HOME/.codex/ETHOS.md"
 if [ -f "$AGENTS_DIR/codex/config.toml" ]; then
     render_agent_file "$AGENTS_DIR/codex/config.toml" "$HOME/.codex/config.toml"
     chmod 600 "$HOME/.codex/config.toml"
@@ -329,6 +330,7 @@ create_symlink "$AGENTS_DIR/codex/agents" "$HOME/.codex/agents"
 # OpenCode
 mkdir -p "$HOME/.config/opencode"
 create_symlink "$AGENTS_DIR/opencode/AGENTS.md" "$HOME/.config/opencode/AGENTS.md"
+create_symlink "$AGENTS_DIR/shared/ETHOS.md" "$HOME/.config/opencode/ETHOS.md"
 create_symlink "$AGENTS_DIR/opencode/opencode.jsonc" "$HOME/.config/opencode/opencode.jsonc"
 create_symlink "$AGENTS_DIR/opencode/agents" "$HOME/.config/opencode/agents"
 create_symlink "$AGENTS_DIR/opencode/commands" "$HOME/.config/opencode/commands"
