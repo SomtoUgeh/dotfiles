@@ -1,5 +1,5 @@
-shell/.zprofile
 git/.gitconfig.local
 config/gh/hosts.yml
-npm/
 __pycache__/
+.DS_Store
+.ropeproject/

@@ -62,10 +62,13 @@ The install script creates this folder layout:
 - **iTerm2** - Backup terminal
 
 ### Development Tools
-- **fnm** - Fast Node Manager
+- **fnm** - Fast Node Manager (chosen Node version manager)
 - **uv** - Python package manager
+- **rust** / **go** - language toolchains
 - **ast-grep** - Structural code search
 - **delta** - Better git diffs
+- **graphite** - Stacked PRs CLI
+- **direnv** - Per-directory environment variables
 
 ### CLI Utilities
 - **eza** - Modern ls with icons
@@ -144,16 +147,20 @@ Shared across Cursor/VSCode/Zed:
    pbcopy < ~/.ssh/id_ed25519.pub  # Add to GitHub
    ```
 
-2. **Git Identity** - Set if not using global:
+2. **Git Identity** - Create your local git config (included by `.gitconfig`):
    ```bash
-   git config --global user.name "Your Name"
-   git config --global user.email "your.email@example.com"
+   cp templates/gitconfig-local.template ~/.gitconfig.local
+   # Edit ~/.gitconfig.local with your name/email (and signing key if used)
    ```
 
 3. **Private Config** - Add API keys to `~/.zshrc.private`
+   (includes `RESEND_API_KEY` and any others from `templates/zshrc-private.template`)
 
 ### App Store Apps
-Install manually: 1Password, Xcode, etc.
+Most App Store apps (Xcode, Pages, Keynote, WhatsApp, etc.) are installed
+automatically via `mas` in the Brewfile — **sign in to the App Store first**.
+See `macos/apps.md` for the full inventory, including the few apps that must be
+downloaded manually (e.g. Dia browser).
 
 ### Browser Extensions
 Install from respective stores after browser setup.

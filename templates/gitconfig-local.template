@@ -1,0 +1,16 @@
+# Local git identity — machine-specific, NOT committed.
+# Copy to ~/.gitconfig.local and fill in your values:
+#   cp templates/gitconfig-local.template ~/.gitconfig.local
+#
+# The tracked git/.gitconfig includes this file via [include]. Git silently
+# ignores it if absent, so without this file your name/email will be unset.
+
+[user]
+	name = Your Name
+	email = you@example.com
+
+# Optional: commit signing
+# [user]
+#	signingkey = <key-id-or-path>
+# [commit]
+#	gpgsign = true

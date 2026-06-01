@@ -93,6 +93,25 @@ render_agent_file() {
 }
 
 # =============================================================================
+# Homebrew (bootstrap — everything below may depend on it)
+# =============================================================================
+echo ""
+echo "Setting up Homebrew..."
+
+if ! command -v brew &> /dev/null; then
+    echo "Installing Homebrew..."
+    NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    # Put brew on PATH for the rest of this script (Apple Silicon + Intel)
+    if [ -x /opt/homebrew/bin/brew ]; then
+        eval "$(/opt/homebrew/bin/brew shellenv)"
+    elif [ -x /usr/local/bin/brew ]; then
+        eval "$(/usr/local/bin/brew shellenv)"
+    fi
+else
+    echo "✓ Homebrew already installed"
+fi
+
+# =============================================================================
 # Oh My Zsh
 # =============================================================================
 echo ""
@@ -326,7 +345,11 @@ if command -v brew &> /dev/null; then
     fi
     echo "Running brew bundle install..."
     cd "$DOTFILES_DIR"
-    brew bundle install
+    # Non-fatal: one failing cask (delisted app, network blip) must not abort
+    # the rest of the install. Failures are summarized below.
+    if ! brew bundle install; then
+        echo -e "${YELLOW}Some brew packages failed to install. Review above and re-run 'brew bundle install' to retry.${NC}"
+    fi
 else
     echo -e "${RED}Homebrew not found. Please install Homebrew first:${NC}"
     echo '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
@@ -347,6 +370,21 @@ if [ -f "$DOTFILES_DIR/scripts/setup-session-sync.sh" ]; then
     else
         echo -e "${YELLOW}qmd not found. Skipping session sync setup.${NC}"
         echo "  Install qmd, then run: scripts/setup-session-sync.sh"
+    fi
+fi
+
+# =============================================================================
+# Touch ID for sudo (optional — modifies /etc/pam.d/sudo_local)
+# =============================================================================
+echo ""
+if [ -f /etc/pam.d/sudo_local ] && grep -q '^auth.*pam_tid.so' /etc/pam.d/sudo_local 2>/dev/null; then
+    echo "✓ Touch ID for sudo already enabled"
+elif [ -f "$DOTFILES_DIR/scripts/enable_touchid_sudo.sh" ]; then
+    read -r -p "Enable Touch ID for sudo? (needs your password once) [y/N] " enable_touchid
+    if [[ "$enable_touchid" =~ ^[Yy]$ ]]; then
+        bash "$DOTFILES_DIR/scripts/enable_touchid_sudo.sh"
+    else
+        echo "  Skipped. Run later with: enable_touchid_sudo.sh"
     fi
 fi
 
