@@ -44,11 +44,11 @@ CDPATH=.:$HOME:$HOME/code:$HOME/Desktop
 PATH="/opt/homebrew/bin:$PATH"
 PATH="/usr/local/bin:$PATH"
 
-# Custom bins
+# Custom bins (~/.local/bin also covers uv, pipx, and the Claude CLI)
 PATH="$PATH:$HOME/bin:$HOME/.bin:$HOME/.local/bin"
 
-# node_modules (fast local bin access)
-PATH="$PATH:./node_modules/.bin:../node_modules/.bin:../../node_modules/.bin:../../../node_modules/.bin:../../../../node_modules/.bin:../../../../../node_modules/.bin:../../../../../../node_modules/.bin:../../../../../../../node_modules/.bin"
+# node_modules (run locally-installed CLIs from the project root)
+PATH="$PATH:./node_modules/.bin"
 
 # ============================================================================
 # TOOL INTEGRATIONS
@@ -65,15 +65,12 @@ export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 [ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
 
-# pnpm
+# pnpm (binary lives in $PNPM_HOME/bin)
 export PNPM_HOME="$HOME/Library/pnpm"
 case ":$PATH:" in
-  *":$PNPM_HOME:"*) ;;
-  *) export PATH="$PNPM_HOME:$PATH" ;;
+  *":$PNPM_HOME/bin:"*) ;;
+  *) export PATH="$PNPM_HOME/bin:$PATH" ;;
 esac
-
-# uv - Python package manager
-export PATH="$HOME/.local/bin:$PATH"
 
 # PostgreSQL
 export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
@@ -96,11 +93,7 @@ export RIPGREP_CONFIG_PATH=$HOME/.ripgreprc
 export SCARF_ANALYTICS=false
 
 # Claude
-export ENABLE_BACKGROUND_TASKS=1
-export FORCE_AUTO_BACKGROUND_TASKS=1
 export CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1
-export CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=1
-export CLAUDE_CODE_NO_FLICKER=1
 
 # ============================================================================
 # COMPLETIONS
@@ -208,9 +201,6 @@ npm-latest() { npm info "$1" | grep latest; }
 # Kill process on port
 killport() { lsof -i tcp:"$*" | awk 'NR!=1 {print $2}' | xargs kill -9; }
 
-# Git alias (after functions to avoid parse errors)
-alias git=hub
-
 # Quit macOS app
 quit() {
   if [ -z "$1" ]; then
@@ -228,66 +218,6 @@ gif() {
   ffmpeg -i "$1" -i "/tmp/palette.png" -lavfi "fps=25,scale=iw/2:ih/2:flags=lanczos [x]; [x][1:v] paletteuse" -f image2pipe -vcodec ppm - | convert -delay 4 -layers Optimize -loop 0 - "${1%.*}.gif"
 }
 
-# Remote terminal (ttyd + caddy + ngrok)
-remote-session() {
-  stop-remote-session 2>/dev/null
-
-  local user="terminal"
-  local pass="${1:-terminal}"
-  local hashed=$(caddy hash-password --plaintext "$pass")
-
-  ttyd -W -p 7681 tmux new -A -s remote > /dev/null 2>&1 &
-  echo $! > /tmp/ttyd.pid
-
-  local caddyfile=$(mktemp)
-  printf '{\n  admin off\n}\n:7682 {\n  basic_auth {\n    %s %s\n  }\n  reverse_proxy localhost:7681\n}\n' \
-    "$user" "$hashed" > "$caddyfile"
-  caddy run --config "$caddyfile" --adapter caddyfile > /tmp/caddy.log 2>&1 &
-  echo $! > /tmp/caddy.pid
-
-  local j=0
-  while (( j++ < 10 )); do
-    curl -s -o /dev/null http://localhost:7682 2>/dev/null && break
-    sleep 0.5
-  done
-  if ! curl -s -o /dev/null http://localhost:7682 2>/dev/null; then
-    echo "Caddy failed to start. Log: /tmp/caddy.log"
-    stop-remote-session
-    return 1
-  fi
-
-  ngrok http 7682 --log=false > /dev/null 2>&1 &
-  echo $! > /tmp/ngrok.pid
-
-  local url="" i=0
-  while [[ -z "$url" ]] && (( i++ < 20 )); do
-    sleep 0.5
-    url=$(curl -s http://localhost:4040/api/tunnels 2>/dev/null | grep -o '"public_url":"https://[^"]*"' | cut -d'"' -f4)
-  done
-
-  if [[ -z "$url" ]]; then
-    echo "Failed to get ngrok URL"
-    stop-remote-session
-    return 1
-  fi
-
-  printf 'URL:  %s\nUser: %s\nPass: %s\n' "$url" "$user" "$pass" > /tmp/remote-session.txt
-  qrencode -t UTF8 "$url" >> /tmp/remote-session.txt
-  echo ""
-  cat /tmp/remote-session.txt
-  echo ""
-}
-
-stop-remote-session() {
-  for pidfile in /tmp/ttyd.pid /tmp/caddy.pid /tmp/ngrok.pid; do
-    [[ -f "$pidfile" ]] && kill -9 "$(cat "$pidfile")" 2>/dev/null && command rm "$pidfile"
-  done
-  pkill -f "ttyd -W -p 7681" 2>/dev/null
-  pkill -f "ngrok http 7682" 2>/dev/null
-  tmux kill-session -t remote 2>/dev/null
-  command rm /tmp/remote-session.txt 2>/dev/null
-}
-
 # ============================================================================
 # PRIVATE CONFIG
 # ============================================================================
@@ -302,14 +232,7 @@ export STARSHIP_CONFIG="$HOME/code/dotfiles/config/starship/starship.toml"
 eval "$(starship init zsh)"
 
 # opencode
-export PATH=/Users/somto/.opencode/bin:$PATH
-
-# Added by LM Studio CLI (lms)
-export PATH="$PATH:/Users/somto/.lmstudio/bin"
-# End of LM Studio CLI section
-
-# bun completions
-[ -s "/Users/somto/.bun/_bun" ] && source "/Users/somto/.bun/_bun"
+export PATH="$HOME/.opencode/bin:$PATH"
 
 # npm global bin
 export PATH="$HOME/.npm-global/bin:$PATH"
@@ -318,32 +241,9 @@ export PATH="$HOME/.resend/bin:$PATH"
 
 # Pass unmatched globs as literal strings (prevents [HAW-1234] from being interpreted)
 setopt NO_NOMATCH
+
 # CF CLI completions
-[[ -f "/Users/somto/.config/cf/completions/_cf.zsh" ]] && source "/Users/somto/.config/cf/completions/_cf.zsh"
-
-# ============================================================================
-# OSC 52 CLIPBOARD (works through SSH + tmux via the terminal emulator)
-# ============================================================================
-
-# Pipe stdin to the local clipboard via OSC 52. The terminal emulator
-# (Ghostty on Mac, any OSC 52-aware client elsewhere) interprets the escape
-# and writes to the system clipboard. Works through SSH and tmux when wrapped
-# in DCS passthrough. No reverse tunnel or daemon required.
-#
-# Cross-platform note: `base64 | tr -d '\n'` works on both BSD base64 (macOS)
-# and GNU base64 (Linux). Avoid `base64 -w0` here — that flag is GNU-only and
-# fails on macOS.
-mac-copy() {
-  local data encoded
-  data=$(cat)
-  encoded=$(printf %s "$data" | base64 | tr -d '\n')
-  if [[ -n "$TMUX" ]]; then
-    printf '\ePtmux;\e\e]52;c;%s\a\e\\' "$encoded"
-  else
-    printf '\e]52;c;%s\a' "$encoded"
-  fi
-}
-alias pbcopy='mac-copy'
+[[ -f "$HOME/.config/cf/completions/_cf.zsh" ]] && source "$HOME/.config/cf/completions/_cf.zsh"
 
 # >>> hitch shell integration >>>
 function _hitch_prompt_segment() {

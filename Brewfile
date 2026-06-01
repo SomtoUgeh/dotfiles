@@ -9,7 +9,6 @@
 # Taps
 # =============================================================================
 tap "ngrok/ngrok"
-tap "withgraphite/tap"        # graphite (stacked PRs)
 tap "atlassian/acli"          # Jira CLI
 
 # =============================================================================
@@ -33,8 +32,6 @@ brew "git"
 brew "git-delta"              # Better git diff
 brew "git-filter-repo"        # Rewrite git history
 brew "gh"                     # GitHub CLI
-brew "hub"                    # GitHub wrapper for git
-brew "graphite"               # Stacked PRs CLI
 brew "acli"                   # Atlassian / Jira CLI
 
 # Development
@@ -46,7 +43,8 @@ brew "watchman"               # File watcher (React Native / Metro)
 brew "starship"               # Cross-shell prompt
 
 # Cloud / infra CLIs
-brew "neonctl"                # Neon Postgres CLI
+# neonctl is intentionally NOT here: the brew formula pulls in its own Node,
+# which conflicts with fnm-managed Node. install.sh installs it via npm instead.
 brew "hcloud"                 # Hetzner Cloud CLI
 brew "rclone"                 # Cloud storage CLI
 brew "caddy"                  # Web server
@@ -134,9 +132,9 @@ mas "Amphetamine",          id: 937984704
 mas "Hidden Bar",           id: 1452453066
 mas "Spark",                id: 1176895641
 mas "WhatsApp",             id: 310633997
-mas "Keynote",              id: 409183694
-mas "Numbers",              id: 409203825
-mas "Pages",                id: 409201541
+mas "Keynote",              id: 361285480
+mas "Numbers",              id: 361304891
+mas "Pages",                id: 361309726
 mas "Xcode",                id: 497799835
 mas "TestFlight",           id: 899247664
 

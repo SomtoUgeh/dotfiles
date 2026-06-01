@@ -34,6 +34,9 @@ defaults write NSGlobalDomain KeyRepeat -int 1
 # Delay until repeat: 15 = shortest delay before key starts repeating
 defaults write NSGlobalDomain InitialKeyRepeat -int 15
 
+# Hold a key to repeat it (instead of the accent-character popup)
+defaults write NSGlobalDomain ApplePressAndHoldEnabled -bool false
+
 # =============================================================================
 # Locale
 # =============================================================================

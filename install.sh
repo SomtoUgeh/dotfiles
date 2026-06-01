@@ -100,7 +100,22 @@ echo "Setting up Homebrew..."
 
 if ! command -v brew &> /dev/null; then
     echo "Installing Homebrew..."
-    NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    # Homebrew needs sudo to create its prefix. In NONINTERACTIVE mode it
+    # REFUSES to prompt for a password — it requires passwordless sudo, which a
+    # normal machine doesn't have. So only force NONINTERACTIVE when there is no
+    # TTY *and* sudo already works without a password (e.g. CI). With a real
+    # terminal, run interactively so Homebrew can prompt for the password once.
+    if [ -t 0 ]; then
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    elif sudo -n true 2>/dev/null; then
+        NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    else
+        echo -e "${RED}Cannot install Homebrew: no TTY for a password prompt and passwordless sudo is unavailable.${NC}"
+        echo -e "${YELLOW}Run this once in a real terminal window, then re-run ./install.sh:${NC}"
+        echo '  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+        echo -e "${YELLOW}(Do NOT use sudo, and do NOT run it via Claude Code’s ! prefix — both lack a TTY.)${NC}"
+        exit 1
+    fi
     # Put brew on PATH for the rest of this script (Apple Silicon + Intel)
     if [ -x /opt/homebrew/bin/brew ]; then
         eval "$(/opt/homebrew/bin/brew shellenv)"
@@ -180,6 +195,81 @@ else
 fi
 
 # =============================================================================
+# JavaScript runtimes (bun, pnpm) — official installers, not Homebrew
+# =============================================================================
+# shell/.zshrc already wires both (BUN_INSTALL=~/.bun, PNPM_HOME=~/Library/pnpm).
+# Both installers try to append PATH blocks to the shell rc, and since ~/.zshrc
+# is a symlink to the tracked dotfiles file, that would pollute it with
+# non-portable hardcoded paths. We revert any such edits afterward — but only if
+# the shell configs started clean, so we never clobber real local changes.
+echo ""
+echo "Installing JavaScript runtimes (bun, pnpm)..."
+
+shell_was_clean=0
+git -C "$DOTFILES_DIR" diff --quiet -- shell/ 2>/dev/null && shell_was_clean=1
+
+if command -v bun &> /dev/null || [ -x "$HOME/.bun/bin/bun" ]; then
+    echo "✓ bun already installed"
+else
+    echo "Installing bun..."
+    curl -fsSL https://bun.sh/install | bash || \
+        echo -e "${YELLOW}bun install failed (skipped).${NC}"
+fi
+
+if command -v pnpm &> /dev/null || [ -x "$HOME/Library/pnpm/bin/pnpm" ]; then
+    echo "✓ pnpm already installed"
+else
+    echo "Installing pnpm..."
+    curl -fsSL https://get.pnpm.io/install.sh | sh - || \
+        echo -e "${YELLOW}pnpm install failed (skipped).${NC}"
+fi
+
+# Discard PATH blocks the installers appended to the tracked, symlinked shell
+# configs (only when they started clean — see note above).
+if [ "$shell_was_clean" = "1" ] && ! git -C "$DOTFILES_DIR" diff --quiet -- shell/ 2>/dev/null; then
+    echo -e "${YELLOW}Reverting installer edits to tracked shell configs (already wired in dotfiles).${NC}"
+    git -C "$DOTFILES_DIR" checkout -- shell/
+fi
+
+# =============================================================================
+# Node via fnm (latest) — keep fnm the only Node on the machine
+# =============================================================================
+# fnm is installed via Homebrew, but with no default version every shell falls
+# back to a system/brew Node. Install the latest and pin it as the default.
+if command -v fnm &> /dev/null; then
+    echo ""
+    echo "Setting up Node via fnm..."
+
+    if fnm ls 2>/dev/null | grep -qE 'v[0-9]+\.'; then
+        echo "✓ fnm already manages a Node version"
+    else
+        latest_node="$(fnm ls-remote --latest 2>/dev/null | tail -1)"
+        if [ -n "$latest_node" ]; then
+            echo "Installing latest Node ($latest_node)..."
+            fnm install "$latest_node" && fnm default "$latest_node" || \
+                echo -e "${YELLOW}fnm Node setup failed (skipped).${NC}"
+        else
+            echo -e "${YELLOW}Could not determine latest Node from fnm (skipped).${NC}"
+        fi
+    fi
+
+    # Load fnm's Node so npm is on PATH for the global install below.
+    eval "$(fnm env)" 2>/dev/null || true
+    fnm use default 2>/dev/null || true
+
+    # neonctl on fnm's Node (see Brewfile note: the brew formula bundles a second
+    # Node, which would defeat fnm being the only Node).
+    if command -v npm &> /dev/null; then
+        if npm ls -g --depth=0 neonctl &> /dev/null; then
+            echo "✓ neonctl already installed (npm global)"
+        else
+            echo "Installing neonctl (npm global on fnm Node)..."
+            npm install -g neonctl || echo -e "${YELLOW}neonctl install failed (skipped).${NC}"
+        fi
+    fi
+fi
+
+# =============================================================================
 # Agent configurations
 # =============================================================================
 echo ""
@@ -224,6 +314,7 @@ fi
 # Codex
 mkdir -p "$HOME/.codex"
 create_symlink "$AGENTS_DIR/codex/AGENTS.md" "$HOME/.codex/AGENTS.md"
+create_symlink "$AGENTS_DIR/shared/ETHOS.md" "$HOME/.codex/ETHOS.md"
 if [ -f "$AGENTS_DIR/codex/config.toml" ]; then
     render_agent_file "$AGENTS_DIR/codex/config.toml" "$HOME/.codex/config.toml"
     chmod 600 "$HOME/.codex/config.toml"
@@ -239,6 +330,7 @@ create_symlink "$AGENTS_DIR/codex/agents" "$HOME/.codex/agents"
 # OpenCode
 mkdir -p "$HOME/.config/opencode"
 create_symlink "$AGENTS_DIR/opencode/AGENTS.md" "$HOME/.config/opencode/AGENTS.md"
+create_symlink "$AGENTS_DIR/shared/ETHOS.md" "$HOME/.config/opencode/ETHOS.md"
 create_symlink "$AGENTS_DIR/opencode/opencode.jsonc" "$HOME/.config/opencode/opencode.jsonc"
 create_symlink "$AGENTS_DIR/opencode/agents" "$HOME/.config/opencode/agents"
 create_symlink "$AGENTS_DIR/opencode/commands" "$HOME/.config/opencode/commands"
@@ -364,7 +456,14 @@ echo ""
 if [ -f /etc/pam.d/sudo_local ] && grep -q '^auth.*pam_tid.so' /etc/pam.d/sudo_local 2>/dev/null; then
     echo "✓ Touch ID for sudo already enabled"
 elif [ -f "$DOTFILES_DIR/scripts/enable_touchid_sudo.sh" ]; then
-    read -r -p "Enable Touch ID for sudo? (needs your password once) [y/N] " enable_touchid
+    # Only prompt when attached to a terminal. Without a TTY, `read` returns
+    # non-zero on EOF and would abort the whole script under `set -e`.
+    if [ -t 0 ] && read -r -p "Enable Touch ID for sudo? (needs your password once) [y/N] " enable_touchid; then
+        :
+    else
+        enable_touchid=""
+        [ -t 0 ] || echo "  Non-interactive: skipping Touch ID setup. Run later with: enable_touchid_sudo.sh"
+    fi
     if [[ "$enable_touchid" =~ ^[Yy]$ ]]; then
         bash "$DOTFILES_DIR/scripts/enable_touchid_sudo.sh"
     else
