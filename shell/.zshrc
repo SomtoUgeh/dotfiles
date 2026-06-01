@@ -308,14 +308,3 @@ function hitch-dev() {
   _hitch_run hitch-dev "$@"
 }
 # <<< hitch shell integration <<<
-
-# bun completions
-[ -s "/Users/odera/.bun/_bun" ] && source "/Users/odera/.bun/_bun"
-
-# pnpm
-export PNPM_HOME="/Users/odera/Library/pnpm"
-case ":$PATH:" in
-  *":$PNPM_HOME/bin:"*) ;;
-  *) export PATH="$PNPM_HOME/bin:$PATH" ;;
-esac
-# pnpm end
