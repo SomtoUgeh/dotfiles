@@ -44,11 +44,11 @@ CDPATH=.:$HOME:$HOME/code:$HOME/Desktop
 PATH="/opt/homebrew/bin:$PATH"
 PATH="/usr/local/bin:$PATH"
 
-# Custom bins
+# Custom bins (~/.local/bin also covers uv, pipx, and the Claude CLI)
 PATH="$PATH:$HOME/bin:$HOME/.bin:$HOME/.local/bin"
 
-# node_modules (fast local bin access)
-PATH="$PATH:./node_modules/.bin:../node_modules/.bin:../../node_modules/.bin:../../../node_modules/.bin:../../../../node_modules/.bin:../../../../../node_modules/.bin:../../../../../../node_modules/.bin:../../../../../../../node_modules/.bin"
+# node_modules (run locally-installed CLIs from the project root)
+PATH="$PATH:./node_modules/.bin"
 
 # ============================================================================
 # TOOL INTEGRATIONS
@@ -65,15 +65,12 @@ export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 [ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
 
-# pnpm
+# pnpm (binary lives in $PNPM_HOME/bin)
 export PNPM_HOME="$HOME/Library/pnpm"
 case ":$PATH:" in
-  *":$PNPM_HOME:"*) ;;
-  *) export PATH="$PNPM_HOME:$PATH" ;;
+  *":$PNPM_HOME/bin:"*) ;;
+  *) export PATH="$PNPM_HOME/bin:$PATH" ;;
 esac
-
-# uv - Python package manager
-export PATH="$HOME/.local/bin:$PATH"
 
 # PostgreSQL
 export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
@@ -96,11 +93,7 @@ export RIPGREP_CONFIG_PATH=$HOME/.ripgreprc
 export SCARF_ANALYTICS=false
 
 # Claude
-export ENABLE_BACKGROUND_TASKS=1
-export FORCE_AUTO_BACKGROUND_TASKS=1
 export CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1
-export CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=1
-export CLAUDE_CODE_NO_FLICKER=1
 
 # ============================================================================
 # COMPLETIONS
@@ -315,3 +308,14 @@ function hitch-dev() {
   _hitch_run hitch-dev "$@"
 }
 # <<< hitch shell integration <<<
+
+# bun completions
+[ -s "/Users/odera/.bun/_bun" ] && source "/Users/odera/.bun/_bun"
+
+# pnpm
+export PNPM_HOME="/Users/odera/Library/pnpm"
+case ":$PATH:" in
+  *":$PNPM_HOME/bin:"*) ;;
+  *) export PATH="$PNPM_HOME/bin:$PATH" ;;
+esac
+# pnpm end
