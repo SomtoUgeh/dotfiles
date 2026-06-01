@@ -26,6 +26,9 @@ export OPENCODE_SERVER_PASSWORD=""
 # GitHub (for CLI access beyond gh auth)
 # export GITHUB_TOKEN=""
 
+# Resend (transactional email)
+# export RESEND_API_KEY=""
+
 # =============================================================================
 # Cloud Services
 # =============================================================================

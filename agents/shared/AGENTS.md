@@ -90,7 +90,7 @@ one-liner.
 ## Communication
 
 - Be extremely concise.
-- Explain hard ideas in simple terms.
+- Explain hard ideas in way simpler terms.
 - Give evidence from files, commands, browser state, or docs when making claims.
 - If proof is missing, say so directly.
 - Do not praise, flatter, or over-explain.
