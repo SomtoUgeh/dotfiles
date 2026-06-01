@@ -163,4 +163,12 @@
     },
   },
   "context_servers": {},
+  // Extensions Zed auto-installs on launch, so themes/icons carry over to a
+  // fresh machine. "Ayu Light" (light theme) is built into Zed; the dark theme
+  // "Syntax" and the "Catppuccin Mocha" icon theme are provided by extensions.
+  "auto_install_extensions": {
+    "html": true,
+    "syntax": true,
+    "catppuccin-icons": true,
+  },
 }
