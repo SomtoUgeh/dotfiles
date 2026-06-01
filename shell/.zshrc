@@ -208,9 +208,6 @@ npm-latest() { npm info "$1" | grep latest; }
 # Kill process on port
 killport() { lsof -i tcp:"$*" | awk 'NR!=1 {print $2}' | xargs kill -9; }
 
-# Git alias (after functions to avoid parse errors)
-alias git=hub
-
 # Quit macOS app
 quit() {
   if [ -z "$1" ]; then
