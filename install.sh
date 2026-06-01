@@ -232,6 +232,44 @@ if [ "$shell_was_clean" = "1" ] && ! git -C "$DOTFILES_DIR" diff --quiet -- shel
 fi
 
 # =============================================================================
+# Node via fnm (latest) — keep fnm the only Node on the machine
+# =============================================================================
+# fnm is installed via Homebrew, but with no default version every shell falls
+# back to a system/brew Node. Install the latest and pin it as the default.
+if command -v fnm &> /dev/null; then
+    echo ""
+    echo "Setting up Node via fnm..."
+
+    if fnm ls 2>/dev/null | grep -qE 'v[0-9]+\.'; then
+        echo "✓ fnm already manages a Node version"
+    else
+        latest_node="$(fnm ls-remote --latest 2>/dev/null | tail -1)"
+        if [ -n "$latest_node" ]; then
+            echo "Installing latest Node ($latest_node)..."
+            fnm install "$latest_node" && fnm default "$latest_node" || \
+                echo -e "${YELLOW}fnm Node setup failed (skipped).${NC}"
+        else
+            echo -e "${YELLOW}Could not determine latest Node from fnm (skipped).${NC}"
+        fi
+    fi
+
+    # Load fnm's Node so npm is on PATH for the global install below.
+    eval "$(fnm env)" 2>/dev/null || true
+    fnm use default 2>/dev/null || true
+
+    # neonctl on fnm's Node (see Brewfile note: the brew formula bundles a second
+    # Node, which would defeat fnm being the only Node).
+    if command -v npm &> /dev/null; then
+        if npm ls -g --depth=0 neonctl &> /dev/null; then
+            echo "✓ neonctl already installed (npm global)"
+        else
+            echo "Installing neonctl (npm global on fnm Node)..."
+            npm install -g neonctl || echo -e "${YELLOW}neonctl install failed (skipped).${NC}"
+        fi
+    fi
+fi
+
+# =============================================================================
 # Agent configurations
 # =============================================================================
 echo ""

@@ -43,7 +43,8 @@ brew "watchman"               # File watcher (React Native / Metro)
 brew "starship"               # Cross-shell prompt
 
 # Cloud / infra CLIs
-brew "neonctl"                # Neon Postgres CLI
+# neonctl is intentionally NOT here: the brew formula pulls in its own Node,
+# which conflicts with fnm-managed Node. install.sh installs it via npm instead.
 brew "hcloud"                 # Hetzner Cloud CLI
 brew "rclone"                 # Cloud storage CLI
 brew "caddy"                  # Web server
