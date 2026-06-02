@@ -384,10 +384,25 @@ create_symlink "$DOTFILES_DIR/config/zed/keymap.json" "$ZED_CONFIG_DIR/keymap.js
 echo ""
 
 VSCODE_CONFIG_DIR="$HOME/Library/Application Support/Code/User"
-if [ -d "$VSCODE_CONFIG_DIR" ]; then
+# mkdir -p (don't guard on the dir existing): on a fresh machine VSCode hasn't
+# launched yet so the User dir is absent, and the old `if [ -d ]` guard skipped
+# linking entirely — leaving VSCode on empty defaults. Match the Zed/Ghostty blocks.
+if [ -d "/Applications/Visual Studio Code.app" ]; then
     echo "Setting up VSCode configuration..."
+    mkdir -p "$VSCODE_CONFIG_DIR"
     create_symlink "$DOTFILES_DIR/config/vscode/vscode-settings.json" "$VSCODE_CONFIG_DIR/settings.json"
     create_symlink "$DOTFILES_DIR/config/vscode/vscode-keybindings.json" "$VSCODE_CONFIG_DIR/keybindings.json"
+
+    # Install extensions from the manifest (VSCode has no auto-install like Zed,
+    # so themes/icons would silently fall back without this). Needs the `code` CLI.
+    if [ -f "$DOTFILES_DIR/config/vscode/extensions.txt" ] && command -v code &> /dev/null; then
+        echo "Installing VSCode extensions..."
+        while IFS= read -r ext || [ -n "$ext" ]; do
+            [[ "$ext" =~ ^#.*$ || -z "$ext" ]] && continue
+            echo "  Installing extension: $ext"
+            code --install-extension "$ext" --force &> /dev/null || echo -e "${YELLOW}  Failed: $ext${NC}"
+        done < "$DOTFILES_DIR/config/vscode/extensions.txt"
+    fi
 fi
 
 # =============================================================================

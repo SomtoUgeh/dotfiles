@@ -1,0 +1,5 @@
+# VSCode extensions — installed by install.sh via 'code --install-extension'.
+# Capture current state with: code --list-extensions >> this file
+# Lines starting with # are ignored.
+lakshits11.monokai-pirokai
+monokai.theme-monokai-pro-vscode
