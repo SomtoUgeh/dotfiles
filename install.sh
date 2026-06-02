@@ -55,22 +55,23 @@ create_symlink() {
         mv "$target" "$target.backup.$(date +%Y%m%d_%H%M%S)"
     fi
 
-    # Remove outdated symlink
+    # Handle an existing symlink (use -L so a *broken* link is still detected;
+    # -e follows the link and reports false when the target is missing, which is
+    # exactly how a stale link slips through and later makes `ln` abort the run).
     if [ -L "$target" ]; then
         current_link=$(readlink "$target")
-        if [ "$current_link" != "$source" ]; then
-            echo -e "${YELLOW}Removing outdated symlink: $target${NC}"
-            rm "$target"
+        if [ "$current_link" = "$source" ]; then
+            echo -e "✓ Already linked: $target"
+            return
         fi
+        echo -e "${YELLOW}Removing outdated symlink: $target${NC}"
+        rm "$target"
     fi
 
-    # Create symlink
-    if [ ! -e "$target" ]; then
-        echo -e "${GREEN}Linking: $target -> $source${NC}"
-        ln -s "$source" "$target"
-    else
-        echo -e "✓ Already linked: $target"
-    fi
+    # Create symlink. -f guards against any residual path component (e.g. a
+    # racing process) so a stale entry can never abort the installer.
+    echo -e "${GREEN}Linking: $target -> $source${NC}"
+    ln -sf "$source" "$target"
 }
 
 # Render a machine-local copy of a template file.
@@ -334,7 +335,10 @@ create_symlink "$AGENTS_DIR/shared/ETHOS.md" "$HOME/.config/opencode/ETHOS.md"
 create_symlink "$AGENTS_DIR/opencode/opencode.jsonc" "$HOME/.config/opencode/opencode.jsonc"
 create_symlink "$AGENTS_DIR/opencode/agents" "$HOME/.config/opencode/agents"
 create_symlink "$AGENTS_DIR/opencode/commands" "$HOME/.config/opencode/commands"
-mkdir -p "$HOME/.config/opencode/plugins"
+# Symlink the whole plugins dir. Do NOT `mkdir -p` this path first: if it is
+# already a stale/broken symlink (e.g. dotfiles repo moved), mkdir follows the
+# dangling link, fails, and `set -e` aborts the entire installer. create_symlink
+# clears a broken link and recreates it correctly on its own.
 create_symlink "$AGENTS_DIR/opencode/plugins" "$HOME/.config/opencode/plugins"
 
 # Claude plugins (install if claude CLI available)
