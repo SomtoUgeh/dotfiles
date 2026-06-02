@@ -228,7 +228,9 @@ gif() {
 # PROMPT (Keep at end)
 # ============================================================================
 
-export STARSHIP_CONFIG="$HOME/code/dotfiles/config/starship/starship.toml"
+# Point at the installer-managed symlink (~/.config is Starship's default dir),
+# not the repo path — so this survives the dotfiles repo being moved/renamed.
+export STARSHIP_CONFIG="$HOME/.config/starship.toml"
 eval "$(starship init zsh)"
 
 # opencode
