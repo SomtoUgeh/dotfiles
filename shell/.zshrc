@@ -57,7 +57,7 @@ PATH="$PATH:./node_modules/.bin"
 # fnm (Fast Node Manager)
 FNM_PATH="/opt/homebrew/opt/fnm/bin"
 if [ -d "$FNM_PATH" ]; then
-  eval "$(fnm env)"
+  eval "$(fnm env --use-on-cd)"
 fi
 
 # bun
@@ -91,9 +91,6 @@ source ~/.orbstack/shell/init.zsh 2>/dev/null || :
 
 export RIPGREP_CONFIG_PATH=$HOME/.ripgreprc
 export SCARF_ANALYTICS=false
-
-# Claude
-export CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1
 
 # ============================================================================
 # COMPLETIONS
