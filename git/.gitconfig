@@ -1,3 +1,9 @@
+[user]
+	# No email here on purpose — identity is folder-driven (see includeIf below).
+	# useConfigOnly forces a hard "Author identity unknown" error in any folder
+	# outside ~/code/personal or ~/code/work, instead of silently auto-generating
+	# an email. This is the safety net — do not add a default user.email.
+	useConfigOnly = true
 [pull]
 	rebase = true
 [branch]
@@ -66,3 +72,12 @@
 	required = true
 [include]
 	path = ~/.gitconfig.local
+
+# Folder-driven identity + auth. These come LAST so they win over .gitconfig.local.
+# Trailing slash ≡ /** (recursive). Never drop the slash.
+[includeIf "gitdir:~/code/personal/"]
+	path = ~/.gitconfig-personal
+[includeIf "gitdir:~/code/work/"]
+	path = ~/.gitconfig-work
+[gpg "ssh"]
+	allowedSignersFile = /Users/odera/.ssh/allowed_signers
