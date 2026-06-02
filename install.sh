@@ -286,11 +286,15 @@ create_symlink "$AGENTS_DIR/skills" "$HOME/.agents/skills"
 
 # Claude Code
 mkdir -p "$HOME/.claude/hooks"
-mkdir -p "$HOME/.claude/plugins"
 create_symlink "$AGENTS_DIR/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 create_symlink "$AGENTS_DIR/shared/ETHOS.md" "$HOME/.claude/ETHOS.md"
-render_agent_file "$AGENTS_DIR/claude/settings.json" "$HOME/.claude/settings.json"
-chmod 600 "$HOME/.claude/settings.json"
+# settings.json is SYMLINKED, not rendered. Claude resolves the link and writes
+# through it (atomic temp+rename at the real path), so the repo copy always
+# reflects live config and never drifts. It uses ${HOME}-relative paths, so no
+# per-host rendering is needed. Its enabledPlugins + extraKnownMarketplaces are
+# the single source of truth for plugins (the installed_plugins.json /
+# known_marketplaces.json caches are derived and are no longer tracked).
+create_symlink "$AGENTS_DIR/claude/settings.json" "$HOME/.claude/settings.json"
 create_symlink "$AGENTS_DIR/claude/mcp.json" "$HOME/.claude/mcp.json"
 create_symlink "$AGENTS_DIR/claude/commands" "$HOME/.claude/commands"
 create_symlink "$AGENTS_DIR/claude/agents" "$HOME/.claude/agents"
@@ -299,18 +303,6 @@ create_symlink "$AGENTS_DIR/shared/hooks/git_guard.py" "$HOME/.claude/hooks/git_
 create_symlink "$AGENTS_DIR/claude/statusline.sh" "$HOME/.claude/statusline.sh"
 create_symlink "$AGENTS_DIR/claude/file-suggestion.sh" "$HOME/.claude/file-suggestion.sh"
 chmod +x "$HOME/.claude/hooks/git_guard.py" "$HOME/.claude/statusline.sh" "$HOME/.claude/file-suggestion.sh" 2>/dev/null || true
-
-if [ -d "$AGENTS_DIR/claude/plugins" ]; then
-    for plugin_file in "$AGENTS_DIR/claude/plugins/"*.json; do
-        if [ -f "$plugin_file" ]; then
-            plugin_name=$(basename "$plugin_file")
-            local_plugin_file="$HOME/.claude/plugins/$plugin_name"
-            render_agent_file "$plugin_file" "$local_plugin_file"
-            chmod 600 "$local_plugin_file"
-            echo -e "${GREEN}✓ Rebuilt local Claude plugin metadata: $local_plugin_file${NC}"
-        fi
-    done
-fi
 
 # Codex
 mkdir -p "$HOME/.codex"
@@ -341,20 +333,33 @@ create_symlink "$AGENTS_DIR/opencode/commands" "$HOME/.config/opencode/commands"
 # clears a broken link and recreates it correctly on its own.
 create_symlink "$AGENTS_DIR/opencode/plugins" "$HOME/.config/opencode/plugins"
 
-# Claude plugins (install if claude CLI available)
-if [ -f "$AGENTS_DIR/claude/plugins.txt" ] && command -v claude &> /dev/null; then
-    echo "Installing Claude Code plugins..."
-    while IFS= read -r plugin || [ -n "$plugin" ]; do
-        # Skip comments and empty lines
-        [[ "$plugin" =~ ^#.*$ || -z "$plugin" ]] && continue
-        echo "  Installing plugin: $plugin"
-        claude plugins install "${plugin}@claude-plugins-official" 2>/dev/null || true
-    done < "$AGENTS_DIR/claude/plugins.txt"
-else
-    if [ -f "$AGENTS_DIR/claude/plugins.txt" ]; then
-        echo -e "${YELLOW}Claude CLI not found. Skipping plugin installation.${NC}"
-        echo "  Run manually after installing Claude: claude plugins install <plugin>@claude-plugins-official"
-    fi
+# Claude plugins: declared once in the symlinked settings.json (enabledPlugins +
+# extraKnownMarketplaces) — the single source of truth. Claude also syncs these
+# on launch, but install them explicitly so a fresh machine is ready without a
+# first-run round-trip. enabledPlugins keys are already in "name@marketplace" form.
+CLAUDE_SETTINGS="$HOME/.claude/settings.json"
+if command -v claude &> /dev/null && [ -f "$CLAUDE_SETTINGS" ]; then
+    echo "Installing Claude Code plugins from settings.json..."
+    # Register non-default (GitHub) marketplaces first.
+    python3 -c 'import json,sys
+d=json.load(open(sys.argv[1]))
+for m in (d.get("extraKnownMarketplaces") or {}).values():
+    s=m.get("source",{})
+    if s.get("source")=="github" and s.get("repo"): print(s["repo"])' "$CLAUDE_SETTINGS" | while IFS= read -r repo; do
+        if [ -n "$repo" ]; then claude plugins marketplace add "$repo" 2>/dev/null || true; fi
+    done
+    # Install every enabled plugin.
+    python3 -c 'import json,sys
+d=json.load(open(sys.argv[1]))
+for k,v in (d.get("enabledPlugins") or {}).items():
+    if v: print(k)' "$CLAUDE_SETTINGS" | while IFS= read -r plugin; do
+        if [ -n "$plugin" ]; then
+            echo "  Installing plugin: $plugin"
+            claude plugins install "$plugin" 2>/dev/null || true
+        fi
+    done
+elif ! command -v claude &> /dev/null; then
+    echo -e "${YELLOW}Claude CLI not found. Skipping plugin install (Claude syncs enabledPlugins from settings.json on first launch).${NC}"
 fi
 
 # =============================================================================

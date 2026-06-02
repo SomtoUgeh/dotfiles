@@ -190,9 +190,9 @@ rm ~/.zshrc  # Remove existing file
 
 ## Portable agent configs (Mac -> WSL / other machines)
 
-`install.sh` now builds machine-local copies of agent state files so host-specific paths are resolved from `$HOME`:
+`install.sh` keeps host-specific paths out of the tracked files:
 
-- `~/.codex/config.toml` is rendered from `agents/codex/config.toml` with `/Users/<user>` values replaced by `$HOME`.
-- `~/.claude/plugins/*.json` are rendered from `agents/claude/plugins/*.json` with `/Users/<user>` values replaced by `$HOME`.
+- `~/.codex/config.toml` and `~/.codex/hooks.json` are rendered from `agents/codex/` with `/Users/<user>` values replaced by `$HOME`.
+- `~/.claude/settings.json` is **symlinked** to `agents/claude/settings.json`. It uses `${HOME}`-relative paths, and Claude resolves the link and writes through it, so the tracked copy always reflects live config and never drifts.
 
-This keeps the tracked files human-editable in dotfiles while avoiding hardcoded paths when you install on another machine.
+Claude's `installed_plugins.json` / `known_marketplaces.json` are machine-generated caches (absolute paths, timestamps, commit SHAs) and are intentionally **not** tracked. They are rebuilt from `enabledPlugins` + `extraKnownMarketplaces` in `settings.json`, which is the single source of truth for plugins — `install.sh` installs them from there, and Claude re-syncs on launch.
