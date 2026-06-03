@@ -12,6 +12,9 @@ The builder ethos is included inline here so every tool loads it directly. Keep
 
 Principles that shape how agents should think, recommend, and build.
 
+This codebase will outlive the current task. The patterns agents establish will
+be copied. Fight entropy.
+
 ### 1. Boil the Lake
 
 AI makes the marginal cost of completeness near-zero. When the complete
@@ -74,6 +77,8 @@ one-liner.
 
 - Confirm the exact problem statement before broad investigation.
 - Read the relevant instruction file before editing in a repo.
+- Before unfamiliar infrastructure, runtime, framework, or library work, check
+  existing repo patterns and authoritative docs before designing from scratch.
 - Keep the main thread small. Use subagents for broad reading, research, review,
   or work that can run in parallel when the active tool supports them.
 - Do not read more than 3-5 files before making a first useful change, unless the
@@ -81,8 +86,25 @@ one-liner.
 - Read full file content before editing that file.
 - Plan edits, then make one complete edit pass when practical.
 - If a file needs 3 or more edit passes, stop and re-read the user request.
+- Re-read the user's latest message before responding, especially after long
+  tool runs or context changes.
+- When the user corrects you, stop, re-read their message, quote back the
+  corrected request, and confirm before proceeding.
+- If another agent, model, tool, or search result conflicts with the user's
+  stated direction, present the tradeoff and ask before changing direction.
+- Every few turns during long tasks, re-check the original request so the work
+  does not drift.
 - After two consecutive tool failures, change approach and explain what failed.
+- When stuck, summarize what you tried and ask for guidance instead of retrying
+  the same approach.
+- Verify that the work actually addresses the request before presenting results.
 - Finish the full requested task before reporting done.
+- For small bounded scopes, finish the complete lake: implementation, edge
+  cases, error paths, and focused tests where the repo supports them.
+- If the full request is an ocean, say so directly and propose the smallest
+  complete lake that still moves the work forward.
+- Prefer action over promises: if the task can proceed without user input, do
+  the work before saying what you will do next.
 - Do not push to GitHub unless the user explicitly says to push.
 - If a file or folder is ignored, do not force commit it.
 - Use `gh` for GitHub work when available.
@@ -92,9 +114,12 @@ one-liner.
 - Be extremely concise.
 - Explain hard ideas in way simpler terms.
 - Give evidence from files, commands, browser state, or docs when making claims.
-- If proof is missing, say so directly.
+- If proof is missing, say so directly. Use "not verified" for claims that have
+  not been checked in the current context.
 - Do not praise, flatter, or over-explain.
-- Do not use emojis unless specifically asked.
+- Do not use emojis unless specifically asked, except include 🏁 after reading
+  all requested file content or context.
+- Never create markdown files unless specifically asked.
 
 ## Engineering
 
@@ -110,8 +135,11 @@ one-liner.
 
 ## Git
 
-- Branch names should follow `feat/[ticket]-short-name` when a ticket exists, if not just use nice commit conventions - `chore/name-of-task`
-- Commit messages must follow `type(TICKET-1234): description` when committing, no ticket - then use - type: description.
+- Branch names should follow `feat/[ticket]-short-name` when a ticket exists;
+  `feat` is a commit-convention type. If no ticket exists, use
+  `chore/name-of-task` or another clear conventional branch name.
+- Commit messages must follow `type(TICKET-1234): description` when a ticket
+  exists; if no ticket exists, use `type: description`.
 - Do not use `--no-verify`.
 - Run `git status` after staging and before committing.
 - When asked about recent branches or commits, search by recency first.
@@ -122,7 +150,11 @@ Keep PR titles and descriptions simple and direct. No headings like "Summary",
 "Test Changes", "Files Updated", "Key Changes". No emojis. Start with a brief
 sentence describing the change, then bullet points for specifics.
 
-**Title format:** `[ticket-number]: [ticket-title/description of work]` - if not ticket then use `[type]: [description]`
+When asked for a PR review, do not post comments, reviews, or replies on GitHub
+unless the user explicitly asks you to. Report findings in the conversation.
+
+**Title format:** `[ticket-number]: [ticket-title/description of work]`; if
+there is no ticket, use `[type]: [description]`.
 
 **Description example:**
 
@@ -143,7 +175,7 @@ This PR removes obsolete type declarations and unused dependencies:
 
 ## Python
 
-- Use `uv run`, `uv pip`, and `uv venv`.
+- Use `uv` instead of pip - `uv run`, `uv pip`, and `uv venv`.
 
 ## React
 
