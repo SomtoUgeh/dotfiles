@@ -44,10 +44,8 @@ CDPATH=.:$HOME:$HOME/code:$HOME/Desktop
 PATH="/opt/homebrew/bin:$PATH"
 PATH="/usr/local/bin:$PATH"
 
-# Custom bins (~/.local/bin also covers uv, pipx, and the Claude CLI)
-PATH="$PATH:$HOME/bin:$HOME/.bin:$HOME/.local/bin"
-
-# node_modules (run locally-installed CLIs from the project root)
+# node_modules (run locally-installed CLIs from the project root).
+# ~/bin and ~/.local/bin are added in .zshenv (portable + dedup-guarded).
 PATH="$PATH:./node_modules/.bin"
 
 # ============================================================================
@@ -60,9 +58,8 @@ if [ -d "$FNM_PATH" ]; then
   eval "$(fnm env --use-on-cd)"
 fi
 
-# bun
+# bun (PATH handled in .zshenv; BUN_INSTALL kept for bun's own use)
 export BUN_INSTALL="$HOME/.bun"
-export PATH="$BUN_INSTALL/bin:$PATH"
 [ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
 
 # pnpm (binary lives in $PNPM_HOME/bin)
@@ -181,7 +178,7 @@ z() {
 gc() { git commit -m "$@"; }
 
 # Git diff
-dif() { git diff --color --no-index "$1" "$2" | diff-so-fancy; }
+dif() { git diff --no-index "$1" "$2" | delta; }
 cdiff() { cursor --diff "$1" "$2"; }
 
 # ast-grep helpers
@@ -232,11 +229,6 @@ eval "$(starship init zsh)"
 
 # opencode
 export PATH="$HOME/.opencode/bin:$PATH"
-
-# npm global bin
-export PATH="$HOME/.npm-global/bin:$PATH"
-
-export PATH="$HOME/.resend/bin:$PATH"
 
 # Pass unmatched globs as literal strings (prevents [HAW-1234] from being interpreted)
 setopt NO_NOMATCH

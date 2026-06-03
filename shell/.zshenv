@@ -16,22 +16,9 @@ _add_to_path() {
 }
 
 _add_to_path "$HOME/bin"
-_add_to_path "$HOME/.local/bin"
+_add_to_path "$HOME/.local/bin"   # also covers uv, pipx, and the Claude CLI
 _add_to_path "$HOME/.bun/bin"
-_add_to_path "$HOME/.npm-global/bin"
 _add_to_path "$HOME/.cargo/bin"
-
-# NVM-managed Node bin: prepend the highest-version installed node's bin to PATH.
-# This is the cheap path-only fix — we deliberately do NOT source nvm.sh here
-# (it's ~1000 lines and slow). nvm.sh is still useful in .zshrc for interactive
-# `nvm use` / `nvm install`, but non-interactive shells just need `node`,
-# `npm`, and npm-globally-installed CLIs (codex, opencode, pnpm, wrangler) to
-# resolve, which a single PATH entry achieves.
-if [[ -d "$HOME/.nvm/versions/node" ]]; then
-  _nvm_latest=$(ls "$HOME/.nvm/versions/node" 2>/dev/null | sort -V | tail -1)
-  [[ -n "$_nvm_latest" ]] && _add_to_path "$HOME/.nvm/versions/node/$_nvm_latest/bin"
-  unset _nvm_latest
-fi
 
 unset -f _add_to_path
 
