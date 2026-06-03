@@ -65,6 +65,7 @@ brew "uv"                     # Fast Python package manager
 brew "zsh"
 brew "zsh-autosuggestions"
 brew "zsh-syntax-highlighting"
+brew "pam-reattach"           # Touch ID for sudo inside tmux/screen (see scripts/enable_touchid_sudo.sh)
 
 # App Store CLI
 brew "mas"                    # Install Mac App Store apps (see bottom of file)
@@ -74,10 +75,8 @@ brew "mas"                    # Install Mac App Store apps (see bottom of file)
 # =============================================================================
 
 # Editors & terminals
-cask "cursor"                 # Primary editor (AI VSCode fork)
 cask "visual-studio-code"     # Shares config with Cursor
 cask "zed"                    # Fast modern editor
-cask "iterm2"                 # Backup terminal
 
 # Dev tooling
 cask "orbstack"               # Docker/Linux VMs (lightweight Docker Desktop alt)
@@ -90,7 +89,6 @@ cask "ngrok"                  # Localhost tunneling (ngrok/ngrok tap)
 # AI / assistants
 cask "claude"                 # Claude desktop app
 cask "granola"                # Meeting notes
-cask "superwhisper"           # Local dictation
 
 # Browsers & communication
 cask "google-chrome"
@@ -102,7 +100,6 @@ cask "notion"
 # Productivity & utilities
 cask "raycast"                # Launcher
 cask "alt-tab"                # Windows-style app switcher
-cask "bartender"              # Menu bar management
 cask "alcove"                 # Notch / Dynamic Island utility
 cask "bettermouse"           # Mouse customization
 cask "cap"                    # Screen recorder
@@ -114,7 +111,6 @@ cask "dropbox"
 cask "spotify"
 
 # Networking / VPN
-cask "tailscale"
 cask "cloudflare-warp"
 cask "surfshark"
 cask "termius"                # SSH client

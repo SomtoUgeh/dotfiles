@@ -1,8 +1,5 @@
 git/.gitconfig.local
 config/gh/hosts.yml
-# Claude plugin caches: machine-generated (abs paths, timestamps, SHAs).
-# Rebuilt from settings.json enabledPlugins/extraKnownMarketplaces — not tracked.
-agents/claude/plugins/
 __pycache__/
 .DS_Store
 .ropeproject/
