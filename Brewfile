@@ -77,7 +77,6 @@ brew "mas"                    # Install Mac App Store apps (see bottom of file)
 cask "cursor"                 # Primary editor (AI VSCode fork)
 cask "visual-studio-code"     # Shares config with Cursor
 cask "zed"                    # Fast modern editor
-cask "ghostty"                # GPU-accelerated terminal
 cask "iterm2"                 # Backup terminal
 
 # Dev tooling

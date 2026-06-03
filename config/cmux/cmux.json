@@ -1,0 +1,33 @@
+{
+  "$schema": "https://raw.githubusercontent.com/manaflow-ai/cmux/main/web/data/cmux.schema.json",
+  "schemaVersion": 1,
+
+  // Managed by dotfiles (JSONC). Only the settings we override live here;
+  // everything else falls back to cmux's in-app Settings (Cmd+,).
+  // NOTE: terminal font is NOT file-configurable in cmux — set
+  // "JetBrainsMono NFM" @ 14 in Settings to match the Ghostty config.
+
+  "terminal": {
+    "copyOnSelect": true,
+    "showScrollBar": false
+  },
+
+  "app": {
+    "sendAnonymousTelemetry": false
+  },
+
+  // Use the macOS default browser instead of cmux's embedded browser.
+  // cmux has no single "disable browser" switch; these four routing toggles
+  // cover every auto-open path (clicked links, terminal `open` commands,
+  // sidebar PR links, sidebar port links). The embedded browser pane can
+  // still be opened manually with Cmd+Shift+L.
+  "browser": {
+    "openTerminalLinksInCmuxBrowser": false,
+    "interceptTerminalOpenCommandInCmuxBrowser": false
+  },
+
+  "sidebar": {
+    "openPullRequestLinksInCmuxBrowser": false,
+    "openPortLinksInCmuxBrowser": false
+  }
+}

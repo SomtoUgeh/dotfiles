@@ -1,21 +1,20 @@
-# Ghostty Configuration
+# cmux terminal (Ghostty-backed) configuration
+# cmux's embedded terminal reads ~/.config/ghostty/config.
 # https://ghostty.org/docs/config
 
-# Keybindings
-keybind = shift+enter=text:\x1b\r
-keybind = super+k=clear_screen
-keybind = super+shift+n=new_window
-keybind = super+t=new_tab
-keybind = super+w=close_surface
-
-# Font (Nerd Font for icons in terminal)
+# Font
 font-family = JetBrainsMono NFM
-font-size = 14
+font-size = 16
 
-# Window
-window-padding-x = 8
-window-padding-y = 6
+# Spacing: extra line height (cell) + window padding for breathing room
+adjust-cell-height = 12%
+window-padding-x = 10
+window-padding-y = 8
 
 # Behavior
 copy-on-select = clipboard
 shell-integration = zsh
+
+# Keybindings
+keybind = shift+enter=text:\x1b\r
+keybind = super+k=clear_screen

@@ -363,14 +363,21 @@ elif ! command -v claude &> /dev/null; then
 fi
 
 # =============================================================================
-# Ghostty terminal
+# cmux terminal
 # =============================================================================
+# cmux.json is a user-authored override layer (JSONC). cmux reads it but never
+# writes back to it (in-app changes go to its own Settings store), so symlinking
+# the tracked copy is safe and never drifts.
 echo ""
-echo "Setting up Ghostty configuration..."
+echo "Setting up cmux configuration..."
 
-GHOSTTY_CONFIG_DIR="$HOME/Library/Application Support/com.mitchellh.ghostty"
-mkdir -p "$GHOSTTY_CONFIG_DIR"
-create_symlink "$DOTFILES_DIR/config/ghostty/config" "$GHOSTTY_CONFIG_DIR/config"
+mkdir -p "$HOME/.config/cmux"
+create_symlink "$DOTFILES_DIR/config/cmux/cmux.json" "$HOME/.config/cmux/cmux.json"
+
+# cmux's embedded terminal is Ghostty-backed and reads ~/.config/ghostty/config
+# for font, spacing, and rendering. (The standalone Ghostty app is no longer used.)
+mkdir -p "$HOME/.config/ghostty"
+create_symlink "$DOTFILES_DIR/config/ghostty/config" "$HOME/.config/ghostty/config"
 
 # =============================================================================
 # Zed editor

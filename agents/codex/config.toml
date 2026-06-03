@@ -16,45 +16,11 @@ memories = true
 multi_agent = true
 prevent_idle_sleep = true
 
-[marketplaces.openai-bundled]
-last_updated = "2026-05-09T09:41:36Z"
-source_type = "local"
-source = "/Users/somto/.codex/.tmp/bundled-marketplaces/openai-bundled"
-
-[marketplaces.openai-primary-runtime]
-last_updated = "2026-05-07T15:24:58Z"
-source_type = "local"
-source = "/Users/somto/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime"
-
-[marketplaces.claude-plugins-official]
-last_updated = "2026-05-09T10:55:30Z"
-last_revision = "76b35e91d1c99c090b1a08dade53bcc5e352c1b2"
-source_type = "git"
-source = "https://github.com/anthropics/claude-plugins-official.git"
-
 [marketplaces.cloudflare]
 last_updated = "2026-05-09T10:55:31Z"
 last_revision = "60147cbb773649eadca89cee92b4e0caf02234b4"
 source_type = "git"
 source = "https://github.com/cloudflare/skills.git"
-
-[marketplaces.last30days-skill]
-last_updated = "2026-05-04T19:27:44Z"
-last_revision = "b1773be8f360b46e45b4b42386c8d041c7ec7bef"
-source_type = "git"
-source = "https://github.com/mvanhorn/last30days-skill.git"
-
-[marketplaces.marketingskills]
-last_updated = "2026-05-09T10:55:33Z"
-last_revision = "906c2fb28e471c5b1d149d4159ec5ddb40b7c364"
-source_type = "git"
-source = "https://github.com/coreyhaines31/marketingskills.git"
-
-[marketplaces.openai-codex]
-last_updated = "2026-05-09T10:55:34Z"
-last_revision = "807e03ac9d5aa23bc395fdec8c3767500a86b3cf"
-source_type = "git"
-source = "https://github.com/openai/codex-plugin-cc.git"
 
 [marketplaces.shopify-ai-toolkit]
 last_updated = "2026-05-09T10:55:35Z"
@@ -69,14 +35,10 @@ url = "https://mcp.cloudflare.com/mcp"
 url = "https://mcp.context7.com/mcp"
 
 [mcp_servers.context7.env_http_headers]
-CONTEXT7_API_KEY = "CONTEXT7_API_KEY"
+CONTEXT7_API_KEY = "***REDACTED***"
 
 [mcp_servers.exa]
 url = "https://mcp.exa.ai/mcp"
-
-[mcp_servers.figma]
-url = "https://mcp.figma.com/mcp"
-enabled = false
 
 [mcp_servers.figma-remote-mcp]
 url = "https://mcp.figma.com/mcp"
@@ -167,15 +129,6 @@ enabled = true
 [plugins."superpowers@openai-curated"]
 enabled = true
 
-[plugins."agent-sdk-dev@claude-plugins-official"]
-enabled = true
-
-[plugins."claude-code-setup@claude-plugins-official"]
-enabled = true
-
-[plugins."claude-md-management@claude-plugins-official"]
-enabled = true
-
 [plugins."code-review@claude-plugins-official"]
 enabled = true
 
@@ -188,49 +141,20 @@ enabled = true
 [plugins."frontend-design@claude-plugins-official"]
 enabled = true
 
-[plugins."hookify@claude-plugins-official"]
-enabled = true
-
-[plugins."playground@claude-plugins-official"]
-enabled = true
-
-[plugins."pr-review-toolkit@claude-plugins-official"]
-enabled = true
-
-[plugins."telegram@claude-plugins-official"]
-enabled = true
-
 [plugins."codex@openai-codex"]
 enabled = true
 
 [plugins."browser-use@openai-bundled"]
 enabled = true
 
-[projects."/Users/somto"]
-trust_level = "trusted"
-
 [shell_environment_policy]
 inherit = "core"
 
 [shell_environment_policy.set]
-ANTHROPIC_DEFAULT_HAIKU_MODEL = "claude-sonnet-4-6"
-ANTHROPIC_DEFAULT_SONNET_MODEL = "claude-sonnet-4-6"
-BASH_MAX_OUTPUT_LENGTH = "25000"
-CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR = "1"
-CLAUDE_CODE_AUTO_COMPACT_WINDOW = "400000"
-CLAUDE_CODE_BUBBLEWRAP = "1"
-CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING = "1"
-CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION = "1"
-CLAUDE_CODE_ENABLE_TELEMETRY = "1"
-CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS = "25000"
-CLAUDE_CODE_GLOB_HIDDEN = "0"
-CLAUDE_CODE_GLOB_TIMEOUT_SECONDS = "8"
-CLAUDE_CODE_MAX_OUTPUT_TOKENS = "29000"
-CLAUDE_CODE_NO_FLICKER = "1"
 DISABLE_COST_WARNINGS = "1"
 DISABLE_ERROR_REPORTING = "1"
 DISABLE_NON_ESSENTIAL_MODEL_CALLS = "1"
-DISABLE_TELEMETRY = "0"
+DISABLE_TELEMETRY = "1"
 MAX_MCP_OUTPUT_TOKENS = "20000"
 MAX_THINKING_TOKENS = "25999"
 MCP_TIMEOUT = "60000"
@@ -259,14 +183,3 @@ status_line = [
 
 [tui.model_availability_nux]
 "gpt-5.5" = 4
-
-[hooks.state]
-
-[hooks.state."/Users/somto/.codex/hooks.json:post_tool_use:0:0"]
-trusted_hash = "sha256:fe1b0141a0e112b340361622f97cb1e3673d43c4692c2f73248ff48553aa90ff"
-
-[hooks.state."/Users/somto/.codex/hooks.json:pre_tool_use:0:0"]
-trusted_hash = "sha256:d325739d5558631979237f955d18ebb3007e0685641bc515f15aefb182b87187"
-
-[hooks.state."/Users/somto/.codex/hooks.json:stop:0:0"]
-trusted_hash = "sha256:60a54fe2606cfe8377c3440b1a2f11aae082418c936f64eda0b68fee68c0b0a4"
