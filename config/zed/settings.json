@@ -15,7 +15,7 @@
     },
     "codex-acp": {
       "favorite_config_option_values": {
-        "model": ["gpt-5.3-codex-spark", "gpt-5.5"],
+        "model": ["gpt-5.5"],
       },
       "type": "registry",
     },
@@ -77,12 +77,11 @@
     },
     "commit_message_model": {
       "provider": "openai",
-      "model": "gpt-5.3-codex-spark",
+      "model": "gpt-5.5",
     },
     "play_sound_when_agent_done": "when_hidden",
     "default_width": 600.0,
     "dock": "left",
-    "model_parameters": [],
   },
   "project_panel": {
     "entry_spacing": "comfortable",
