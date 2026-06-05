@@ -51,7 +51,8 @@
     "pr-review-toolkit@claude-plugins-official": true,
     "typescript-lsp@claude-plugins-official": true,
     "last30days@last30days-skill": true,
-    "plannotator@plannotator": true
+    "plannotator@plannotator": true,
+    "paper-desktop@paper": true
   },
   "extraKnownMarketplaces": {
     "last30days-skill": {
@@ -71,6 +72,12 @@
       "source": {
         "source": "github",
         "repo": "backnotprop/plannotator"
+      }
+    },
+    "paper": {
+      "source": {
+        "source": "github",
+        "repo": "paper-design/agent-plugins"
       }
     }
   },

@@ -295,7 +295,11 @@ create_symlink "$AGENTS_DIR/shared/ETHOS.md" "$HOME/.claude/ETHOS.md"
 # the single source of truth for plugins (the installed_plugins.json /
 # known_marketplaces.json caches are derived and are no longer tracked).
 create_symlink "$AGENTS_DIR/claude/settings.json" "$HOME/.claude/settings.json"
-create_symlink "$AGENTS_DIR/claude/mcp.json" "$HOME/.claude/mcp.json"
+# NOTE: mcp.json is NOT symlinked. Claude Code does not read ~/.claude/mcp.json;
+# it loads MCP servers from ~/.claude.json (user scope) or a project .mcp.json.
+# agents/claude/mcp.json is the declarative inventory, registered via the CLI in
+# the "Claude MCP servers" block below. Remove any stale dead symlink from a prior install.
+rm -f "$HOME/.claude/mcp.json"
 create_symlink "$AGENTS_DIR/claude/commands" "$HOME/.claude/commands"
 create_symlink "$AGENTS_DIR/claude/agents" "$HOME/.claude/agents"
 create_symlink "$AGENTS_DIR/skills" "$HOME/.claude/skills"
@@ -360,6 +364,25 @@ for k,v in (d.get("enabledPlugins") or {}).items():
     done
 elif ! command -v claude &> /dev/null; then
     echo -e "${YELLOW}Claude CLI not found. Skipping plugin install (Claude syncs enabledPlugins from settings.json on first launch).${NC}"
+fi
+
+# Claude MCP servers: declared in agents/claude/mcp.json (the inventory). Claude
+# Code does NOT read ~/.claude/mcp.json, so register each remote server at user
+# scope via the CLI — idempotent (skips if already present), available in every
+# session from any directory.
+CLAUDE_MCP="$AGENTS_DIR/claude/mcp.json"
+if command -v claude &> /dev/null && [ -f "$CLAUDE_MCP" ]; then
+    echo "Registering Claude MCP servers from mcp.json (user scope)..."
+    python3 -c 'import json,sys
+d=json.load(open(sys.argv[1]))
+for name,cfg in (d.get("mcpServers") or {}).items():
+    t=cfg.get("type","stdio"); url=cfg.get("url","")
+    if t in ("http","sse") and url: print(f"{name}\t{t}\t{url}")' "$CLAUDE_MCP" | while IFS=$'\t' read -r name transport url; do
+        if [ -n "$name" ] && ! claude mcp get "$name" &> /dev/null; then
+            echo "  Adding MCP server: $name ($transport)"
+            claude mcp add --transport "$transport" --scope user "$name" "$url" 2>/dev/null || true
+        fi
+    done
 fi
 
 # =============================================================================

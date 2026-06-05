@@ -217,6 +217,7 @@ gif() {
 # ============================================================================
 
 [ -f ~/.zshrc.private ] && source ~/.zshrc.private
+[ -f "$HOME/.config/agent-secrets/openai.zsh" ] && . "$HOME/.config/agent-secrets/openai.zsh"
 
 # ============================================================================
 # PROMPT (Keep at end)
@@ -299,3 +300,6 @@ function hitch-dev() {
   _hitch_run hitch-dev "$@"
 }
 # <<< hitch shell integration <<<
+
+# bun completions
+[ -s "/Users/odera/.bun/_bun" ] && source "/Users/odera/.bun/_bun"

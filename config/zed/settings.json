@@ -9,6 +9,7 @@
 {
   // Note: Context servers with API keys should be configured in
   // ~/.config/zed/settings.json.local (not tracked in dotfiles)
+  "agent_buffer_font_size": 14.0,
   "agent_servers": {
     "codex-acp": {
       "favorite_config_option_values": {
@@ -25,11 +26,14 @@
     "dock": "left",
   },
   "buffer_font_family": ".ZedMono",
-  "buffer_font_size": 13.0,
-  "buffer_font_weight": 350.0,
+  "buffer_font_size": 14.0,
+  "buffer_font_weight": 300.0,
   "ui_font_family": ".ZedMono",
-  "ui_font_size": 15.0,
-  "ui_font_weight": 350.0,
+  "ui_font_size": 16.0,
+  "ui_font_weight": 300.0,
+  "buffer_line_height": {
+    "custom": 2.2,
+  },
   "colorize_brackets": true,
   "git_panel": {
     "dock": "left",
@@ -95,7 +99,7 @@
       "enabled": true,
     },
   },
-  "agent_ui_font_size": 14.0,
+  "agent_ui_font_size": 16.0,
   "theme": {
     "mode": "system",
     "light": "Ayu Light",
