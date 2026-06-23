@@ -182,3 +182,7 @@ This PR removes obsolete type declarations and unused dependencies:
 Before adding `useEffect`, check whether it is actually synchronizing with an
 external system. Derived render data, event handling, and prop/state resets should
 usually be handled without effects.
+
+<!-- BEGIN @agent-native/skills -->
+When using a high-cost frontier model for codebase-heavy work, use the /efficient-frontier skill always.
+<!-- END @agent-native/skills -->

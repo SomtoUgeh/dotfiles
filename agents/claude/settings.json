@@ -52,7 +52,8 @@
     "typescript-lsp@claude-plugins-official": true,
     "last30days@last30days-skill": true,
     "plannotator@plannotator": true,
-    "paper-desktop@paper": true
+    "paper-desktop@paper": true,
+    "cloudflare@cloudflare": true
   },
   "extraKnownMarketplaces": {
     "last30days-skill": {
