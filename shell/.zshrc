@@ -303,3 +303,9 @@ function hitch-dev() {
 
 # bun completions
 [ -s "/Users/odera/.bun/_bun" ] && source "/Users/odera/.bun/_bun"
+
+# >>> grok installer >>>
+export PATH="$HOME/.grok/bin:$PATH"
+fpath=(~/.grok/completions/zsh $fpath)
+autoload -Uz compinit && compinit -C
+# <<< grok installer <<<
