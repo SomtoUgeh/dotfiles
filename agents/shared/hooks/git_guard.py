@@ -31,8 +31,10 @@ DESTRUCTIVE_PATTERNS = [
     (r"git\s+push\s+.*--force(?!-with-lease)", "git push --force can overwrite remote history (use --force-with-lease)"),
     (r"git\s+push\s+.*-f(?:\s|$)", "git push -f can overwrite remote history"),
 
-    # force delete branch
-    (r"git\s+branch\s+-D", "git branch -D force deletes without merge check (use -d)"),
+    # force delete branch ((?-i:) keeps -D case-sensitive under the global
+    # IGNORECASE match, so the safe merge-checked -d stays allowed)
+    (r"git\s+branch\s+(?-i:-D)\b", "git branch -D force deletes without merge check (use -d)"),
+    (r"git\s+branch\s+.*--delete\s+.*--force|git\s+branch\s+.*--force\s+.*--delete", "git branch --delete --force skips the merge check (drop --force)"),
 
     # stash destruction
     (r"git\s+stash\s+drop", "git stash drop permanently deletes stashed changes"),

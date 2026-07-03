@@ -84,7 +84,7 @@
       }
     }
   },
-  "effortLevel": "xhigh",
+  "effortLevel": "high",
   "awaySummaryEnabled": false,
   "skipDangerousModePermissionPrompt": true,
   "agentPushNotifEnabled": true,
