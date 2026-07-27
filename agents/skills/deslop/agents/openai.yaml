@@ -1,0 +1,4 @@
+interface:
+  display_name: "Deslop"
+  short_description: "Remove AI slop from code or writing while preserving real voice."
+  default_prompt: "Use $deslop to remove AI patterns. For code, clean the branch vs main. For writing, edit the draft while preserving my voice, or detect slop patterns without rewriting if I ask whether it reads as AI."

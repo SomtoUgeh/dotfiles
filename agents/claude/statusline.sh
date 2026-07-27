@@ -46,6 +46,9 @@ worktree_name=""
 main_repo_name=""
 worktree_count=0
 
+grok_wt_root="$HOME/.grok/worktrees"
+grok_wt_db="$HOME/.grok/worktrees.db"
+
 if [ -d "$current_dir" ] && git -C "$current_dir" rev-parse --git-dir >/dev/null 2>&1; then
   toplevel=$(git -C "$current_dir" rev-parse --show-toplevel 2>/dev/null)
 
@@ -58,10 +61,35 @@ if [ -d "$current_dir" ] && git -C "$current_dir" rev-parse --git-dir >/dev/null
     main_repo_name=$(basename "$(dirname "$common_dir")")
   fi
 
+  # Grok worktrees are standalone clones under ~/.grok/worktrees, not linked
+  # git worktrees, so git-common-dir never flags them. Detect by path and
+  # resolve the source repo from grok's registry.
+  case "$toplevel" in
+    "$grok_wt_root"/*)
+      in_worktree=1
+      worktree_name=$(basename "$toplevel")
+      if command -v sqlite3 >/dev/null 2>&1 && [ -f "$grok_wt_db" ]; then
+        grok_src=$(sqlite3 "$grok_wt_db" "SELECT source_repo FROM worktrees WHERE path = '${toplevel//\'/\'\'}';" 2>/dev/null)
+        [ -n "$grok_src" ] && main_repo_name=$(basename "$grok_src")
+      fi
+      [ -z "$main_repo_name" ] && main_repo_name=$(basename "$(dirname "$toplevel")")
+      ;;
+  esac
+
   # Count all non-main worktrees via git
   total_wt=$(git -C "$current_dir" worktree list 2>/dev/null | wc -l | tr -d ' ')
   worktree_count=$((total_wt - 1))
   [ "$worktree_count" -lt 0 ] && worktree_count=0
+
+  # Add grok worktrees of this repo. The db keeps rows for deleted worktrees
+  # (status stays 'alive'), so only count paths that still exist on disk.
+  if command -v sqlite3 >/dev/null 2>&1 && [ -f "$grok_wt_db" ] && [ -n "$toplevel" ]; then
+    grok_count=0
+    while IFS= read -r wt_path; do
+      [ -n "$wt_path" ] && [ -d "$wt_path" ] && grok_count=$((grok_count + 1))
+    done < <(sqlite3 "$grok_wt_db" "SELECT path FROM worktrees WHERE source_repo = '${toplevel//\'/\'\'}' AND status = 'alive';" 2>/dev/null)
+    worktree_count=$((worktree_count + grok_count))
+  fi
 fi
 
 # ---- context window (via transcript parsing for accuracy) ----

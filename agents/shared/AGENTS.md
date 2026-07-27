@@ -1,9 +1,11 @@
 # Agent Instructions
 
-This is the shared behavior contract for coding agents. It must stay tool-neutral.
-Tool-specific paths, models, hooks, permissions, command schemas, and MCP syntax
-belong in each tool folder. Shared scripts and MCP inventory belong in
-`agents/shared/`.
+This is the shared behavior contract for coding agents. Keep day-to-day rules
+tool-neutral. Cross-harness model routing (which model for implement vs review
+vs escalate) lives here so every agent sees the same policy.
+
+Tool-specific paths, hooks, permissions, command schemas, and MCP syntax belong
+in each tool folder. Shared scripts and MCP inventory belong in `agents/shared/`.
 
 The builder ethos is included inline here so every tool loads it directly. Keep
 `ETHOS.md` beside this file as the standalone reference copy.
@@ -109,6 +111,180 @@ one-liner.
 - If a file or folder is ignored, do not force commit it.
 - Use `gh` for GitHub work when available.
 
+## Models for Workflows and Subagents
+
+Pick models by role. Rankings: higher is better. **Cost** is what is actually
+paid (OpenAI Codex limits stay generous; list price is not the axis), not
+sticker price. **Intelligence** is how hard a problem you can hand the model
+unsupervised. **Taste** covers UI/UX, code quality, API design, and copy.
+
+| model       | cost | intelligence | taste | harness |
+|-------------|------|--------------|-------|---------|
+| grok-4.5    | 9    | 6            | 5     | Grok Build CLI (`grok`) — **default implementer** |
+| gpt-5.6-sol | 8    | 8            | 6     | Codex CLI (`codex`) — escalate when Grok stalls |
+| sonnet-5    | 5    | 5            | 7     | Claude Agent/Workflow `model` param |
+| opus-4.8    | 4    | 7            | 8     | Claude Agent/Workflow `model` param |
+| fable-5     | 2    | 9            | 9     | Claude Agent/Workflow `model` param |
+
+**Default implementer is grok-4.5** — clear-spec coding, backend work,
+migrations, renames, and most subagent implementation. Escalate to
+**gpt-5.6-sol** when the task is tricky, Grok's output misses the bar, or you
+need longer unsupervised agency. GPT-5.6 cheaper tiers: `gpt-5.6-terra`,
+`gpt-5.6-luna`. Never use Haiku.
+
+### How to apply (defaults, not limits)
+
+- Standing permission to escalate: if Grok (or any cheaper model) misses the
+  bar, rerun with Sol / Fable / Opus without asking. Judge the output, not the
+  price tag. Escalating costs less than shipping mediocre work.
+- When axes conflict for anything that ships: **intelligence > taste > cost**.
+  Cost is a tie-breaker only.
+- **Anything user-facing** (UI, copy, API design) needs **taste ≥ 7**
+  (fable-5 or opus-4.8). Do not default Grok on polish-sensitive UI.
+- **Reviews of plans/implementations**: see **Review routing** below.
+  Default reviewer is fable-5 high, or gpt-5.6-sol via Codex; optionally
+  opus-4.8 as an independent second opinion.
+
+### Review routing
+
+Reviews are a first-class use of this model policy. Pick the skill by job,
+then apply the model row. Skills live under `~/.agents/skills/` (dotfiles
+`agents/skills/`).
+
+**Three tiers (do not confuse them):**
+
+| Tier | Skill | Job | Default depth |
+|------|-------|-----|---------------|
+| **1. Closeout** | `code-review` mode **closeout** (default) + optional `codex review` | Ship/commit gate; openclaw-style autoreview contract in `code-review/closeout.md` | P0/P1 |
+| **2. Axes** | `code-review` mode **axes** | Standards vs Spec only (issue/PRD fidelity + repo standards) | two reports |
+| **3. Full** | `workflows-review` / `/workflows-review` | Exhaustive multi-agent bench, todos/prd, workflow pipeline | P1–P3 |
+
+`code-review` and `workflows-review` are **different jobs**, not two names for
+the same pass. Everyday readiness → tier 1. "Did we build the right thing the
+right way?" → tier 2. "Throw every specialist at this PR" → tier 3.
+
+| Job | Skill / command | Reviewer model | Effort | Notes |
+|-----|-----------------|----------------|--------|-------|
+| Uncommitted / branch / PR **closeout** | `code-review` (default mode) or `codex review --uncommitted` / `--base main` | **fable-5** or **gpt-5.6-sol** | high | Follow `code-review/closeout.md`; one gate; verify then fix with Grok |
+| Two-axis Standards + Spec | `code-review` mode **axes** | **fable-5** × 2 parallel | high | See `code-review/axes.md`; no third nested Fable |
+| Exhaustive multi-agent PR/branch | `workflows-review` / `/workflows-review` | Orchestrator **fable-5**/sonnet; specialists fable when taste/security/arch | high on gate | Still obeys closeout scope governor; specialists report only |
+| Plan before implement | `workflows-plan-review` | Manager **fable-5 high**; outside voice **gpt-5.6-sol** | high | Outside voice opt-in; never two Fable reviewers on the same plan |
+| UI / design slices | `emil-design-engineering`, `web-design-guidelines`, etc. | **fable-5** or **opus-4.8** | med / high | taste ≥ 7 |
+| Plannotator visual review | `plannotator-review` | harness-agnostic UI | n/a | Then apply model policy when fixing annotations |
+
+**Review rules (always):**
+
+1. **One Fable gate.** Never let a Fable reviewer spawn Fable subagents. One
+   high-taste reviewer synthesizes; specialist agents may run in parallel on
+   inherited or cheaper models for scoped axes, then feed the gate.
+2. **Independent second opinion** is Sol (`codex review` / `codex exec -s
+   read-only`) or opus-4.8 — not a second Fable in the same tree.
+3. **Verify every finding** against real code before treating it as blocking.
+   Review output is advisory until checked.
+4. **Severity default for closeout:** surface merge-blockers first (security,
+   data loss, broken main path, missing required behavior). Wider P2/P3 only
+   when the user asks for a full pass or the skill is exhaustive
+   (`workflows-review`, plan CEO review).
+5. **Scope governor:** fix only in-scope blockers from the current diff/plan.
+   Adjacent bug classes become follow-ups unless the user expands scope.
+6. **Do not push to review.** Push only when the user asked to push/ship/update
+   a PR.
+7. **Harness truth:** Claude `model` params only accept Claude ids (fable-5,
+   opus-4.8, sonnet-5). Grok review stays in `grok`; Sol review stays in
+   `codex`. Do not invent Claude names for Sol/Grok.
+
+**How to run a solid closeout review:**
+
+```text
+# Preferred high-taste gate (Claude session on the branch/PR)
+# model: fable-5, effort: high → run code-review or workflows-review skill
+
+# Codex-native independent review (no Claude model string)
+codex review --uncommitted
+codex review --base main
+
+# Read-only investigate when a finding needs more context
+codex exec -s read-only -m gpt-5.6-sol -c model_reasoning_effort="high" "…"
+```
+
+After review, fix with the **default implementer (grok-4.5)** unless the fix is
+UI/taste-sensitive (then fable-5 / opus-4.8) or Grok already missed the bar
+(then Sol). Re-run the same review gate after material fixes.
+
+### Single-model pairing (discovery → constrained)
+
+| Situation | Model | Effort |
+|---|---|---|
+| Don't know what I'm building yet / refining the idea | fable-5 | high |
+| Ambitious throwaway prototype, hours autonomous | fable-5 | ultracode / max available |
+| Well-specified task, tricky code, unfamiliar libs | gpt-5.6-sol | medium / high |
+| Meaty backend or clear-spec implementation (default) | grok-4.5 | high |
+| Bulk/mechanical (migrations, renames, data analysis) | grok-4.5 | high |
+| Grok missed the bar / needs heavier agency | gpt-5.6-sol | high / xhigh |
+| Anything UI-heavy or rich HTML plans | fable-5 | medium |
+| Small UI change where polish matters | opus-4.8 | med / high / xhigh |
+| Small constrained tweak, fast and pleasant | grok-4.5 | high |
+
+### Orchestrating a big parallel job
+
+| Role | Model | Notes |
+|---|---|---|
+| Manager | fable-5 high | Claude models orchestrate best |
+| Default implementer subagent | grok-4.5 high | via `grok -p` — main coding path |
+| Escalation subagent (tricky / failed Grok) | gpt-5.6-sol med/high | via `codex exec` |
+| UI subagent | fable-5 low/med | taste-sensitive frontend |
+| Reviewer | fable-5 high | one reviewer gates everything |
+
+**The one rule:** never let the Fable reviewer spawn its own Fable subagents —
+it burns far too many tokens. One reviewer; escalate to Fable *implementation*
+only when the work is not up to snuff.
+
+### Mechanics — how to invoke each harness
+
+**Claude (fable-5, opus-4.8, sonnet-5):** set the Agent/Workflow `model` (and
+effort) parameter. No shell-out needed. Use for discovery, orchestration,
+review, and taste-sensitive UI — not as the default code implementer.
+
+**xAI Grok 4.5 (default implementer):** model id `grok-4.5` (aliases
+`grok-4.5-latest`, `grok-build-latest`). CLI: `grok` (`~/.grok/bin/grok`).
+
+- Interactive: `grok` or `grok "…"`; switch with `/model grok-4.5`
+- List models: `grok models`
+- Headless implement (preferred coding path):
+  `grok -p "…self-contained prompt…" -m grok-4.5 --reasoning-effort high --always-approve`
+- Structured output for wrappers: `--output-format json` or `streaming-json`
+- Effort ladder: `none | minimal | low | medium | high | xhigh | max`
+
+**OpenAI GPT-5.6 (escalation / hard jobs via Codex only):** not available as a
+Claude model string. Requires Codex CLI ≥ `0.144.0`. Defaults live in
+`~/.codex/config.toml` (`model = "gpt-5.6-sol"`,
+`model_reasoning_effort = "high"`).
+
+- Use when Grok stalls, the task is tricky/unfamiliar, or you want an
+  independent review opinion.
+- Interactive: `codex -m gpt-5.6-sol` (switch with `/model`)
+- Headless:
+  `codex exec -m gpt-5.6-sol -c model_reasoning_effort="high" "…self-contained prompt…"`
+- Harder: effort `xhigh` or `max`; multi-agent: `ultra`
+- Investigate only: `codex exec -s read-only "…"`
+- Review: `codex review --uncommitted` or `codex review --base main`
+- Prefer codex-implementation / codex-review / codex-computer-use skills when
+  they fit; otherwise call `codex exec` directly.
+- Ensure `codex` is on `PATH` (install:
+  `curl -fsSL https://chatgpt.com/codex/install.sh | sh`).
+
+### Calling Grok or Codex from a Claude session
+
+Claude `model` only accepts Claude ids.
+
+- Default implementation wrapper: thin Claude agent with `model: 'sonnet'`,
+  `effort: 'low'` → self-contained prompt →
+  `grok -p … -m grok-4.5 --reasoning-effort high --always-approve` → return
+  result.
+- Escalation wrapper: same shape, but run `codex exec -m gpt-5.6-sol …` instead.
+- Do not invent Claude model names like `gpt-5.6-sol` or `grok-4.5` — wrong
+  harness.
+
 ## Communication
 
 - Be extremely concise.
@@ -182,7 +358,3 @@ This PR removes obsolete type declarations and unused dependencies:
 Before adding `useEffect`, check whether it is actually synchronizing with an
 external system. Derived render data, event handling, and prop/state resets should
 usually be handled without effects.
-
-<!-- BEGIN @agent-native/skills -->
-When using a high-cost frontier model for codebase-heavy work, use the /efficient-frontier skill always.
-<!-- END @agent-native/skills -->

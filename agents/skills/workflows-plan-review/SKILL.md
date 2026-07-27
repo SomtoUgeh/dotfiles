@@ -23,6 +23,24 @@ Founder-mode review that stress-tests a plan before implementation. Not a rubber
 
 **Hard gate:** Do NOT make code changes. Do NOT start implementation. Review the plan only.
 
+## Models (from shared AGENTS.md)
+
+Follow **Models for Workflows and Subagents → Review routing** in the shared
+agent instructions.
+
+| Role | Model | Effort | Notes |
+|------|-------|--------|-------|
+| Plan CEO reviewer (this skill) | **fable-5** | high | Primary gate; taste + intelligence |
+| Research / audit gatherers | inherit or **sonnet-5** | med | repo-research-analyst, git-history |
+| Outside voice (opt-in) | **gpt-5.6-sol** | high | Via Codex skill or `codex exec -s read-only` — independent harness |
+| Optional second Claude opinion | **opus-4.8** | high | Only if user asks; never stack Fable under Fable |
+| Implementation after plan is approved | **grok-4.5** default | high | Via `/workflows-work`; not this skill |
+
+**Rules:** One Fable plan reviewer. Quality-loop subagents report only — do not
+set them to fable-5 if that would nest Fable under Fable; use inherit/sonnet for
+the meta quality check. Outside voice is Sol (Codex), not another Fable session
+in the same tree.
+
 ## Where This Fits
 
 ```
@@ -580,27 +598,32 @@ Tuned for review quality, not doc quality:
 
 ## Outside Voice (Optional)
 
-Independent cross-model challenge via `codex-plan-review`. Two different AI models agreeing is stronger signal than one model reviewing itself.
+Independent cross-model challenge via Codex on **gpt-5.6-sol** (shared model
+policy: second opinion = Sol, not a second Fable). Two different harnesses
+agreeing is stronger signal than one model reviewing itself.
 
 ### Offer
 
-Via structured user-question tool: "Want an outside voice? Codex can independently review the plan with structured output — categorized issues, severity ratings, and concrete suggestions. Recommended for plans with >5 files or new architecture."
+Via structured user-question tool: "Want an outside voice? Codex (gpt-5.6-sol) can independently review the plan with structured output — categorized issues, severity ratings, and concrete suggestions. Recommended for plans with >5 files or new architecture."
 
 If declined, skip to completion summary.
 
 ### Execute
 
-Invoke the codex-plan-review skill, passing the plan folder path:
+Prefer, in order:
 
-```
-skill: codex-plan-review
-```
+1. `skill: codex-plan-review` with the plan folder path (if installed).
+2. Else headless Codex:
+   ```bash
+   codex exec -s read-only -m gpt-5.6-sol -c model_reasoning_effort="high" \
+     "Independently review the plan at <plan-folder>. Read spec.md and prd.json. Return categorized issues with severity and concrete suggestions. Do not implement."
+   ```
 
-This runs structured Codex review (correctness, architecture, security, data-model, edge-cases, story-breakdown, feasibility), revises spec.md/prd.json directly, and loops until the user is satisfied.
+This runs structured Codex review (correctness, architecture, security, data-model, edge-cases, story-breakdown, feasibility). If the skill revises spec.md/prd.json, loop until the user is satisfied; the CLI path only reports unless the user asks to apply edits.
 
-**If codex-plan-review fails** (Codex not installed, auth error, etc.):
+**If Codex fails** (not installed, auth error, etc.):
 
-Fall back to an active-runtime subagent challenge:
+Fall back to an active-runtime subagent challenge on **opus-4.8** if available, else inherit — never spawn another Fable under this Fable reviewer:
 
 - Launch subagent `general-purpose` with prompt ("You are a brutally honest technical reviewer. You have NEVER seen this plan before. Read [plan folder path]/spec.md and prd.json fresh and find what the review missed: logical gaps, overcomplexity, feasibility risks, missing dependencies or sequencing issues, strategic miscalibration. Be direct. Be terse. No compliments.")
 

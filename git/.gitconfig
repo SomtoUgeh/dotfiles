@@ -79,6 +79,18 @@
 	path = ~/.gitconfig-personal
 [includeIf "gitdir:~/code/work/"]
 	path = ~/.gitconfig-work
+# Agent worktree pools outside ~/code/{personal,work}. Default to personal
+# GitHub auth (id_ed25519_personal). Add a more specific work rule if a
+# Swissblock checkout ever lives under one of these roots.
+#
+# Claude: usually in-repo under <repo>/.claude/worktrees/ — already covered by
+# the ~/code/personal/ or ~/code/work/ rules above when the main repo is there.
+[includeIf "gitdir:~/.grok/worktrees/"]
+	path = ~/.gitconfig-personal
+[includeIf "gitdir:~/.codex/worktrees/"]
+	path = ~/.gitconfig-personal
+[includeIf "gitdir:~/.config/superpowers/worktrees/"]
+	path = ~/.gitconfig-personal
 [gpg "ssh"]
 	allowedSignersFile = /Users/odera/.ssh/allowed_signers
 [credential "https://github.com"]

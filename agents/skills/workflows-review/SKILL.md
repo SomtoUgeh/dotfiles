@@ -1,9 +1,30 @@
 ---
 name: workflows-review
-description: Perform exhaustive code reviews using multi-agent analysis and dynamic skill discovery
+description: >
+  Exhaustive multi-agent code review with dynamic agent/skill discovery,
+  stakeholder and scenario passes, and todo/prd output. Use for large or
+  high-risk PRs, after implementation in the workflows-* pipeline, or when
+  code-review mode full hands off. Not for everyday ship gates — use
+  code-review closeout for that.
 ---
 
-# Review Command
+# Workflows review (exhaustive)
+
+## When to use this vs `code-review`
+
+| Need | Use |
+|------|-----|
+| Ship/commit gate, P0/P1, often | **`code-review` closeout** (default) |
+| Standards vs Spec only | **`code-review` axes** |
+| Full agent bench, P1–P3, todos/prd | **This skill** (`workflows-review`) |
+
+This skill is expensive by design. Prefer `code-review` closeout unless risk,
+size, or the user asks for exhaustive review.
+
+**Shared closeout contract:** still apply
+[`code-review/closeout.md`](../code-review/closeout.md) for scope governor,
+two-cycle pause, advisory findings, no push-to-review, and model/harness
+rules. This skill adds breadth; it does not cancel the governor.
 
 ## Runtime Tools
 
@@ -13,6 +34,34 @@ When this skill needs user questions, todo/progress tracking, subagents, or anot
 Adhere to the Builder Ethos (ETHOS.md): Boil the Lake, Search Before Building, User Sovereignty.
 
 Perform exhaustive code reviews using multi-agent analysis, dynamic skill/agent discovery, and optional prd.json integration.
+
+## Models (from shared AGENTS.md)
+
+Follow **Models for Workflows and Subagents → Review routing** in the shared
+agent instructions. This skill is the exhaustive multi-agent path.
+
+| Role | Model | Effort | Notes |
+|------|-------|--------|-------|
+| Orchestrator / synthesizer (you) | **fable-5** preferred, else **sonnet-5** | high | One gate. You rank severity and write the report. |
+| Core taste / security / architecture agents | **fable-5** when spawn allows model override | high | security-sentinel, architecture-strategist, code-simplicity-reviewer, kieran-typescript-reviewer, design reviewers |
+| Pure gatherers (history, file lists) | inherit or **sonnet-5** | med | git-history-analyzer, repo-research-analyst |
+| Independent second opinion (optional) | **gpt-5.6-sol** | high | After synthesis: `codex review --base <base>` or `codex exec -s read-only` — do not re-run the full agent fan-out |
+| UI skill slices | **fable-5** or **opus-4.8** | med / high | emil-design-engineering, web-design-guidelines, etc. |
+| Post-review fixes | **grok-4.5** default implementer | high | Escalate Sol if Grok misses; UI polish → Fable/Opus |
+
+**Hard rules:**
+
+1. **Never nest Fable under Fable.** Specialists return findings only; they do
+   not launch their own Fable subagents or re-enter this skill.
+2. **One synthesizer.** You (or a single Fable manager) produce the final
+   P1/P2/P3 report. Do not ask every specialist to also produce a full ship
+   decision.
+3. **Claude model params only accept Claude ids.** Sol and Grok run via CLI
+   harnesses (`codex`, `grok`), never as invented Claude model names.
+4. **Verify before block.** Cite file:line and confirm the path still exists
+   before marking P1.
+5. **Closeout severity:** P1 blocks merge; P2 should fix; P3 optional. Prefer
+   fewer high-signal P1s over a wall of nits unless the user asked for depth.
 
 ## Prerequisites
 
@@ -114,12 +163,17 @@ find ~/.codex/plugins ~/.claude/plugins ~/.config/opencode/plugins -path "*/skil
 
 **Core Review Agents (always run):**
 
-- Launch subagent `security-sentinel` with prompt ("Review these changed files for security vulnerabilities: <changed_files>")
-- Launch subagent `performance-oracle` with prompt ("Review these changed files for performance issues: <changed_files>")
-- Launch subagent `architecture-strategist` with prompt ("Review these changed files for architectural concerns: <changed_files>")
-- Launch subagent `code-simplicity-reviewer` with prompt ("Review these changed files for unnecessary complexity: <changed_files>")
-- Launch subagent `pattern-recognition-specialist` with prompt ("Review these changed files for anti-patterns: <changed_files>")
-- Launch subagent `code-reviewer` with prompt ("Review these changed files for code quality issues: <changed_files>")
+When the runtime supports model overrides on Agent/subagent calls, set
+**`model: fable-5`** (high effort) for security, architecture, simplicity, and
+TypeScript/quality reviewers. Pattern/history gatherers may inherit. Pass
+explicit instruction: report findings only; do not spawn further subagents.
+
+- Launch subagent `security-sentinel` with prompt ("Review these changed files for security vulnerabilities: <changed_files>. Return findings only; do not spawn subagents.")
+- Launch subagent `performance-oracle` with prompt ("Review these changed files for performance issues: <changed_files>. Return findings only; do not spawn subagents.")
+- Launch subagent `architecture-strategist` with prompt ("Review these changed files for architectural concerns: <changed_files>. Return findings only; do not spawn subagents.")
+- Launch subagent `code-simplicity-reviewer` with prompt ("Review these changed files for unnecessary complexity: <changed_files>. Return findings only; do not spawn subagents.")
+- Launch subagent `pattern-recognition-specialist` with prompt ("Review these changed files for anti-patterns: <changed_files>. Return findings only; do not spawn subagents.")
+- Launch subagent `code-reviewer` with prompt ("Review these changed files for code quality issues: <changed_files>. Return findings only; do not spawn subagents.")
 
 Every single one. No exceptions.
 

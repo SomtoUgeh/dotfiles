@@ -30,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${HOME}/.agents/skills/shaping/shaping-ripple.sh\"",
+            "command": "${HOME}/.agents/skills/shaping/shaping-ripple.sh",
             "timeout": 5
           }
         ]
