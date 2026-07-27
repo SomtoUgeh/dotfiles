@@ -85,6 +85,7 @@
     }
   },
   "effortLevel": "high",
+  "outputStyle": "bro",
   "awaySummaryEnabled": false,
   "skipDangerousModePermissionPrompt": true,
   "agentPushNotifEnabled": true,
