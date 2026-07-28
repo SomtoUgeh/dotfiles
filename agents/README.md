@@ -22,8 +22,9 @@ not put tool-specific syntax there.
 
 The installer links it to:
 
-- `~/.agents/skills` for Codex and OpenCode discovery
+- `~/.agents/skills` for Codex discovery (and as a shared agent-compatible path)
 - `~/.claude/skills` for Claude Code's native skill path
+- `~/.config/opencode/skills` for OpenCode's native skill path
 - `~/.codex/hooks.json` and `~/.codex/config.toml` are rendered locally from
   templates so paths use this machine's `$HOME` and dotfiles path.
 
@@ -33,6 +34,7 @@ OpenCode setup includes:
 - `~/.config/opencode/opencode.jsonc`
 - `~/.config/opencode/agents`
 - `~/.config/opencode/commands`
+- `~/.config/opencode/skills` → shared `agents/skills`
 - `~/.config/opencode/plugins` for local hook plugins
 
 Do not replace `~/.codex/skills`; Codex can keep local-only skills there while

@@ -278,8 +278,9 @@ echo "Setting up agent configurations..."
 
 AGENTS_DIR="$DOTFILES_DIR/agents"
 
-# Shared skills live at the neutral path. Codex and OpenCode discover
-# ~/.agents/skills directly; Claude also gets its native ~/.claude/skills link.
+# Shared skills live at the neutral path. Codex discovers ~/.agents/skills
+# directly; Claude and OpenCode also get their native skill-path links so
+# tool-specific installers write through to the shared tree.
 # Do not replace ~/.codex/skills: Codex may keep local-only skills there.
 mkdir -p "$HOME/.agents"
 create_symlink "$AGENTS_DIR/skills" "$HOME/.agents/skills"
@@ -332,6 +333,7 @@ create_symlink "$AGENTS_DIR/shared/ETHOS.md" "$HOME/.config/opencode/ETHOS.md"
 create_symlink "$AGENTS_DIR/opencode/opencode.jsonc" "$HOME/.config/opencode/opencode.jsonc"
 create_symlink "$AGENTS_DIR/opencode/agents" "$HOME/.config/opencode/agents"
 create_symlink "$AGENTS_DIR/opencode/commands" "$HOME/.config/opencode/commands"
+create_symlink "$AGENTS_DIR/skills" "$HOME/.config/opencode/skills"
 # Symlink the whole plugins dir. Do NOT `mkdir -p` this path first: if it is
 # already a stale/broken symlink (e.g. dotfiles repo moved), mkdir follows the
 # dangling link, fails, and `set -e` aborts the entire installer. create_symlink

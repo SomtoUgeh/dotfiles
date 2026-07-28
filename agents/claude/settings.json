@@ -84,11 +84,12 @@
       }
     }
   },
-  "effortLevel": "high",
   "outputStyle": "bro",
+  "effortLevel": "high",
   "awaySummaryEnabled": false,
   "skipDangerousModePermissionPrompt": true,
   "agentPushNotifEnabled": true,
   "voiceEnabled": true,
-  "gitAttribution": false
+  "gitAttribution": false,
+  "model": "claude-fable-5[1m]"
 }
