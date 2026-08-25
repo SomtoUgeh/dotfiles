@@ -92,7 +92,7 @@
 [includeIf "gitdir:~/.config/superpowers/worktrees/"]
 	path = ~/.gitconfig-personal
 [gpg "ssh"]
-	allowedSignersFile = /Users/odera/.ssh/allowed_signers
+	allowedSignersFile = ~/.ssh/allowed_signers
 [credential "https://github.com"]
 	helper = 
 	helper = !/opt/homebrew/bin/gh auth git-credential
