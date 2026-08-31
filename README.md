@@ -84,8 +84,11 @@ dotfiles/
 ├── install.sh              # Main installation script
 ├── Brewfile                # Homebrew packages
 ├── README.md
+├── docs/
+│   └── cloud-development-workspace.md
 ├── shell/                  # Shell configurations
 │   ├── .zshrc
+│   ├── .zshrc.cloud        # Ubuntu VM Zsh
 │   ├── .zshenv
 │   └── .zprofile
 ├── git/                    # Git configuration
@@ -101,15 +104,21 @@ dotfiles/
 │   ├── shared/             # Shared AGENTS.md, ETHOS.md, hooks, MCP inventory
 │   ├── claude/             # Claude Code config, commands, agents, plugins
 │   ├── codex/              # Codex config and agents
-│   ├── opencode/           # OpenCode config, commands, and agents
+│   ├── opencode/           # OpenCode config, including opencode.cloud.jsonc
 │   └── skills/             # Shared SKILL.md packages via ~/.agents/skills
-├── scripts/                # Custom scripts (linked to ~/bin)
-│   └── enable_touchid_sudo.sh  # Enable Touch ID for sudo
+├── scripts/
+│   ├── enable_touchid_sudo.sh
+│   ├── setup_altschool_cloud.sh
+│   ├── install_cloud_dotfiles.sh
+│   └── verify_altschool_cloud.sh
 ├── macos/
 │   └── defaults.sh         # macOS system preferences
 └── templates/              # Templates for sensitive files
     ├── zshrc-private.template
     ├── ssh-config.template
+    ├── gitconfig-local.template
+    ├── gitconfig-personal.template
+    ├── ssh-config-cloud.template
     └── aws-config.template
 ```
 
@@ -129,10 +138,14 @@ Shared across Cursor/VSCode/Zed:
 - `cmd+q cmd+f` - Quick text search
 
 ### Git
+- Folder-driven identity via `includeIf` (`~/code/personal`, `~/code/work`, `~/code/TalentQL`)
+- `user.useConfigOnly` so folders without a match fail instead of inventing an email
 - Auto rebase on pull
 - Delta pager for diffs
 - Case-sensitive file handling
 - Useful aliases: `a`, `c`, `p`, `l`, `rh`, `b`, `co`, `amend`, `undo`
+- GitHub HTTPS credentials through `gh` on PATH (`!gh auth git-credential`)
+- Cloud worker: personal SSH key at `~/.ssh/id_ed25519_personal`, `commit.gpgsign` in `~/.gitconfig-personal` so every includeIf checkout signs
 
 ## Manual Steps
 
@@ -145,10 +158,13 @@ Shared across Cursor/VSCode/Zed:
    pbcopy < ~/.ssh/id_ed25519.pub  # Add to GitHub
    ```
 
-2. **Git Identity** - Create your local git config (included by `.gitconfig`):
+2. **Git Identity** - Folder-driven, not a global email. Copy the local files
+   (included by `git/.gitconfig`):
    ```bash
    cp templates/gitconfig-local.template ~/.gitconfig.local
-   # Edit ~/.gitconfig.local with your name/email (and signing key if used)
+   cp templates/gitconfig-personal.template ~/.gitconfig-personal
+   # Mac work identity is ~/.gitconfig-work (not tracked). Add signing keys
+   # and SSH insteadOf rewrites only on machines that have those keys.
    ```
 
 3. **Private Config** - Add API keys to `~/.zshrc.private`
@@ -169,6 +185,42 @@ Install from respective stores after browser setup.
 cd ~/code/dotfiles
 git pull
 ./install.sh  # Re-run to update symlinks
+```
+
+## Cloud Development VM
+
+Private Ubuntu worker. No public inbound path. Cloudflare One routes a
+private `/32` through an outbound-only tunnel. The Mac is the infrastructure
+control plane. The VM is a replaceable worker with Git checkouts, ignored
+application environment files, Grok, and OpenCode.
+
+```mermaid
+flowchart LR
+  Mac["Mac or Termius"] -->|"Cloudflare One client"| Route["Private /32 route"]
+  Route -->|"outbound-only cloudflared"| VM["Ubuntu VM :22"]
+  VM --> Git["Git checkouts"]
+  VM --> Env["Ignored env files"]
+  VM --> Agents["Grok and OpenCode"]
+```
+
+**Daily path:** Cloudflare One shows Connected → `ssh altschool` →
+`tmux new -As development` → `talentql`. Ports `3000`, `5173`, and `8080`
+forward to the Mac. Bind development servers to `127.0.0.1`.
+
+The runbook is the source of truth (current host, security, rebuild,
+migration, cost, recovery):
+
+[Cloud Development Workspace Runbook](docs/cloud-development-workspace.md) ·
+[Daily](docs/cloud-development-workspace.md#daily-access) ·
+[Verify](docs/cloud-development-workspace.md#verification) ·
+[Rebuild](docs/cloud-development-workspace.md#build-or-rebuild-a-host) ·
+[Troubleshoot](docs/cloud-development-workspace.md#troubleshooting)
+
+```bash
+./scripts/setup_altschool_cloud.sh
+./scripts/setup_altschool_cloud.sh --auth
+./scripts/setup_altschool_cloud.sh --update --auth --repo OWNER/REPO
+./scripts/verify_altschool_cloud.sh --require-auth --smoke
 ```
 
 ## Troubleshooting

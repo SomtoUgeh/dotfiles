@@ -195,6 +195,23 @@ npm-latest() { npm info "$1" | grep latest; }
 # Kill process on port
 killport() { lsof -i tcp:"$*" | awk 'NR!=1 {print $2}' | xargs kill -9; }
 
+# Wrap only the droplet SSH alias so OSC 52 clipboard copy works in Grok.
+# Other hosts (github.com, jump boxes, altschool-vm) stay plain ssh.
+unalias ssh 2>/dev/null
+ssh() {
+  local _grok_wrap=0 _arg
+  for _arg in "$@"; do
+    case "$_arg" in
+      altschool) _grok_wrap=1; break ;;
+    esac
+  done
+  if (( _grok_wrap )) && command -v grok >/dev/null; then
+    command grok wrap ssh "$@"
+  else
+    command ssh "$@"
+  fi
+}
+
 # Quit macOS app
 quit() {
   if [ -z "$1" ]; then
@@ -309,3 +326,4 @@ export PATH="$HOME/.grok/bin:$PATH"
 fpath=(~/.grok/completions/zsh $fpath)
 autoload -Uz compinit && compinit -C
 # <<< grok installer <<<
+export PATH="$HOME/.local/bin:$PATH"

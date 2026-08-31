@@ -111,7 +111,7 @@ cask "dropbox"
 cask "spotify"
 
 # Networking / VPN
-cask "cloudflare-warp"
+# Cloudflare One Agent is the Zero Trust client; do not install consumer WARP.
 cask "surfshark"
 cask "termius"                # SSH client
 

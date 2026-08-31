@@ -9,6 +9,20 @@
 {
   // Note: Context servers with API keys should be configured in
   // ~/.config/zed/settings.json.local (not tracked in dotfiles)
+  "ssh_connections": [
+    {
+      "host": "altschool",
+      "args": [],
+      "projects": [
+        {
+          "paths": [
+            "/home/altschool/code/TalentQL/altschool-web-platforms"
+          ]
+        }
+      ],
+      "nickname": "altschool"
+    }
+  ],
   "agent_buffer_font_size": 14.0,
   "agent_servers": {
     "codex-acp": {

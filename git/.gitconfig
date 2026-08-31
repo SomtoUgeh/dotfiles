@@ -1,7 +1,7 @@
 [user]
 	# No email here on purpose — identity is folder-driven (see includeIf below).
 	# useConfigOnly forces a hard "Author identity unknown" error in any folder
-	# outside ~/code/personal or ~/code/work, instead of silently auto-generating
+	# outside the includeIf roots below, instead of silently auto-generating
 	# an email. This is the safety net — do not add a default user.email.
 	useConfigOnly = true
 [pull]
@@ -79,6 +79,10 @@
 	path = ~/.gitconfig-personal
 [includeIf "gitdir:~/code/work/"]
 	path = ~/.gitconfig-work
+# Cloud application checkouts. The altschool worker uses the personal GitHub
+# account (SomtoUgeh) over SSH, so TalentQL uses the personal identity file.
+[includeIf "gitdir:~/code/TalentQL/"]
+	path = ~/.gitconfig-personal
 # Agent worktree pools outside ~/code/{personal,work}. Default to personal
 # GitHub auth (id_ed25519_personal). Add a more specific work rule if a
 # Swissblock checkout ever lives under one of these roots.
@@ -89,13 +93,15 @@
 	path = ~/.gitconfig-personal
 [includeIf "gitdir:~/.codex/worktrees/"]
 	path = ~/.gitconfig-personal
-[includeIf "gitdir:~/.config/superpowers/worktrees/"]
+[includeIf "gitdir:~/.opencode/worktrees/"]
 	path = ~/.gitconfig-personal
 [gpg "ssh"]
 	allowedSignersFile = ~/.ssh/allowed_signers
+# `!` runs a shell snippet (gitcredentials(7)). `gh` must be on PATH; do not
+# hardcode Homebrew or /usr/bin. `helper =` first clears inherited helpers.
 [credential "https://github.com"]
-	helper = 
-	helper = !/opt/homebrew/bin/gh auth git-credential
+	helper =
+	helper = !gh auth git-credential
 [credential "https://gist.github.com"]
-	helper = 
-	helper = !/opt/homebrew/bin/gh auth git-credential
+	helper =
+	helper = !gh auth git-credential

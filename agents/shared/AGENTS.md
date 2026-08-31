@@ -60,6 +60,10 @@ version of something that already exists as a one-liner.
   requested task. Prefer action over promises when no input is needed.
 - Never push to GitHub unless the user says to. Do not force-commit ignored
   paths. Use `gh` for GitHub work when available.
+- Never comment on open PRs. No GitHub review comments, issue comments on a
+  PR, Copilot/review submissions, `gh pr comment`, or
+  `gh api …/pulls/…/comments|reviews`. Put findings in the conversation.
+  Only post on a PR if the user explicitly asks to comment on that PR.
 
 ## Models
 
@@ -146,8 +150,8 @@ reviewers on the same plan.
 - Recent branches/commits: search by recency first.
 - PR title: `[ticket]: description` or `[type]: description`.
 - PR body: one short sentence, then bullets. No "Summary" / "Key Changes"
-  headings. No emojis. Do not post GitHub review comments unless asked —
-  report in the conversation.
+  headings. No emojis.
+- Do not comment on open PRs (see Operating loop). Review in the conversation.
 
 ## Shell and stack
 

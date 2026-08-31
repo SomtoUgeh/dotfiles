@@ -38,7 +38,7 @@ AI: Claude, Granola, superwhisper
 Browsers/comms: Google Chrome, Slack, Discord, Telegram, Notion
 Utilities: Raycast, AltTab, Bartender, Alcove, BetterMouse, Cap, 1Password, 1Password CLI
 Storage/media: Dropbox, Spotify
-Networking: Tailscale, Cloudflare WARP, Surfshark, Termius
+Networking: Tailscale, Surfshark, Termius
 Fonts: JetBrains Mono Nerd Font, Zed Mono Nerd Font
 
 ## Installed via Mac App Store (`mas`)
@@ -50,6 +50,8 @@ Keynote, Numbers, Pages, Xcode, TestFlight.
 
 ## Manual installs (no reliable brew/MAS source)
 
+- **Cloudflare One Agent** — Zero Trust device client. Do not install Homebrew
+  `cloudflare-warp` / consumer WARP / `warp-cli` on this Mac.
 - **Dia browser** (The Browser Company) — https://www.diabrowser.com
 - **Paper.app** — verify the official source before scripting it
 - **Developer.app** — Apple developer companion (ships via Xcode / App Store)

@@ -11,11 +11,6 @@
     ],
   ],
   "mcp": {
-    "plan": {
-      "type": "remote",
-      "url": "https://plan.agent-native.com/_agent-native/mcp",
-      "enabled": true,
-    },
     "context7": {
       "type": "remote",
       "url": "https://mcp.context7.com/mcp",
@@ -44,9 +39,78 @@
       "url": "http://127.0.0.1:29979/mcp",
       "enabled": false,
     },
+    "cloudflare": {
+      "type": "remote",
+      "url": "https://mcp.cloudflare.com/mcp",
+      "enabled": true,
+      "oauth": {},
+    },
+    "cloudflare-docs": {
+      "type": "remote",
+      "url": "https://docs.mcp.cloudflare.com/mcp",
+      "enabled": true,
+    },
+    "cloudflare-bindings": {
+      "type": "remote",
+      "url": "https://bindings.mcp.cloudflare.com/mcp",
+      "enabled": true,
+      "oauth": {},
+    },
+    "cloudflare-builds": {
+      "type": "remote",
+      "url": "https://builds.mcp.cloudflare.com/mcp",
+      "enabled": true,
+      "oauth": {},
+    },
+    "cloudflare-observability": {
+      "type": "remote",
+      "url": "https://observability.mcp.cloudflare.com/mcp",
+      "enabled": true,
+      "oauth": {},
+    },
+    "digitalocean-accounts": {
+      "type": "remote",
+      "url": "https://accounts.mcp.digitalocean.com/mcp",
+      "enabled": true,
+      "oauth": false,
+      "headers": {
+        "Authorization": "Bearer {env:DIGITALOCEAN_API_TOKEN}",
+      },
+    },
+    "digitalocean-droplets": {
+      "type": "remote",
+      "url": "https://droplets.mcp.digitalocean.com/mcp",
+      "enabled": true,
+      "oauth": false,
+      "headers": {
+        "Authorization": "Bearer {env:DIGITALOCEAN_API_TOKEN}",
+      },
+    },
+    "digitalocean-networking": {
+      "type": "remote",
+      "url": "https://networking.mcp.digitalocean.com/mcp",
+      "enabled": true,
+      "oauth": false,
+      "headers": {
+        "Authorization": "Bearer {env:DIGITALOCEAN_API_TOKEN}",
+      },
+    },
+    "digitalocean-docs": {
+      "type": "remote",
+      "url": "https://docs.mcp.digitalocean.com/mcp",
+      "enabled": true,
+      "oauth": false,
+      "headers": {
+        "Authorization": "Bearer {env:DIGITALOCEAN_API_TOKEN}",
+      },
+    },
   },
   "permission": {
     "*": "allow",
+    "cloudflare*": "ask",
+    "cloudflare-docs_*": "allow",
+    "digitalocean-*": "ask",
+    "digitalocean-docs_*": "allow",
     "edit": "allow",
     "bash": "allow",
     "webfetch": "allow",
@@ -71,6 +135,10 @@
       "mode": "primary",
       "permission": {
         "*": "allow",
+        "cloudflare*": "ask",
+        "cloudflare-docs_*": "allow",
+        "digitalocean-*": "ask",
+        "digitalocean-docs_*": "allow",
         "edit": "allow",
         "bash": "allow",
         "webfetch": "allow",
@@ -95,6 +163,10 @@
       "mode": "primary",
       "permission": {
         "*": "allow",
+        "cloudflare*": "ask",
+        "cloudflare-docs_*": "allow",
+        "digitalocean-*": "ask",
+        "digitalocean-docs_*": "allow",
         "edit": "allow",
         "bash": "allow",
         "webfetch": "allow",

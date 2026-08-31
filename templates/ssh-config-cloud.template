@@ -1,0 +1,6 @@
+# Personal-only GitHub SSH. The cloud worker does not carry the Swissblock key.
+Host github.com github-personal
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/id_ed25519_personal
+  IdentitiesOnly yes

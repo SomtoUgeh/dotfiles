@@ -1,0 +1,25 @@
+# Personal GitHub identity (SomtoUgeh). Used on machines where github.com is
+# this account — the altschool worker, and Mac personal checkouts after
+# machine-local SSH rewrites. Do not copy this over the Mac work identity.
+#
+#   cp templates/gitconfig-personal.template ~/.gitconfig-personal
+
+[user]
+	name = Somto Odera
+	email = smugeh@gmail.com
+	signingkey = ~/.ssh/id_ed25519_personal.pub
+
+[gpg]
+	format = ssh
+
+[commit]
+	gpgsign = true
+
+[tag]
+	gpgSign = true
+
+[core]
+	sshCommand = ssh -i ~/.ssh/id_ed25519_personal -o IdentitiesOnly=yes
+
+[url "git@github.com:"]
+	insteadOf = https://github.com/

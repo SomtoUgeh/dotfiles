@@ -278,5 +278,8 @@
     "git checkout": true,
     "gh": true
   },
-  "claudeCode.preferredLocation": "panel"
+  "claudeCode.preferredLocation": "panel",
+  "extensions.supportAgentsWindow": {
+    "monokai.theme-monokai-pro-vscode": true
+  }
 }

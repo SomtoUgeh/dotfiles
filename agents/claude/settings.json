@@ -87,9 +87,10 @@
   "outputStyle": "bro",
   "effortLevel": "high",
   "awaySummaryEnabled": false,
+  "tui": "fullscreen",
   "skipDangerousModePermissionPrompt": true,
+  "theme": "dark",
   "agentPushNotifEnabled": true,
   "voiceEnabled": true,
-  "gitAttribution": false,
-  "model": "claude-fable-5[1m]"
+  "gitAttribution": false
 }

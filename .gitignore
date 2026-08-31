@@ -3,3 +3,5 @@ config/gh/hosts.yml
 __pycache__/
 .DS_Store
 .ropeproject/
+!docs/
+!docs/cloud-development-workspace.md
