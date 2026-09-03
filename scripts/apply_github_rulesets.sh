@@ -82,7 +82,22 @@ fi
 
 n_ok=0; n_skip=0; n_fail=0
 for repo in $repos; do
+  # Rulesets are unavailable on private repos for free personal accounts, and
+  # unreadable without admin. Distinguish "no ruleset yet" from "cannot".
+  # An archived repo is read-only: it rejects every write, including a
+  # force-push with a valid token. That is stronger than the ruleset, so treat
+  # it as already protected rather than a failure.
+  if [ "$(gh api "repos/$OWNER/$repo" -q .archived 2>/dev/null)" = "true" ]; then
+    grn "  = $repo (archived: read-only, force-push already impossible)"
+    n_skip=$((n_skip+1)); continue
+  fi
+
+  if ! resp="$(gh api "repos/$OWNER/$repo/rulesets" 2>/dev/null)"; then
+    ylw "  - $repo (rulesets unavailable: private repo on a free plan, or no admin)"
+    n_skip=$((n_skip+1)); continue
+  fi
   existing="$(gh api "repos/$OWNER/$repo/rulesets" -q ".[] | select(.name==\"$NAME\") | .id" 2>/dev/null | head -1)"
+  case "$existing" in ''|*[!0-9]*) existing="" ;; esac
 
   if [ "$MODE" = "dry" ]; then
     if [ -n "$existing" ]; then ylw "  would UPDATE  $repo  (ruleset id $existing)"
