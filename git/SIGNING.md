@@ -1,7 +1,8 @@
-# Commit signing and SSH identities
+# SSH identities and commit signing
 
-Two GitHub identities, four ed25519 keys, all held in 1Password. No private
-key material exists on this machine as a file.
+Two GitHub identities use four Ed25519 keys, and the AltSchool VM uses one RSA
+key. All five are held in 1Password. No private key material exists on this
+machine as a file.
 
 | Key | Vault | Account | Role |
 |---|---|---|---|
@@ -9,6 +10,7 @@ key material exists on this machine as a file.
 | `somto_sign_ed25519` | Personal | `SomtoUgeh` | commit signing |
 | `swissblock_auth_ed25519` | Swissblock | `somto-swissblock` | authentication |
 | `swissblock_sign_ed25519` | Swissblock | `somto-swissblock` | commit signing |
+| `AltSchool VM SSH Key` | Personal | `altschool` VM | authentication |
 
 Identity is folder-driven by `includeIf` in `git/.gitconfig`:
 `~/code/personal/` and `~/code/TalentQL/` get the personal identity,
@@ -37,7 +39,7 @@ accepted.
 
 **Public keys are kept in `~/.ssh`.** The doc's final step deletes all key
 files. Private keys never existed here, and the `.pub` files are required: to
-pin which of four agent identities is offered per host (`IdentityFile`), and to
+pin which agent identity is offered per host (`IdentityFile`), and to
 build `allowed_signers`. Public keys are not secret.
 
 ## Where the doc appears to be wrong

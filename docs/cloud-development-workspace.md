@@ -1,6 +1,6 @@
 # Cloud Development Workspace Runbook
 
-Last verified: 2026-08-31
+Last verified: 2026-09-03
 
 This runbook documents the private Ubuntu development workspace currently
 hosted on DigitalOcean and the provider-neutral procedure for rebuilding,
@@ -112,7 +112,7 @@ migration.
 | Cloudflare connector | `cloudflared` 2026.8.3, active and enabled |
 | Mac client | Cloudflare One Agent, connected as Cloudflare Zero Trust |
 | Device routing | Split Tunnels Include mode with `10.106.0.2/32` included |
-| Mac SSH alias | `altschool` |
+| Mac SSH aliases | `altschool` (shell), `altschool-tunnel` (local forwards) |
 | Termius address | `10.106.0.2`, user `altschool` |
 | Application repository | `~/code/TalentQL/altschool-web-platforms` |
 | Dotfiles repository | `~/code/personal/dotfiles` |
@@ -120,8 +120,10 @@ migration.
 Powering off the Droplet does not end its compute charges. Destroy it when it
 is no longer needed.
 
-The Mac SSH alias disables agent forwarding and uses the dedicated key
-`~/.ssh/id_ed25519_digitalocean_altschool`. Live sshd settings are in
+The Mac SSH alias disables agent forwarding and selects the dedicated
+`AltSchool VM SSH Key` from the 1Password SSH agent via the public key at
+`~/.ssh/altschool_vm_rsa.pub`. The private key never exists as a local file.
+Live sshd settings are in
 `/etc/ssh/sshd_config.d/99-cloud-development.conf`: publickey-only
 authentication, `AllowAgentForwarding no`, `AllowTcpForwarding local`,
 and `X11Forwarding no`.
@@ -163,7 +165,7 @@ credential paths. The cloud Zsh configuration starts Grok with the explicit
 | `scripts/verify_altschool_cloud.sh` | Checks host identity, tools, resources, auth, tunnel service, and optional live model requests |
 | `shell/.zshrc.cloud` | Cloud Zsh, history, aliases, PATH, direnv, and Starship setup |
 | `agents/opencode/opencode.cloud.jsonc` | Cloud OpenCode model, MCP, permission, and credential-read policy |
-| `~/.ssh/config` | Local private aliases and development port forwards; not managed by the cloud installer |
+| `templates/ssh-config.template` | Local private aliases and the dedicated development-tunnel alias, installed by `setup_ssh_from_1password.sh` |
 
 ## Commands
 
@@ -188,15 +190,19 @@ exec zsh
 
 1. Confirm the Cloudflare One Agent says `Connected` and uses the `julds` Zero
    Trust team.
-2. Connect with `ssh altschool`.
-3. Run `tmux new -As development` for work that must survive a disconnect.
-4. Run `talentql` to enter the application repository.
+2. Connect with `ssh altschool` for a normal shell or file transfer.
+3. When local web ports are needed, start one dedicated session with
+   `ssh altschool-tunnel` and leave it running.
+4. Run `tmux new -As development` for work that must survive a disconnect.
+5. Run `talentql` to enter the application repository.
 
-The SSH alias forwards remote loopback ports 3000, 5173, and 8080 to the same
-Mac loopback ports. Bind development servers to `127.0.0.1` on the VM unless a
-tool requires another address.
+The tunnel alias forwards remote loopback ports 3000, 5173, and 8080 to the
+same Mac loopback ports. Run only one tunnel session at a time; ordinary
+`ssh altschool` sessions do not claim those ports. Bind development servers to
+`127.0.0.1` on the VM unless a tool requires another address.
 
-Termius uses the same Cloudflare connection, address, user, and dedicated key.
+Termius uses the same Cloudflare connection, address, and user, but has its own
+dedicated per-host key because it does not use the Mac 1Password SSH agent.
 Cloudflare One must be connected on the device running Termius.
 
 ## Verification
@@ -263,16 +269,19 @@ both Cloudflare routes can coexist for testing.
 
 ### 2. Create a Per-Host SSH Key
 
-Keep the old key and alias until cutover. Create a separate replacement key:
+Keep the old key and alias until cutover. Create the replacement key inside
+1Password, then export only its public half for SSH identity selection:
 
 ```bash
-ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_PROVIDER_altschool \
-  -C 'altschool development host'
-chmod 600 ~/.ssh/id_ed25519_PROVIDER_altschool
+op item create --category 'SSH Key' --vault Personal \
+  --title 'AltSchool VM SSH Key (PROVIDER)' --ssh-generate-key ed25519
+op read 'op://Personal/AltSchool VM SSH Key (PROVIDER)/public key' \
+  > ~/.ssh/altschool_PROVIDER_ed25519.pub
+chmod 644 ~/.ssh/altschool_PROVIDER_ed25519.pub
 ```
 
-Upload only the `.pub` file. Never upload or paste the private key into a
-provider console.
+The 1Password SSH agent serves the private key. Upload only the `.pub` file.
+Never upload, paste, or export the private key into a provider console.
 
 ### 3. Bootstrap the Linux User
 
@@ -323,6 +332,18 @@ sudo systemctl reload ssh
 sudo sshd -T | grep -E \
   'permitrootlogin|passwordauthentication|kbdinteractiveauthentication|allowagentforwarding|allowtcpforwarding|authenticationmethods|x11forwarding'
 ```
+
+After both the 1Password-backed Mac session and the dedicated Termius session
+have passed fresh connection tests, lock any temporary root password created
+for provider-console recovery:
+
+```bash
+sudo passwd -l root
+sudo passwd -S root
+```
+
+The status must begin with `root L`. Keep the provider console available for
+recovery; locking the password does not disable the console itself.
 
 Install base protections and add only the replacement provider's private CIDR.
 Mosh uses UDP ports 60000 through 61000.
@@ -378,25 +399,30 @@ with different private addresses do not meet that condition.
 Add a separate alias instead of changing `altschool` immediately:
 
 ```sshconfig
-Host altschool-PROVIDER
+Host altschool-PROVIDER altschool-PROVIDER-tunnel
   HostName NEW_PRIVATE_IP
   User altschool
-  IdentityFile ~/.ssh/id_ed25519_PROVIDER_altschool
+  IdentityFile ~/.ssh/altschool_PROVIDER_ed25519.pub
   IdentitiesOnly yes
   ForwardAgent no
   ServerAliveInterval 60
   ServerAliveCountMax 3
+  SendEnv COLORTERM TERM_PROGRAM
+
+Host altschool-PROVIDER-tunnel
+  ExitOnForwardFailure yes
   LocalForward 127.0.0.1:3000 127.0.0.1:3000
   LocalForward 127.0.0.1:5173 127.0.0.1:5173
   LocalForward 127.0.0.1:8080 127.0.0.1:8080
-  SendEnv COLORTERM TERM_PROGRAM
 ```
 
 Verify effective settings and the host fingerprint:
 
 ```bash
 ssh -G altschool-PROVIDER | grep -E \
-  '^(hostname|user|identityfile|forwardagent|localforward) '
+  '^(hostname|user|identityfile|forwardagent) '
+ssh -G altschool-PROVIDER-tunnel | grep -E \
+  '^(hostname|user|identityfile|forwardagent|exitonforwardfailure|localforward) '
 ssh altschool-PROVIDER
 ```
 
@@ -493,6 +519,11 @@ After SSH and Termius work through Cloudflare:
 | Key | Dedicated per-host Ed25519 key |
 | Agent forwarding | Off |
 
+Termius and the Mac CLI intentionally use different keys. The Mac CLI selects
+the 1Password-hosted key through `~/.ssh/altschool_vm_rsa.pub`; Termius stores
+its dedicated key in the Termius vault. Both public keys belong in the
+server's `authorized_keys` file.
+
 Keep separate Termius entries for old and replacement hosts during migration.
 Do not edit the working host until the replacement passes a connection test.
 If Termius sync is enabled, review its key-storage and account-security settings
@@ -500,6 +531,22 @@ before importing a private key.
 
 Mosh is optional. It requires UDP 60000 through 61000 over the private route.
 Plain SSH inside tmux is the simpler fallback.
+
+### New Mac Setup
+
+1. Install and sign in to 1Password, then enable its SSH agent and CLI
+   integration.
+2. Clone this dotfiles repository and run
+   `./scripts/setup_ssh_from_1password.sh` to export only the public keys and
+   install the tracked SSH configuration.
+3. Enrol Cloudflare One in team `julds` and confirm the private `/32` route is
+   active.
+4. Test `ssh -T git@github.com`, `ssh -T git@github-personal`, and
+   `ssh -o ClearAllForwardings=yes altschool`.
+5. Sign in to Termius and confirm the `altschool` host and its dedicated
+   `digitalocean-altschool` key are present before testing a fresh session.
+
+No Mac private-key file should be copied between computers.
 
 ## Provider Migration
 

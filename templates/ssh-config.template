@@ -1,8 +1,12 @@
+# OrbStack requires this include before every Host block. OpenSSH ignores it
+# when OrbStack is not installed, so the same template works on a new Mac.
+Include ~/.orbstack/ssh/config
+
 # ~/.ssh/config
 #
 # Private keys live in the 1Password vault and are served by the 1Password SSH
 # agent. Only PUBLIC keys exist in this directory; IdentityFile points at a
-# .pub so ssh knows which of the four agent identities to offer per host.
+# .pub so ssh knows which agent identity to offer per host.
 #
 # Work is the default for github.com. Personal repos go through the
 # github-personal alias, which the personal gitconfig rewrites URLs to
@@ -24,3 +28,21 @@ Host github-personal
     User git
     IdentityFile ~/.ssh/somto_auth_ed25519.pub
     IdentitiesOnly yes
+
+# Private AltSchool development VM through Cloudflare One. Use the plain alias
+# for shells and file copies; use the tunnel alias for local web ports.
+Host altschool altschool-tunnel
+    HostName 10.106.0.2
+    User altschool
+    IdentityFile ~/.ssh/altschool_vm_rsa.pub
+    IdentitiesOnly yes
+    ForwardAgent no
+    ServerAliveInterval 60
+    ServerAliveCountMax 3
+    SendEnv COLORTERM TERM_PROGRAM
+
+Host altschool-tunnel
+    ExitOnForwardFailure yes
+    LocalForward 127.0.0.1:3000 127.0.0.1:3000
+    LocalForward 127.0.0.1:5173 127.0.0.1:5173
+    LocalForward 127.0.0.1:8080 127.0.0.1:8080

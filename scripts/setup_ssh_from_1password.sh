@@ -5,10 +5,10 @@
 #
 #   setup_ssh_from_1password.sh --check     verify only, change nothing
 #   setup_ssh_from_1password.sh             create what is missing
-#   setup_ssh_from_1password.sh --force     also overwrite existing gitconfig-*
+#   setup_ssh_from_1password.sh --force     also overwrite protected configs
 #
 # What it does:
-#   1. exports the four PUBLIC keys from 1Password to ~/.ssh/*.pub
+#   1. exports the five PUBLIC keys from 1Password to ~/.ssh/*.pub
 #   2. builds ~/.ssh/allowed_signers from the two SIGNING keys
 #   3. installs ~/.ssh/config and ~/.config/1Password/ssh/agent.toml
 #   4. installs ~/.gitconfig{.local,-personal,-work} from templates
@@ -21,12 +21,13 @@
 
 set -u
 
-# name | vault | email | role
+# file stem | vault | public-key comment | role | item title (defaults to stem)
 KEYS=(
   "somto_auth_ed25519|Personal|smugeh@gmail.com|auth"
   "somto_sign_ed25519|Personal|smugeh@gmail.com|sign"
   "swissblock_auth_ed25519|Swissblock|smedua@swissblock.net|auth"
   "swissblock_sign_ed25519|Swissblock|smedua@swissblock.net|sign"
+  "altschool_vm_rsa|Personal|altschool development host|auth|AltSchool VM SSH Key"
 )
 
 MODE=create
@@ -72,11 +73,12 @@ else red "  op cannot read vaults — enable CLI integration in 1Password (Setti
 hdr "Public keys"
 mkdir -p "$HOME/.ssh"; chmod 700 "$HOME/.ssh"
 for entry in "${KEYS[@]}"; do
-  IFS='|' read -r name vault email role <<< "$entry"
+  IFS='|' read -r name vault email role item <<< "$entry"
+  item="${item:-$name}"
   target="$HOME/.ssh/$name.pub"
-  pub="$(op read "op://$vault/$name/public key" </dev/null 2>/dev/null)"
+  pub="$(op read "op://$vault/$item/public key" </dev/null 2>/dev/null)"
   if [ -z "$pub" ]; then
-    red "  ✗ $name — not found in vault '$vault'"; fail=1; continue
+    red "  ✗ $item — not found in vault '$vault'"; fail=1; continue
   fi
   want="$pub $email"
   if [ -f "$target" ] && [ "$(cat "$target")" = "$want" ]; then
@@ -92,7 +94,7 @@ done
 hdr "allowed_signers"
 signers=""
 for entry in "${KEYS[@]}"; do
-  IFS='|' read -r name vault email role <<< "$entry"
+  IFS='|' read -r name vault email role item <<< "$entry"
   [ "$role" = sign ] || continue
   [ -f "$HOME/.ssh/$name.pub" ] || continue
   signers+="$email namespaces=\"git\" $(awk '{print $1" "$2}' "$HOME/.ssh/$name.pub")"$'\n'

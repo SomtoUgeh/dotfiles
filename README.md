@@ -199,7 +199,8 @@ cd ~/code/work     && gh api user --jq .login   # somto-swissblock
    ```bash
    ./scripts/setup_ssh_from_1password.sh          # --check to preview
    ```
-   It writes the four public keys, `~/.ssh/allowed_signers`, `~/.ssh/config`
+   It writes five public keys (four GitHub keys plus the AltSchool VM key),
+   `~/.ssh/allowed_signers`, `~/.ssh/config`
    and the gitconfig identity files. See [`git/SIGNING.md`](git/SIGNING.md).
 
 2. **Git Identity** - Folder-driven, not a global email. Copy the local files
@@ -325,8 +326,9 @@ flowchart LR
 ```
 
 **Daily path:** Cloudflare One shows Connected → `ssh altschool` →
-`tmux new -As development` → `talentql`. Ports `3000`, `5173`, and `8080`
-forward to the Mac. Bind development servers to `127.0.0.1`.
+`tmux new -As development` → `talentql`. When local web ports are needed,
+start one separate `ssh altschool-tunnel` session; it forwards ports `3000`,
+`5173`, and `8080` to the Mac. Bind development servers to `127.0.0.1`.
 
 The runbook is the source of truth (current host, security, rebuild,
 migration, cost, recovery):
