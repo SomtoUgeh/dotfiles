@@ -127,6 +127,37 @@ else
 fi
 
 # =============================================================================
+# Homebrew packages (early: later sections depend on these tools)
+# =============================================================================
+# Runs immediately after the Homebrew bootstrap, NOT at the end. Sections
+# below guard on tools this installs - fnm for Node, `code` and
+# Visual Studio Code.app for the editor config, jq for the Claude plugin and
+# MCP blocks. With the bundle last, a fresh machine silently skipped all of
+# them and needed a second run of this script to come up complete.
+echo ""
+echo "Installing Homebrew packages..."
+
+if command -v brew &> /dev/null; then
+    BREW_PREFIX="$(brew --prefix)"
+    if [ ! -w "$BREW_PREFIX" ]; then
+        echo -e "${YELLOW}Fixing Homebrew permissions...${NC}"
+        # Non-fatal: a cancelled sudo prompt must not abort the whole install.
+        sudo chown -R "$(whoami)" "$BREW_PREFIX" || \
+            echo -e "${YELLOW}Could not fix Homebrew permissions (skipped). brew bundle may fail.${NC}"
+    fi
+    echo "Running brew bundle install..."
+    cd "$DOTFILES_DIR"
+    # Non-fatal: one failing cask (delisted app, network blip) must not abort
+    # the rest of the install. Failures are summarized below.
+    if ! brew bundle install; then
+        echo -e "${YELLOW}Some brew packages failed to install. Review above and re-run 'brew bundle install' to retry.${NC}"
+    fi
+else
+    echo -e "${RED}Homebrew not found. Please install Homebrew first:${NC}"
+    echo '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+fi
+
+# =============================================================================
 # Oh My Zsh
 # =============================================================================
 echo ""
@@ -369,8 +400,8 @@ create_symlink "$AGENTS_DIR/opencode/plugins" "$HOME/.config/opencode/plugins"
 # extraKnownMarketplaces) — the single source of truth. Claude also syncs these
 # on launch, but install them explicitly so a fresh machine is ready without a
 # first-run round-trip. enabledPlugins keys are already in "name@marketplace" form.
-# jq reads the JSON below. It is declared in the Brewfile, but `brew bundle`
-# runs later in this script, so ensure it here. python3 is deliberately NOT
+# jq reads the JSON below. It comes from the Brewfile, which now runs early,
+# so this is a fallback for a partially-failed bundle. python3 is deliberately NOT
 # used: installing Homebrew pulls in the Xcode toolchain, after which
 # /usr/bin/python3 refuses to run until the Xcode licence is accepted, and the
 # `|| true` on these calls would swallow the failure — registering no plugins
@@ -512,32 +543,6 @@ for script in "$DOTFILES_DIR/scripts/"*; do
         fi
     fi
 done
-
-# =============================================================================
-# Homebrew packages
-# =============================================================================
-echo ""
-echo "Installing Homebrew packages..."
-
-if command -v brew &> /dev/null; then
-    BREW_PREFIX="$(brew --prefix)"
-    if [ ! -w "$BREW_PREFIX" ]; then
-        echo -e "${YELLOW}Fixing Homebrew permissions...${NC}"
-        # Non-fatal: a cancelled sudo prompt must not abort the whole install.
-        sudo chown -R "$(whoami)" "$BREW_PREFIX" || \
-            echo -e "${YELLOW}Could not fix Homebrew permissions (skipped). brew bundle may fail.${NC}"
-    fi
-    echo "Running brew bundle install..."
-    cd "$DOTFILES_DIR"
-    # Non-fatal: one failing cask (delisted app, network blip) must not abort
-    # the rest of the install. Failures are summarized below.
-    if ! brew bundle install; then
-        echo -e "${YELLOW}Some brew packages failed to install. Review above and re-run 'brew bundle install' to retry.${NC}"
-    fi
-else
-    echo -e "${RED}Homebrew not found. Please install Homebrew first:${NC}"
-    echo '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
-fi
 
 # =============================================================================
 # Touch ID for sudo (optional — modifies /etc/pam.d/sudo_local)
