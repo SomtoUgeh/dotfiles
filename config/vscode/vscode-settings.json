@@ -220,6 +220,9 @@
 	"terminal.integrated.fontFamily": "JetBrainsMono NFP",
 	"terminal.integrated.inheritEnv": false,
 	"terminal.integrated.letterSpacing": 1,
+	// todo-tree ships no ripgrep binary — it expects @vscode/ripgrep, which the
+	// marketplace package omits. Point it at the Homebrew rg from the Brewfile.
+	"todo-tree.ripgrep": "/opt/homebrew/bin/rg",
 	"todo-tree.filtering.excludeGlobs": ["**/node_modules"],
 	"todo-tree.filtering.useBuiltInExcludes": "file excludes",
 	"todo-tree.general.tags": [
