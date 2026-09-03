@@ -16,14 +16,18 @@ git clone https://github.com/SomtoUgeh/dotfiles.git ~/code/personal/dotfiles
 cd ~/code/personal/dotfiles
 ./install.sh
 
-# 4. Configure private settings
+# 4. Rebuild SSH keys and commit signing from 1Password
+./scripts/setup_ssh_from_1password.sh
+# writes public keys, allowed_signers, ~/.ssh/config, gitconfig identities
+
+# 5. Configure private settings
 cp templates/zshrc-private.template ~/.zshrc.private
 # Edit ~/.zshrc.private with your API keys
 
-# 5. Apply macOS settings
+# 6. Apply macOS settings
 ./macos/defaults.sh
 
-# 6. Restart terminal
+# 7. Restart terminal
 exec zsh
 ```
 
@@ -34,12 +38,13 @@ The install script creates this folder layout:
 ```
 ~/
 ├── code/                    # All code projects (CDPATH enabled)
-│   ├── myrepo/              # Main repo
-│   └── myrepo--feature/     # Worktree (git worktree add)
+│   ├── personal/            # Personal identity (SomtoUgeh)
+│   │   └── dotfiles/        # This repo
+│   └── work/                # Swissblock identity (somto-swissblock)
 ├── bin/                     # Custom scripts (in PATH)
-├── Pictures/Screenshots/    # macOS screenshots location
+├── .git-hooks/              # -> git/hooks (global core.hooksPath)
 ├── .config/                 # XDG config home
-└── .ssh/                    # SSH keys (700 permissions)
+└── .ssh/                    # Public keys only; private keys live in 1Password
 ```
 
 **CDPATH** is configured so you can `cd projectname` from anywhere to jump to `~/code/projectname`.
@@ -53,13 +58,13 @@ The install script creates this folder layout:
 - Custom aliases and functions
 
 ### Editors
-- **Cursor** (primary) - AI-powered VSCode fork
-- **Zed** - Fast, modern editor
-- **VSCode** - Shares config with Cursor
+- **VS Code** (primary) - settings, keybindings and extension list tracked
+- **Zed** - fast native editor; extensions auto-install on first launch
 
 ### Terminal
 - **Ghostty** - GPU-accelerated terminal
-- **iTerm2** - Backup terminal
+- **cmux** - multiplexer with an embedded Ghostty; installed by other tooling,
+  not by the Brewfile
 
 ### Development Tools
 - **fnm** - Fast Node Manager (chosen Node version manager)
@@ -67,8 +72,8 @@ The install script creates this folder layout:
 - **rust** / **go** - language toolchains
 - **ast-grep** - Structural code search
 - **delta** - Better git diffs
-- **graphite** - Stacked PRs CLI
 - **direnv** - Per-directory environment variables
+- **jq** - JSON processing (install.sh depends on it)
 
 ### CLI Utilities
 - **eza** - Modern ls with icons
@@ -93,13 +98,17 @@ dotfiles/
 │   └── .zprofile
 ├── git/                    # Git configuration
 │   ├── .gitconfig
-│   └── .gitignore_global
+│   ├── .gitignore_global
+│   ├── SIGNING.md          # two-identity SSH signing setup
+│   └── hooks/              # global hooks (worm guard pre-commit)
 ├── config/
-│   ├── cursor/             # Cursor/VSCode settings
+│   ├── vscode/             # settings, keybindings, extensions.txt
+│   ├── zed/                # settings and keymap
 │   ├── ghostty/            # Ghostty terminal config
+│   ├── cmux/               # cmux terminal config
 │   ├── starship/           # Starship prompt config
-│   ├── zed/                # Zed editor settings
 │   └── gh/                 # GitHub CLI config
+│       └── rulesets/       # branch protection JSON, applied by script
 ├── agents/                 # Claude, Codex, OpenCode, and shared skills
 │   ├── shared/             # Shared AGENTS.md, ETHOS.md, hooks, MCP inventory
 │   ├── claude/             # Claude Code config, commands, agents, plugins
@@ -107,6 +116,9 @@ dotfiles/
 │   ├── opencode/           # OpenCode config, including opencode.cloud.jsonc
 │   └── skills/             # Shared SKILL.md packages via ~/.agents/skills
 ├── scripts/
+│   ├── setup_ssh_from_1password.sh   # rebuild keys + signing from the vault
+│   ├── scan_repo.sh                  # scan an untrusted repo before opening
+│   ├── apply_github_rulesets.sh      # push branch protection to repos
 │   ├── enable_touchid_sudo.sh
 │   ├── setup_altschool_cloud.sh
 │   ├── install_cloud_dotfiles.sh
@@ -130,10 +142,10 @@ dotfiles/
 ### Keyboard Speed
 macOS defaults are too slow for coding. `macos/defaults.sh` sets:
 - `KeyRepeat = 1` (fastest, 15ms between repeats)
-- `InitialKeyRepeat = 15` (shortest delay before repeat)
+- `InitialKeyRepeat = 10` (shortest delay before repeat)
 
 ### Editor Keybindings
-Shared across Cursor/VSCode/Zed:
+Shared across VS Code and Zed:
 - `cmd+t` - Toggle terminal
 - `shift+down/up` - Duplicate line
 - `alt+up` - Move line up
@@ -154,12 +166,13 @@ Shared across Cursor/VSCode/Zed:
 
 ### After Installation
 
-1. **SSH Keys** - Copy from old machine or generate new:
+1. **SSH keys** - Do not run `ssh-keygen`. Private keys live in 1Password and
+   never touch the disk. One script rebuilds everything on a new machine:
    ```bash
-   ssh-keygen -t ed25519 -C "your_email@example.com"
-   ssh-add --apple-use-keychain ~/.ssh/id_ed25519
-   pbcopy < ~/.ssh/id_ed25519.pub  # Add to GitHub
+   ./scripts/setup_ssh_from_1password.sh          # --check to preview
    ```
+   It writes the four public keys, `~/.ssh/allowed_signers`, `~/.ssh/config`
+   and the gitconfig identity files. See [`git/SIGNING.md`](git/SIGNING.md).
 
 2. **Git Identity** - Folder-driven, not a global email. Copy the local files
    (included by `git/.gitconfig`):
@@ -185,6 +198,56 @@ downloaded manually (e.g. Dia browser).
 
 ### Browser Extensions
 Install from respective stores after browser setup.
+
+## Security
+
+Defences against a repo you did not write. Prompted by a real git config
+injection worm, which hid a payload behind 50+ spaces in an interpreted config
+file and used `.vscode/tasks.json` with `runOn: folderOpen` to run it.
+
+### Scan before you open
+
+```bash
+scan_repo.sh /path/to/untrusted-repo     # 9 checks
+scan_repo.sh --selftest                  # asserts the checks still fire
+```
+
+Run it before opening an unfamiliar repo in an editor.
+
+**It only sees local clones.** In the documented incident 23 of 42 infected
+repositories had no local copy, and the local scanner said CLEAN every round —
+truthfully. The laptop was never infected. The GitHub repositories were.
+Enumerate from the GitHub API, not from disk.
+
+### Global pre-commit guard
+
+`git/hooks/` is symlinked to `~/.git-hooks` and set as `core.hooksPath`, so the
+guard runs in every repo. It scans staged content for injection markers and
+padded payloads, then chains to the repo's own `pre-commit` if one exists.
+
+- Setting `core.hooksPath` globally disables repo-local hook paths. The chain
+  at the end of the guard is what keeps repo hooks working.
+- A legitimate file that trips the padding check can opt out with the marker
+  `worm-guard:allow-signatures`.
+
+### Branch protection
+
+```bash
+apply_github_rulesets.sh --repo dotfiles          # dry run, the default
+apply_github_rulesets.sh --repo dotfiles --apply
+apply_github_rulesets.sh --all --apply            # every repo you admin
+```
+
+Applies `config/gh/rulesets/*.json` to your repos: block force-push, block
+branch deletion, require signed commits. Safe to run twice — it looks the
+ruleset up by name and updates in place. Archived repos are reported, not
+retried. Private repos need a paid GitHub plan.
+
+### Editor hardening
+
+VS Code `settings.json` keeps `task.allowAutomaticTasks: "off"` and
+`security.workspace.trust.untrustedFiles: "prompt"`. Both block the worm's
+folder-open path. Do not relax them.
 
 ## Updating
 
