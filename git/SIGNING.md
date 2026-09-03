@@ -51,11 +51,47 @@ authenticates as `git`. As written, `git clone github.com:org/repo` attempts
 commit's *email*, so a username principal yields "No principal matched" on
 verify. This setup uses emails plus `namespaces="git"`.
 
+**The example `~/.gitconfig` points `signingkey` at the wrong key.** The doc's
+comment reads `signingkey = # same as the authentication PUBLIC key`. It must be
+the *signing* key. Pointing it at the auth key is exactly what produces
+`unknown_key` on GitHub — see the history note below. This setup uses
+`*_sign_ed25519.pub`.
+
 **No mention of `agent.toml`.** Without
 `~/.config/1Password/ssh/agent.toml` the agent serves only a default subset of
 vaults. The Swissblock vault was excluded, and `op-ssh-sign` failed with
 "No SSH private key found for the specified public key". Template:
 `templates/1password-agent.toml.template`.
+
+## Verified against the doc — 2026-09-03
+
+1Password app settings, read from
+`~/Library/Group Containers/2BUA8C4S2C.com.1password/.../settings/settings.json`:
+
+| Doc requirement | Setting | State |
+|---|---|---|
+| Set up the SSH agent | `sshAgent.enabled` | `true` |
+| Use key names | `sshAgent.storeKeyTitles` | `true` |
+| Remember key approval: 4 hours | `sshAgent.sshSessionDuration` | `4h` |
+| Watchtower: SSH keys | `devWatchtower.localDiskScanning` | `true` |
+| Watchtower: .env files | `devWatchtower.envSubScanning` | `true` |
+| Start at login | SMAppService login item | registered |
+
+`agent.toml` checked against the 1Password spec at
+`1password.dev/ssh/agent/config`: keys are lowercase, values quoted, and
+`[[ssh-keys]]` with `vault` alone serves every key in that vault. Section order
+sets the order keys are offered to a server. Five keys total is under the
+six-key SSH limit, and `IdentitiesOnly yes` with an explicit `IdentityFile` per
+host means only one key is offered anyway.
+
+**Do not click "Edit automatically" again.** Doc step 6.3 tells you to. That
+button rewrites `agent.toml` with *item*-scoped entries and would discard the
+vault scoping, so keys added to either vault later would stop being served.
+The agent is already configured; `sshAgent.commitSigningBannerDismissed` is
+`true`.
+
+Not verified: "Ask approval for each new: application and terminal session" and
+the menu-bar toggle. Neither writes a key to `settings.json` that could be read.
 
 ## History note
 
