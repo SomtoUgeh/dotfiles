@@ -62,8 +62,7 @@
       "source": {
         "source": "github",
         "repo": "mvanhorn/last30days-skill"
-      },
-      "autoUpdate": true
+      }
     },
     "shopify-ai-toolkit": {
       "source": {
