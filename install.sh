@@ -346,22 +346,30 @@ create_symlink "$AGENTS_DIR/opencode/plugins" "$HOME/.config/opencode/plugins"
 # extraKnownMarketplaces) — the single source of truth. Claude also syncs these
 # on launch, but install them explicitly so a fresh machine is ready without a
 # first-run round-trip. enabledPlugins keys are already in "name@marketplace" form.
+# jq reads the JSON below. It is declared in the Brewfile, but `brew bundle`
+# runs later in this script, so ensure it here. python3 is deliberately NOT
+# used: installing Homebrew pulls in the Xcode toolchain, after which
+# /usr/bin/python3 refuses to run until the Xcode licence is accepted, and the
+# `|| true` on these calls would swallow the failure — registering no plugins
+# and no MCP servers with no visible error.
+if ! command -v jq &> /dev/null; then
+    echo "Installing jq (needed to read settings.json)..."
+    brew install jq 2>/dev/null || \
+        echo -e "${YELLOW}jq unavailable; plugin and MCP registration will be skipped.${NC}"
+fi
+
 CLAUDE_SETTINGS="$HOME/.claude/settings.json"
-if command -v claude &> /dev/null && [ -f "$CLAUDE_SETTINGS" ]; then
+if command -v claude &> /dev/null && command -v jq &> /dev/null && [ -f "$CLAUDE_SETTINGS" ]; then
     echo "Installing Claude Code plugins from settings.json..."
     # Register non-default (GitHub) marketplaces first.
-    python3 -c 'import json,sys
-d=json.load(open(sys.argv[1]))
-for m in (d.get("extraKnownMarketplaces") or {}).values():
-    s=m.get("source",{})
-    if s.get("source")=="github" and s.get("repo"): print(s["repo"])' "$CLAUDE_SETTINGS" | while IFS= read -r repo; do
+    jq -r '(.extraKnownMarketplaces // {}) | to_entries[] | (.value.source // {})
+            | select((.source // "") == "github" and (.repo // "") != "") | .repo' \
+        "$CLAUDE_SETTINGS" | while IFS= read -r repo; do
         if [ -n "$repo" ]; then claude plugins marketplace add "$repo" 2>/dev/null || true; fi
     done
     # Install every enabled plugin.
-    python3 -c 'import json,sys
-d=json.load(open(sys.argv[1]))
-for k,v in (d.get("enabledPlugins") or {}).items():
-    if v: print(k)' "$CLAUDE_SETTINGS" | while IFS= read -r plugin; do
+    jq -r '(.enabledPlugins // {}) | to_entries[] | select(.value) | .key' \
+        "$CLAUDE_SETTINGS" | while IFS= read -r plugin; do
         if [ -n "$plugin" ]; then
             echo "  Installing plugin: $plugin"
             claude plugins install "$plugin" 2>/dev/null || true
@@ -376,13 +384,13 @@ fi
 # scope via the CLI — idempotent (skips if already present), available in every
 # session from any directory.
 CLAUDE_MCP="$AGENTS_DIR/claude/mcp.json"
-if command -v claude &> /dev/null && [ -f "$CLAUDE_MCP" ]; then
+if command -v claude &> /dev/null && command -v jq &> /dev/null && [ -f "$CLAUDE_MCP" ]; then
     echo "Registering Claude MCP servers from mcp.json (user scope)..."
-    python3 -c 'import json,sys
-d=json.load(open(sys.argv[1]))
-for name,cfg in (d.get("mcpServers") or {}).items():
-    t=cfg.get("type","stdio"); url=cfg.get("url","")
-    if t in ("http","sse") and url: print(f"{name}\t{t}\t{url}")' "$CLAUDE_MCP" | while IFS=$'\t' read -r name transport url; do
+    jq -r '(.mcpServers // {}) | to_entries[] | . as $e
+            | (($e.value.type) // "stdio") as $t | (($e.value.url) // "") as $u
+            | select(($t == "http" or $t == "sse") and $u != "")
+            | "\($e.key)\t\($t)\t\($u)"' \
+        "$CLAUDE_MCP" | while IFS=$'\t' read -r name transport url; do
         if [ -n "$name" ] && ! claude mcp get "$name" &> /dev/null; then
             echo "  Adding MCP server: $name ($transport)"
             claude mcp add --transport "$transport" --scope user "$name" "$url" 2>/dev/null || true

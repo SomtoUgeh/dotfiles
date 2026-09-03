@@ -105,6 +105,7 @@ cask "bettermouse"           # Mouse customization
 cask "cap"                    # Screen recorder
 cask "1password"
 cask "1password-cli"
+cask "suspicious-package"     # Inspect .pkg contents and install scripts before running
 
 # Storage & media
 cask "dropbox"

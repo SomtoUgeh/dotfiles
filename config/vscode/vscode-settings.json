@@ -211,7 +211,6 @@
   "prettier.useTabs": true,
   "redhat.telemetry.enabled": true,
   "search.useGlobalIgnoreFiles": true,
-  "security.promptForLocalFileProtocolHandling": false,
   "security.workspace.trust.untrustedFiles": "prompt",
   "task.allowAutomaticTasks": "off",
   "terminal.integrated.copyOnSelection": true,
