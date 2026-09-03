@@ -106,7 +106,7 @@ defaults write NSGlobalDomain ApplePressAndHoldEnabled -bool false
 # NOTE: needs a logout/restart to take effect; opening the Keyboard pane in
 # System Settings can reset these to slider-legal values.
 defaults write NSGlobalDomain KeyRepeat -int 1
-defaults write NSGlobalDomain InitialKeyRepeat -int 10
+defaults write NSGlobalDomain InitialKeyRepeat -int 15
 
 # Ctrl + scroll wheel to zoom the screen, following the keyboard focus.
 # May no-op unless the calling terminal has Accessibility permission.

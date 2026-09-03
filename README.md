@@ -133,6 +133,10 @@ dotfiles/
     ├── gitconfig-personal.template      # SomtoUgeh
     ├── gitconfig-work.template          # somto-swissblock
     ├── 1password-agent.toml.template    # which vaults the SSH agent serves
+    ├── gh-hosts-personal.yml.template   # gh active account: SomtoUgeh
+    ├── gh-hosts-work.yml.template       # gh active account: somto-swissblock
+    ├── envrc-personal.template          # -> ~/code/personal/.envrc
+    ├── envrc-work.template              # -> ~/code/work/.envrc
     ├── env.template
     └── aws-config.template
 ```
@@ -142,7 +146,7 @@ dotfiles/
 ### Keyboard Speed
 macOS defaults are too slow for coding. `macos/defaults.sh` sets:
 - `KeyRepeat = 1` (fastest, 15ms between repeats)
-- `InitialKeyRepeat = 10` (shortest delay before repeat)
+- `InitialKeyRepeat = 15` (225ms before the repeat starts)
 
 ### Editor Keybindings
 Shared across VS Code and Zed:
@@ -161,6 +165,30 @@ Shared across VS Code and Zed:
 - Useful aliases: `a`, `c`, `p`, `l`, `rh`, `b`, `co`, `amend`, `undo`
 - GitHub HTTPS credentials through `gh` on PATH (`!gh auth git-credential`)
 - Cloud worker: personal SSH key at `~/.ssh/id_ed25519_personal`, `commit.gpgsign` in `~/.gitconfig-personal` so every includeIf checkout signs
+
+### GitHub CLI accounts
+Two GitHub accounts, one per code root. `direnv` picks the account by folder,
+the same way `includeIf` picks the git identity.
+
+| Folder | gh account | `GH_CONFIG_DIR` |
+|---|---|---|
+| `~/code/personal` | `SomtoUgeh` | `~/.config/gh-personal` |
+| `~/code/work` | `somto-swissblock` | `~/.config/gh-work` |
+| anywhere else | whatever `gh auth switch` last set | `~/.config/gh` |
+
+`gh` reads its whole config from `$GH_CONFIG_DIR`, so a separate dir per
+account is what makes "active account" a per-directory fact. Each dir holds a
+`hosts.yml` naming one active user, plus a symlink to the shared `config.yml`.
+
+Tokens are not duplicated. They stay in the macOS keychain under service
+`gh:github.com`, keyed by username, and every config dir reads the same ones.
+So `gh auth login` once per account and both folders work.
+
+Check it:
+```bash
+cd ~/code/personal && gh api user --jq .login   # SomtoUgeh
+cd ~/code/work     && gh api user --jq .login   # somto-swissblock
+```
 
 ## Manual Steps
 
@@ -187,7 +215,17 @@ Shared across VS Code and Zed:
    # and SSH insteadOf rewrites only on machines that have those keys.
    ```
 
-3. **Private Config** - Add API keys to `~/.zshrc.private`
+3. **direnv** - `install.sh` writes `~/code/personal/.envrc` and
+   `~/code/work/.envrc`, but direnv will not load a new or changed `.envrc`
+   until you approve it:
+   ```bash
+   direnv allow ~/code/personal
+   direnv allow ~/code/work
+   ```
+   Do not add a `whitelist` block to `~/.config/direnv/direnv.toml` for these
+   roots. That would auto-run the `.envrc` of any repo you clone under them.
+
+4. **Private Config** - Add API keys to `~/.zshrc.private`
    (includes `RESEND_API_KEY` and any others from `templates/zshrc-private.template`)
 
 ### App Store Apps
