@@ -1,16 +1,22 @@
-# Personal GitHub identity (SomtoUgeh). Used on machines where github.com is
-# this account — the altschool worker, and Mac personal checkouts after
-# machine-local SSH rewrites. Do not copy this over the Mac work identity.
+# Personal GitHub identity (SomtoUgeh). Active under ~/code/personal/,
+# ~/code/TalentQL/ and the agent worktree dirs, via includeIf in git/.gitconfig.
 #
 #   cp templates/gitconfig-personal.template ~/.gitconfig-personal
+#
+# Private key is held in the 1Password Personal vault and served by the
+# 1Password SSH agent. signingkey points at the PUBLIC key on disk.
 
 [user]
 	name = Somto Odera
 	email = smugeh@gmail.com
-	signingkey = ~/.ssh/id_ed25519_personal.pub
+	signingkey = ~/.ssh/somto_sign_ed25519.pub
 
 [gpg]
 	format = ssh
+
+[gpg "ssh"]
+	program = /Applications/1Password.app/Contents/MacOS/op-ssh-sign
+	allowedSignersFile = ~/.ssh/allowed_signers
 
 [commit]
 	gpgsign = true
@@ -19,7 +25,8 @@
 	gpgSign = true
 
 [core]
-	sshCommand = ssh -i ~/.ssh/id_ed25519_personal -o IdentitiesOnly=yes
+	sshCommand = ssh -i ~/.ssh/somto_auth_ed25519.pub -o IdentitiesOnly=yes
 
-[url "git@github.com:"]
+[url "git@github-personal:"]
 	insteadOf = https://github.com/
+	insteadOf = git@github.com:

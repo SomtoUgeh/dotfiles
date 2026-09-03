@@ -28,6 +28,7 @@
 	pager = delta
 	excludesfile = ~/.gitignore_global
 	ignorecase = false
+	hooksPath = ~/.git-hooks
 [interactive]
 	diffFilter = delta --color-only
 [color]

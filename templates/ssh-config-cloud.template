@@ -1,4 +1,14 @@
-# Personal-only GitHub SSH. The cloud worker does not carry the Swissblock key.
+# Cloud worker only. NOT the Mac.
+#
+#   cp templates/ssh-config-cloud.template ~/.ssh/config
+#
+# The cloud worker has no 1Password agent, so its key is an ordinary private
+# key FILE (~/.ssh/id_ed25519_personal) - deliberately a different key from the
+# Mac's vault-held somto_auth_ed25519. It must be registered on GitHub in its
+# own right; the Mac's keys will not work here.
+#
+# Personal-only: the cloud worker does not carry the Swissblock key.
+
 Host github.com github-personal
   HostName github.com
   User git

@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+#
+# Global pre-commit guard against the git config injection worm.
+# Installed via: git config --global core.hooksPath ~/.git-hooks
+#
+# Scans STAGED content (git show :file), not the working tree — the worm
+# appends to files after they are read, and the two can differ.
+#
+# Bypass:  git commit --no-verify        (or WORMGUARD_SKIP=1 git commit)
+# Chains:  runs $GIT_DIR/hooks/pre-commit afterwards if one exists, because
+#          a global core.hooksPath otherwise disables per-repo hooks silently.
+
+set -u
+[ "${WORMGUARD_SKIP:-0}" = "1" ] && exit 0
+
+red() { printf '\033[0;31m%s\033[0m\n' "$1" >&2; }
+ylw() { printf '\033[1;33m%s\033[0m\n' "$1" >&2; }
+
+bad=0
+note() { red "  [$1] $2"; bad=1; }
+
+# Only staged adds/copies/modifies.
+files=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$files" ] && exit 0
+
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  content=$(git show ":$f" 2>/dev/null) || continue
+
+  # Skip the guard's own files: a detector necessarily contains the strings it
+  # detects. Any file may opt out with the marker below, used sparingly.
+  case "$f" in
+    git/hooks/*|*/git/hooks/*) continue ;;
+  esac
+  printf '%s' "$content" | grep -q 'worm-guard:allow-signatures' && continue
+
+  case "$f" in
+    *.js|*.cjs|*.mjs|*.ts|*.tsx|*.jsx|*.json|*.jsonc|*.sh|*.zsh|*.bash|*.py|*.rb|*.yml|*.yaml|*.toml)
+      printf '%s' "$content" | grep -vE '^[[:space:]]*(#|//|\*|/\*)' | grep -qE ' {50,}[^[:space:]]' \
+        && note "padding" "$f — payload hidden after 50+ spaces"
+      printf '%s' "$content" | grep -qE "global\[['\"](!|_V|_t_t)['\"]\]|global\.i[[:space:]]*=|global\.r[[:space:]]*=[[:space:]]*require|A8-3997-1" \
+        && note "marker" "$f — worm bootstrap / campaign marker"
+      printf '%s' "$content" | grep -qE 'require\([^)]*\\u00[0-9a-fA-F]{2}' \
+        && note "escaped-require" "$f — Unicode-escaped require()"
+      ;;
+  esac
+
+  printf '%s' "$content" | grep -qE 'trongrid\.io|bsc-dataseed|166\.88\.54\.158' \
+    && note "c2" "$f — known C2 endpoint"
+
+  case "$f" in
+    *.vscode/tasks.json|.vscode/tasks.json)
+      printf '%s' "$content" | grep -q 'folderOpen' \
+        && note "dropper" "$f — task runs on folderOpen" ;;
+    *.vscode/settings.json|.vscode/settings.json)
+      printf '%s' "$content" | grep -qE 'allowAutomaticTasks"[[:space:]]*:[[:space:]]*true' \
+        && note "dropper" "$f — re-enables automatic tasks" ;;
+    *.gitignore|.gitignore)
+      printf '%s' "$content" | grep -qE 'temp_auto_push\.bat|temp_interactive_push\.bat|branch_structure\.json' \
+        && note "artifacts" "$f — worm .gitignore entries" ;;
+    *.woff2)
+      [ "$(git show ":$f" 2>/dev/null | head -c 4)" = "wOF2" ] \
+        || note "fake-font" "$f — .woff2 without wOF2 magic bytes" ;;
+    *.woff)
+      [ "$(git show ":$f" 2>/dev/null | head -c 4)" = "wOFF" ] \
+        || note "fake-font" "$f — .woff without wOFF magic bytes" ;;
+  esac
+done <<< "$files"
+
+if [ "$bad" -ne 0 ]; then
+  red ""
+  red "COMMIT BLOCKED — worm indicators in staged content."
+  ylw "If you are certain this is legitimate:  git commit --no-verify"
+  exit 1
+fi
+
+# Chain to the repository's own hook, which a global hooksPath would bypass.
+repo_hook="$(git rev-parse --git-dir)/hooks/pre-commit"
+[ -x "$repo_hook" ] && exec "$repo_hook" "$@"
+exit 0

@@ -1,0 +1,31 @@
+# Swissblock identity (somto-swissblock). Active under ~/code/work/ via
+# includeIf in git/.gitconfig.
+#
+#   cp templates/gitconfig-work.template ~/.gitconfig-work
+#
+# Private key is held in the 1Password Swissblock vault. Separate signing
+# key from the auth key, per Swissblock policy.
+
+[user]
+	name = Somto Odera
+	email = smedua@swissblock.net
+	signingkey = ~/.ssh/swissblock_sign_ed25519.pub
+
+[gpg]
+	format = ssh
+
+[gpg "ssh"]
+	program = /Applications/1Password.app/Contents/MacOS/op-ssh-sign
+	allowedSignersFile = ~/.ssh/allowed_signers
+
+[commit]
+	gpgsign = true
+
+[tag]
+	gpgSign = true
+
+[core]
+	sshCommand = ssh -i ~/.ssh/swissblock_auth_ed25519.pub -o IdentitiesOnly=yes
+
+[url "git@github.com:"]
+	insteadOf = https://github.com/

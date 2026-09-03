@@ -1,13 +1,26 @@
-# Work account (default)
-Host github.com
-  HostName github.com
-  User git
-  IdentityFile ~/.ssh/id_ed25519
-  IdentitiesOnly yes
+# ~/.ssh/config
+#
+# Private keys live in the 1Password vault and are served by the 1Password SSH
+# agent. Only PUBLIC keys exist in this directory; IdentityFile points at a
+# .pub so ssh knows which of the four agent identities to offer per host.
+#
+# Work is the default for github.com. Personal repos go through the
+# github-personal alias, which the personal gitconfig rewrites URLs to
+# automatically, so you rarely type it.
 
-# Personal account (SomtoUgeh)
+Host *
+    IdentityAgent "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+
+# Work account (default) - somto-swissblock
+Host github.com
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/swissblock_auth_ed25519.pub
+    IdentitiesOnly yes
+
+# Personal account - SomtoUgeh
 Host github-personal
-  HostName github.com
-  User git
-  IdentityFile ~/.ssh/id_ed25519_personal
-  IdentitiesOnly yes
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/somto_auth_ed25519.pub
+    IdentitiesOnly yes

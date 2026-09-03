@@ -12,8 +12,8 @@ xcode-select --install
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
 # 3. Clone and install
-git clone https://github.com/SomtoUgeh/dotfiles.git ~/code/dotfiles
-cd ~/code/dotfiles
+git clone https://github.com/SomtoUgeh/dotfiles.git ~/code/personal/dotfiles
+cd ~/code/personal/dotfiles
 ./install.sh
 
 # 4. Configure private settings
@@ -113,12 +113,15 @@ dotfiles/
 │   └── verify_altschool_cloud.sh
 ├── macos/
 │   └── defaults.sh         # macOS system preferences
-└── templates/              # Templates for sensitive files
+└── templates/              # Templates for sensitive / machine-local files
     ├── zshrc-private.template
-    ├── ssh-config.template
-    ├── gitconfig-local.template
-    ├── gitconfig-personal.template
-    ├── ssh-config-cloud.template
+    ├── ssh-config.template              # Mac: 1Password agent, work default
+    ├── ssh-config-cloud.template        # cloud worker: file-based key
+    ├── gitconfig-local.template         # name only, no email
+    ├── gitconfig-personal.template      # SomtoUgeh
+    ├── gitconfig-work.template          # somto-swissblock
+    ├── 1password-agent.toml.template    # which vaults the SSH agent serves
+    ├── env.template
     └── aws-config.template
 ```
 
@@ -163,6 +166,10 @@ Shared across Cursor/VSCode/Zed:
    ```bash
    cp templates/gitconfig-local.template ~/.gitconfig.local
    cp templates/gitconfig-personal.template ~/.gitconfig-personal
+   cp templates/gitconfig-work.template ~/.gitconfig-work
+   cp templates/ssh-config.template ~/.ssh/config
+   mkdir -p ~/.config/1Password/ssh
+   cp templates/1password-agent.toml.template ~/.config/1Password/ssh/agent.toml
    # Mac work identity is ~/.gitconfig-work (not tracked). Add signing keys
    # and SSH insteadOf rewrites only on machines that have those keys.
    ```
@@ -182,7 +189,7 @@ Install from respective stores after browser setup.
 ## Updating
 
 ```bash
-cd ~/code/dotfiles
+cd ~/code/personal/dotfiles
 git pull
 ./install.sh  # Re-run to update symlinks
 ```

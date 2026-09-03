@@ -27,7 +27,6 @@ echo "Setting up directory structure..."
 # Main directories
 mkdir -p "$HOME/code"              # All code projects
 mkdir -p "$HOME/bin"               # Custom scripts
-mkdir -p "$HOME/Pictures/Screenshots"  # Screenshots location
 
 # Config directories
 mkdir -p "$HOME/.config"
@@ -182,6 +181,9 @@ echo "Setting up git configurations..."
 
 create_symlink "$DOTFILES_DIR/git/.gitconfig" "$HOME/.gitconfig"
 create_symlink "$DOTFILES_DIR/git/.gitignore_global" "$HOME/.gitignore_global"
+
+# Global git hooks (worm guard). core.hooksPath in git/.gitconfig points here.
+create_symlink "$DOTFILES_DIR/git/hooks" "$HOME/.git-hooks"
 
 # =============================================================================
 # Claude Code CLI
@@ -542,9 +544,13 @@ echo "1. Copy private configuration template:"
 echo "   cp templates/zshrc-private.template ~/.zshrc.private"
 echo "   # Then edit ~/.zshrc.private with your API keys"
 echo ""
-echo "2. Apply macOS system preferences:"
+echo "2. Rebuild SSH keys and commit signing from 1Password:"
+echo "   ./scripts/setup_ssh_from_1password.sh"
+echo "   # exports public keys, allowed_signers, ssh config, gitconfig identities"
+echo ""
+echo "3. Apply macOS system preferences:"
 echo "   ./macos/defaults.sh"
 echo ""
-echo "3. Restart your terminal or run: exec zsh"
+echo "4. Restart your terminal or run: exec zsh"
 echo ""
 echo "For detailed instructions, see README.md"
