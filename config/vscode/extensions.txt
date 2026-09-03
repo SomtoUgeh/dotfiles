@@ -1,5 +1,40 @@
 # VSCode extensions — installed by install.sh via 'code --install-extension'.
-# Capture current state with: code --list-extensions >> this file
+# Regenerate with: code --list-extensions > config/vscode/extensions.txt
+#   (then re-add these comments — '>' overwrites, '>>' would duplicate lines)
 # Lines starting with # are ignored.
+
+# Formatters and linters. vscode-settings.json names these as
+# editor.defaultFormatter per language — without them, formatting fails silently.
+esbenp.prettier-vscode
+biomejs.biome
+dbaeumer.vscode-eslint
+ms-python.black-formatter
+redhat.vscode-yaml
+yzhang.markdown-all-in-one
+CucumberOpen.cucumber-official
+
+# Pulled in automatically as dependencies of ms-python.black-formatter.
+# Listed so a fresh machine ends up with the same set, not a subset.
+ms-python.python
+ms-python.vscode-pylance
+ms-python.debugpy
+ms-python.vscode-python-envs
+
+# Editor helpers. Each one backs a settings namespace already in
+# vscode-settings.json (errorLens.*, todo-tree.*, gitlens.*).
+usernamehw.errorlens
+Gruntfuggly.todo-tree
+eamodio.gitlens
+
+# GitHub and agents (github.copilot.*, githubPullRequests.*, claudeCode.*)
+# GitHub.copilot — cannot be installed from the CLI. It hard-depends on
+#   github.copilot-chat 0.48.1, but VS Code now ships Copilot Chat as a
+#   built-in at a newer version and refuses the downgrade. Install it from
+#   the Extensions pane inside VS Code, which resolves the built-in correctly.
+#   The built-in Chat already serves most github.copilot.chat.* settings.
+GitHub.vscode-pull-request-github
+anthropic.claude-code
+
+# Theme and icons (workbench.colorTheme, workbench.iconTheme)
 lakshits11.monokai-pirokai
 monokai.theme-monokai-pro-vscode

@@ -75,6 +75,7 @@
   "editor.fontFamily": "JetBrainsMono NFP",
   "editor.fontLigatures": true,
   "editor.fontSize": 13,
+  "editor.formatOnSave": true,
   "editor.formatOnType": true,
   "editor.guides.bracketPairs": true,
   "editor.inlayHints.enabled": "offUnlessPressed",
