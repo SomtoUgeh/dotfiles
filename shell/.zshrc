@@ -165,6 +165,9 @@ alias cat="bat"
 alias yolo="claude --dangerously-skip-permissions"
 alias yolo-tg="claude --dangerously-skip-permissions --channels plugin:telegram@claude-plugins-official"
 
+# AltSchool VM
+alias altschool-up="pgrep -f '^ssh .*altschool-tunnel$' >/dev/null || command ssh -fN altschool-tunnel"
+
 # ============================================================================
 # FUNCTIONS
 # ============================================================================
