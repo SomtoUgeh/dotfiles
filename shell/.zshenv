@@ -25,5 +25,17 @@ unset -f _add_to_path
 # Rust/Cargo (if installed)
 [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
 
+# ============================================================================
+# 1Password SSH agent
+# ============================================================================
+# ~/.ssh/config sets IdentityAgent, which covers `ssh` itself — but ssh-add,
+# ssh-keygen -Y and other agent-aware tools read SSH_AUTH_SOCK and would
+# otherwise talk to Apple's launchd agent and report "no identities".
+# Guarded on the socket existing, so the cloud worker (file-based keys, no
+# 1Password) and any Linux box are unaffected.
+_op_agent="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+[ -S "$_op_agent" ] && export SSH_AUTH_SOCK="$_op_agent"
+unset _op_agent
+
 # Machine-local secrets; never committed.
 [ -f "$HOME/.config/agent-secrets/context7.zsh" ] && . "$HOME/.config/agent-secrets/context7.zsh"

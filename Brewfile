@@ -63,8 +63,12 @@ brew "uv"                     # Fast Python package manager
 
 # Shell
 brew "zsh"
-brew "zsh-autosuggestions"
-brew "zsh-syntax-highlighting"
+# NOTE: zsh-autosuggestions and fast-syntax-highlighting are installed as
+# oh-my-zsh plugins by install.sh (pinned to reviewed commits) and loaded via
+# `plugins=(...)` in shell/.zshrc. The brew formulae were unused: the
+# oh-my-zsh clone shadows brew's zsh-autosuggestions, and brew's
+# zsh-syntax-highlighting is a different project from fast-syntax-highlighting
+# and was never sourced at all.
 brew "pam-reattach"           # Touch ID for sudo inside tmux/screen (see scripts/enable_touchid_sudo.sh)
 
 # App Store CLI

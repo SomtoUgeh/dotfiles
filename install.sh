@@ -139,29 +139,52 @@ else
     echo "✓ Oh My Zsh already installed"
 fi
 
-# Install Oh My Zsh plugins
+# =============================================================================
+# Oh My Zsh plugins — PINNED
+# =============================================================================
+# These plugins are sourced by shell/.zshrc, so their code runs in EVERY shell
+# you open. Cloning a branch means an upstream compromise executes here
+# silently and forever, with no prompt. Each is therefore pinned to a specific
+# reviewed commit, and an existing clone that has drifted is put back.
+#
+# To update one: read the upstream diff, then bump the SHA here deliberately.
+#   git -C ~/.oh-my-zsh/custom/plugins/<name> log --oneline HEAD..origin/master
 ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
 
-if [ ! -d "$ZSH_CUSTOM/plugins/fzf-tab" ]; then
-    echo "Installing fzf-tab plugin..."
-    git clone https://github.com/Aloxaf/fzf-tab "$ZSH_CUSTOM/plugins/fzf-tab"
-else
-    echo "✓ fzf-tab already installed"
-fi
+#              name | repo | pinned commit
+ZSH_PLUGINS=(
+    "fzf-tab|Aloxaf/fzf-tab|24105b15714bfec37989ed5c5b6e60f572253019"
+    "zsh-autosuggestions|zsh-users/zsh-autosuggestions|85919cd1ffa7d2d5412f6d3fe437ebdbeeec4fc5"
+    "fast-syntax-highlighting|zdharma-continuum/fast-syntax-highlighting|4672ad5dd9ad68a7effc1476d65afb7c584ce2b3"
+)
 
-if [ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ]; then
-    echo "Installing zsh-autosuggestions plugin..."
-    git clone https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions"
-else
-    echo "✓ zsh-autosuggestions already installed"
-fi
+for entry in "${ZSH_PLUGINS[@]}"; do
+    IFS='|' read -r zp_name zp_repo zp_pin <<< "$entry"
+    zp_dest="$ZSH_CUSTOM/plugins/$zp_name"
 
-if [ ! -d "$ZSH_CUSTOM/plugins/fast-syntax-highlighting" ]; then
-    echo "Installing fast-syntax-highlighting plugin..."
-    git clone https://github.com/zdharma-continuum/fast-syntax-highlighting "$ZSH_CUSTOM/plugins/fast-syntax-highlighting"
-else
-    echo "✓ fast-syntax-highlighting already installed"
-fi
+    if [ -d "$zp_dest/.git" ]; then
+        zp_at="$(git -C "$zp_dest" rev-parse HEAD 2>/dev/null || echo unknown)"
+        if [ "$zp_at" = "$zp_pin" ]; then
+            echo "✓ $zp_name pinned at ${zp_pin:0:8}"
+            continue
+        fi
+        echo -e "${YELLOW}$zp_name is at ${zp_at:0:8}, re-pinning to ${zp_pin:0:8}${NC}"
+        git -C "$zp_dest" fetch --quiet origin 2>/dev/null || true
+    else
+        echo "Installing $zp_name (pinned ${zp_pin:0:8})..."
+        rm -rf "$zp_dest"
+        git clone --quiet "https://github.com/$zp_repo" "$zp_dest" || {
+            echo -e "${RED}Could not clone $zp_repo${NC}"; continue; }
+    fi
+
+    # Detached checkout of the exact commit. If the pin is unreachable, leave
+    # the plugin OUT rather than silently running whatever the branch tip is.
+    if ! git -C "$zp_dest" checkout --quiet --detach "$zp_pin" 2>/dev/null; then
+        echo -e "${RED}Pinned commit ${zp_pin:0:8} not found in $zp_name — removing it${NC}"
+        echo -e "${YELLOW}  Verify upstream, then update the SHA in install.sh.${NC}"
+        rm -rf "$zp_dest"
+    fi
+done
 
 # =============================================================================
 # Shell configurations
