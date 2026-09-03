@@ -235,7 +235,6 @@
   ],
   "typescript.preferences.importModuleSpecifier": "non-relative",
   "typescript.updateImportsOnFileMove.enabled": "always",
-  "update.releaseTrack": "prerelease",
   "window.clickThroughInactive": false,
   "window.closeWhenEmpty": true,
   "window.nativeTabs": true,
