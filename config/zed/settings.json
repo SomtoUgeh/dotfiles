@@ -178,7 +178,16 @@
   // fresh machine. "Ayu Light" (light theme) is built into Zed; the dark theme
   // "Syntax" and the "Catppuccin Mocha" icon theme are provided by extensions.
   "auto_install_extensions": {
+    // Language servers named in "lsp" and "languages" below. Zed does not
+    // install these on demand — without them, biome/ruff/basedpyright config
+    // is read and then ignored. vtsls needs no extension; it ships with Zed.
+    "basedpyright": true,
+    "ruff": true,
+    "biome": true,
+    // Markup
     "html": true,
+    // Themes: "Syntax" is the dark theme, "Catppuccin Mocha" the icon theme.
+    // "Ayu Light" is built in and needs no extension.
     "syntax": true,
     "catppuccin-icons": true,
   },
