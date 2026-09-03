@@ -255,3 +255,9 @@ rm ~/.zshrc  # Remove existing file
 - `~/.claude/settings.json` is **symlinked** to `agents/claude/settings.json`. It uses `${HOME}`-relative paths, and Claude resolves the link and writes through it, so the tracked copy always reflects live config and never drifts.
 
 Claude's `installed_plugins.json` / `known_marketplaces.json` are machine-generated caches (absolute paths, timestamps, commit SHAs) and are intentionally **not** tracked. They are rebuilt from `enabledPlugins` + `extraKnownMarketplaces` in `settings.json`, which is the single source of truth for plugins — `install.sh` installs them from there, and Claude re-syncs on launch.
+
+## Commit signing
+
+SSH commit signing with two identities (personal / Swissblock), keys held in
+1Password. Setup, accepted policy deviations and rebuild steps:
+[`git/SIGNING.md`](git/SIGNING.md).

@@ -55,7 +55,17 @@ PAYLOAD="$RULESET_DIR/$RULESET.json"
 command -v gh >/dev/null || { red "gh is not installed (brew install gh)"; exit 1; }
 gh auth status >/dev/null 2>&1 || { red "gh is not authenticated (gh auth login)"; exit 1; }
 
-NAME="$(python3 -c "import json;print(json.load(open('$PAYLOAD'))['name'])")"
+# Read the ruleset name without hard-depending on any one parser: a fresh
+# machine may have jq missing and /usr/bin/python3 blocked behind the Xcode
+# licence prompt.
+if command -v jq >/dev/null; then
+  NAME="$(jq -r .name "$PAYLOAD")"
+elif python3 -c "" 2>/dev/null; then
+  NAME="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['name'])" "$PAYLOAD")"
+else
+  NAME="$(sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$PAYLOAD" | head -1)"
+fi
+[ -n "$NAME" ] || { red "could not read .name from $PAYLOAD"; exit 2; }
 OWNER="$(gh api user -q .login)"
 
 echo "ruleset : $RULESET  (name: $NAME)"
