@@ -525,6 +525,59 @@ echo "Setting up GitHub CLI configuration..."
 mkdir -p "$HOME/.config/gh"
 create_symlink "$DOTFILES_DIR/config/gh/config.yml" "$HOME/.config/gh/config.yml"
 
+# --- Per-account gh config dirs (direnv-driven) --------------------------------
+# One gh account per code root. gh reads its ENTIRE config from $GH_CONFIG_DIR,
+# so a separate dir per account is the only way to make "active account" a
+# per-directory fact. direnv exports GH_CONFIG_DIR from ~/code/{personal,work}.
+#
+# OAuth tokens are NOT copied: they stay in the macOS keychain under service
+# "gh:github.com", keyed by username, and every config dir reads the same ones.
+# So `gh auth login` once per account, then these dirs just pick which is active.
+#
+# config.yml is symlinked so settings/aliases stay shared. hosts.yml is a real
+# file because gh rewrites it (e.g. `gh auth refresh`) — never symlink it into
+# the repo.
+for gh_account in personal work; do
+    gh_dir="$HOME/.config/gh-$gh_account"
+    mkdir -p "$gh_dir"
+    create_symlink "$DOTFILES_DIR/config/gh/config.yml" "$gh_dir/config.yml"
+    if [ -L "$gh_dir/hosts.yml" ]; then
+        echo -e "${YELLOW}Replacing symlink with a private hosts file: $gh_dir/hosts.yml${NC}"
+        rm "$gh_dir/hosts.yml"
+    fi
+    if [ -f "$gh_dir/hosts.yml" ]; then
+        echo "✓ Already present: $gh_dir/hosts.yml"
+    else
+        cp "$DOTFILES_DIR/templates/gh-hosts-$gh_account.yml.template" "$gh_dir/hosts.yml"
+        chmod 600 "$gh_dir/hosts.yml"
+        echo -e "${GREEN}Created: $gh_dir/hosts.yml${NC}"
+    fi
+done
+
+# --- direnv .envrc per code root ----------------------------------------------
+# These live OUTSIDE the repo (~/code/personal is the repo's parent), so they
+# are rendered, not symlinked. Existing files are never overwritten because
+# they may contain unrelated project configuration. The Zsh directory hook is
+# the authoritative account selector; these files support direnv-aware tools.
+for gh_account in personal work; do
+    envrc_dir="$HOME/code/$gh_account"
+    mkdir -p "$envrc_dir"
+    envrc_src="$DOTFILES_DIR/templates/envrc-$gh_account.template"
+    envrc_target="$envrc_dir/.envrc"
+    if [ -e "$envrc_target" ] || [ -L "$envrc_target" ]; then
+        if [ -f "$envrc_target" ] && cmp -s "$envrc_src" "$envrc_target"; then
+            echo "✓ Already current: $envrc_target"
+        else
+            echo -e "${YELLOW}Preserving existing: $envrc_target${NC}"
+            echo -e "${YELLOW}  Add GH_CONFIG_DIR manually if this shell does not use shell/.zshrc.${NC}"
+        fi
+    else
+        cp "$envrc_src" "$envrc_target"
+        echo -e "${GREEN}Wrote: $envrc_target${NC}"
+        echo -e "${YELLOW}  Run: direnv allow $envrc_dir${NC}"
+    fi
+done
+
 # =============================================================================
 # Custom scripts
 # =============================================================================

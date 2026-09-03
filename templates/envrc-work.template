@@ -1,0 +1,5 @@
+# ~/code/work/.envrc — rendered by install.sh, allowed with `direnv allow`.
+#
+# Points the GitHub CLI at the Swissblock account (somto-swissblock).
+# See envrc-personal.template for how this works.
+export GH_CONFIG_DIR="$HOME/.config/gh-work"

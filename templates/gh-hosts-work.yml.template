@@ -1,0 +1,9 @@
+# Rendered by install.sh to ~/.config/gh-work/hosts.yml
+#
+# See gh-hosts-personal.yml.template for why this file is safe to commit.
+# direnv points GH_CONFIG_DIR here inside ~/code/work (see .envrc).
+github.com:
+    git_protocol: ssh
+    users:
+        somto-swissblock:
+    user: somto-swissblock

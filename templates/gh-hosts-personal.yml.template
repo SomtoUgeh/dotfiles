@@ -1,0 +1,12 @@
+# Rendered by install.sh to ~/.config/gh-personal/hosts.yml
+#
+# This file selects WHICH GitHub account gh uses. It holds no secrets:
+# the OAuth tokens live in the macOS keychain under service "gh:github.com",
+# keyed by username, so every gh config dir shares the same tokens.
+#
+# direnv points GH_CONFIG_DIR here inside ~/code/personal (see .envrc).
+github.com:
+    git_protocol: ssh
+    users:
+        SomtoUgeh:
+    user: SomtoUgeh

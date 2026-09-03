@@ -79,6 +79,21 @@ export PATH="$PATH:$HOME/.lmstudio/bin"
 # matching the OrbStack pattern below)
 command -v direnv >/dev/null && eval "$(direnv hook zsh)"
 
+# Keep the GitHub CLI account aligned with the current code root. Register
+# after direnv so a repository's own .envrc cannot shadow the parent account.
+autoload -Uz add-zsh-hook
+_set_gh_config_dir() {
+  case "$PWD/" in
+    "$HOME/code/personal/"*) export GH_CONFIG_DIR="$HOME/.config/gh-personal" ;;
+    "$HOME/code/TalentQL/"*) export GH_CONFIG_DIR="$HOME/.config/gh-personal" ;;
+    "$HOME/code/work/"*) export GH_CONFIG_DIR="$HOME/.config/gh-work" ;;
+    *) unset GH_CONFIG_DIR ;;
+  esac
+}
+add-zsh-hook chpwd _set_gh_config_dir
+add-zsh-hook precmd _set_gh_config_dir
+_set_gh_config_dir
+
 # OrbStack
 source ~/.orbstack/shell/init.zsh 2>/dev/null || :
 
@@ -324,9 +339,10 @@ function hitch-dev() {
 # bun completions
 [ -s "/Users/odera/.bun/_bun" ] && source "/Users/odera/.bun/_bun"
 
+export PATH="$HOME/.local/bin:$PATH"
+
 # >>> grok installer >>>
 export PATH="$HOME/.grok/bin:$PATH"
 fpath=(~/.grok/completions/zsh $fpath)
 autoload -Uz compinit && compinit -C
 # <<< grok installer <<<
-export PATH="$HOME/.local/bin:$PATH"

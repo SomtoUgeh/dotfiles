@@ -167,12 +167,15 @@ Shared across VS Code and Zed:
 - Cloud worker: personal SSH key at `~/.ssh/id_ed25519_personal`, `commit.gpgsign` in `~/.gitconfig-personal` so every includeIf checkout signs
 
 ### GitHub CLI accounts
-Two GitHub accounts, one per code root. `direnv` picks the account by folder,
-the same way `includeIf` picks the git identity.
+Two GitHub accounts, one per code root. A Zsh directory hook picks the account
+by folder, the same way `includeIf` picks the git identity. It runs after
+`direnv`, so a repository's own `.envrc` cannot silently select the wrong
+account.
 
 | Folder | gh account | `GH_CONFIG_DIR` |
 |---|---|---|
 | `~/code/personal` | `SomtoUgeh` | `~/.config/gh-personal` |
+| `~/code/TalentQL` | `SomtoUgeh` | `~/.config/gh-personal` |
 | `~/code/work` | `somto-swissblock` | `~/.config/gh-work` |
 | anywhere else | whatever `gh auth switch` last set | `~/.config/gh` |
 
@@ -216,9 +219,9 @@ cd ~/code/work     && gh api user --jq .login   # somto-swissblock
    # and SSH insteadOf rewrites only on machines that have those keys.
    ```
 
-3. **direnv** - `install.sh` writes `~/code/personal/.envrc` and
-   `~/code/work/.envrc`, but direnv will not load a new or changed `.envrc`
-   until you approve it:
+3. **direnv** - `install.sh` creates `~/code/personal/.envrc` and
+   `~/code/work/.envrc` when they do not already exist. It preserves customized
+   files. Direnv will not load a new `.envrc` until you approve it:
    ```bash
    direnv allow ~/code/personal
    direnv allow ~/code/work

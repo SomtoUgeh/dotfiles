@@ -1,0 +1,9 @@
+# ~/code/personal/.envrc — rendered by install.sh, allowed with `direnv allow`.
+#
+# Points the GitHub CLI at the personal account (SomtoUgeh). gh reads its
+# whole config from $GH_CONFIG_DIR, and ~/.config/gh-personal/hosts.yml marks
+# SomtoUgeh as the active user. Tokens come from the shared macOS keychain.
+#
+# Git identity is separate and already folder-driven by includeIf in
+# git/.gitconfig -> ~/.gitconfig-personal. Do not duplicate it here.
+export GH_CONFIG_DIR="$HOME/.config/gh-personal"
