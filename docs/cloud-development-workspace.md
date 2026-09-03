@@ -196,10 +196,23 @@ exec zsh
 4. Run `tmux new -As development` for work that must survive a disconnect.
 5. Run `talentql` to enter the application repository.
 
-The tunnel alias forwards remote loopback ports 3000, 5173, and 8080 to the
-same Mac loopback ports. Run only one tunnel session at a time; ordinary
-`ssh altschool` sessions do not claim those ports. Bind development servers to
-`127.0.0.1` on the VM unless a tool requires another address.
+The tunnel alias forwards the degree-admin backend on port 5050 and the eight
+Next.js applications on ports 8000 through 8007 to the same Mac loopback
+ports. Run only one tunnel session at a time; ordinary `ssh altschool` sessions
+do not claim those ports. Bind development servers to `127.0.0.1` on the VM
+unless a tool requires another address.
+
+| Local URL | Application |
+| --- | --- |
+| `http://localhost:5050` | Degree admin backend |
+| `http://localhost:8000` | Home |
+| `http://localhost:8001` | Engineering |
+| `http://localhost:8002` | Data |
+| `http://localhost:8003` | Product |
+| `http://localhost:8004` | Creative economy |
+| `http://localhost:8005` | Business |
+| `http://localhost:8006` | Student |
+| `http://localhost:8007` | Core |
 
 Termius uses the same Cloudflare connection, address, and user, but has its own
 dedicated per-host key because it does not use the Mac 1Password SSH agent.
@@ -411,9 +424,15 @@ Host altschool-PROVIDER altschool-PROVIDER-tunnel
 
 Host altschool-PROVIDER-tunnel
   ExitOnForwardFailure yes
-  LocalForward 127.0.0.1:3000 127.0.0.1:3000
-  LocalForward 127.0.0.1:5173 127.0.0.1:5173
-  LocalForward 127.0.0.1:8080 127.0.0.1:8080
+  LocalForward 127.0.0.1:5050 127.0.0.1:5050
+  LocalForward 127.0.0.1:8000 127.0.0.1:8000
+  LocalForward 127.0.0.1:8001 127.0.0.1:8001
+  LocalForward 127.0.0.1:8002 127.0.0.1:8002
+  LocalForward 127.0.0.1:8003 127.0.0.1:8003
+  LocalForward 127.0.0.1:8004 127.0.0.1:8004
+  LocalForward 127.0.0.1:8005 127.0.0.1:8005
+  LocalForward 127.0.0.1:8006 127.0.0.1:8006
+  LocalForward 127.0.0.1:8007 127.0.0.1:8007
 ```
 
 Verify effective settings and the host fingerprint:

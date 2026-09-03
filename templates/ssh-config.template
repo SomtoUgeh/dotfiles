@@ -43,6 +43,12 @@ Host altschool altschool-tunnel
 
 Host altschool-tunnel
     ExitOnForwardFailure yes
-    LocalForward 127.0.0.1:3000 127.0.0.1:3000
-    LocalForward 127.0.0.1:5173 127.0.0.1:5173
-    LocalForward 127.0.0.1:8080 127.0.0.1:8080
+    LocalForward 127.0.0.1:5050 127.0.0.1:5050
+    LocalForward 127.0.0.1:8000 127.0.0.1:8000
+    LocalForward 127.0.0.1:8001 127.0.0.1:8001
+    LocalForward 127.0.0.1:8002 127.0.0.1:8002
+    LocalForward 127.0.0.1:8003 127.0.0.1:8003
+    LocalForward 127.0.0.1:8004 127.0.0.1:8004
+    LocalForward 127.0.0.1:8005 127.0.0.1:8005
+    LocalForward 127.0.0.1:8006 127.0.0.1:8006
+    LocalForward 127.0.0.1:8007 127.0.0.1:8007

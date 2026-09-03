@@ -327,8 +327,9 @@ flowchart LR
 
 **Daily path:** Cloudflare One shows Connected → `ssh altschool` →
 `tmux new -As development` → `talentql`. When local web ports are needed,
-start one separate `ssh altschool-tunnel` session; it forwards ports `3000`,
-`5173`, and `8080` to the Mac. Bind development servers to `127.0.0.1`.
+start one separate `ssh altschool-tunnel` session; it forwards the application
+ports `5050` and `8000–8007` to the Mac. Bind development servers to
+`127.0.0.1`.
 
 The runbook is the source of truth (current host, security, rebuild,
 migration, cost, recovery):
