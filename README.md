@@ -246,9 +246,22 @@ file and used `.vscode/tasks.json` with `runOn: folderOpen` to run it.
 ### Scan before you open
 
 ```bash
-scan_repo.sh /path/to/untrusted-repo     # 9 checks
-scan_repo.sh --selftest                  # asserts the checks still fire
+scan_repo.sh /path/to/untrusted-repo     # 14 checks
+scan_repo.sh --selftest                  # 12/12 must fire against a known sample
 ```
+
+The checks cover the dropper (`.vscode` folderOpen tasks, a task running `node`
+against a `.woff2`, fake font magic bytes), the payload (50+ space padding,
+`global.i="A8-3997-1"` and friends, Unicode-escaped `require`, `createRequire`
+prepended to ESM), the C2 endpoints, the worm's `.gitignore` edits including the
+line that hides itself, the malicious npm dependency, a leaked `gho_` OAuth
+token, and two git-history checks — known dropper blob SHAs, and the
+author/committer timezone mismatch that marks a server-side rewrite.
+
+A detector contains the strings it detects. Any file carrying the marker
+`worm-guard:allow-signatures` is skipped, and the IOC literals in the scanner
+and the hook are assembled from fragments so they do not trip other people's
+scanners either.
 
 Run it before opening an unfamiliar repo in an editor.
 
