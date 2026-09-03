@@ -54,10 +54,6 @@
   "biome.suggestInstallingGlobally": false,
   "breadcrumbs.enabled": true,
   "chat.useNestedAgentsMdFiles": true,
-  "cursor.composer.cmdPFilePicker2": true,
-  "cursor.composer.shouldChimeAfterChatFinishes": true,
-  "cursor.cpp.disabledLanguages": ["scminput"],
-  "cursor.preferNotificationsSameAsChat": true,
   "debug.toolBarLocation": "commandCenter",
   "diffEditor.diffAlgorithm": "advanced",
   "diffEditor.ignoreTrimWhitespace": false,
@@ -216,7 +212,8 @@
   "redhat.telemetry.enabled": true,
   "search.useGlobalIgnoreFiles": true,
   "security.promptForLocalFileProtocolHandling": false,
-  "security.workspace.trust.untrustedFiles": "open",
+  "security.workspace.trust.untrustedFiles": "prompt",
+  "task.allowAutomaticTasks": "off",
   "terminal.integrated.copyOnSelection": true,
   "terminal.integrated.cursorBlinking": true,
   "terminal.integrated.cursorStyle": "line",
@@ -275,8 +272,7 @@
   "chat.tools.terminal.autoApprove": {
     "git add": true,
     "git commit": true,
-    "git checkout": true,
-    "gh": true
+    "git checkout": true
   },
   "claudeCode.preferredLocation": "panel",
   "extensions.supportAgentsWindow": {

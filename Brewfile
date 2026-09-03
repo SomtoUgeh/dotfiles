@@ -75,7 +75,7 @@ brew "mas"                    # Install Mac App Store apps (see bottom of file)
 # =============================================================================
 
 # Editors & terminals
-cask "visual-studio-code"     # Shares config with Cursor
+cask "visual-studio-code"
 cask "zed"                    # Fast modern editor
 
 # Dev tooling
