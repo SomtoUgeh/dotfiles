@@ -33,6 +33,11 @@ warn() { ylw "  [$1] $2"; }
 
 # IOC fragments, joined at use — see the same note in pre-commit.
 _t="temp_"; _b="branch_"
+# v1 / v2 obfuscator signatures, split at a quote boundary so a -F search for
+# the literal does not match this file. Joined values are byte-identical.
+_s1="rmcej"'%otb%'; _s2="Cot"'%3t=shtP'
+# Malicious npm package names, also fragmented for the same reason.
+_tw="tailwindcss-"; _tl="tailwind-"; _pc="postcss-minify-"
 
 zero=$(git hash-object --stdin </dev/null | tr '0-9a-f' '0')
 remote_name="${1:-origin}"
@@ -72,8 +77,8 @@ while IFS=$'\t' read -r tip f; do
     .gitignore|*/.gitignore)                       kind=ignore ;;
     *.woff2)                                       kind=woff2 ;;
     *.woff)                                        kind=woff ;;
-    *.bat)                                         kind=bat ;;
-    *.js|*.cjs|*.mjs|*.mts|*.cts|*.ts|*.tsx|*.jsx|*.vue|*.svelte|*.astro|*.php|*.json|*.jsonc|*.sh|*.zsh|*.bash|*.py|*.rb|*.yml|*.yaml|*.toml)
+    *.bat|*.ps1)                                   kind=bat ;;
+    *.js|*.cjs|*.mjs|*.mts|*.cts|*.ts|*.tsx|*.jsx|*.vue|*.svelte|*.astro|*.php|*.json|*.jsonc|*.sh|*.zsh|*.bash|*.py|*.rb|*.yml|*.yaml|*.toml|*.lock)
                                                    kind=code ;;
     *) continue ;;
   esac
@@ -100,7 +105,7 @@ while IFS=$'\t' read -r tip f; do
     code)
       printf '%s' "$content" | grep -vE '^[[:space:]]*(#|//|\*|/\*)' | grep -qE '[[:space:]]{50,}[^[:space:]]' \
         && note "padding" "$f — payload hidden after 50+ whitespace chars (space OR tab)"
-      printf '%s' "$content" | grep -qE "global\[['\"](!|_V|_t_t)['\"]\]|global\.i[[:space:]]*=|global\.r[[:space:]]*=[[:space:]]*require|A8-3997-1" \
+      printf '%s' "$content" | grep -qE "global\[['\"](!|_V|_t_t|r|m)['\"]\]|global\.i[[:space:]]*=|global\.r[[:space:]]*=[[:space:]]*require|A8-3997-1|A8-5657-1|${_s1}|${_s2}|_\\\$_1e42" \
         && note "marker" "$f — worm bootstrap / campaign marker"
       printf '%s' "$content" | grep -qE 'require\([^)]*\\u00[0-9a-fA-F]{2}' \
         && note "escaped-require" "$f — Unicode-escaped require()"
@@ -109,6 +114,13 @@ while IFS=$'\t' read -r tip f; do
         *.min.*|*-lock.json|package-lock.json|yarn.lock|pnpm-lock.yaml|*.bundle.*|*.map) ;;
         *) printf '%s' "$content" | awk 'length($0)>2000{exit 1}' \
              || warn "long-line" "$f — line over 2000 chars; scroll right before trusting it" ;;
+      esac
+
+      # Dependency names are plaintext, so this is cheap and worth blocking early.
+      case "$f" in
+        *package.json|*package-lock.json|*yarn.lock|*pnpm-lock.yaml)
+          printf '%s' "$content" | grep -qE "${_tw}(style-animate|typography-style|style-modify|animate-style)|${_tl}(mainanimation|autoanimation|animationbased)|${_pc}selector-parser|html-to-gutenberg|fetch-page-assets|aes-decode-runner-pro" \
+            && note "bad-dep" "$f — known malicious npm package" ;;
       esac
       ;;
     tasks)

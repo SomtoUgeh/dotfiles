@@ -69,7 +69,10 @@ scan() {
 
   hdr "2. Obfuscation bootstrap markers"
   local m
-  m=$(grep -rInE "global\[['\"](!|_V|_t_t)['\"]\]|global\.i[[:space:]]*=|global\.r[[:space:]]*=[[:space:]]*require|A8-3997-1|_\\\$_1e42" \
+  # v1 / v2 obfuscator signatures, split at a quote boundary so a -F search for
+  # the literal does not match this file. Joined values are byte-identical.
+  local _s1="rmcej"'%otb%' _s2="Cot"'%3t=shtP'
+  m=$(grep -rInE "global\[['\"](!|_V|_t_t|r|m)['\"]\]|global\.i[[:space:]]*=|global\.r[[:space:]]*=[[:space:]]*require|A8-3997-1|A8-5657-1|${_s1}|${_s2}|_\\\$_1e42" \
         "$DIR" "${CODE[@]}" "${EXCL[@]}" 2>/dev/null | drop_marked | head -20)
   if [ -n "$m" ]; then red "  !! campaign/bootstrap marker:"; printf '    %s\n' "$m"; findings=$((findings+1))
   else grn "  none"; fi
@@ -101,9 +104,20 @@ scan() {
   if [ -n "$m" ]; then red "  !! escaped require():"; printf '    %s\n' "$m"; findings=$((findings+1))
   else grn "  none"; fi
 
-  hdr "5. C2 endpoints"
-  m=$(grep -rInE 'trongrid\.io|bsc-dataseed|166\.88\.54\.158' "$DIR" "${EXCL[@]}" 2>/dev/null | drop_marked | head -10)
-  if [ -n "$m" ]; then red "  !! C2 reference:"; printf '    %s\n' "$m"; findings=$((findings+1))
+  hdr "5. C2 endpoints, wallet addresses and XOR keys"
+  # Escaped dots double as fragmentation: a -F search for the plain hostname
+  # will not match this file. Wallet addresses have no dots, so split them.
+  local _tr1="TMfKQEd7TJJa5xNZ" _tr2="TXfxHUet9pJVU1Bg"
+  local _ap1="0xbe037400670fbf1c32364f762975908d" _ap2="0x3f0e5781d0855fb460661ac63257376d"
+  m=$(grep -rInE "trongrid\\.io|bsc-dataseed|bsc-rpc\\.publicnode\\.com|fullnode\\.mainnet\\.aptoslabs\\.com|166\\.88\\.54\\.158|(default-configuration|vscode-settings-bootstrap|vscode-settings-config|vscode-bootstrapper|vscode-load-config|260120)\\.vercel\\.app|${_tr1}JZ2Lep838vrzrs7mAP|${_tr2}VkBAbrES4YUc1nGzcG|${_ap1}c43eeb38759263e7dfcdabc76380811e|${_ap2}b1941b2bb522499e4757ecb3ebd5dce3" \
+        "$DIR" "${EXCL[@]}" 2>/dev/null | drop_marked | head -10)
+  # XOR keys contain [ ^ - so they must go through -F, not a regex.
+  local _x1='2[gWfGj;<:-93Z' _x2='m6:tTh^D)cBz?NM'
+  local x
+  x=$(grep -rInF -e "${_x1}^C" -e "${_x2}]" "$DIR" "${EXCL[@]}" 2>/dev/null | drop_marked | head -5)
+  [ -n "$x" ] && m="${m}${m:+
+}${x}"
+  if [ -n "$m" ]; then red "  !! C2 / wallet / XOR-key reference:"; printf '    %s\n' "$m"; findings=$((findings+1))
   else grn "  none"; fi
 
   hdr "6. Fake font droppers"
@@ -147,10 +161,22 @@ scan() {
   if [ -n "$m" ]; then red "  !! a task runs node against a FONT file — this is the dropper:"; printf '    %s\n' "$m"; findings=$((findings+1))
   else grn "  none"; fi
 
+  hdr "9b. Commit-tamper script (.bat / .ps1)"
+  local _t2="temp_"
+  m=$(find "$DIR" \( -name .git -o -name node_modules \) -prune -o -type f \
+        \( -name "${_t2}auto_push.bat" -o -name "${_t2}interactive_push.bat" \) -print 2>/dev/null | head -10)
+  x=$(grep -rIn 'LAST_COMMIT_DATE' "$DIR" --include='*.bat' --include='*.ps1' --include='*.sh' \
+        "${EXCL[@]}" 2>/dev/null | drop_marked | head -5)
+  [ -n "$x" ] && m="${m}${m:+
+}${x}"
+  if [ -n "$m" ]; then red "  !! commit-tamper / push script:"; printf '    %s\n' "$m"; findings=$((findings+1))
+  else grn "  none"; fi
+
   hdr "10. Malicious npm dependency"
   # Fragmented: a literal here would trip check-polinrider A6 against this file.
-  local _tw="tailwindcss-"
-  m=$(grep -rn "${_tw}style-animate" "$DIR" --include='package.json' --include='package-lock.json' \
+  local _tw="tailwindcss-" _tl="tailwind-" _pc="postcss-minify-"
+  m=$(grep -rnE "${_tw}(style-animate|typography-style|style-modify|animate-style)|${_tl}(mainanimation|autoanimation|animationbased)|${_pc}selector-parser|html-to-gutenberg|fetch-page-assets|aes-decode-runner-pro" \
+        "$DIR" --include='package.json' --include='package-lock.json' \
         --include='yarn.lock' --include='pnpm-lock.yaml' "${EXCL[@]}" 2>/dev/null | drop_marked | head -10)
   if [ -n "$m" ]; then red "  !! malicious npm package:"; printf '    %s\n' "$m"; findings=$((findings+1))
   else grn "  none"; fi
