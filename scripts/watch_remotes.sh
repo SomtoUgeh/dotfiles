@@ -240,7 +240,7 @@ content_indicators() { # owner/repo ref tree-json
   done < <(printf '%s' "$3" \
     | jq -r '.tree[]? | select(.type=="blob")
             | select( (.path|test("\\.config\\.(js|cjs|mjs|ts|mts)$|\\.gitignore$|\\.vscode/settings\\.json$"))
-                      or ((.path|test("\\.(js|jsx|mjs|cjs|ts|tsx|mts|cts)$")) and (.size >= 20000)) )
+                      or ((.path|test("\\.(js|jsx|mjs|cjs|ts|tsx|mts|cts|vue|svelte|py|rb|php|astro)$")) and (.size >= 20000)) )
             | "\(.sha)\t\(.size)\t\(.path)"' 2>/dev/null)
 }
 
