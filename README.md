@@ -311,7 +311,15 @@ What it finds on a remote, with no clone:
 
 It runs every 4 hours from `templates/worm-guard-watch.plist.template`,
 installed as a LaunchAgent so `gh` can read the login keychain. Log:
-`~/.local/state/worm-guard/watch.log`. Exit 1 means it found something.
+`~/.local/state/worm-guard/watch.log`.
+
+Exit codes carry the distinction that matters: **0 means checked and clean,
+1 means findings, 2 means it could not check.** A read that fails is reported
+as a finding, never absorbed into a pass — if the API returns 403, the tree
+comes back truncated, or an account is rate limited, it says so and exits
+non-zero. Zero accounts scanned exits 2. That separation exists because
+during the incident this came from, an exhausted API budget made three
+different code paths print "no indicators found" while reading nothing.
 
 **Zero pushable repos is a blind spot, not a pass.** An org that restricts
 OAuth apps caps the token at public read. Then `permissions.push` is false
