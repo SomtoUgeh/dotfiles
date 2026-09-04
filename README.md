@@ -306,7 +306,11 @@ What it finds on a remote, with no clone:
   one batch and `fa-solid-500.woff2` in another, while `fa-solid-900.woff2`
   is the genuine Font Awesome file — so the name proves nothing either way
 - whitespace padding and very long lines inside config file contents
-- a `postcss` or `tailwind` config above 3000 bytes — clean ones are under 200
+- a config file it could not read. Configs are fetched as blobs by sha, so
+  size is no limit, and a read that fails three times is reported rather than
+  skipped. There is deliberately no file-size check: an "over 3000 bytes"
+  heuristic lived here for a while and its only hit in practice was a real
+  Tailwind palette, so the content checks below carry that work instead
 - ghost commits: same email, but different author and committer names
 
 It runs every 4 hours from `templates/worm-guard-watch.plist.template`,
