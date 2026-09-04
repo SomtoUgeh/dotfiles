@@ -297,8 +297,14 @@ moved. Every call is a GET, so the script cannot change a repo.
 
 What it finds on a remote, with no clone:
 
-- a ref that moved, including a tip that moved backwards
-- `.vscode` folderOpen tasks and `fa-solid-500.woff2` in the tree listing
+- a ref that moved, including a tip that moved backwards. Every moved ref is
+  scanned, not just the default branch, and a plain fast-forward push counts.
+  A stale feature branch is already behind, so the worm does not need a
+  rewrite to move it — two of the four branches it hit arrived that way
+- `.vscode` folderOpen tasks in the tree listing, and fonts checked by magic
+  bytes rather than by name. The payload was called `fa-solid-400.woff2` in
+  one batch and `fa-solid-500.woff2` in another, while `fa-solid-900.woff2`
+  is the genuine Font Awesome file — so the name proves nothing either way
 - whitespace padding and very long lines inside config file contents
 - a `postcss` or `tailwind` config above 3000 bytes — clean ones are under 200
 - ghost commits: same email, but different author and committer names
