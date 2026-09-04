@@ -261,8 +261,13 @@ for acct in "${ACCOUNTS[@]}"; do
     # times during the incident this script came out of. Say it out loud.
     if [ -z "$repos" ]; then
       warn "$login can push to NOTHING this token can see — that is a blind spot, not a pass."
-      warn "  Likely cause: the org restricts OAuth apps, capping gh at public read."
-      warn "  Check: gh api repos/OWNER/REPO --jq .permissions"
+      warn "  Two causes look identical here, and they need different fixes:"
+      warn "    1. the account owns nothing and belongs to no org — check"
+      warn "       'gh api user --jq .public_repos' and 'gh api user/orgs'"
+      warn "    2. an org restricts OAuth apps or enforces SAML — that returns"
+      warn "       403 with an X-GitHub-SSO header, so check for it explicitly:"
+      warn "       gh api -i orgs/ORG/repos | grep -i x-github-sso"
+      warn "  A plain 200 with no SSO header and an empty repo list means (1)."
       warn "  Fix:   have an org owner approve the GitHub CLI app, or watch that org"
       warn "         through its own audit log and branch protection instead."
       continue
