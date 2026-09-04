@@ -320,12 +320,23 @@ for acct in "${ACCOUNTS[@]}"; do
       while IFS= read -r a; do warn "$full  pushes by another actor: $a"; done < <(printf '%s\n' "$others")
     fi
 
-    # Only scan refs that actually moved. Default branch always, every branch
-    # under --deep, because branch flattening points many refs at one commit.
+    # Scan every ref the fresh activity actually touched, plus the default
+    # branch. Scanning only the default branch was a real hole. On
+    # TalentQL/website the payload landed on dev, feature-update,
+    # feature-updates and old-website while main stayed clean, so a
+    # default-branch-only pass had nothing to find and said so. Two of those
+    # four also arrived by plain fast-forward push, not force push, because a
+    # stale feature branch is behind and does not need a rewrite — so reading
+    # only force_push events would have hidden half of it as well.
     if [ "$DEEP" = 1 ]; then
       refs=$(gh api "repos/$full/branches?per_page=100" --jq '.[].name' 2>/dev/null | head -"$MAX_BRANCHES")
     else
-      refs=$(gh api "repos/$full" --jq '.default_branch' 2>/dev/null)
+      # Deletions carry after=000000000 and there is nothing left to read.
+      moved=$(printf '%s\n' "$fresh" \
+              | awk -F'\t' '$2!="branch_deletion" && $6!="000000000" {print $3}' \
+              | grep '^refs/heads/' | sed 's|^refs/heads/||' | sort -u)
+      refs=$(printf '%s\n%s\n' "$moved" "$(gh api "repos/$full" --jq '.default_branch' 2>/dev/null)" \
+             | grep -v '^$' | sort -u | head -"$MAX_BRANCHES")
     fi
     for r in $refs; do
       scan_ref "$full" "$r"
