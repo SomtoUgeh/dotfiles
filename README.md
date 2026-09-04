@@ -244,18 +244,25 @@ Install from respective stores after browser setup.
 ## Security
 
 Defences against a repo you did not write. Prompted by a real git config
-injection worm, which hid a payload behind 50+ spaces in an interpreted config
-file and used `.vscode/tasks.json` with `runOn: folderOpen` to run it.
+injection worm, which hid a payload behind a long whitespace run in an
+interpreted config file and used `.vscode/tasks.json` with `runOn: folderOpen`
+to run it.
+
+Every live sample padded with **tabs**, not spaces — 273 of them. Every public
+scanner for this campaign matches ` {100,}`, spaces only, and misses all of
+them. The padding checks here use a whitespace class for that reason, and the
+long-line check does not care about padding at all.
 
 ### Scan before you open
 
 ```bash
-scan_repo.sh /path/to/untrusted-repo     # 14 checks
-scan_repo.sh --selftest                  # 12/12 must fire against a known sample
+scan_repo.sh /path/to/untrusted-repo     # 16 checks
+scan_repo.sh --selftest                  # 12/12 detectable groups must fire
 ```
 
 The checks cover the dropper (`.vscode` folderOpen tasks, a task running `node`
-against a `.woff2`, fake font magic bytes), the payload (50+ space padding,
+against a `.woff2`, fake font magic bytes), the payload (50+ whitespace padding,
+a padding-independent long-line check,
 `global.i="A8-3997-1"` and friends, Unicode-escaped `require`, `createRequire`
 prepended to ESM), the C2 endpoints, the worm's `.gitignore` edits including the
 line that hides itself, the malicious npm dependency, a leaked `gho_` OAuth
@@ -273,6 +280,38 @@ Run it before opening an unfamiliar repo in an editor.
 repositories had no local copy, and the local scanner said CLEAN every round —
 truthfully. The laptop was never infected. The GitHub repositories were.
 Enumerate from the GitHub API, not from disk.
+
+### Watch the remotes
+
+```bash
+watch_remotes.sh                      # every pushable repo, what moved since last run
+watch_remotes.sh --deep               # every branch tip, not just the default
+watch_remotes.sh --repo owner/name    # one repo
+watch_remotes.sh --repo R --ref SHA   # check one commit before you trust it
+watch_remotes.sh --selftest           # prove the patterns can still fail
+```
+
+This answers the question above. It lists your pushable repos from the API,
+saves the last sha it saw for each ref, and next run scans only the refs that
+moved. Every call is a GET, so the script cannot change a repo.
+
+What it finds on a remote, with no clone:
+
+- a ref that moved, including a tip that moved backwards
+- `.vscode` folderOpen tasks and `fa-solid-500.woff2` in the tree listing
+- whitespace padding and very long lines inside config file contents
+- a `postcss` or `tailwind` config above 3000 bytes — clean ones are under 200
+- ghost commits: same email, but different author and committer names
+
+It runs every 4 hours from `templates/worm-guard-watch.plist.template`,
+installed as a LaunchAgent so `gh` can read the login keychain. Log:
+`~/.local/state/worm-guard/watch.log`. Exit 1 means it found something.
+
+**Zero pushable repos is a blind spot, not a pass.** An org that restricts
+OAuth apps caps the token at public read. Then `permissions.push` is false
+everywhere and the loop checks nothing. The script prints that warning instead
+of a clean result, because during the incident a clean result meant zero files
+checked three times.
 
 ### Global pre-commit guard
 
