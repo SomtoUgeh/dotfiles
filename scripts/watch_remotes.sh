@@ -115,7 +115,10 @@ fi
 
 # -------------------------------------------------------------------- setup ---
 command -v gh >/dev/null || { red "gh is not installed (brew install gh)"; exit 2; }
+command -v jq >/dev/null || { red "jq is not installed (brew install jq)"; exit 2; }
 mkdir -p "$STATE_DIR"
+
+
 
 # One gh config dir per account, the same split shell/.zshrc drives by
 # directory. Listed explicitly rather than globbed so a stray dir cannot
@@ -128,10 +131,31 @@ done
 [ ${#ACCOUNTS[@]} -eq 0 ] && { red "no gh config dir found (looked for ~/.config/gh-{personal,work})"; exit 2; }
 
 # --------------------------------------------------------------- indicators ---
-# Tree-level: cheap, one call per ref. Catches the dropper and the fake font,
-# which is what the .vscode variant needs to run at all.
-tree_indicators() { # owner/repo ref -> prints findings, empty if clean
-  gh api "repos/$1/git/trees/$2?recursive=1" --jq '
+# Fetch the tree ONCE per ref, with retries, and prove the response really is
+# a tree before anyone reads it.
+#
+# Two bugs lived here. First, three separate functions each fetched this same
+# tree, so every ref cost three identical calls — that is what exhausted a
+# 5000/hour budget mid-scan. Second, each call ended in `2>/dev/null` and fed
+# jq directly, so a rate-limit 403 or a timeout produced an empty result that
+# was indistinguishable from "no indicators found". A scheduled run would
+# print a clean bill of health having read nothing at all. Never again: a read
+# that fails is a finding, not a pass.
+fetch_tree() { # owner/repo ref -> tree json on stdout, nonzero if unreadable
+  local j i
+  for i in 1 2 3; do
+    j=$(gh api "repos/$1/git/trees/$2?recursive=1" 2>/dev/null)
+    if [ -n "$j" ] && [ "$(printf '%s' "$j" | jq -r 'if (.tree|type)=="array" then "ok" else "no" end' 2>/dev/null)" = "ok" ]; then
+      printf '%s' "$j"; return 0
+    fi
+    sleep $((i * 3))
+  done
+  return 1
+}
+
+# Tree-level: reads the already-fetched tree, no network.
+tree_indicators() { # tree-json -> prints findings, empty if clean
+  printf '%s' "$1" | jq -r '
     [.tree[]? | select(.type=="blob")] as $t
     | [ ($t[] | select(.path|test("\\.vscode/tasks\\.json$"))       | "vscode-task  \(.path)"),
         ($t[] | select(.path|test("temp_auto_push|temp_interactive_push|branch_structure|truffleSecrets"))
@@ -149,9 +173,9 @@ tree_indicators() { # owner/repo ref -> prints findings, empty if clean
 # Content-level: only for the handful of paths worth reading. Padding uses a
 # whitespace CLASS, so tab padding is caught; the live samples used 273 tabs
 # and every space-only pattern in circulation missed them entirely.
-content_indicators() { # owner/repo ref
-  gh api "repos/$1/git/trees/$2?recursive=1" \
-    --jq '.tree[]? | select(.type=="blob")
+content_indicators() { # owner/repo ref tree-json
+  printf '%s' "$3" \
+  | jq -r '.tree[]? | select(.type=="blob")
           | select(.path|test("\\.config\\.(js|cjs|mjs|ts|mts)$|\\.gitignore$|\\.vscode/settings\\.json$"))
           | .path' 2>/dev/null \
   | while IFS= read -r p; do
@@ -183,9 +207,9 @@ content_indicators() { # owner/repo ref
 # Scoped to the Font Awesome naming space, not every font in the tree. A repo
 # can hold hundreds of fonts and this runs every 4 hours; verifying them all
 # would cost hundreds of blob fetches per pass to re-prove the same thing.
-font_indicators() { # owner/repo ref
-  gh api "repos/$1/git/trees/$2?recursive=1" \
-    --jq '.tree[]? | select(.type=="blob")
+font_indicators() { # owner/repo ref tree-json
+  printf '%s' "$3" \
+  | jq -r '.tree[]? | select(.type=="blob")
           | select(.path|test("fa-[a-z]+-[0-9]+\\.(woff2?|ttf|otf)$"))
           | "\(.sha) \(.size) \(.path)"' 2>/dev/null \
   | while read -r bsha bsize bpath; do
@@ -216,25 +240,70 @@ tip_fingerprint() { # owner/repo ref
 # discarded, and the script exits 0 with findings on screen — which silently
 # breaks the whole point of a scheduled run.
 scan_ref() { # owner/repo ref
-  local out l
-  out=$(tree_indicators "$1" "$2")
+  local out l tj
+  if ! tj=$(fetch_tree "$1" "$2"); then
+    note "$1 [$2] api-error    tree unreadable after 3 tries — this ref was NOT scanned"
+    warn "  a failed read is not a clean result. Check: gh api rate_limit --jq .resources.core"
+    return
+  fi
+  if [ "$(printf '%s' "$tj" | jq -r '.truncated // false' 2>/dev/null)" = "true" ]; then
+    note "$1 [$2] truncated    tree too large to list fully — this scan is PARTIAL"
+  fi
+  out=$(tree_indicators "$tj")
   if [ -n "$out" ]; then
     while IFS= read -r l; do note "$1 [$2] $l"; done < <(printf '%s\n' "$out")
   fi
-  out=$(content_indicators "$1" "$2")
+  out=$(content_indicators "$1" "$2" "$tj")
   if [ -n "$out" ]; then
     while IFS= read -r l; do note "$1 [$2] $l"; done < <(printf '%s\n' "$out")
   fi
-  out=$(font_indicators "$1" "$2")
+  out=$(font_indicators "$1" "$2" "$tj")
   if [ -n "$out" ]; then
     while IFS= read -r l; do note "$1 [$2] $l"; done < <(printf '%s\n' "$out")
   fi
 }
 
+ACCOUNTS_SCANNED=0
 for acct in "${ACCOUNTS[@]}"; do
   export GH_CONFIG_DIR="$HOME/.config/gh-$acct"
-  login=$(gh api user --jq '.login' 2>/dev/null) || {
-    warn "account '$acct' is not authenticated (gh auth login), skipping"; continue; }
+
+  # `gh api user` failing used to be reported as "not authenticated" and
+  # skipped. That is a misdiagnosis when the real cause is a 403 rate limit,
+  # and it mattered: the account was skipped, nothing was read, and the run
+  # still printed "no indicators" and exited 0. Read the error, name the
+  # cause, and count it as a finding either way.
+  # gh prints the error BODY to stdout, so a failed call still yields a
+  # non-empty $login full of JSON. Testing for emptiness is not enough —
+  # validate the shape. GitHub logins are 1-39 chars of alnum and hyphen.
+  uerr=$(gh api user --jq '.login' 2>&1 >/dev/null)
+  login=$(gh api user --jq '.login' 2>/dev/null | tr -d '\r' | head -1)
+  case "$login" in
+    *[!A-Za-z0-9-]*|"") login="" ;;
+  esac
+  if [ -z "$login" ]; then
+    case "$uerr" in
+      *"rate limit"*|*"403"*|*"secondary"*)
+        note "account '$acct' is RATE LIMITED — not scanned, and not clean"
+        warn "  check: gh api rate_limit --jq .resources.core ; re-run after reset" ;;
+      *)
+        note "account '$acct' unreadable: $(printf '%s' "$uerr" | head -1 | cut -c1-90)"
+        warn "  if logged out: gh auth login. Either way this account was NOT scanned." ;;
+    esac
+    continue
+  fi
+
+  # Budget floor for THIS account. The old check ran once, before the loop,
+  # against whichever account GH_CONFIG_DIR happened to point at — so a
+  # healthy work token masked an exhausted personal token.
+  rl=$(gh api rate_limit 2>/dev/null | jq -r '.resources.core.remaining // empty' 2>/dev/null)
+  if [ -n "$rl" ] && [ "$rl" -lt 200 ]; then
+    rs=$(gh api rate_limit 2>/dev/null | jq -r '.resources.core.reset // 0' 2>/dev/null)
+    note "account '$acct' ($login) has only $rl API calls left — not scanned, and not clean"
+    warn "  budget resets at $(date -r "$rs" -u +%H:%M:%SZ 2>/dev/null || echo "$rs"); re-run after that"
+    continue
+  fi
+
+  ACCOUNTS_SCANNED=$((ACCOUNTS_SCANNED+1))
   STATE="$STATE_DIR/watch-$acct.tsv"
   touch "$STATE"
 
@@ -362,8 +431,14 @@ if [ "$RESET" = 1 ]; then
   grn "state reset — current positions recorded, nothing reported"
   exit 0
 fi
+# Zero accounts scanned is not a pass. Every false-clean in this incident
+# traced back to a verdict printed over an empty check.
+if [ "$ACCOUNTS_SCANNED" -eq 0 ]; then
+  red "NO account was scanned — that is 'unknown', not 'clean'."
+  exit 2
+fi
 if [ "$findings" -eq 0 ]; then
-  grn "no new force pushes and no indicators on the refs checked"
+  grn "no new force pushes and no indicators ($ACCOUNTS_SCANNED account(s) actually scanned)"
   exit 0
 fi
 red "$findings indicator(s) found"
