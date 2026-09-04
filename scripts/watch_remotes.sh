@@ -153,6 +153,26 @@ fetch_tree() { # owner/repo ref -> tree json on stdout, nonzero if unreadable
   return 1
 }
 
+# Read a blob by its sha, and treat a failed read as a finding.
+#
+# This used the contents API by path, which refuses any blob over 1MB, and then
+# did `[ -z "$body" ] && continue`. Between them, a config the API would not
+# serve was skipped in silence and the ref still printed clean. The tree
+# already carries the sha and the size, so reading the blob costs nothing extra
+# and works up to 100MB.
+read_blob() { # owner/repo blob-sha -> decoded bytes on stdout, nonzero if unreadable
+  local j i
+  for i in 1 2 3; do
+    j=$(gh api "repos/$1/git/blobs/$2" 2>/dev/null)
+    if [ "$(printf '%s' "$j" | jq -r 'if .content!=null then "ok" else "no" end' 2>/dev/null)" = "ok" ]; then
+      printf '%s' "$j" | jq -r '.content' | base64 -d 2>/dev/null
+      return 0
+    fi
+    sleep $((i * 3))
+  done
+  return 1
+}
+
 # Tree-level: reads the already-fetched tree, no network.
 tree_indicators() { # tree-json -> prints findings, empty if clean
   printf '%s' "$1" | jq -r '
@@ -174,27 +194,36 @@ tree_indicators() { # tree-json -> prints findings, empty if clean
 # whitespace CLASS, so tab padding is caught; the live samples used 273 tabs
 # and every space-only pattern in circulation missed them entirely.
 content_indicators() { # owner/repo ref tree-json
-  printf '%s' "$3" \
-  | jq -r '.tree[]? | select(.type=="blob")
-          | select(.path|test("\\.config\\.(js|cjs|mjs|ts|mts)$|\\.gitignore$|\\.vscode/settings\\.json$"))
-          | .path' 2>/dev/null \
-  | while IFS= read -r p; do
-      body=$(gh api "repos/$1/contents/$p?ref=$2" --jq '.content' 2>/dev/null | base64 -d 2>/dev/null)
+  local csha csize cpath body
+  while IFS=$'\t' read -r csha csize cpath; do
+      [ -z "$cpath" ] && continue
+      if ! body=$(read_blob "$1" "$csha"); then
+        echo "api-error    $cpath — blob unreadable after 3 tries, this file was NOT checked"
+        continue
+      fi
+      # An empty decode is only trustworthy when the blob is genuinely empty.
+      if [ -z "$body" ] && [ "$csize" != "0" ]; then
+        echo "api-error    $cpath — decoded empty but size is ${csize}B, this file was NOT checked"
+        continue
+      fi
       [ -z "$body" ] && continue
       printf '%s' "$body" | grep -qE '[[:space:]]{50,}[^[:space:]]' \
-        && echo "padding      $p — code hidden after 50+ whitespace chars"
+        && echo "padding      $cpath — code hidden after 50+ whitespace chars"
       printf '%s' "$body" | awk 'length($0)>2000{exit 1}' \
-        || echo "long-line    $p — single line over 2000 chars"
+        || echo "long-line    $cpath — single line over 2000 chars"
       printf '%s' "$body" | grep -qE 'createRequire\(import\.meta\.url\)' \
-        && case "$p" in *.mjs|*.mts) echo "createRequire $p — CJS shim prepended to an ESM config" ;; esac
+        && case "$cpath" in *.mjs|*.mts) echo "createRequire $cpath — CJS shim prepended to an ESM config" ;; esac
       printf '%s' "$body" | grep -qE 'branch_structure\.json|temp_auto_push\.bat|temp_interactive_push\.bat' \
-        && echo "worm-ignore  $p — hides the worm's own push scripts"
-      case "$p" in
+        && echo "worm-ignore  $cpath — hides the worm's own push scripts"
+      case "$cpath" in
         *.vscode/settings.json)
           printf '%s' "$body" | grep -qE '"task\.allowAutomaticTasks"[[:space:]]*:[[:space:]]*true' \
-            && echo "auto-task    $p — allowAutomaticTasks:true enables the folderOpen dropper" ;;
+            && echo "auto-task    $cpath — allowAutomaticTasks:true enables the folderOpen dropper" ;;
       esac
-    done
+  done < <(printf '%s' "$3" \
+    | jq -r '.tree[]? | select(.type=="blob")
+            | select(.path|test("\\.config\\.(js|cjs|mjs|ts|mts)$|\\.gitignore$|\\.vscode/settings\\.json$"))
+            | "\(.sha)\t\(.size)\t\(.path)"' 2>/dev/null)
 }
 
 # Font Awesome legitimately ships fa-solid-900.woff2, so matching the name
@@ -213,8 +242,7 @@ font_indicators() { # owner/repo ref tree-json
           | select(.path|test("fa-[a-z]+-[0-9]+\\.(woff2?|ttf|otf)$"))
           | "\(.sha) \(.size) \(.path)"' 2>/dev/null \
   | while read -r bsha bsize bpath; do
-      magic=$(gh api "repos/$1/git/blobs/$bsha" --jq '.content' 2>/dev/null \
-              | base64 -d 2>/dev/null | head -c4 | od -An -tx1 | tr -d ' \n')
+      magic=$(read_blob "$1" "$bsha" | head -c4 | od -An -tx1 | tr -d ' \n')
       case "$magic" in
         774f4632|774f4646|00010000|4f54544f|74727565|74746366) : ;;
         "") echo "font-unread  $bpath — blob unreadable, check this one by hand" ;;
