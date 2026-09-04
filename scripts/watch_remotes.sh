@@ -134,7 +134,6 @@ tree_indicators() { # owner/repo ref -> prints findings, empty if clean
   gh api "repos/$1/git/trees/$2?recursive=1" --jq '
     [.tree[]? | select(.type=="blob")] as $t
     | [ ($t[] | select(.path|test("\\.vscode/tasks\\.json$"))       | "vscode-task  \(.path)"),
-        ($t[] | select(.path|test("fa-solid-[0-9]+\\.woff2$"))      | "odd-font     \(.path) (\(.size)B)"),
         ($t[] | select(.path|test("temp_auto_push|temp_interactive_push|branch_structure|truffleSecrets"))
                                                                      | "worm-artifact \(.path)"),
         # Scoped to postcss/tailwind on purpose. Those are 69-200 bytes in every
@@ -173,6 +172,32 @@ content_indicators() { # owner/repo ref
     done
 }
 
+# Font Awesome legitimately ships fa-solid-900.woff2, so matching the name
+# alone fires on every healthy repo that uses the library — it did, on
+# TalentQL/website, and cost a round of triage. The live payloads were named
+# fa-solid-400.woff2 and fa-solid-500.woff2 in different batches, so the name
+# is not the signal in either direction. Read the first four bytes instead.
+# The payload began 09090909, four tab characters, which no font format uses.
+#
+# Scoped to the Font Awesome naming space, not every font in the tree. A repo
+# can hold hundreds of fonts and this runs every 4 hours; verifying them all
+# would cost hundreds of blob fetches per pass to re-prove the same thing.
+font_indicators() { # owner/repo ref
+  gh api "repos/$1/git/trees/$2?recursive=1" \
+    --jq '.tree[]? | select(.type=="blob")
+          | select(.path|test("fa-[a-z]+-[0-9]+\\.(woff2?|ttf|otf)$"))
+          | "\(.sha) \(.size) \(.path)"' 2>/dev/null \
+  | while read -r bsha bsize bpath; do
+      magic=$(gh api "repos/$1/git/blobs/$bsha" --jq '.content' 2>/dev/null \
+              | base64 -d 2>/dev/null | head -c4 | od -An -tx1 | tr -d ' \n')
+      case "$magic" in
+        774f4632|774f4646|00010000|4f54544f|74727565|74746366) : ;;
+        "") echo "font-unread  $bpath — blob unreadable, check this one by hand" ;;
+        *)  echo "fake-font    $bpath (${bsize}B, magic=$magic) — not a font, this is the payload" ;;
+      esac
+    done
+}
+
 # A rewritten tip keeps the author date and loses the committer identity: the
 # name shortens to the GitHub profile display name and the offset becomes the
 # server's. Same email, different name, different offset.
@@ -196,6 +221,10 @@ scan_ref() { # owner/repo ref
     while IFS= read -r l; do note "$1 [$2] $l"; done < <(printf '%s\n' "$out")
   fi
   out=$(content_indicators "$1" "$2")
+  if [ -n "$out" ]; then
+    while IFS= read -r l; do note "$1 [$2] $l"; done < <(printf '%s\n' "$out")
+  fi
+  out=$(font_indicators "$1" "$2")
   if [ -n "$out" ]; then
     while IFS= read -r l; do note "$1 [$2] $l"; done < <(printf '%s\n' "$out")
   fi
