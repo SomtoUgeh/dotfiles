@@ -136,12 +136,13 @@ tree_indicators() { # owner/repo ref -> prints findings, empty if clean
     | [ ($t[] | select(.path|test("\\.vscode/tasks\\.json$"))       | "vscode-task  \(.path)"),
         ($t[] | select(.path|test("temp_auto_push|temp_interactive_push|branch_structure|truffleSecrets"))
                                                                      | "worm-artifact \(.path)"),
-        # Scoped to postcss/tailwind on purpose. Those are 69-200 bytes in every
-        # clean repo checked, so 3000 is a screaming outlier. vite, vitest and
-        # oxlint configs are legitimately 5-8KB — including them made this fire
-        # on four healthy files and told you nothing.
-        ($t[] | select((.path|test("(postcss|tailwind)\\.config\\.")) and .size>3000)
-                                                                     | "big-config   \(.path) (\(.size)B, clean ones are under 200B)")
+        # No size heuristic here. It was scoped to postcss/tailwind on the
+        # theory that clean ones are 69-200 bytes, but Greenbaq/green-app has
+        # a legitimate 3061-byte tailwind config — 125 lines, longest line 78
+        # chars, no padding — and it fired on that. The check was redundant
+        # anyway: content_indicators reads every *.config.{js,cjs,mjs,ts,mts}
+        # and tests it for padding and long lines directly, which is what
+        # actually distinguishes a payload from a big palette.
       ] | .[]' 2>/dev/null
 }
 
