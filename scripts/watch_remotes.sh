@@ -207,12 +207,29 @@ content_indicators() { # owner/repo ref tree-json
         continue
       fi
       [ -z "$body" ] && continue
-      printf '%s' "$body" | grep -qE '[[:space:]]{50,}[^[:space:]]' \
-        && echo "padding      $cpath — code hidden after 50+ whitespace chars"
-      printf '%s' "$body" | awk 'length($0)>2000{exit 1}' \
-        || echo "long-line    $cpath — single line over 2000 chars"
+      # Two bars, because the two file classes carry different noise.
+      #
+      # Configs: padding alone and a long line alone are each suspicious, and
+      # neither gave a false positive on real data.
+      #
+      # Source files: both signals fire on innocent code. Deep JSX indentation
+      # gives a 50-char whitespace run on a 260-char line, and an inlined SVG
+      # gives a 43318-char line with no padding — longer than the 31326-char
+      # payload, so length alone cannot separate them. Requiring BOTH on one
+      # line separated every observed case: 4 payloads caught, 5 innocent
+      # files cleared.
+      case "$cpath" in
+        *.config.js|*.config.cjs|*.config.mjs|*.config.ts|*.config.mts|*.gitignore|*.vscode/settings.json)
+          printf '%s' "$body" | grep -qE '[[:space:]]{50,}[^[:space:]]' \
+            && echo "padding      $cpath — code hidden after 50+ whitespace chars"
+          printf '%s' "$body" | awk 'length($0)>2000{exit 1}' \
+            || echo "long-line    $cpath — single line over 2000 chars" ;;
+        *)
+          printf '%s' "$body" | awk 'length($0)>2000' | grep -qE '[[:space:]]{50,}[^[:space:]]' \
+            && echo "padding      $cpath — 2000+ char line with a 50+ whitespace run" ;;
+      esac
       printf '%s' "$body" | grep -qE 'createRequire\(import\.meta\.url\)' \
-        && case "$cpath" in *.mjs|*.mts) echo "createRequire $cpath — CJS shim prepended to an ESM config" ;; esac
+        && echo "createRequire $cpath — CJS require shim in an ESM file"
       printf '%s' "$body" | grep -qE 'branch_structure\.json|temp_auto_push\.bat|temp_interactive_push\.bat' \
         && echo "worm-ignore  $cpath — hides the worm's own push scripts"
       case "$cpath" in
@@ -222,7 +239,8 @@ content_indicators() { # owner/repo ref tree-json
       esac
   done < <(printf '%s' "$3" \
     | jq -r '.tree[]? | select(.type=="blob")
-            | select(.path|test("\\.config\\.(js|cjs|mjs|ts|mts)$|\\.gitignore$|\\.vscode/settings\\.json$"))
+            | select( (.path|test("\\.config\\.(js|cjs|mjs|ts|mts)$|\\.gitignore$|\\.vscode/settings\\.json$"))
+                      or ((.path|test("\\.(js|jsx|mjs|cjs|ts|tsx|mts|cts)$")) and (.size >= 20000)) )
             | "\(.sha)\t\(.size)\t\(.path)"' 2>/dev/null)
 }
 
