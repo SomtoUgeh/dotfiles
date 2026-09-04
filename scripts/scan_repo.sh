@@ -23,9 +23,20 @@ hdr() { printf '\n\033[1m%s\033[0m\n' "$1"; }
 
 EXCL=(--exclude-dir=.git --exclude-dir=node_modules --exclude-dir=.venv)
 CODE=(--include='*.js' --include='*.cjs' --include='*.mjs' --include='*.ts'
-      --include='*.tsx' --include='*.jsx' --include='*.json' --include='*.jsonc'
+      --include='*.tsx' --include='*.jsx' --include='*.mts' --include='*.cts'
+      --include='*.vue' --include='*.svelte' --include='*.astro' --include='*.php'
+      --include='*.json' --include='*.jsonc'
       --include='*.sh' --include='*.zsh' --include='*.bash' --include='*.py'
       --include='*.rb' --include='*.yml' --include='*.yaml' --include='*.toml')
+
+# grep -r prints "path:lineno:content". The old filter tested the WHOLE line for
+# a comment marker, so any payload containing "://" was silently dropped. This
+# tests only the content field, anchored at its start.
+drop_comment_lines() {
+  awk '{ i=index($0,":"); r=substr($0,i+1); j=index(r,":"); c=substr(r,j+1)
+         if (c ~ /^[[:space:]]*(#|\/\/|\*|\/\*)/) next
+         print }'
+}
 
 # Drop matches coming from files that carry the opt-out marker. A detector
 # necessarily contains the strings it detects; without this the scanner reports
@@ -63,10 +74,27 @@ scan() {
   if [ -n "$m" ]; then red "  !! campaign/bootstrap marker:"; printf '    %s\n' "$m"; findings=$((findings+1))
   else grn "  none"; fi
 
-  hdr "3. Payload hidden after 50+ spaces (interpreted files only)"
-  m=$(grep -rInE ' {50,}[^[:space:]]' "$DIR" "${CODE[@]}" "${EXCL[@]}" 2>/dev/null | grep -vE ':[[:space:]]*(#|//|\*)' | drop_marked | head -20)
+  hdr "3. Payload hidden after 50+ whitespace chars, space OR tab (interpreted files only)"
+  m=$(grep -rInE '[[:space:]]{50,}[^[:space:]]' "$DIR" "${CODE[@]}" "${EXCL[@]}" 2>/dev/null | drop_comment_lines | drop_marked | head -20)
   if [ -n "$m" ]; then red "  !! long-whitespace padding in code:"; printf '    %s\n' "$m"; findings=$((findings+1))
   else grn "  none in code/config files"; fi
+
+  hdr "3b. Very long single line in code (padding-independent)"
+  # awk, not grep: BSD grep rejects an interval over 255 ("maximum repetition
+  # exceeds 255") and the old 2>/dev/null turned that error into a clean result.
+  m=$(find "$DIR" \( -name .git -o -name node_modules -o -name .venv \) -prune -o -type f \
+        \( -name '*.js' -o -name '*.cjs' -o -name '*.mjs' -o -name '*.mts' -o -name '*.cts' \
+        -o -name '*.ts' -o -name '*.tsx' -o -name '*.jsx' -o -name '*.vue' -o -name '*.svelte' \
+        -o -name '*.astro' -o -name '*.php' -o -name '*.json' -o -name '*.jsonc' \) -print 2>/dev/null \
+      | while IFS= read -r f; do
+          case "$f" in
+            *.min.*|*-lock.json|*/yarn.lock|*/pnpm-lock.yaml|*.bundle.*|*.map) continue ;;
+          esac
+          grep -q 'worm-guard:allow-signatures' "$f" 2>/dev/null && continue
+          awk -v F="$f" 'length($0)>2000 { printf "%s:%d: single line of %d chars\n", F, NR, length($0); exit }' "$f"
+        done | head -10)
+  if [ -n "$m" ]; then red "  !! line over 2000 chars — catches any padding variant:"; printf '    %s\n' "$m"; findings=$((findings+1))
+  else grn "  none"; fi
 
   hdr "4. Unicode-escaped requires (defeats naive grep)"
   m=$(grep -rInE 'require\([^)]*\\u00[0-9a-fA-F]{2}' "$DIR" "${CODE[@]}" "${EXCL[@]}" 2>/dev/null | drop_marked | head -10)

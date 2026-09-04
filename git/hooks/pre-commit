@@ -18,6 +18,9 @@ ylw() { printf '\033[1;33m%s\033[0m\n' "$1" >&2; }
 
 bad=0
 note() { red "  [$1] $2"; bad=1; }
+# Non-blocking. A very long line is a padding-independent payload signal: the
+# real config upstream is 2.5 KB, the infected one carried a 34,696-char line.
+warn() { ylw "  [$1] $2"; }
 
 # IOC fragments, joined at use. Spelling an indicator out in full here makes
 # other people's scanners report this guard as a hit. Detection is unchanged.
@@ -39,9 +42,15 @@ while IFS= read -r f; do
   printf '%s' "$content" | grep -q 'worm-guard:allow-signatures' && continue
 
   case "$f" in
-    *.js|*.cjs|*.mjs|*.ts|*.tsx|*.jsx|*.json|*.jsonc|*.sh|*.zsh|*.bash|*.py|*.rb|*.yml|*.yaml|*.toml)
-      printf '%s' "$content" | grep -vE '^[[:space:]]*(#|//|\*|/\*)' | grep -qE ' {50,}[^[:space:]]' \
-        && note "padding" "$f — payload hidden after 50+ spaces"
+    *.js|*.cjs|*.mjs|*.mts|*.cts|*.ts|*.tsx|*.jsx|*.vue|*.svelte|*.astro|*.php|*.json|*.jsonc|*.sh|*.zsh|*.bash|*.py|*.rb|*.yml|*.yaml|*.toml)
+      printf '%s' "$content" | grep -vE '^[[:space:]]*(#|//|\*|/\*)' | grep -qE '[[:space:]]{50,}[^[:space:]]' \
+        && note "padding" "$f — payload hidden after 50+ whitespace chars (space OR tab)"
+
+      case "$f" in
+        *.min.*|*-lock.json|package-lock.json|yarn.lock|pnpm-lock.yaml|*.bundle.*|*.map) ;;
+        *) printf '%s' "$content" | awk 'length($0)>2000{exit 1}' \
+             || warn "long-line" "$f — line over 2000 chars; scroll right before trusting it" ;;
+      esac
       printf '%s' "$content" | grep -qE "global\[['\"](!|_V|_t_t)['\"]\]|global\.i[[:space:]]*=|global\.r[[:space:]]*=[[:space:]]*require|A8-3997-1" \
         && note "marker" "$f — worm bootstrap / campaign marker"
       printf '%s' "$content" | grep -qE 'require\([^)]*\\u00[0-9a-fA-F]{2}' \
