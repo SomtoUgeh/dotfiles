@@ -46,7 +46,7 @@ class DetectorTests(unittest.TestCase):
             ("padding", "x" + " " * 50 + "payload"),
             ("escaped-require", r'require("\u0068ttp")'),
             ("font-command", "node ./assets/font.woff2"),
-            ("bootstrap", "global.r = require"),
+            ("bootstrap-pattern", "global.r = require"),
         ]
         for group, value in cases:
             with self.subTest(group=group):
@@ -54,6 +54,22 @@ class DetectorTests(unittest.TestCase):
         self.assertNotIn("padding", scan("//" + " " * 80 + "comment"))
         self.assertNotIn("escaped-require", scan(r'require(foo) "\u0068"'))
         self.assertNotIn("font-command", scan("node file.js\nasset.woff2"))
+
+    def test_campaign_and_generic_matches_remain_distinct(self):
+        generic = scan("global.i = value; trongrid.io; node ordinary text .woff2")
+        self.assertTrue({"bootstrap-pattern", "blockchain-rpc", "font-command"} <= generic.keys())
+        self.assertFalse(patterns.CAMPAIGN_GROUPS.intersection(generic))
+        exact = scan("A8-3997-1; 166.88.54.158")
+        self.assertEqual(patterns.CAMPAIGN_GROUPS.intersection(exact), {"bootstrap", "network-ioc"})
+        mixed = scan("global.r=require; A8-5657-1; trongrid.io; 166.88.54.158")
+        self.assertTrue({"bootstrap", "bootstrap-pattern", "network-ioc", "blockchain-rpc"} <= mixed.keys())
+
+    def test_cheap_prefilters_preserve_unicode_and_multiline_matches(self):
+        self.assertIn("font-command", scan("node asset.woff2"))
+        self.assertIn("escaped-require", scan(r'requıre("\u0068")'))
+        self.assertIn("escaped-bootstrap", scan(r"\u0068\u0074\u0074\u0070" + "\n" + r"\u0063\u0068\u0069\u006c\u0064"))
+        self.assertNotIn("font-command", scan("node asset_woff2"))
+        self.assertNotIn("escaped-require", scan("require('plain')"))
 
     def test_equivalent_to_original_patterns(self):
         originals = {

@@ -275,6 +275,9 @@ People without these dotfiles can download and run just the scanner:
 
 # One branch, tag or commit
 (set -o pipefail; curl -fsSL https://raw.githubusercontent.com/SomtoUgeh/dotfiles/main/scripts/scan.sh | bash -s -- repo OWNER/REPO --ref main)
+
+# Also read untracked build caches and show more review locations
+(set -o pipefail; curl -fsSL https://raw.githubusercontent.com/SomtoUgeh/dotfiles/main/scripts/scan.sh | bash -s -- local /path/to/repo --include-generated --details)
 ```
 
 Run these from a trusted terminal. The downloaded script is executable code
@@ -315,11 +318,24 @@ scanner uses GitHub GET requests, verifies blob hashes and sizes, and never
 clones or executes the repository. Both use the same detection rules.
 
 Local scans print a start message immediately and progress every five seconds,
-including the current phase and file. Large build output is still inspected;
-it is not silently skipped to speed up a scan. Ctrl+C reports an interrupted,
-incomplete scan without a Python traceback.
+including the current phase and file. By default, untracked files under `.next`,
+`.nuxt`, `.svelte-kit`, `.turbo`, and `.parcel-cache` are outside the scan scope;
+the report lists the excluded directories. Tracked paths, locally stored Git
+objects, and nested repositories are still inspected. Arbitrary `.gitignore`
+entries do not exclude source files. Use `--include-generated` to read those
+build caches too; oversized or changing files can make that scan incomplete.
+Dependency exclusions still apply. Ctrl+C reports an interrupted, incomplete
+scan without a Python traceback.
 
-Exit codes: **0 = requested checks completed without findings; 1 = findings;
+The local report starts with campaign matches, review signals, and inspection
+errors as separate counts. Exact campaign markers are distinguished from generic
+patterns such as long lines, public blockchain endpoints, and active Git hooks.
+Neither category proves execution or infection. Review groups show three example
+locations by default; `--details` shows up to 20 per group. Counts include all
+matches, even when the list is capped. These options also work directly with
+`scan_repo.sh /path/to/repo --include-generated --details`.
+
+Exit codes: **0 = requested checks completed without findings; 1 = campaign matches or review signals;
 2 = incomplete.** A signature match needs investigation; it does not prove
 execution or machine compromise. An incomplete scan is not a clean verdict.
 Even a completed scan covers known indicators within its stated scope, not
@@ -340,6 +356,7 @@ Scanner changes can be checked offline from this checkout:
 ./tests/test_scanner_install.sh
 uv run --no-project python tests/test_worm_guard_patterns.py
 uv run --no-project python tests/test_scan_progress.py
+uv run --no-project python tests/test_scan_scope.py
 ```
 
 ### Manual inventory scans

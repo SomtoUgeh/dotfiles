@@ -53,7 +53,7 @@ run_case() {
   shift 2
   mkdir -p "$fixture" || exit 2
   "$@" "$fixture" || exit 2
-  /bin/bash "$SCANNER" "$fixture" > "$output" 2>&1
+  /bin/bash "$SCANNER" "$fixture" --details > "$output" 2>&1
   rc=$?
   tests=$((tests + 1))
   if [ "$rc" -ne "$expected" ]; then
@@ -541,7 +541,7 @@ for extension in woff2 woff ttf otf eot; do
   grep -q "tiny-source-renamed.$extension" "$TEST_ROOT/bad-fonts.out" \
     || fail "invalid .$extension file was missed"
 done
-grep -q 'node executes a file with a font extension' "$TEST_ROOT/font-command.out" \
+grep -q 'node command text and a font extension occur on the same line' "$TEST_ROOT/font-command.out" \
   || fail 'task executing a non-WOFF font was missed'
 grep -q '50 or more whitespace characters before content' "$TEST_ROOT/padding.out" \
   || fail 'known whitespace-padding shape was missed'
@@ -549,7 +549,7 @@ grep -q 'SENSITIVE_PADDING_PAYLOAD' "$TEST_ROOT/padding.out" \
   && fail 'padding finding leaked matched source'
 grep -q 'Inspection incomplete' "$TEST_ROOT/broken-read.out" \
   || fail 'read failure did not produce an incomplete result'
-grep -q 'indicator(s) were also found' "$TEST_ROOT/broken-read.out" \
+grep -q 'Campaign matches: [1-9]' "$TEST_ROOT/broken-read.out" \
   || fail 'read failure did not retain the independently detected finding'
 if grep -q 'AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHHIIII\|trongrid[.]io\|fetch(' "$TEST_ROOT/redacted-secret.out"; then
   fail 'scanner output leaked matched source or token material'

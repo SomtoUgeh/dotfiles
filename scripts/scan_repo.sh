@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 #
-# scan_repo.sh [dir]          scan a local tree for known git-worm indicators
+# scan_repo.sh [dir] [--include-generated] [--details]
 # scan_repo.sh --selftest     run one inert smoke test in a temporary directory
 #
-# Exit codes: 0 checked and clean, 1 indicators found, 2 inspection incomplete.
+# Exit codes: 0 no findings in scope, 1 matches/review signals, 2 incomplete.
+# Default excludes untracked build caches; --include-generated reads them too.
+# --details shows up to 20 locations per group (default: 3 review examples).
 #
 # Scans readable files, Git metadata, and stored blobs in discovered repositories.
 # Missing history/objects or unreadable data make inspection incomplete. This is
@@ -33,7 +35,7 @@ run_scan() {
   script_dir=$WORM_GUARD_SCRIPT_DIR
   script_path="$script_dir/scan_repo.sh"
   worm_guard_runtime || return 2
-  worm_guard_python - "$target" "$script_path" <<'PY'
+  worm_guard_python - "$target" "$script_path" "${2:-0}" "${3:-0}" <<'PY'
 import json
 import importlib.util
 import os
@@ -58,26 +60,29 @@ scan_text = patterns.scan_text
 MAX_TEXT_BYTES = 64 * 1024 * 1024
 GIT_TIMEOUT_SECONDS = 300
 SKIP_UNTRACKED_DIRS = {"node_modules", ".venv"}
+GENERATED_DIRS = {".next", ".nuxt", ".svelte-kit", ".turbo", ".parcel-cache"}
 GROUPS = (
     ("artifact", "Propagation artifact names"),
     ("artifact-path", "Propagation artifact filenames"),
     ("escaped-bootstrap", "Escaped bootstrap modules"),
-    ("auto-run", "1. VS Code auto-run configuration"),
-    ("bootstrap", "2. Campaign/bootstrap markers"),
-    ("padding", "3. Long whitespace padding in text"),
-    ("long-line", "3b. Very long single line in text"),
-    ("escaped-require", "4. Unicode-escaped require"),
-    ("network-ioc", "5. C2, wallet, or XOR-key indicator"),
-    ("fake-font", "6. Invalid font signature"),
-    ("gitignore", "7. Worm .gitignore entries"),
-    ("font-command", "9. Task executes a font file"),
-    ("commit-tamper", "9b. Commit-tamper script"),
-    ("package", "10. Known malicious npm dependency"),
-    ("take-home", "11. Weaponized take-home marker"),
-    ("oauth-token", "12. GitHub OAuth token"),
-    ("timezone", "13. Local history timezone mismatch"),
-    ("dropper-blob", "14. Known dropper blob in local history"),
-    ("git-command", "15. Git hooks and command-bearing configuration (review required)"),
+    ("auto-run", "VS Code auto-run configuration"),
+    ("bootstrap", "Campaign markers"),
+    ("bootstrap-pattern", "Global assignment patterns"),
+    ("padding", "Long whitespace padding in text"),
+    ("long-line", "Very long single line in text"),
+    ("escaped-require", "Unicode-escaped require"),
+    ("network-ioc", "Campaign host, wallet, or XOR-key indicator"),
+    ("blockchain-rpc", "Public blockchain RPC endpoints"),
+    ("fake-font", "Invalid font signature"),
+    ("gitignore", "Self-hiding or helper .gitignore entries"),
+    ("font-command", "Node command and font extension on the same line"),
+    ("commit-tamper", "Commit-tamper script marker"),
+    ("package", "Known malicious npm dependency"),
+    ("take-home", "Weaponized take-home marker"),
+    ("oauth-token", "GitHub OAuth token-shaped secret"),
+    ("timezone", "Local history timezone mismatch"),
+    ("dropper-blob", "Known dropper blob prefix in local history"),
+    ("git-command", "Git hooks and command-bearing configuration"),
 )
 
 
@@ -90,9 +95,12 @@ def display_path(root, path):
 
 
 class Scanner:
-    def __init__(self, root, scanner_path):
+    def __init__(self, root, scanner_path, include_generated=False, details=False):
         self.root = root
         self.scanner_path = scanner_path
+        self.include_generated = include_generated
+        self.details = details
+        self.excluded_generated_dirs = []
         self.findings = {key: [] for key, _ in GROUPS}
         self.finding_counts = {key: 0 for key, _ in GROUPS}
         self.errors = []
@@ -280,6 +288,12 @@ def filesystem_files(scanner):
                 scanner.error(path, "path metadata could not be read")
                 continue
             if stat.S_ISDIR(mode):
+                if entry.name in GENERATED_DIRS and not scanner.include_generated:
+                    scanner.excluded_generated_dirs.append(path)
+                    # Still discover nested repositories. Their index entries
+                    # and stored objects are added independently of this walk.
+                    visit(path, include_files=False)
+                    continue
                 if entry.name in SKIP_UNTRACKED_DIRS:
                     scanner.skipped_dependency_dirs += 1
                     # Discover repositories even in excluded dependency trees;
@@ -769,6 +783,20 @@ def print_item(scanner, item):
 
 def render(scanner, history_checked):
     print("\033[1mScanning: " + json.dumps(str(scanner.root), ensure_ascii=True) + "\033[0m")
+    campaign = sum(count for key, count in scanner.finding_counts.items() if key in patterns.CAMPAIGN_GROUPS)
+    total = sum(scanner.finding_counts.values())
+    review = total - campaign
+    print("Campaign matches: " + str(campaign) + "; Review signals: " + str(review)
+          + "; Inspection errors: " + str(scanner.error_count))
+    if scanner.error_count:
+        print("Inspection incomplete; " + str(scanner.error_count) + " error(s).")
+    elif campaign:
+        print("Campaign signatures matched; investigate the locations below.")
+    elif review:
+        print("No campaign signatures matched. Review signals alone do not establish infection.")
+    else:
+        print("No known worm indicators found in the files inspected.")
+    print("Matches do not establish execution or infection. This is a check of the stated scope, not all malware.")
     print(
         "Coverage: files=" + str(scanner.files_inspected)
         + " text=" + str(scanner.text_files)
@@ -786,23 +814,34 @@ def render(scanner, history_checked):
     else:
         print("Git history was not checked: no repositories were discovered.")
     print("Scope: dependency directories are excluded unless tracked; remote-only/pruned objects and configuration includes are not inspected.")
-    for key, title in GROUPS:
-        if key == "font-command":
-            print("\n\033[1m8. createRequire context\033[0m")
-            if scanner.advisories:
-                print("\033[1;33m  advisory only; createRequire is legitimate without a correlated indicator\033[0m")
-                for item in scanner.advisories:
-                    print_item(scanner, item)
-            else:
-                print("\033[0;32m  none\033[0m")
-        print("\n\033[1m" + title + "\033[0m")
-        items = scanner.findings[key]
-        if items:
-            print("\033[0;31m  !! " + str(scanner.finding_counts[key]) + " indicator(s)\033[0m")
+    print("Generated directories excluded: " + str(len(scanner.excluded_generated_dirs)))
+    for path in scanner.excluded_generated_dirs:
+        print("    path=" + display_path(scanner.root, path))
+    if not scanner.include_generated:
+        print("Build-cache scope: untracked files under " + ", ".join(sorted(GENERATED_DIRS))
+              + " are excluded. Tracked paths and stored Git objects remain inspected.")
+        print("Use --include-generated to inspect those files; large or changing build outputs may be incomplete.")
+    for is_campaign, heading in ((True, "Campaign match locations"), (False, "Review signals (not proof of infection)")):
+        groups = [(key, title) for key, title in GROUPS
+                  if (key in patterns.CAMPAIGN_GROUPS) == is_campaign and scanner.finding_counts[key]]
+        if not groups:
+            continue
+        print("\n" + heading)
+        for key, title in groups:
+            count = scanner.finding_counts[key]
+            print("  " + title + ": " + str(count))
+            limit = 20 if scanner.details or is_campaign else 3
+            items = scanner.findings[key][:limit]
             for item in items:
                 print_item(scanner, item)
-        else:
-            print("\033[0;32m  none\033[0m")
+            if count > len(items):
+                print("    " + str(count - len(items)) + " more location(s); "
+                      + ("report capped at 20 per group" if scanner.details else "use --details for up to 20 per group"))
+    if scanner.advisories:
+        print("\ncreateRequire: advisory only; createRequire is legitimate without a correlated indicator")
+        if scanner.details:
+            for item in scanner.advisories:
+                print_item(scanner, item)
     if scanner.errors:
         print("\n\033[1mInspection errors\033[0m")
         for path, reason in scanner.errors:
@@ -810,23 +849,15 @@ def render(scanner, history_checked):
         if scanner.error_count > len(scanner.errors):
             print("    " + str(scanner.error_count - len(scanner.errors)) + " additional error(s) omitted")
 
-    total = sum(scanner.finding_counts.values())
-    print("\n\033[1mResult\033[0m")
-    if scanner.errors:
-        print("\033[0;31m  Inspection incomplete; " + str(scanner.error_count) + " error(s).\033[0m")
-        if total:
-            print("\033[0;31m  " + str(total) + " indicator(s) were also found.\033[0m")
+    if scanner.error_count:
         return 20
     if total:
-        print("\033[0;31m  " + str(total) + " indicator(s) found. Review before opening in an editor.\033[0m")
         return 10
-    print("\033[0;32m  No known worm indicators found in the files inspected.\033[0m")
-    print("\033[1;33m  This result does not establish that the Mac or any remote repository is clean.\033[0m")
     return 0
 
 
 def main():
-    if len(sys.argv) != 3:
+    if len(sys.argv) != 5:
         print("inspection incomplete: invalid scanner invocation", file=sys.stderr)
         return 20
     try:
@@ -838,7 +869,7 @@ def main():
     if not root.is_dir() or not scanner_path.is_file():
         print("inspection incomplete: invalid scanner path", file=sys.stderr)
         return 20
-    scanner = Scanner(root, scanner_path)
+    scanner = Scanner(root, scanner_path, sys.argv[3] == "1", sys.argv[4] == "1")
     try:
         scanner.start_progress()
         paths = filesystem_files(scanner)
@@ -897,8 +928,22 @@ selftest() {
   return "$result"
 }
 
-case "${1:---help}" in
-  --selftest) selftest ;;
-  --help|-h)  sed -n '2,12p' "$0" ;;
-  *)          run_scan "${1:-.}" ;;
-esac
+main() {
+  local target=. target_set=0 include_generated=0 details=0
+  if [ "$#" -eq 0 ]; then sed -n '2,14p' "$0"; return 0; fi
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --selftest) [ "$#" -eq 1 ] && [ "$target_set" -eq 0 ] || return 2; selftest; return $? ;;
+      --help|-h) sed -n '2,14p' "$0"; return 0 ;;
+      --include-generated) include_generated=1 ;;
+      --details) details=1 ;;
+      --) shift; [ "$#" -eq 1 ] && [ "$target_set" -eq 0 ] || return 2; target=$1; target_set=1 ;;
+      -*) red "inspection incomplete: unknown option $1"; return 2 ;;
+      *) [ "$target_set" -eq 0 ] || { red 'inspection incomplete: expected one directory'; return 2; }; target=$1; target_set=1 ;;
+    esac
+    shift
+  done
+  run_scan "$target" "$include_generated" "$details"
+}
+
+main "$@"

@@ -5,7 +5,7 @@ fail() { printf 'INCOMPLETE: %s\n' "$*" >&2; exit 2; }
 
 usage() {
   cat <<'USAGE'
-Usage: scan.sh local [DIRECTORY]
+Usage: scan.sh local [DIRECTORY] [--include-generated] [--details]
        scan.sh repo OWNER/REPO [--ref BRANCH_TAG_OR_SHA]
 
 Downloads verified scanner files and installs missing dependencies.
@@ -13,7 +13,9 @@ Automatic setup: macOS (Homebrew), Debian/Ubuntu (apt), Fedora (dnf).
 Other Linux systems work when Git, Python 3.9+, uv, and (for remote scans)
 gh, jq, file and iconv are already installed in standard locations.
 GitHub scans use your normal gh login or GH_TOKEN/GITHUB_TOKEN.
-Exit: 0 no known indicators; 1 findings to review; 2 incomplete/setup failed.
+Local scans exclude untracked build caches by default and report their paths.
+Use --include-generated to read them too; --details shows more review locations.
+Exit: 0 no findings in scope; 1 matches/review signals; 2 incomplete/setup failed.
 USAGE
 }
 
@@ -42,9 +44,9 @@ fetch_scanners() {
     download "https://raw.githubusercontent.com/SomtoUgeh/dotfiles/main/scripts/$name" "$SCAN_WORK/$name"
     verify "$SCAN_WORK/$name" "$digest"
   done <<'SCANNERS'
-79ac632ce78aad03e7b835ce63b4e382aac307eca85ba0d14a406cc8f723728f scan_repo.sh
+76f78405fbfeab9f1e07eb890d262df5be5bd7fbfb58bd66eb50e48a62142891 scan_repo.sh
 637183e27a2c2111accc640a91a0fdc4f3613b8d68cb78995438faf5771415ae scan_remote.sh
-ed37284ab6078f0b59c953ef8a16dfce41c07d4806640341e2c990c02d18c456 worm_guard_patterns.py
+cef0c40097484118548fe1dbeff200c6ef57cab72e2a46b23ba491238d6a522c worm_guard_patterns.py
 775a287e026ba33378368ac75a8dba31dbb857134d201965a697049cf9ef6871 worm_guard_runtime.sh
 SCANNERS
 }
@@ -147,11 +149,20 @@ main() {
   set -u
   set -o pipefail
   local mode=${1:---help} target ref='' os rc
+  local local_args=()
   case "$mode" in
     --help|-h) usage; return 0 ;;
     local)
-      [ "$#" -le 2 ] || fail 'usage: scan.sh local [DIRECTORY]'
-      target=${2:-.}
+      shift
+      target=.
+      if [ "$#" -gt 0 ] && [[ "$1" != --* ]]; then target=$1; shift; fi
+      while [ "$#" -gt 0 ]; do
+        case "$1" in
+          --include-generated|--details) local_args+=("$1") ;;
+          *) fail 'usage: scan.sh local [DIRECTORY] [--include-generated] [--details]' ;;
+        esac
+        shift
+      done
       [ -d "$target" ] || fail 'local target is not a directory'
       target=$(CDPATH= cd -- "$target" && pwd -P) || fail 'cannot resolve local target'
       ;;
@@ -180,7 +191,7 @@ main() {
   fetch_scanners
   setup_dependencies "$os" "$mode"
   if [ "$mode" = local ]; then
-    /bin/bash "$SCAN_WORK/scan_repo.sh" "$target"
+    /bin/bash "$SCAN_WORK/scan_repo.sh" "$target" ${local_args[@]+"${local_args[@]}"}
     rc=$?
   else
     github_login

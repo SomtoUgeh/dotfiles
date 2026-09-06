@@ -17,6 +17,10 @@ FONT_SIGNATURES = {
     ".eot": lambda data: len(data) >= 36 and data[34:36] == b"LP",
 }
 TEXT_DECODE_ERROR = object()
+CAMPAIGN_GROUPS = frozenset({
+    "artifact", "artifact-path", "bootstrap", "network-ioc", "package",
+    "take-home", "dropper-blob",
+})
 GENERATED_NAMES = (
     re.compile(r"\.min\.", re.IGNORECASE),
     re.compile(r"-lock\.json$", re.IGNORECASE),
@@ -64,13 +68,14 @@ def escaped_require_line(lines):
     for number, value in enumerate(lines, 1):
         opened = False
         for match in tokens.finditer(value):
-            token = match.group().lower()
-            if token == "require(":
-                opened = True
-            elif token == ")":
+            token = match.group()
+            if token == ")":
                 opened = False
-            elif opened:
-                return number
+            elif token.startswith("\\"):
+                if opened:
+                    return number
+            else:
+                opened = True
     return None
 
 
@@ -91,14 +96,20 @@ def scan_text(scanner, path, text):
     lines = text.splitlines()
     suffix = path.suffix.lower()
 
-    bootstrap = re.compile(
+    bootstrap_pattern = re.compile(
         r"global\[['\"](?:!|_V|_t_t|r|m)['\"]\]|global\.i\s*=|"
-        r"global\.r\s*=\s*require|A8-(?:3997|5657)-1|"
+        r"global\.r\s*=\s*require"
+    )
+    bootstrap = re.compile(
+        r"A8-(?:3997|5657)-1|"
         + re.escape("rmcej" + "%otb%") + "|" + re.escape("Cot" + "%3t=shtP") + r"|_\$_1e42"
     )
-    network = re.compile(
+    blockchain_rpc = re.compile(
         r"trongrid\.io|bsc-" + r"dataseed|bsc-rpc\.publicnode\.com|"
-        r"fullnode\.mainnet\.aptoslabs\.com|166\.88\.54\.158|"
+        r"fullnode\.mainnet\.aptoslabs\.com"
+    )
+    network = re.compile(
+        r"166\.88\.54\.158|"
         r"(?:default-configuration|vscode-settings-bootstrap|vscode-settings-config|"
         r"vscode-bootstrapper|vscode-load-config|260120)\.vercel\.app|"
         + re.escape("TMfKQEd7TJJa5xNZ" + "JZ2Lep838vrzrs7mAP") + "|"
@@ -117,11 +128,14 @@ def scan_text(scanner, path, text):
     line = first_line(lines, artifact)
     if line is not None:
         scanner.finding("artifact", path, line, "known propagation artifact name")
-    if re.search(r"\\u0068" + r"\\u0074\\u0074\\u0070|\\x68" + r"\\x74\\x74\\x70", text, re.IGNORECASE) and re.search(r"\\u0063" + r"\\u0068\\u0069\\u006c\\u0064|\\x63" + r"\\x68\\x69\\x6c\\x64", text, re.IGNORECASE):
+    if "\\" in text and re.search(r"\\u0068" + r"\\u0074\\u0074\\u0070|\\x68" + r"\\x74\\x74\\x70", text, re.IGNORECASE) and re.search(r"\\u0063" + r"\\u0068\\u0069\\u006c\\u0064|\\x63" + r"\\x68\\x69\\x6c\\x64", text, re.IGNORECASE):
         scanner.finding("escaped-bootstrap", path, 1, "escaped http and child-process module names occur together")
     line = first_line(lines, bootstrap)
     if line is not None:
         scanner.finding("bootstrap", path, line, "known bootstrap signature")
+    line = first_line(lines, bootstrap_pattern)
+    if line is not None:
+        scanner.finding("bootstrap-pattern", path, line, "global assignment pattern; legitimate code can match")
     for number, value in enumerate(lines, 1):
         stripped = value.lstrip()
         if stripped.startswith(("#", "//", "*", "/*")):
@@ -135,12 +149,15 @@ def scan_text(scanner, path, text):
             if len(value) > 2000:
                 scanner.finding("long-line", path, number, "line exceeds 2000 characters")
                 break
-    line = escaped_require_line(lines)
+    line = escaped_require_line(lines) if "\\" in text else None
     if line is not None:
         scanner.finding("escaped-require", path, line, "require contains a Unicode escape")
     line = first_line(lines, network)
     if line is not None:
         scanner.finding("network-ioc", path, line, "known campaign indicator")
+    line = first_line(lines, blockchain_rpc)
+    if line is not None:
+        scanner.finding("blockchain-rpc", path, line, "public blockchain endpoint; legitimate code can match")
 
     if path.name == ".gitignore":
         ignore_names = {"temp_" + "auto_push.bat", "temp_" + "interactive_push.bat", "branch_" + "structure.json"}
@@ -160,9 +177,9 @@ def scan_text(scanner, path, text):
     line = first_line(lines, re.compile(task_pattern))
     if line is not None:
         scanner.finding("auto-run", path, line, "editor task can run when the folder opens")
-    line = font_command_line(lines)
+    line = font_command_line(lines) if "." in text else None
     if line is not None:
-        scanner.finding("font-command", path, line, "node executes a file with a font extension")
+        scanner.finding("font-command", path, line, "node command text and a font extension occur on the same line; execution is not established")
 
     line = first_line(lines, re.compile(r"\bLAST_" + r"COMMIT_DATE\b"))
     if line is not None and suffix in {".bat", ".ps1", ".sh"}:

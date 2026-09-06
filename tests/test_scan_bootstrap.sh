@@ -60,6 +60,10 @@ printf '%s\n' "$T/local target" > "$T/expected"
 cmp "$T/expected" "$T/args"
 [ "$(grep -c '^download ' "$T/events")" = 4 ]
 echo 'PASS embedded manifest matches actual scanner files; local path with spaces forwarded'
+run 0 local "$T/local target" --include-generated --details
+printf '%s\n' "$T/local target" --include-generated --details > "$T/expected"
+cmp "$T/expected" "$T/args"
+echo 'PASS local scope and detail arguments forwarded'
 run 0 repo owner/repo --ref 'feature/a+b#ref'
 printf '%s\n' --account default --repo owner/repo --ref 'feature/a+b#ref' > "$T/expected"
 cmp "$T/expected" "$T/args"
@@ -89,6 +93,8 @@ run 2 invalid
 run 2 local "$T/missing"
 [ ! -s "$T/events" ]
 run 2 local "$T/local target" extra
+[ ! -s "$T/events" ]
+run 2 local "$T/local target" --unknown
 [ ! -s "$T/events" ]
 run 2 repo bad-repo
 [ ! -s "$T/events" ]
