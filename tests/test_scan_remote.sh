@@ -45,8 +45,18 @@ cat > "$T/bin/gh" <<'MOCK'
 #!/usr/bin/env bash
 set -eu
 printf '%s\n' "$*" >> "$MOCK_LOG"
-[ "$1" = api ] || exit 90
 [ "${GH_HOST:-}" = github.com ] || { printf 'GH_HOST was not pinned to github.com\n' >&2; exit 89; }
+if [ "${EXPECT_DEFAULT_AUTH:-}" = 1 ]; then
+  [ "${GH_CONFIG_DIR-unset}" = "$EXPECTED_GH_CONFIG" ] || exit 89
+  [ "${GH_TOKEN-unset}" = "$EXPECTED_GH_TOKEN" ] || exit 89
+  [ "${GITHUB_TOKEN-unset}" = "$EXPECTED_GITHUB_TOKEN" ] || exit 89
+fi
+if [ "$1" = auth ]; then
+  [ "$*" = 'auth status --hostname github.com' ] || exit 90
+  [ "$MOCK_CASE" != auth ] && [ "$MOCK_CASE" != inactive-auth ] || exit 1
+  exit 0
+fi
+[ "$1" = api ] || exit 90
 endpoint=$2
 case "$endpoint" in
   user)
@@ -55,28 +65,38 @@ case "$endpoint" in
     printf 'tester\n'
     ;;
   rate_limit)
+    [ "$MOCK_CASE" != default-auth ] || exit 1
     [ "$MOCK_CASE" != rate-fraction ] || { printf '{"resources":{"core":{"remaining":199.5}}}\n'; exit; }
     printf '{"resources":{"core":{"remaining":5000}}}\n'
     ;;
   user/repos*)
-    [[ " $* " = *' --paginate '* && " $* " = *' --slurp '* ]] || exit 91
+    [[ " $* " = *' --paginate '* && " $* " != *' --slurp '* ]] || exit 91
     case "$MOCK_CASE" in
-      empty-auto|inventory|inventory-missing|ignore-other) printf '[[]]\n' ;;
-      malformed-repos) printf '[[{"full_name":4,"permissions":{"pull":true}}]]\n' ;;
-      *) printf '[[{"full_name":"test/auto","permissions":{"pull":true}}],[]]\n' ;;
+      empty-auto|inventory|inventory-missing|ignore-other) printf '[]\n' ;;
+      malformed-repos) printf '[{"full_name":4,"permissions":{"pull":true}}]\n' ;;
+      *) printf '[{"full_name":"test/auto","permissions":{"pull":true}}]\n[]\n' ;;
     esac
     ;;
   repos/*/branches\?*)
     [ "$MOCK_CASE" != refs-error ] || exit 1
-    [[ " $* " = *' --paginate '* && " $* " = *' --slurp '* ]] || exit 91
-    printf '[[{"name":"main","commit":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}],[{"name":"page-two","commit":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}]]\n'
+    [[ " $* " = *' --paginate '* && " $* " != *' --slurp '* ]] || exit 91
+    case "$MOCK_CASE" in
+      pages-empty) exit 0 ;;
+      pages-malformed) printf '[{"name":'; exit 0 ;;
+      pages-object) printf '{}\n'; exit 0 ;;
+      pages-rate) printf '[]\n'; printf 'API rate limit exceeded\n' >&2; exit 1 ;;
+      pages-merged)
+        printf '[{"name":"main","commit":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},{"name":"page-two","commit":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}]\n'
+        ;;
+      *) printf '[{"name":"main","commit":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}]\n[{"name":"page-two","commit":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}]\n' ;;
+    esac
     ;;
   repos/*/tags\?*)
-    [[ " $* " = *' --paginate '* && " $* " = *' --slurp '* ]] || exit 91
+    [[ " $* " = *' --paginate '* && " $* " != *' --slurp '* ]] || exit 91
     if [ "$MOCK_CASE" = tagged ]; then
-      printf '[[{"name":"v1","commit":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}],[]]\n'
+      printf '[{"name":"v1","commit":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}]\n[]\n'
     else
-      printf '[[],[]]\n'
+      printf '[]\n[]\n'
     fi
     ;;
   repos/*/commits/*)
@@ -483,6 +503,21 @@ run_scan 2 --account personal --repo test/repo
 jq -e '.scan_complete==false and .counts.incomplete_checks>0' "$WORMGUARD_STATE/scan-last-run.json" >/dev/null
 echo 'PASS failed ref enumeration cannot produce a complete manual scan'
 
+export MOCK_CASE=pages-merged
+new_case pages-merged
+run_scan 0 --account personal --repo test/repo
+jq -e '.scan_complete and .counts.refs_checked==2' "$WORMGUARD_STATE/scan-last-run.json" >/dev/null
+echo 'PASS older gh merged pagination output retains all refs'
+for MOCK_CASE in pages-empty pages-malformed pages-object pages-rate; do
+  export MOCK_CASE
+  new_case "$MOCK_CASE"
+  run_scan 2 --account personal --repo test/repo
+  jq -e '.scan_complete==false and .status=="incomplete"' "$WORMGUARD_STATE/scan-last-run.json" >/dev/null
+  ! grep -q '/commits/' "$MOCK_LOG"
+done
+[ "$(grep -c '/branches?' "$MOCK_LOG")" = 1 ]
+echo 'PASS empty/malformed page streams fail closed and rate-limit errors stop pagination'
+
 export MOCK_CASE=clean
 new_case ci
 export GH_TOKEN=fixture-token
@@ -491,8 +526,46 @@ unset GH_TOKEN
 grep -q 'github-actions' "$T/result"
 echo 'PASS CI installation-token mode does not require user endpoint'
 
+export EXPECT_DEFAULT_AUTH=1
+export GH_CONFIG_DIR="$T/normal-gh-config"
+export EXPECTED_GH_CONFIG="$GH_CONFIG_DIR"
+export EXPECTED_GH_TOKEN=unset EXPECTED_GITHUB_TOKEN=unset
+unset GH_TOKEN GITHUB_TOKEN
+export MOCK_CASE=inactive-auth
+new_case default-config
+run_scan 0 --account default --repo test/repo
+! grep -q '^auth ' "$MOCK_LOG"
+grep -q '^api rate_limit$' "$MOCK_LOG"
+grep -q '^api repos/test/repo$' "$MOCK_LOG"
+! grep -q '^api user' "$MOCK_LOG"
+jq -e '.request.account=="default" and .request.ref_scope=="all-current-tips" and .counts.refs_checked==2' "$WORMGUARD_STATE/scan-last-run.json" >/dev/null
+echo 'PASS default account checks selected API credentials despite unrelated inactive authentication failure'
+
+export GH_TOKEN=fixture-default-token GITHUB_TOKEN=fixture-github-token
+export EXPECTED_GH_TOKEN="$GH_TOKEN" EXPECTED_GITHUB_TOKEN="$GITHUB_TOKEN"
+new_case default-tokens
+run_scan 0 --account default --repo test/repo --ref main
+jq -e '.request.ref_scope=="single-ref" and .counts.refs_checked==1' "$WORMGUARD_STATE/scan-last-run.json" >/dev/null
+unset GH_TOKEN
+export EXPECTED_GH_TOKEN=unset
+new_case default-github-token
+run_scan 0 --account default --repo test/repo --ref main
+echo 'PASS default account preserves both token variables and GITHUB_TOKEN alone'
+
+unset GH_CONFIG_DIR GITHUB_TOKEN
+export EXPECTED_GH_CONFIG=unset EXPECTED_GITHUB_TOKEN=unset
+export MOCK_CASE=default-auth
+new_case default-no-auth
+run_scan 2 --account default --repo test/repo
+jq -e '.status=="incomplete" and .scan_complete==false and .counts.repositories_checked==0' "$WORMGUARD_STATE/scan-last-run.json" >/dev/null
+! grep -q '^api repos/' "$MOCK_LOG"
+unset EXPECT_DEFAULT_AUTH EXPECTED_GH_CONFIG EXPECTED_GH_TOKEN EXPECTED_GITHUB_TOKEN
+echo 'PASS missing default authentication produces incomplete evidence without repository requests'
+
 export MOCK_CASE=clean
 new_case cli
+run_scan 2 --account default
+run_scan 2 --account default --all-readable
 run_scan 2 --account ci --repo test/repo --ref main
 run_scan 2 --repo
 run_scan 2 --ref main

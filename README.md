@@ -262,6 +262,51 @@ scan_remote.sh --account personal --repo OWNER/REPO --ref COMMIT_SHA
 scan_remote.sh --account personal --repo OWNER/REPO
 ```
 
+### Standalone curl scans
+
+People without these dotfiles can download and run just the scanner:
+
+```bash
+# Local folder, including any locally stored Git history
+(set -o pipefail; curl -fsSL https://raw.githubusercontent.com/SomtoUgeh/dotfiles/main/scripts/scan.sh | bash -s -- local /path/to/repo)
+
+# All current branch and tag tips in a GitHub repository
+(set -o pipefail; curl -fsSL https://raw.githubusercontent.com/SomtoUgeh/dotfiles/main/scripts/scan.sh | bash -s -- repo OWNER/REPO)
+
+# One branch, tag or commit
+(set -o pipefail; curl -fsSL https://raw.githubusercontent.com/SomtoUgeh/dotfiles/main/scripts/scan.sh | bash -s -- repo OWNER/REPO --ref main)
+```
+
+Run these from a trusted terminal. The downloaded script is executable code
+from this repository; inspect `scripts/scan.sh` first if needed. `pipefail`
+keeps an initial curl failure from returning success. The bootstrap downloads
+all four scanner files into a temporary directory and checks their SHA-256
+digests before loading them. A failed or mismatched download stops the run.
+It removes the temporary scripts on exit and preserves the scanner's exit code.
+
+Setup installs missing dependencies using Homebrew on macOS (installing
+Homebrew if absent), apt on Debian/Ubuntu, or dnf on Fedora. It may request an
+administrator password. Git and Python 3.9+ are needed for local scans; remote
+scans also need GitHub CLI, jq, file and iconv. Linux setup installs a pinned uv
+release in `~/.local/bin` using its official installer. Installed dependencies
+remain available afterward. Other Linux distributions can run the scanner
+when these dependencies are already installed in the standard locations.
+The bootstrap requires Bash, curl and sha256sum or shasum to start.
+
+Remote scans use your normal `gh` configuration or `GH_TOKEN`/`GITHUB_TOKEN`.
+On an interactive terminal, missing authentication starts GitHub's browser
+login. For unattended use, provide a token with read access to the target repo.
+You can use this mode directly with
+`scan_remote.sh --account default --repo OWNER/REPO`.
+
+Installer references: [Homebrew](https://brew.sh/),
+[uv installer options](https://docs.astral.sh/uv/reference/installer/), and
+[GitHub CLI login](https://cli.github.com/manual/gh_auth_login).
+
+When changing a shipped scanner or helper, update its SHA-256 digest in
+`scripts/scan.sh` in the same commit. `tests/test_scan_bootstrap.sh` checks
+that the embedded digests match the source files.
+
 The local scanner reads the working tree and available Git objects as data.
 Dependencies, unreadable files, oversized files and missing shallow history are
 reported scope limits; inspect the report. It runs Python through uv with
@@ -286,6 +331,7 @@ Scanner changes can be checked offline from this checkout:
 ```bash
 ./tests/test_scan_repo.sh
 ./tests/test_scan_remote.sh
+./tests/test_scan_bootstrap.sh
 ./tests/test_scanner_install.sh
 ```
 

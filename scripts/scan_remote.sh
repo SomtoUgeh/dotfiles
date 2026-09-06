@@ -3,6 +3,7 @@
 # scan_remote.sh                    scan all branch/tag tips in the explicit inventory
 # scan_remote.sh --all-readable     opt in to all readable GitHub repositories
 # scan_remote.sh --account personal check one configured account
+# scan_remote.sh --account default --repo owner/name use normal gh authentication
 # scan_remote.sh --repo owner/name  check one readable repository
 # scan_remote.sh --repo R --ref REF scan one ref or immutable commit
 # scan_remote.sh --selftest         run local detector checks without network
@@ -46,7 +47,7 @@ while [ $# -gt 0 ]; do
     --repo) ONLY_REPO="$2"; shift 2 ;;
     --ref) ONLY_REF="$2"; shift 2 ;;
     --selftest) SELFTEST=1; shift ;;
-    -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -56,6 +57,8 @@ done
 [ -z "$ONLY_REPO" ] || printf '%s' "$ONLY_REPO" | grep -Eq '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$' || { echo '--repo must be owner/name' >&2; exit 2; }
 case "$ONLY_ACCOUNT" in
   ""|personal|work) ;;
+  default)
+    [ -n "$ONLY_REPO" ] || { echo '--account default requires --repo' >&2; exit 2; } ;;
   ci)
     [ -n "$ONLY_REPO" ] && [ -n "$ONLY_REF" ] || { echo '--account ci requires --repo and --ref' >&2; exit 2; }
     [ -n "${GH_TOKEN:-}" ] || { echo '--account ci requires GH_TOKEN' >&2; exit 2; } ;;
@@ -240,7 +243,7 @@ api_list() { # endpoint destination
   local attempt error="$WORK/api.error"
   for attempt in 1 2 3; do
     [ "$API_STOP" = 0 ] || return 1
-    if gh api "$1" --paginate --slurp > "$2.tmp" 2> "$error" &&
+    if gh api "$1" --paginate 2> "$error" | jq -s > "$2.tmp" &&
        jq -e 'if type=="array" and length>0 and all(.[]; type=="array") then true else error("invalid pages") end' "$2.tmp" >/dev/null 2>&1; then
       jq 'add' "$2.tmp" > "$2" && rm -f "$2.tmp" && return 0
     fi
@@ -523,6 +526,10 @@ for acct in $ACCOUNTS; do
   account_repo_start=$repos_checked
   if [ "$acct" = ci ]; then
     login=github-actions
+  elif [ "$acct" = default ]; then
+    # Let gh select its normal config or environment token without modifying it.
+    # The API budget and repository-read checks below validate selected credentials.
+    login=github-cli
   else
     if [ ! -f "$GH_CONFIG_ROOT/gh-$acct/hosts.yml" ]; then
       unknown "account '$acct' is in scope but $GH_CONFIG_ROOT/gh-$acct/hosts.yml is missing"
