@@ -34,6 +34,7 @@ npm install @cloudflare/codemode ai zod
 ## Usage
 
 ```typescript
+import { AIChatAgent } from "@cloudflare/ai-chat";
 import { createCodeTool } from "@cloudflare/codemode/ai";
 import { DynamicWorkerExecutor } from "@cloudflare/codemode";
 import { streamText, tool, convertToModelMessages } from "ai";
@@ -52,8 +53,11 @@ const tools = {
   })
 };
 
-export class MyAgent extends Agent<Env, State> {
-  async onChatMessage() {
+export class MyAgent extends AIChatAgent<Env> {
+  async onChatMessage(
+    onFinish: Parameters<AIChatAgent<Env>["onChatMessage"]>[0],
+    options: Parameters<AIChatAgent<Env>["onChatMessage"]>[1]
+  ) {
     const executor = new DynamicWorkerExecutor({
       loader: this.env.LOADER
     });
@@ -64,7 +68,9 @@ export class MyAgent extends Agent<Env, State> {
       model,
       system: "You are a helpful assistant.",
       messages: await convertToModelMessages(this.messages),
-      tools: { codemode }
+      tools: { codemode },
+      abortSignal: options?.abortSignal,
+      onFinish
     });
 
     return result.toUIMessageStreamResponse();

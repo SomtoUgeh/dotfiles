@@ -34,7 +34,7 @@ Minimal configuration requires only `assets.directory`:
 **Configuration keys:**
 
 - `directory` (string, required): Path to assets folder (e.g. `./dist`, `./public`, `./build`)
-- `binding` (string, optional): Name to access assets in Worker code (e.g. `env.ASSETS`). Default: `"ASSETS"`
+- `binding` (string, optional): Name to access assets in Worker code (e.g. `env.ASSETS`). No implicit binding; set it when code accesses `env.ASSETS`
 - `not_found_handling` (string, optional): Behavior when asset not found
   - `"single-page-application"`: Serve `/index.html` for non-asset paths (default for SPAs)
   - `"404-page"`: Serve `/404.html` if present, otherwise 404
@@ -93,7 +93,7 @@ Controls which requests invoke Worker before checking assets.
 
 **Pattern rules:**
 
-- Glob patterns: `*` (any chars), `**` (any path segments)
+- Use the documented wildcard route syntax; do not assume a filesystem glob engine
 - Negative patterns: Prefix with `!` to exclude
 - Precedence: Negative patterns override positive patterns
 - Default: `false` (assets served directly)
@@ -135,15 +135,12 @@ import { cloudflare } from '@cloudflare/vite-plugin';
 
 export default defineConfig({
   plugins: [
-    cloudflare({
-      assets: {
-        directory: './dist',
-        binding: 'ASSETS'
-      }
-    })
+    cloudflare()
   ]
 });
 ```
+
+Configure asset binding/routing in the input Wrangler config. Vite generates the build-output asset directory; do not invent a top-level plugin `assets` option. See [Vite static assets](https://developers.cloudflare.com/workers/vite-plugin/reference/static-assets/).
 
 **Features:**
 

@@ -4,7 +4,7 @@
 
 ## Explanation
 
-Sessions maintain user authentication state across requests. Use HTTP-only cookies with secure settings to prevent XSS and CSRF attacks. Never store sensitive data in client-accessible storage.
+Sessions maintain user authentication state across requests. Use HTTP-only cookies with secure settings to reduce token theft. Cookies alone do not prevent XSS or all CSRF; retain Start's CSRF checks and authorize each server operation. Never store sensitive data in client-accessible storage.
 
 ## Bad Example
 
@@ -28,16 +28,24 @@ export const setSession = createServerFn({ method: 'POST' })
 // lib/session.server.ts
 import { useSession } from '@tanstack/react-start/server'
 
+interface SessionData { userId: string; email: string; createdAt: number }
+
+function sessionSecret(): string {
+  const secret = process.env.SESSION_SECRET
+  if (!secret || secret.length < 32) throw new Error('SESSION_SECRET must have at least 32 characters')
+  return secret
+}
+
 // Configure session with secure defaults
 export function getSession() {
-  return useSession({
-    password: process.env.SESSION_SECRET!,  // At least 32 characters
+  return useSession<SessionData>({
+    password: sessionSecret(),
+    name: '__session',
+    maxAge: 60 * 60 * 24 * 7, // Enforced by the sealed session, not just the browser
     cookie: {
-      name: '__session',
       httpOnly: true,          // Not accessible via JavaScript
       secure: process.env.NODE_ENV === 'production',  // HTTPS only in prod
       sameSite: 'lax',         // CSRF protection
-      maxAge: 60 * 60 * 24 * 7, // 7 days
     },
   })
 }
@@ -72,7 +80,8 @@ export const login = createServerFn({ method: 'POST' })
 import { createServerFn } from '@tanstack/react-start'
 import { redirect } from '@tanstack/react-router'
 import { getSession } from './session.server'
-import { hashPassword, verifyPassword } from './password.server'
+import { verifyPassword } from './password.server'
+import { z } from 'zod'
 
 // Login
 export const login = createServerFn({ method: 'POST' })
@@ -93,6 +102,7 @@ export const login = createServerFn({ method: 'POST' })
     await session.update({
       userId: user.id,
       email: user.email,
+      createdAt: Date.now(),
     })
 
     throw redirect({ to: '/dashboard' })
@@ -123,6 +133,7 @@ export const getCurrentUser = createServerFn()
         email: true,
         name: true,
         avatar: true,
+        role: true,
         // Don't include passwordHash!
       },
     })
@@ -133,12 +144,13 @@ export const getCurrentUser = createServerFn()
 
 ## Good Example: Session with Role-Based Access
 
+Read the current role from the database so revoked privileges do not remain valid for the cookie lifetime. `getSessionData` stays server-only; routes call the `getCurrentUser` server function from `auth.functions.ts`.
+
 ```tsx
 // lib/session.server.ts
 interface SessionData {
   userId: string
   email: string
-  role: 'user' | 'admin'
   createdAt: number
 }
 
@@ -148,6 +160,8 @@ export async function getSessionData(): Promise<SessionData | null> {
 
   if (!data?.userId) return null
 
+  if (typeof data.email !== 'string' || typeof data.createdAt !== 'number') return null
+
   // Validate session age
   const maxAge = 7 * 24 * 60 * 60 * 1000  // 7 days
   if (Date.now() - data.createdAt > maxAge) {
@@ -155,7 +169,7 @@ export async function getSessionData(): Promise<SessionData | null> {
     return null
   }
 
-  return data as SessionData
+  return { userId: data.userId, email: data.email, createdAt: data.createdAt }
 }
 
 // Middleware for admin-only routes
@@ -163,11 +177,12 @@ export const requireAdmin = createMiddleware()
   .server(async ({ next }) => {
     const session = await getSessionData()
 
-    if (!session || session.role !== 'admin') {
+    const user = session ? await db.users.findUnique({ where: { id: session.userId } }) : null
+    if (!user || user.role !== 'admin') {
       throw redirect({ to: '/unauthorized' })
     }
 
-    return next({ context: { session } })
+    return next({ context: { user } })
   })
 ```
 

@@ -20,150 +20,35 @@ const liveInput = await client.stream.liveInputs.create({
 // Returns: { uid, rtmps, srt, webRTC }
 ```
 
-### Raw fetch API
+### Read Live Status
 
 ```typescript
-async function createLiveInput(accountId: string, apiToken: string) {
-  const response = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}/stream/live_inputs`,
-    {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        recording: { mode: 'automatic', timeoutSeconds: 30 },
-        deleteRecordingAfterDays: 30
-      })
-    }
-  );
-  const { result } = await response.json();
-  return {
-    uid: result.uid,
-    rtmps: { url: result.rtmps.url, streamKey: result.rtmps.streamKey },
-    srt: { url: result.srt.url, streamId: result.srt.streamId, passphrase: result.srt.passphrase },
-    webRTC: result.webRTC
-  };
-}
+const liveInput = await client.stream.liveInputs.get(liveInputId, { account_id: env.CF_ACCOUNT_ID });
+const isConnected = liveInput.status === 'connected' || liveInput.status === 'reconnected';
 ```
 
-## Check Live Status
-
-```typescript
-async function getLiveStatus(accountId: string, liveInputId: string, apiToken: string) {
-  const response = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}/stream/live_inputs/${liveInputId}`,
-    { headers: { 'Authorization': `Bearer ${apiToken}` } }
-  );
-  const { result } = await response.json();
-  return {
-    isLive: result.status?.current?.state === 'connected',
-    recording: result.recording,
-    status: result.status
-  };
-}
-```
+`status` is a nullable string, not `status.current.state`. Treat connection state separately from recording/playback readiness. Keep RTMPS/SRT keys and `webRTC.url` private to the broadcaster.
 
 ## Simulcast (Live Outputs)
 
 ### Create Output
 
 ```typescript
-async function createLiveOutput(
-  accountId: string, liveInputId: string, apiToken: string,
-  outputUrl: string, streamKey: string
-) {
-  return fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}/stream/live_inputs/${liveInputId}/outputs`,
-    {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        url: `${outputUrl}/${streamKey}`,
-        enabled: true,
-        streamKey // For platforms like YouTube, Twitch
-      })
-    }
-  ).then(r => r.json());
-}
+await client.stream.liveInputs.outputs.create(liveInputId, {
+  account_id: env.CF_ACCOUNT_ID,
+  url: 'rtmp://a.rtmp.youtube.com/live2',
+  streamKey: youtubeStreamKey,
+  enabled: true,
+});
 ```
 
-### Example: Simulcast to YouTube + Twitch
-
-```typescript
-const liveInput = await createLiveInput(accountId, apiToken);
-
-// Add YouTube output
-await createLiveOutput(
-  accountId, liveInput.uid, apiToken,
-  'rtmp://a.rtmp.youtube.com/live2',
-  'your-youtube-stream-key'
-);
-
-// Add Twitch output
-await createLiveOutput(
-  accountId, liveInput.uid, apiToken,
-  'rtmp://live.twitch.tv/app',
-  'your-twitch-stream-key'
-);
-```
+Pass the destination URL and stream key separately. Do not concatenate the key onto the URL as well. This is a real external broadcast destination; configure only the intended authorized output.
 
 ## WebRTC Streaming (WHIP/WHEP)
 
-### Browser to Stream (WHIP)
+Use the exact `webRTC.url` returned for publishing: it contains a secret and cannot be reconstructed from the live input ID. Use `webRTCPlayback.url` for playback. Use a WHIP/WHEP client that implements SDP, ICE gathering/trickle, response status checks, session Location handling, and teardown. For browser implementation follow the [official tutorial](https://developers.cloudflare.com/stream/examples/browser-based-webrtc/); a single bare SDP POST without lifecycle handling is incomplete.
 
-```typescript
-async function startWebRTCBroadcast(liveInputId: string) {
-  const pc = new RTCPeerConnection();
-  
-  // Add local media tracks
-  const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-  stream.getTracks().forEach(track => pc.addTrack(track, stream));
-  
-  // Create offer
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
-  
-  // Send to Stream via WHIP
-  const response = await fetch(
-    `https://customer-<CODE>.cloudflarestream.com/${liveInputId}/webRTC/publish`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/sdp' },
-      body: offer.sdp
-    }
-  );
-  
-  const answer = await response.text();
-  await pc.setRemoteDescription({ type: 'answer', sdp: answer });
-}
-```
-
-### Stream to Browser (WHEP)
-
-```typescript
-async function playWebRTCStream(videoId: string) {
-  const pc = new RTCPeerConnection();
-  
-  pc.addTransceiver('video', { direction: 'recvonly' });
-  pc.addTransceiver('audio', { direction: 'recvonly' });
-  
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
-  
-  const response = await fetch(
-    `https://customer-<CODE>.cloudflarestream.com/${videoId}/webRTC/play`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/sdp' },
-      body: offer.sdp
-    }
-  );
-  
-  const answer = await response.text();
-  await pc.setRemoteDescription({ type: 'answer', sdp: answer });
-  
-  return pc;
-}
-```
+As checked 2026-09-05, WHIP and WHEP must be used together: RTMP/SRT inputs cannot be played via WHEP, and WHIP inputs cannot be recorded, simulcast via RTMP/SRT, or played through HLS/DASH. See [current WebRTC capabilities](https://developers.cloudflare.com/stream/webrtc-beta/).
 
 ## Recording Settings
 
@@ -178,7 +63,7 @@ const recordingConfig = {
   mode: 'automatic',
   timeoutSeconds: 30, // Auto-stop 30s after stream ends
   requireSignedURLs: true, // Require token for VOD playback
-  allowedOrigins: ['https://yourdomain.com']
+  allowedOrigins: ['yourdomain.com']
 };
 ```
 

@@ -44,9 +44,14 @@ A 30-second flaky loop is barely better than no loop; a 2-second deterministic o
 
 The goal is not a clean repro but a **higher reproduction rate**. Loop the trigger 100×, parallelise, add stress, narrow timing windows, inject sleeps. A 50%-flake bug is debuggable; 1% is not — keep raising the rate until it's debuggable.
 
-### When you genuinely cannot build a loop
+### When you cannot build a loop yet
 
-Stop and say so explicitly. List what you tried. Ask the user for: (a) access to whatever environment reproduces it, (b) a captured artifact (HAR file, log dump, core dump, screen recording with timestamps), or (c) permission to add temporary production instrumentation. Do **not** proceed to hypothesise without a loop.
+Say so explicitly and list what you tried. Request the smallest missing artifact
+or access that would make reproduction possible. Meanwhile, continue useful
+read-only work: inspect logs and traces already available, follow the static code
+path, compare recent changes, and form evidence-ranked hypotheses. Label these as
+unverified until a runnable signal exists. Adding production instrumentation
+still requires authorization.
 
 ### Completion criterion — a tight loop that goes red
 
@@ -57,7 +62,9 @@ Phase 1 is done when the loop is **tight** and **red-capable**: you can name **o
 - [ ] **Fast** — seconds, not minutes.
 - [ ] **Agent-runnable** — you can run it unattended; a human in the loop only via `scripts/hitl-loop.template.sh`.
 
-If you catch yourself reading code to build a theory before this command exists, **stop — jumping straight to a hypothesis is the exact failure this skill prevents.** No red-capable command, no Phase 2.
+Do not claim Phase 1 complete without this command. If the environment prevents a
+red-capable command, use the evidence-only path above rather than pretending the
+bug has been reproduced.
 
 ## Phase 2 — Reproduce + minimise
 
@@ -77,7 +84,9 @@ Why bother: a minimal repro shrinks the hypothesis space in Phase 3 (fewer movin
 
 Done when **every remaining element is load-bearing** — removing any one of them makes the loop go green.
 
-Do not proceed until you have reproduced **and** minimised.
+When reproduction is available, do not proceed to a fix until you have reproduced
+and minimised. When it is unavailable, continue diagnosis only: rank hypotheses,
+collect discriminating evidence, and state what remains unverified.
 
 ## Phase 3 — Hypothesise
 

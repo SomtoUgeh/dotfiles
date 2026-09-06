@@ -29,7 +29,7 @@ secret_name = "stripe_api_key"
 
 Fields:
 - `binding`: Variable name for `env` access
-- `store_id`: From `wrangler secrets-store store list`
+- `store_id`: From `wrangler secrets-store store list --remote`
 - `secret_name`: Identifier (no spaces)
 
 ### Environment-Specific
@@ -82,7 +82,7 @@ secret_name = "staging_api_key"
 ### Store Management
 
 ```bash
-wrangler secrets-store store list
+wrangler secrets-store store list --remote
 wrangler secrets-store store create my-store --remote
 wrangler secrets-store store delete <store-id> --remote
 ```
@@ -100,18 +100,18 @@ cat secret.txt | wrangler secrets-store secret create <store-id> \
 
 # List/get/update/delete
 wrangler secrets-store secret list <store-id> --remote
-wrangler secrets-store secret get <store-id> --name MY_SECRET --remote
-wrangler secrets-store secret update <store-id> --name MY_SECRET --new-value "val" --remote
-wrangler secrets-store secret delete <store-id> --name MY_SECRET --remote
+wrangler secrets-store secret get <store-id> --secret-id <secret-id> --remote
+wrangler secrets-store secret update <store-id> --secret-id <secret-id> --scopes workers --remote
+wrangler secrets-store secret delete <store-id> --secret-id <secret-id> --remote
 
 # Duplicate
 wrangler secrets-store secret duplicate <store-id> \
-  --name ORIG --new-name COPY --remote
+  --secret-id <secret-id> --name COPY --scopes workers --remote
 ```
 
 ### Local Development
 
-**CRITICAL**: Production secrets (`--remote`) NOT accessible in local dev.
+Production secrets (`--remote`) are not accessible in local development. Without `--remote`, secret commands use local storage; local stores are created automatically on first use.
 
 ```bash
 # Create local-only (no --remote)
@@ -165,8 +165,9 @@ Deploy options:
 - name: Create secret
   env:
     CLOUDFLARE_API_TOKEN: ${{ secrets.CF_TOKEN }}
+    API_KEY_VALUE: ${{ secrets.API_KEY }}
   run: |
-    echo "${{ secrets.API_KEY }}" | \
+    printf '%s' "$API_KEY_VALUE" | \
     npx wrangler secrets-store secret create $STORE_ID \
       --name API_KEY --scopes workers --remote
 
@@ -178,7 +179,7 @@ Deploy options:
 
 ```yaml
 script:
-  - echo "$API_KEY_VALUE" | npx wrangler secrets-store secret create $STORE_ID --name API_KEY --scopes workers --remote
+  - printf '%s' "$API_KEY_VALUE" | npx wrangler secrets-store secret create $STORE_ID --name API_KEY --scopes workers --remote
   - npx wrangler deploy
 ```
 

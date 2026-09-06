@@ -10,9 +10,9 @@ binding = "ARTIFACTS"
 namespace = "default"
 ```
 
-This exposes Artifacts on `env.ARTIFACTS` inside your Worker.
+This exposes Artifacts on `env.ARTIFACTS`. The binding is non-inheritable: repeat it in each named Wrangler environment. `remote = true` opts local development into the hosted service; those calls can mutate real repositories.
 
-If you authenticate with `wrangler login`, current docs say Wrangler requests `artifacts:write` by default.
+Authenticate Wrangler for local commands or CI and verify closed-beta access. Do not assume that a successfully generated type proves account entitlement.
 
 ## TypeScript
 
@@ -42,24 +42,23 @@ Artifacts works best when autonomous work is isolated:
 
 ## REST Configuration
 
-For external systems, configure the namespace-scoped base URL and gateway JWT:
+For external systems, configure the account/namespace-scoped base URL and Cloudflare API token:
 
 ```bash
 export ARTIFACTS_NAMESPACE="default"
-export ARTIFACTS_JWT="<YOUR_GATEWAY_JWT>"
-export ARTIFACTS_BASE_URL="https://artifacts.cloudflare.net/v1/api/namespaces/$ARTIFACTS_NAMESPACE"
+export ACCOUNT_ID="<YOUR_ACCOUNT_ID>"
+export CLOUDFLARE_API_TOKEN="<YOUR_API_TOKEN>"
+export ARTIFACTS_BASE_URL="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/artifacts/namespaces/$ARTIFACTS_NAMESPACE"
 ```
 
-Some environments also expose an `/edge/v1/api/...` base path. Verify the correct host and base path in the live docs for your Artifacts environment.
-
-Use environment variables or your secret manager. Do not hardcode gateway JWTs or repo tokens.
+Use environment variables or your secret manager. Keep Cloudflare API tokens and repo tokens out of source control. Current public REST routes do not use the gateway-JWT or `/edge/v1` paths from older drafts.
 
 ## Repo Tokens
 
 Artifacts workflows usually involve repo-scoped tokens returned by `create()` or minted later through the binding or REST API.
 
 Keep the control plane and data plane separate:
-- Use the **Workers binding** or **REST API** with a gateway JWT to create repos and mint tokens.
+- Use the **Workers binding** or **REST API** with a Cloudflare API token to create repos and mint tokens.
 - Use repo-scoped tokens only for **Git operations** against the returned `remote`.
 
 Recommended handling:
@@ -79,7 +78,7 @@ Prefer header-based auth for local tooling so the full token stays out of the re
 git -c http.extraHeader="Authorization: Bearer $ARTIFACTS_TOKEN" clone "$ARTIFACTS_REMOTE" artifacts-clone
 ```
 
-Use a Basic-auth remote only for short-lived commands that need a self-contained URL.
+Use a credential helper when process-argument visibility matters; do not persist a token in the Git remote URL.
 
 ## Retrieval Checklist
 
@@ -88,5 +87,7 @@ Check the live docs before relying on:
 - exact token formats
 - availability or product status
 - route details for import, fork, and token-management flows
-- the correct control-plane host or `/edge/v1` base path for your environment
+- the current account/namespace REST paths
 - platform limits or pricing
+
+[Current configuration](https://developers.cloudflare.com/artifacts/api/workers-binding/) · [REST authentication](https://developers.cloudflare.com/artifacts/api/rest-api/)

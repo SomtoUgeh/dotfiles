@@ -5,23 +5,20 @@ Two-axis review of the diff between `HEAD` and a fixed point the user supplies:
 - **Standards** — does the code conform to this repo's documented coding standards?
 - **Spec** — does the code faithfully implement the originating issue / PRD / spec?
 
-Both axes run as **parallel sub-agents** so they don't pollute each other's
-context, then the skill aggregates findings. Do **not** merge or rerank across
-axes.
+When the runtime supports subagents, run the axes independently so they do not
+pollute each other's context, then aggregate findings. Otherwise run them
+sequentially with separate evidence notes. Do **not** merge or rerank across axes.
 
-The issue tracker should have been provided — run `/setup-matt-pocock-skills`
-if `docs/agents/issue-tracker.md` is missing.
+Discover the actual spec source from repository instructions, commit/branch
+references, local issue-tracker documentation, or an accessible PR/issue. Do not
+invoke a setup skill that is not installed. If no spec exists, report that fact
+and run only the Standards axis.
 
 ## Models
 
-| Role | Model | Effort |
-|------|-------|--------|
-| Orchestrator | fable-5 or sonnet-5 | high / med |
-| Standards sub-agent | **fable-5** | high |
-| Spec sub-agent | **fable-5** | high |
-
-Two parallel Fable axes max. No nested Fable under either axis. Optional Sol
-second opinion after the report via `codex review`.
+Follow shared `AGENTS.md`. Use runtime-native agents without model overrides by
+default. If the user requests a distinct-model opinion, select only a model that
+the runtime exposes through its proper harness. Keep the one lead reviewer.
 
 ## Process
 
@@ -44,8 +41,9 @@ Fail here on bad ref or empty diff — not inside sub-agents.
 
 In order:
 
-1. Issue references in commits (`#123`, `Closes #45`, etc.) — fetch via
-   `docs/agents/issue-tracker.md`.
+1. Issue references in commits (`#123`, `Closes #45`, etc.) — use repository
+   instructions, an existing `docs/agents/issue-tracker.md`, or the configured
+   issue provider.
 2. Path the user passed as an argument.
 3. PRD/spec under `docs/`, `specs/`, or `.scratch/` matching branch/feature.
 4. If nothing found, ask. If they say there is no spec, Spec axis reports
@@ -75,10 +73,12 @@ Smell baseline (_Refactoring_, ch.3) — *what it is* → *how to fix*:
 - **Middle Man** — mostly delegates → cut and call the real target.
 - **Refused Bequest** — subclass ignores most of what it inherits → composition instead.
 
-### 4. Spawn both sub-agents in parallel
+### 4. Run independent axes
 
-Use `general-purpose` twice. When supported, set **`model: fable-5`**, high
-effort. Instruction: findings only; do not spawn children.
+Use the active runtime equivalent in `../RUNTIME_TOOLS.md`. Run independent
+subagents in parallel when available; otherwise run isolated sequential passes.
+Do not force a model override or unavailable agent type. Instruction: findings
+only; do not spawn children.
 
 **Standards brief:** Report per file/hunk (a) documented standard violations
 (cite file + rule) and (b) baseline smells (name + quoted hunk). Distinguish

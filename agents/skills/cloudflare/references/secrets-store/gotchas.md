@@ -32,8 +32,8 @@ try {
 
 ### "Scope Mismatch"
 
-**Cause:** Secret exists but missing `workers` scope (only has `ai-gateway` scope)  
-**Solution:** Update secret scopes: `wrangler secrets-store secret update <store-id> --name SECRET --scopes workers --remote` or add via Dashboard
+**Cause:** Secret exists but missing `workers` scope (only has `ai_gateway` scope)
+**Solution:** Get the secret ID from `wrangler secrets-store secret list <store-id> --remote`, then update scopes with `wrangler secrets-store secret update <store-id> --secret-id <secret-id> --scopes workers --remote`, or use the dashboard
 
 ### "JSON Parsing Failure"
 
@@ -54,7 +54,7 @@ try {
   const configStr = await env.CONFIG.get();
   const config = JSON.parse(configStr);
 } catch (error) {
-  console.error("Invalid config JSON:", error);
+  console.error("Invalid config JSON"); // Parser errors can include secret contents.
   return new Response("Invalid configuration", { status: 500 });
 }
 ```
@@ -87,7 +87,7 @@ try {
 | Max stores per account | 1 | Beta limit |
 | Max secret size | 1024 bytes | Per secret |
 | Local secrets | Don't count toward limit | Only production secrets count |
-| Scopes available | `workers`, `ai-gateway` | Must have correct scope for access |
+| Scopes available | `workers`, `ai_gateway` | Must have correct scope for access |
 | Scope | Account-level | Can be reused across multiple Workers |
 | Access method | `await env.BINDING.get()` | Async only, throws on error |
 | Management | Centralized | Via secrets-store commands |

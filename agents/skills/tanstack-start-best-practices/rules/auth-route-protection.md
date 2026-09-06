@@ -4,7 +4,7 @@
 
 ## Explanation
 
-Use `beforeLoad` in route definitions to check authentication before the route loads. This prevents unauthorized access, redirects to login, and can extend context with user data for child routes.
+Use `beforeLoad` in route definitions to check authentication before the route loads. This redirects route navigation and can extend context with user data for child routes. It is a UI guard: every server function and server route must independently authenticate and authorize its data access.
 
 ## Bad Example
 
@@ -39,13 +39,13 @@ export const Route = createFileRoute('/dashboard')({
 ```tsx
 // routes/_authenticated.tsx - Layout route for protected area
 import { createFileRoute, redirect, Outlet } from '@tanstack/react-router'
-import { getSessionData } from '@/lib/session.server'
+import { getCurrentUser } from '@/lib/auth.functions'
 
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: async ({ location }) => {
-    const session = await getSessionData()
+    const user = await getCurrentUser()
 
-    if (!session) {
+    if (!user) {
       throw redirect({
         to: '/login',
         search: {
@@ -56,7 +56,7 @@ export const Route = createFileRoute('/_authenticated')({
 
     // Extend context with user for all child routes
     return {
-      user: session,
+      user,
     }
   },
   component: AuthenticatedLayout,
@@ -94,8 +94,8 @@ function DashboardPage() {
 ## Good Example: Role-Based Access
 
 ```tsx
-// routes/_admin.tsx
-export const Route = createFileRoute('/_admin')({
+// routes/_authenticated/_admin.tsx
+export const Route = createFileRoute('/_authenticated/_admin')({
   beforeLoad: async ({ context }) => {
     // context.user comes from parent _authenticated route
     if (context.user.role !== 'admin') {
@@ -119,24 +119,29 @@ export const Route = createFileRoute('/_admin')({
 
 ## Good Example: Preserving Redirect URL
 
+Validate return destinations against the app's supported internal routes. Extend this allowlist deliberately; do not navigate to an arbitrary URL from a query parameter. Refresh router auth context after login before navigating.
+
 ```tsx
 // routes/login.tsx
 import { z } from 'zod'
+import { useRouter, useNavigate } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/login')({
   validateSearch: z.object({
-    redirect: z.string().optional(),
+    redirect: z.enum(['/dashboard', '/settings']).optional().catch(undefined),
   }),
   component: LoginPage,
 })
 
 function LoginPage() {
+  const router = useRouter()
+  const navigate = useNavigate()
   const { redirect } = Route.useSearch()
   const loginMutation = useMutation({
     mutationFn: login,
     onSuccess: () => {
-      // Redirect to original destination or default
-      navigate({ to: redirect ?? '/dashboard' })
+      // Refresh auth context and use a validated internal destination
+      void router.invalidate().then(() => navigate({ to: redirect ?? '/dashboard' }))
     },
   })
 
@@ -160,8 +165,8 @@ beforeLoad: async ({ location }) => {
 // Public route with different content for logged-in users
 export const Route = createFileRoute('/')({
   beforeLoad: async () => {
-    const session = await getSessionData()
-    return { user: session?.user ?? null }
+    const user = await getCurrentUser()
+    return { user }
   },
   component: HomePage,
 })

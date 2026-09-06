@@ -23,7 +23,9 @@ API = f"https://api.sql.cloudflarestorage.com/api/v1/accounts/{ACCOUNT_ID}/r2-sq
 HEADERS = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
 
 def r2sql(query):
-    body = requests.post(API, headers=HEADERS, json={"query": query}, timeout=180).json()
+    response = requests.post(API, headers=HEADERS, json={"query": query}, timeout=180)
+    response.raise_for_status()
+    body = response.json()
     if body["success"]:
         return body["result"]["rows"], body["result"]["metrics"]
     raise RuntimeError(body["errors"])
@@ -42,7 +44,7 @@ curl -X POST \
 
 ## Dashboard Worker
 
-No R2 SQL binding exists — query the REST endpoint via `fetch()`.
+No R2 SQL binding exists — query the REST endpoint via `fetch()`. Protect the analytics route with application authentication and authorize dataset access. Keep SQL server-defined and validate any parameters; never expose an unrestricted query proxy.
 
 ```typescript
 interface Env { ACCOUNT_ID: string; BUCKET: string; R2_SQL_TOKEN: string; }
@@ -55,7 +57,13 @@ async function queryR2SQL(env: Env, query: string) {
     body: JSON.stringify({ query }),
   });
   if (!resp.ok) throw new Error(`R2 SQL ${resp.status}: ${await resp.text()}`);
-  return (await resp.json() as any).result;
+  const body: unknown = await resp.json();
+  if (typeof body !== 'object' || body === null || !('success' in body) || body.success !== true ||
+      !('result' in body) || typeof body.result !== 'object' || body.result === null ||
+      !('rows' in body.result) || !Array.isArray(body.result.rows)) {
+    throw new Error('R2 SQL returned an unsuccessful or invalid response');
+  }
+  return body.result;
 }
 
 export default {
@@ -96,16 +104,19 @@ GROUP BY z.domain ORDER BY requests DESC LIMIT 25;
 
 ## Cursor-Based Pagination
 
-Paginate on a sortable (ideally partition) column rather than `OFFSET`:
+Use a stable, unique composite cursor; timestamp-only cursors skip rows sharing the last timestamp. Concurrent writes can change pages, so fix an upper bound/snapshot for consistent exports. Escape and validate cursor values before constructing SQL; never interpolate unchecked request text. `OFFSET` is unsupported:
 
 ```sql
-SELECT * FROM logs.requests ORDER BY __ingest_ts DESC LIMIT 500;                       -- page 1
-SELECT * FROM logs.requests WHERE __ingest_ts < '<last_ts>' ORDER BY __ingest_ts DESC LIMIT 500;  -- page 2
+-- event_id must be unique and non-null to break timestamp ties.
+SELECT * FROM logs.requests ORDER BY __ingest_ts DESC, event_id DESC LIMIT 500;
+SELECT * FROM logs.requests
+WHERE __ingest_ts < '<last_ts>' OR (__ingest_ts = '<last_ts>' AND event_id < '<last_id>')
+ORDER BY __ingest_ts DESC, event_id DESC LIMIT 500;
 ```
 
 ## Performance (essentials)
 
-- **Always `LIMIT`** (early termination); **filter on partition keys first** (`__ingest_ts` range), then add predicates.
+- `LIMIT` bounds returned rows; aggregates and sorts may still scan all matching data. Filter on partition keys and narrow time ranges to reduce scanning.
 - **Narrow time ranges**; **compact tables** (file count dominates latency — enable automatic compaction in [r2-data-catalog](../r2-data-catalog/configuration.md)).
 - Read response `metrics` (`files_scanned`, `bytes_scanned`) to tune. Full guidance: limitations-best-practices doc.
 

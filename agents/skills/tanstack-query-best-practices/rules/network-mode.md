@@ -82,7 +82,7 @@ const queryClient = new QueryClient({
 ## Good Example: Offline-First Mode
 
 ```tsx
-// Only fetch when online, but don't fail when offline
+// Attempt once even offline; pause retries until connectivity returns
 const { data } = useQuery({
   queryKey: ['user-preferences'],
   queryFn: fetchPreferences,
@@ -105,7 +105,7 @@ function TodoApp() {
       // Optimistic update works offline
       await queryClient.cancelQueries({ queryKey: ['todos'] })
       const previous = queryClient.getQueryData(['todos'])
-      queryClient.setQueryData(['todos'], (old: Todo[]) => [...old, newTodo])
+      queryClient.setQueryData(['todos'], (old: Todo[] = []) => [...old, newTodo])
       return { previous }
     },
     onError: (err, newTodo, context) => {
@@ -122,7 +122,7 @@ function TodoApp() {
   })
 
   const pausedMutations = pendingMutations.filter(
-    m => m.state.isPaused
+    m => m.isPaused
   )
 
   return (
@@ -156,6 +156,7 @@ function NetworkStatus() {
   const isOnline = useSyncExternalStore(
     onlineManager.subscribe,
     () => onlineManager.isOnline(),
+    () => true, // Stable server snapshot; matches the initial client render
   )
 
   return (

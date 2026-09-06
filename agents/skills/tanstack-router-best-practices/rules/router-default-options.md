@@ -115,7 +115,7 @@ export function DefaultNotFound() {
 | `defaultErrorComponent` | `Component` | Built-in | Global error boundary |
 | `defaultNotFoundComponent` | `Component` | Built-in | Global 404 page |
 | `scrollRestoration` | `boolean` | `false` | Restore scroll on navigation |
-| `defaultStructuralSharing` | `boolean` | `true` | Optimize loader data re-renders |
+| `defaultStructuralSharing` | `boolean` | `false` | Optimize loader data re-renders |
 
 ## Good Example: Route-Level Overrides
 

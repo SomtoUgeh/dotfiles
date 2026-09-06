@@ -21,7 +21,6 @@ prisma db execute [options]
 |--------|-------------|
 | `--file` | Path to a file containing the script to execute |
 | `--stdin` | Use terminal standard input as the script |
-| `--url` | Override the datasource URL from the Prisma config file |
 | `--config` | Custom path to your Prisma config file |
 
 ## Examples
@@ -35,24 +34,24 @@ prisma db execute --file ./script.sql
 ### Execute from stdin
 
 ```bash
-echo "TRUNCATE TABLE User;" | prisma db execute --stdin
+echo 'SELECT 1;' | prisma db execute --stdin
 ```
 
 ### Execute `migrate diff` output
 
-Pipe the output of `migrate diff` directly to the database:
+For an authorized disposable target, a pipe can apply a diff. For persistent data, save the SQL, review it and verify backup/recovery first; use `set -o pipefail` when piping so a failed diff cannot look successful:
 
 ```bash
 prisma migrate diff \
   --from-empty \
-  --to-schema-datamodel prisma/schema.prisma \
+  --to-schema prisma/schema.prisma \
   --script \
 | prisma db execute --stdin
 ```
 
 ## Configuration
 
-Uses `datasource` from `prisma.config.ts`:
+Uses `datasource` from `prisma7.config.ts`:
 
 ```typescript
 export default defineConfig({

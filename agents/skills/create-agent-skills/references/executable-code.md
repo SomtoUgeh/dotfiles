@@ -1,175 +1,19 @@
-<when_to_use_scripts>
-Even if the agent could write a script, pre-made scripts offer advantages:
-- More reliable than generated code
-- Save tokens (no need to include code in context)
-- Save time (no code generation required)
-- Ensure consistency across uses
+# Executable Helpers
 
-<execution_vs_reference>
-Make clear whether the agent should:
-- **Execute the script** (most common): "Run `analyze_form.py` to extract fields"
-- **Read it as reference** (for complex logic): "See `analyze_form.py` for the extraction algorithm"
+A helper is useful when a repeated operation benefits from deterministic behavior. Read unfamiliar scripts before executing them; output-only execution can save context after the script is understood.
 
-For most utility scripts, execution is preferred.
-</execution_vs_reference>
+## Contract
 
-<how_scripts_work>
-When the agent executes a script via bash:
-1. Script code never enters context window
-2. Only script output consumes tokens
-3. Far more efficient than having the agent generate equivalent code
-</how_scripts_work>
-</when_to_use_scripts>
+Document inputs, outputs, dependencies, supported environments, side effects, exit codes, and cleanup behavior. Validate before writing. Use an atomic replacement when a partial write would corrupt a prior result. Do not follow arbitrary input paths outside a declared boundary.
 
-<file_organization>
-<scripts_directory>
-**Best practice**: Place all executable scripts in a `scripts/` subdirectory within the skill folder.
+## Failures
 
-```
-skill-name/
-├── SKILL.md
-├── scripts/
-│   ├── main_utility.py
-│   ├── helper_script.py
-│   └── validator.py
-└── references/
-    └── api-docs.md
-```
+Catch errors only when the program can recover or add useful context. A missing input or permission failure must not silently return an empty successful result. Include the failing operation without exposing credentials. Interrupted or partial work remains incomplete.
 
-**Benefits**:
-- Keeps skill root clean and organized
-- Clear separation between documentation and executable code
-- Consistent pattern across all skills
-- Easy to reference: `python scripts/script_name.py`
+## Runtime
 
-**Reference pattern**: In SKILL.md, reference scripts using the `scripts/` path:
+Use `uv run` for Python, with PEP 723 dependencies for standalone scripts when useful. Reuse the repository's existing package manager for other languages. Resolve scripts from the skill directory; do not assume the current directory. Use the actual callable MCP schema, not invented `ServerName:tool_name` identifiers.
 
-```bash
-python ~/.agents/skills/skill-name/scripts/analyze.py input.har
-```
-</scripts_directory>
-</file_organization>
+## Verification
 
-<utility_scripts_pattern>
-<example>
-## Utility scripts
-
-**analyze_form.py**: Extract all form fields from PDF
-
-```bash
-python scripts/analyze_form.py input.pdf > fields.json
-```
-
-Output format:
-```json
-{
-  "field_name": { "type": "text", "x": 100, "y": 200 },
-  "signature": { "type": "sig", "x": 150, "y": 500 }
-}
-```
-
-**validate_boxes.py**: Check for overlapping bounding boxes
-
-```bash
-python scripts/validate_boxes.py fields.json
-# Returns: "OK" or lists conflicts
-```
-
-**fill_form.py**: Apply field values to PDF
-
-```bash
-python scripts/fill_form.py input.pdf fields.json output.pdf
-```
-</example>
-</utility_scripts_pattern>
-
-<solve_dont_punt>
-Handle error conditions rather than punting to the agent.
-
-<example type="good">
-```python
-def process_file(path):
-    """Process a file, creating it if it doesn't exist."""
-    try:
-        with open(path) as f:
-            return f.read()
-    except FileNotFoundError:
-        print(f"File {path} not found, creating default")
-        with open(path, 'w') as f:
-            f.write('')
-        return ''
-    except PermissionError:
-        print(f"Cannot access {path}, using default")
-        return ''
-```
-</example>
-
-<example type="bad">
-```python
-def process_file(path):
-    # Just fail and let the agent figure it out
-    return open(path).read()
-```
-</example>
-
-<configuration_values>
-Document configuration parameters to avoid "voodoo constants":
-
-<example type="good">
-```python
-# HTTP requests typically complete within 30 seconds
-REQUEST_TIMEOUT = 30
-
-# Three retries balances reliability vs speed
-MAX_RETRIES = 3
-```
-</example>
-
-<example type="bad">
-```python
-TIMEOUT = 47  # Why 47?
-RETRIES = 5   # Why 5?
-```
-</example>
-</configuration_values>
-</solve_dont_punt>
-
-<package_dependencies>
-<runtime_constraints>
-Skills run in code execution environments with platform-specific limitations:
-- Hosted agent runtimes may have package-install support
-- API-only runtimes may have no network access and no runtime package installation
-</runtime_constraints>
-
-<guidance>
-List required packages in your SKILL.md and verify they're available.
-
-<example type="good">
-Install required package: `pip install pypdf`
-
-Then use it:
-
-```python
-from pypdf import PdfReader
-reader = PdfReader("file.pdf")
-```
-</example>
-
-<example type="bad">
-"Use the pdf library to process the file."
-</example>
-</guidance>
-</package_dependencies>
-
-<mcp_tool_references>
-If your Skill uses MCP (Model Context Protocol) tools, always use fully qualified tool names.
-
-<format>ServerName:tool_name</format>
-
-<examples>
-- Use the BigQuery:bigquery_schema tool to retrieve table schemas.
-- Use the GitHub:create_issue tool to create issues.
-</examples>
-
-Without the server prefix, the agent may fail to locate the tool, especially when multiple MCP servers are available.
-</mcp_tool_references>
+Run normal, malformed-input, missing-input, and side-effect failure cases in temporary fixtures. Test repeat behavior and cleanup. Confirm the workflow interprets the script's exit status and output correctly. Inspect [using-scripts.md](using-scripts.md) for integration guidance.

@@ -18,7 +18,7 @@ const val = await env.FLAGS.getBooleanValue("my-flag", false);
 
 // ✅ GOOD — pass context attributes that rules reference
 const val = await env.FLAGS.getBooleanValue("my-flag", false, {
-  userId: "user-42",
+  targetingKey: "user-42",
   plan: "enterprise",
 });
 ```
@@ -53,9 +53,9 @@ const val = await env.FLAGS.getStringValue("checkout-flow", "original");
 // ❌ BAD — no targetingKey, rollout is random per request
 const val = await env.FLAGS.getBooleanValue("gradual-rollout", false);
 
-// ✅ GOOD — stable userId for consistent bucketing
+// ✅ GOOD — stable targetingKey for consistent bucketing
 const val = await env.FLAGS.getBooleanValue("gradual-rollout", false, {
-  userId: sessionUserId,
+  targetingKey: sessionUserId,
 });
 ```
 
@@ -70,9 +70,9 @@ const val = await env.FLAGS.getBooleanValue("gradual-rollout", false, {
 curl -X PUT -d '{"enabled": true}' ...
 
 # ✅ GOOD — GET first, modify, PUT back
-FLAG=$(curl -s -H "Authorization: Bearer $TOKEN" "$URL/flags/my-flag" | jq '.result')
+FLAG=$(curl --fail-with-body -sS -H "Authorization: Bearer $TOKEN" "$URL/flags/my-flag" | jq -e 'if .success == true and (.result | type) == "object" then .result | {key, type, default_variation, variations, rules, description, enabled} else error("Flag read failed") end')
 UPDATED=$(echo "$FLAG" | jq '.enabled = true')
-echo "$UPDATED" | curl -s -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d @- "$URL/flags/my-flag"
+echo "$UPDATED" | curl --fail-with-body -sS -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d @- "$URL/flags/my-flag"
 ```
 
 ### Reading REST Envelope Fields
@@ -103,7 +103,7 @@ jq '.errors[].message'
 
 **Cause:** The `authToken` passed to `FlagshipClientProvider` is visible in the browser. It can evaluate flags across all apps in the account.
 
-**Solution:** Use a token with minimal permissions (Flagship Evaluate only). Never use a token with write/management permissions in the browser.
+**Solution:** Keep the Cloudflare token on your server. Use a same-origin evaluation proxy that authenticates the session, allowlists public flag keys, and derives protected context attributes server-side. A browser-supplied plan or targeting key must not grant entitlement.
 
 ---
 
@@ -176,3 +176,5 @@ Flag changes propagate globally within seconds. During the brief propagation win
 - No Worker redeployment needed for flag changes.
 - If the dashboard is temporarily unavailable, evaluation continues using the last propagated configuration.
 - Flag changes made via the REST API and dashboard are equivalent — both trigger propagation.
+
+Initialize each OpenFeature provider once per process/Worker isolate, await readiness before evaluation, and pass user context per evaluation. Do not replace the global provider on every request or store user context globally. Inside Workers, direct env.FLAGS evaluation is the simplest option. Browser evaluation requires an application-owned proxy; implement its authentication, allowed keys, context derivation, and response contract before using the proxy URL above. Flag delivery is not an authorization system.

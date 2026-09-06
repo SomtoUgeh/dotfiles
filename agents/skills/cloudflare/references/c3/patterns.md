@@ -6,11 +6,11 @@
 # TypeScript API Worker
 npm create cloudflare@latest my-api -- --type=hello-world --lang=ts --deploy
 
-# Next.js on Pages
-npm create cloudflare@latest my-app -- --type=web-app --framework=next --platform=pages --ts --deploy
+# Next.js on Workers
+npm create cloudflare@latest my-app -- --framework=next --platform=workers --lang=ts --deploy
 
-# Astro static site  
-npm create cloudflare@latest my-blog -- --type=web-app --framework=astro --platform=pages --ts
+# Astro static site
+npm create cloudflare@latest my-blog -- --framework=astro --platform=pages --lang=ts
 ```
 
 ## CI/CD (GitHub Actions)
@@ -29,7 +29,7 @@ npm create cloudflare@latest my-blog -- --type=web-app --framework=astro --platf
 --no-git             # Recommended (CI already in git)
 --no-deploy          # Deploy separately with secrets
 --framework=<value>  # For web-app
---ts / --no-ts       # Required
+--lang=ts / --lang=js       # Required
 ```
 
 ## Monorepo
@@ -52,24 +52,16 @@ npm create cloudflare@latest -- --template=cloudflare/templates/worker-openapi
 npm create cloudflare@latest my-app -- --template=../my-template
 ```
 
-**Template requires `c3.config.json`:**
-```json
-{
-  "name": "my-template",
-  "category": "hello-world",
-  "copies": [{ "path": "src/" }, { "path": "wrangler.jsonc" }],
-  "transforms": [{ "path": "package.json", "jsonc": { "name": "{{projectName}}" }}]
-}
-```
+Templates are repositories in a supported degit URL format. Inspect the template and its dependency scripts before creation. `c3.config.json` with copies/transforms is not a supported public template contract; use the [C3 template documentation](https://developers.cloudflare.com/workers/get-started/prompting/).
 
 ## Existing Projects
 
 ```bash
 # Add Cloudflare to existing Worker
-npm create cloudflare@latest . -- --type=pre-existing --existing-script=./dist/index.js
+npm create cloudflare@latest . -- --type=pre-existing --existing-script=my-existing-worker
 
 # Add to existing framework app
-npm create cloudflare@latest . -- --type=web-app --framework=next --platform=pages --ts
+npm create cloudflare@latest . -- --framework=next --platform=workers --lang=ts
 ```
 
 ## Post-Creation Checklist
@@ -78,5 +70,7 @@ npm create cloudflare@latest . -- --type=web-app --framework=next --platform=pag
 2. Create bindings: `wrangler kv namespace create`, `wrangler d1 create`, `wrangler r2 bucket create`
 3. Generate types: `npm run cf-typegen`
 4. Test: `npm run dev`
-5. Deploy: `npm run deploy`
-6. Set secrets: `wrangler secret put SECRET_NAME`
+5. Provision required secrets: `wrangler secret put SECRET_NAME`
+6. Deploy when ready: `npm run deploy`
+
+`--existing-script` downloads a deployed Worker; it does not convert local source or migrate an existing framework app. For an existing app, follow its current Workers framework guide. Workers Static Assets also support static sites, and Workers Builds supports Git workflows; Pages is an explicit framework-dependent choice. Inspect generated package scripts instead of assuming every framework uses the same names.

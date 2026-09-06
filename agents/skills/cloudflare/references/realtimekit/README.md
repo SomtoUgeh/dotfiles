@@ -1,113 +1,59 @@
 # Cloudflare RealtimeKit
 
-Expert guidance for building real-time video and audio applications using **Cloudflare RealtimeKit** - a comprehensive SDK suite for adding customizable live video and voice to web or mobile applications.
+RealtimeKit supplies meeting state, media transport, and UI components for web/mobile audio-video applications. Use raw [Realtime SFU](../realtime-sfu/) when you need direct WebRTC signaling control.
 
-## Overview
+## Concepts
 
-RealtimeKit is Cloudflare's SDK suite built on Realtime SFU, abstracting WebRTC complexity with fast integration, pre-built UI components, global performance (300+ cities), and production features (recording, transcription, chat, polls).
-
-**Use cases**: Team meetings, webinars, social video, audio calls, interactive plugins
-
-## Core Concepts
-
-- **App**: Workspace grouping meetings, participants, presets, recordings. Use separate Apps for staging/production
-- **Meeting**: Re-usable virtual room. Each join creates new **Session**
-- **Session**: Live meeting instance. Created on first join, ends after last leave
-- **Participant**: User added via REST API. Returns `authToken` for client SDK. **Do not reuse tokens**
-- **Preset**: Reusable permission/UI template (permissions, meeting type, theme). Applied at participant creation
-- **Peer ID** (`id`): Unique per session, changes on rejoin
-- **Participant ID** (`userId`): Persistent across sessions
+An app groups meetings, presets, participants, and recordings. A meeting is reusable; a session is a live instance. A participant credential authenticates one participant; do not share it between users. Presets assign permissions and UI defaults. Keep staging and production apps separate.
 
 ## Quick Start
 
-### 1. Create App & Meeting (Backend)
+1. Create an API token with Realtime / Realtime Admin permissions.
+2. Create an app and preset in the dashboard, then create a meeting and add a participant through the backend REST API.
+3. Pass the returned participant token as the client SDK's `authToken` option.
+4. Initialize a meeting object and pass that object to the UI component.
 
 ```bash
-# Create app
-curl -X POST 'https://api.cloudflare.com/client/v4/accounts/<account_id>/realtime/kit/apps' \
-  -H 'Authorization: Bearer <api_token>' \
-  -d '{"name": "My RealtimeKit App"}'
-
-# Create meeting
-curl -X POST 'https://api.cloudflare.com/client/v4/accounts/<account_id>/realtime/kit/<app_id>/meetings' \
-  -H 'Authorization: Bearer <api_token>' \
-  -d '{"title": "Team Standup"}'
-
-# Add participant
-curl -X POST 'https://api.cloudflare.com/client/v4/accounts/<account_id>/realtime/kit/<app_id>/meetings/<meeting_id>/participants' \
-  -H 'Authorization: Bearer <api_token>' \
-  -d '{"name": "Alice", "preset_name": "host"}'
-# Returns: { authToken }
+npm install @cloudflare/realtimekit-react @cloudflare/realtimekit-react-ui
 ```
 
-### 2. Client Integration
-
-**React**:
 ```tsx
+import { useState } from 'react';
+import { useRealtimeKitClient, RealtimeKitProvider } from '@cloudflare/realtimekit-react';
 import { RtkMeeting } from '@cloudflare/realtimekit-react-ui';
 
-function App() {
-  return <RtkMeeting authToken="<participant_auth_token>" onLeave={() => {}} />;
+export function MeetingPage({ authToken }: { authToken: string }) {
+  const [meeting, initMeeting] = useRealtimeKitClient();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string>();
+  async function start() {
+    setPending(true);
+    setError(undefined);
+    try {
+      await initMeeting({ authToken, defaults: { audio: true, video: true } });
+    } catch {
+      setError('Could not initialize the meeting. Please try again.');
+    } finally {
+      setPending(false);
+    }
+  }
+  if (!meeting) return <div>
+    <button disabled={pending} onClick={start}>Join meeting</button>
+    {error && <p role="alert">{error}</p>}
+  </div>;
+  return <RealtimeKitProvider value={meeting}>
+    <RtkMeeting meeting={meeting} showSetupScreen={true} leaveOnUnmount={true} />
+  </RealtimeKitProvider>;
 }
 ```
 
-**Core SDK**:
-```typescript
-import RealtimeKitClient from '@cloudflare/realtimekit';
-
-const meeting = new RealtimeKitClient({ authToken: '<token>', video: true, audio: true });
-await meeting.join();
-```
+Keep this component keyed by participant/meeting identity so changing credentials creates a fresh lifecycle. The setup screen handles joining; avoid joining a second time yourself.
 
 ## Reading Order
 
-| Task | Files |
-|------|-------|
-| Quick integration | README only |
-| Custom UI | README → patterns → api |
-| Backend setup | README → configuration |
-| Debug issues | gotchas |
-| Advanced features | patterns → api |
+- [configuration.md](configuration.md): packages, credentials, media settings, branding.
+- [api.md](api.md): SDK methods and backend token creation.
+- [patterns.md](patterns.md): custom controls, events, plugins, cleanup.
+- [gotchas.md](gotchas.md): initialization, permissions, reconnects and verification.
 
-## RealtimeKit vs Realtime SFU
-
-| Choose | When |
-|--------|------|
-| **RealtimeKit** | Need pre-built UI, fast integration, React/Angular/HTML |
-| **Realtime SFU** | Building from scratch, custom WebRTC, full control |
-
-RealtimeKit is built on Realtime SFU but abstracts WebRTC complexity with UI components and SDKs.
-
-## Which Package?
-
-Need pre-built meeting UI?
-- React → `@cloudflare/realtimekit-react-ui` (`<RtkMeeting>`)
-- Angular → `@cloudflare/realtimekit-angular-ui`
-- HTML/Vanilla → `@cloudflare/realtimekit-ui`
-
-Need custom UI?
-- Core SDK → `@cloudflare/realtimekit` (RealtimeKitClient) - full control
-
-Need raw WebRTC control?
-- See `realtime-sfu/` reference
-
-## In This Reference
-
-- [Configuration](./configuration.md) - Setup, installation, wrangler config
-- [API](./api.md) - Meeting object, REST API, SDK methods
-- [Patterns](./patterns.md) - Common workflows, code examples
-- [Gotchas](./gotchas.md) - Common issues, troubleshooting
-
-## See Also
-
-- [Workers](../workers/) - Backend integration
-- [D1](../d1/) - Meeting metadata storage
-- [R2](../r2/) - Recording storage
-- [KV](../kv/) - Session management
-
-## Reference Links
-
-- **Official Docs**: https://developers.cloudflare.com/realtime/realtimekit/
-- **API Reference**: https://developers.cloudflare.com/api/resources/realtime_kit/
-- **Examples**: https://github.com/cloudflare/realtimekit-web-examples
-- **Dashboard**: https://dash.cloudflare.com/?to=/:account/realtime/kit
+[Official quickstart](https://developers.cloudflare.com/realtime/realtimekit/quickstart/) · [API reference](https://developers.cloudflare.com/api/resources/realtime_kit/)

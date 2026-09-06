@@ -2,11 +2,11 @@
 
 ### ⚠️ WebSocket: fetch() vs containerFetch()
 
-**Problem:** WebSocket connections fail silently
+**Problem:** A WebSocket upgrade fails when `containerFetch()` is called through external Durable Object RPC.
 
-**Cause:** `containerFetch()` doesn't support WebSocket upgrades
+**Cause:** The external RPC transport cannot return the WebSocket response. Inside the container Durable Object, `this.containerFetch(request)` supports upgrades.
 
-**Fix:** Always use `fetch()` for WebSocket
+**Fix:** Use the fetch handler transport, `stub.fetch(request)`, for external upgrades.
 
 ```typescript
 // ❌ WRONG
@@ -20,39 +20,23 @@ return container.fetch(request);
 
 **Problem:** "connection refused" after `start()`
 
-**Cause:** `start()` returns when process starts, NOT when ports ready
+**Cause:** `start()` does not wait for port readiness. Direct TCP/port operations need an explicit readiness wait. The SDK `fetch()` and `containerFetch()` methods already start the container and wait for their target port.
 
-**Fix:** Use `startAndWaitForPorts()` before requests
+**Fix:** Use `startAndWaitForPorts()` for explicit prewarming or before direct port operations. Ordinary SDK fetch calls handle readiness.
 
 ```typescript
-// ❌ WRONG
+// Valid, but start() is redundant: fetch() handles startup and readiness.
 await container.start();
 return container.fetch(request);
 
-// ✅ CORRECT
+// Explicit prewarming, useful when startup needs separate control.
 await container.startAndWaitForPorts();
 return container.fetch(request);
 ```
 
-### ⚠️ Activity Timeout on Long Operations
+### Activity timeout during background work
 
-**Problem:** Container stops during long work
-
-**Cause:** `sleepAfter` based on request activity, not internal work
-
-**Fix:** Renew timeout by touching storage
-
-```typescript
-const interval = setInterval(() => {
-  this.ctx.storage.put("keepalive", Date.now());
-}, 60000);
-
-try {
-  await this.doLongWork(data);
-} finally {
-  clearInterval(interval);
-}
-```
+Call `this.renewActivityTimeout()` when appropriate. Writing arbitrary Durable Object storage does not renew container activity. Use a bounded job lifetime and clear renewal timers; long work that must survive request termination needs durable orchestration.
 
 ### ⚠️ blockConcurrencyWhile for Startup
 
@@ -83,7 +67,7 @@ await this.ctx.blockConcurrencyWhile(async () => {
 
 **Cause:** `schedule()` uses `alarm()` internally
 
-**Fix:** Implement `alarm()` to handle scheduled tasks
+**Fix:** Keep the inherited alarm handler and pass a callback method name to `schedule(delaySeconds, callback, payload)`.
 
 ## Common Errors
 
@@ -99,9 +83,9 @@ await this.ctx.blockConcurrencyWhile(async () => {
 
 ### "Port not available"
 
-**Cause:** Calling `fetch()` before port ready
+**Cause:** The target port is not listening within the readiness timeout, or direct TCP/port code skipped readiness.
 
-**Solution:** Use `startAndWaitForPorts()`
+**Solution:** Verify the target port and server bind address. Use `startAndWaitForPorts()` before direct port access.
 
 ### "Container memory exceeded"
 
@@ -113,10 +97,7 @@ await this.ctx.blockConcurrencyWhile(async () => {
 - Use custom instance type
 
 ```jsonc
-"instance_type_custom": {
-  "vcpu": 2,
-  "memory_mib": 8192
-}
+{ "instance_type": { "vcpu": 2, "memory_mib": 8192, "disk_mb": 16000 } }
 ```
 
 ### "Max instances reached"
@@ -140,30 +121,17 @@ await this.ctx.blockConcurrencyWhile(async () => {
 
 ## Limits
 
-| Resource | Limit | Notes |
-|----------|-------|-------|
-| Cold start | 2-3s | Image pre-fetched globally |
-| Graceful shutdown | 15 min | SIGTERM → SIGKILL |
-| `start()` timeout | 8s | Process start |
-| `startAndWaitForPorts()` timeout | 20s | Port ready |
-| Max vCPU per container | 4 | standard-4 or custom |
-| Max memory per container | 12 GiB | standard-4 or custom |
-| Max disk per container | 20 GB | Ephemeral, resets |
-| Account total memory | 400 GiB | All containers |
-| Account total vCPU | 100 | All containers |
-| Account total disk | 2 TB | All containers |
-| Image storage | 50 GB | Per account |
-| Disk persistence | None | Use DO storage |
+Read the [current limits and instance types](https://developers.cloudflare.com/containers/platform/limits/) for account totals and allocation constraints. Cold start duration is workload-dependent. SDK startup timeouts are configurable and are not infrastructure capacity limits. Container disk is ephemeral; store durable state externally or in Durable Object storage.
 
 ## Best Practices
 
-1. **Use `startAndWaitForPorts()` by default** - Prevents port errors
+1. **Wait for ports before direct access** - SDK fetch calls already handle readiness
 2. **Set appropriate `sleepAfter`** - Balance resources vs cold starts
-3. **Use `fetch()` for WebSocket** - Not `containerFetch()`
+3. **Use stub `fetch()` for external WebSocket upgrades** - `this.containerFetch()` is valid inside the Durable Object
 4. **Design for restarts** - Ephemeral disk, implement graceful shutdown
 5. **Monitor resources** - Stay within account limits
 6. **Keep hooks fast** - Run in `blockConcurrencyWhile`
-7. **Renew activity for long ops** - Touch storage to prevent timeout
+7. **Renew activity for long ops** - Use `renewActivityTimeout()`
 
 ## Beta Caveats
 

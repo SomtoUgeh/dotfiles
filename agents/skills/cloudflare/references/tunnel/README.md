@@ -5,10 +5,10 @@ Secure outbound-only connections between infrastructure and Cloudflare's global 
 ## Overview
 
 Cloudflare Tunnel (formerly Argo Tunnel) enables:
-- **Outbound-only connections** - No inbound ports or firewall changes
+- **Outbound-only connections** - No inbound ports; outbound firewall access is still required
 - **Public hostname routing** - Expose local services to internet
 - **Private network access** - Connect internal networks via WARP
-- **Zero Trust integration** - Built-in access policies
+- **Zero Trust integration** - Can be protected by separately configured Access/Gateway policies
 
 **Architecture**: Tunnel (persistent object) → Replica (`cloudflared` process) → Origin services
 
@@ -42,7 +42,7 @@ cloudflared tunnel run my-tunnel
 1. **Zero Trust** > **Networks** > **Tunnels** > **Create**
 2. Name tunnel, copy token
 3. Configure routes in dashboard
-4. Run: `cloudflared tunnel --no-autoupdate run --token <TOKEN>`
+4. Supply `TUNNEL_TOKEN` through the existing secret manager and run `cloudflared tunnel --no-autoupdate run`. Do not paste a token into recorded shell commands.
 
 ## Decision Tree
 
@@ -53,8 +53,7 @@ Need centralized config updates?
 └─ No → Local config file
 
 Multiple environments (dev/staging/prod)?
-├─ Yes → Local config (version controlled)
-└─ No → Either works
+└─ Either source works; isolate tunnel identity and configuration per environment
 
 Need firewall approval?
 └─ See networking.md first
@@ -71,7 +70,7 @@ cloudflared tunnel delete <name>
 
 # DNS routing
 cloudflared tunnel route dns <tunnel> <hostname>
-cloudflared tunnel route list
+cloudflared tunnel route ip show
 
 # Private network
 cloudflared tunnel route ip add 10.0.0.0/8 <tunnel>
@@ -93,7 +92,8 @@ ingress:
   - hostname: api.example.com
     service: https://localhost:8443
     originRequest:
-      noTLSVerify: true
+      originServerName: api.example.com
+      noTLSVerify: false
   - service: http_status:404
 ```
 
@@ -125,5 +125,5 @@ ingress:
 ## See Also
 
 - [workers](../workers/) - Workers with Tunnel integration
-- [access](../access/) - Zero Trust access policies
-- [warp](../warp/) - WARP client for private networks
+- [cloudflare-one](../../../cloudflare-one/SKILL.md) - Zero Trust access policies
+- [Cloudflare One Client](https://developers.cloudflare.com/cloudflare-one/team-and-resources/devices/warp/) - Private network client configuration

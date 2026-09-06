@@ -29,7 +29,7 @@ Private, high-performance connectivity to Cloudflare's network. **Enterprise-onl
 - Enterprise plan
 - IPv4 /24+ or IPv6 /48+ prefixes
 - BGP ASN for v1
-- See [locations PDF](https://developers.cloudflare.com/network-interconnect/static/cni-locations-2026-01.pdf)
+- Find current locations through the [CNI setup documentation](https://developers.cloudflare.com/network-interconnect/get-started/); do not assume a dated PDF exists.
 
 ## Specs
 
@@ -82,7 +82,7 @@ Private, high-performance connectivity to Cloudflare's network. **Enterprise-onl
 **Requires Account Team:**
 - Initial request approval
 - AWS Direct Connect setup (send LOA+VLAN to CF)
-- GCP Cloud Interconnect final activation
+- GCP Cloud Interconnect final activation where required by the provisioning flow
 - Partner interconnect acceptance (Equinix, Megaport)
 - VLAN assignment (v1)
 - Configuration document generation (v1)
@@ -91,7 +91,7 @@ Private, high-performance connectivity to Cloudflare's network. **Enterprise-onl
 **Cannot Be Automated:**
 - Physical cross-connect installation (Direct)
 - Partner portal operations (virtual circuit ordering)
-- AWS/GCP portal operations
+- Cloud-provider ordering may have separate APIs; verify the provider-specific workflow
 - Maintenance window coordination
 
 ## See Also

@@ -15,6 +15,7 @@
 #   "account_mismatch"  ; $CLOUDFLARE_ACCOUNT_ID is set but is not in the token's accounts list
 #   "network_failure"   ; the Edit-scope probe could not reach the Cloudflare API
 #   "upstream_failure"  ; the Edit-scope probe returned an unexpected upstream response
+#   "cleanup_failed"    ; accidental widget creation could not be confirmed cleaned up
 #
 # Account enumeration uses `WRANGLER_BIN whoami --json` only when WRANGLER_BIN is
 # an approved canonical absolute path outside PROJECT_ROOT and WRANGLER_VERSION
@@ -171,18 +172,18 @@ fi
 # The API rejects the empty-name/empty-domains payload with 400 today, so
 # no widget is created. If validation ever loosens and the probe accidentally
 # creates one, we detect the returned sitekey and DELETE it as a safety net
-# so the probe stays side-effect-free.
+# and report cleanup_failed if deletion cannot be confirmed.
 account_enc=$(python3 -I -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$account_id")
 
 if ! probe_response="$(
   printf 'header = "Authorization: Bearer %s"\n' "$token" |
-    curl --disable --config - --silent --show-error --write-out $'\n%{http_code}' -X POST \
+    curl --disable --connect-timeout 10 --max-time 30 --config - --silent --show-error --write-out $'\n%{http_code}' -X POST \
       "https://api.cloudflare.com/client/v4/accounts/$account_enc/challenges/widgets" \
       -H "Content-Type: application/json" \
       --data '{"name":"","domains":[]}'
 )"; then
   echo "auth-probe: network failure probing Edit scope on account $account_id." >&2
-  emit '{"status":"network_failure","account_id":"'"$account_id"'"}'
+  emit "$(python3 -I -c 'import json,sys; print(json.dumps({"status":"network_failure","account_id":sys.argv[1]}))' "$account_id")"
 fi
 
 edit_code="${probe_response##*$'\n'}"
@@ -197,32 +198,29 @@ try:
     data = json.loads(raw) if raw else {}
 except Exception:
     data = None
-if isinstance(data, dict):
-    errors = data.get("errors") or []
-    if not isinstance(errors, list):
-        errors = []
-    first = (errors[0] or {}) if errors else {}
-    if not isinstance(first, dict):
-        first = {}
-    first_code = first.get("code", 0)
+if isinstance(data, dict) and isinstance(data.get("success"), bool):
+    errors = data.get("errors")
+    has_errors = isinstance(errors, list) and bool(errors) and all(
+        isinstance(error, dict) and type(error.get("code")) is int and error["code"] >= 1000
+        for error in errors
+    )
+    rejected = data["success"] is False and has_errors
+    # Successful creation must identify the exact widget we need to delete.
+    result = data.get("result")
+    if isinstance(result, dict) and data["success"] is True:
+        sk = result.get("sitekey", "")
+        if isinstance(sk, str) and sk and sk.strip() == sk:
+            created_sitekey = sk
     if http_code in ("401", "403"):
         verdict = "missing_scope"
-    elif http_code == "200" and data.get("success") is False and first_code == 10000:
+    elif rejected and any(error["code"] == 10000 for error in errors):
         verdict = "missing_scope"
-    elif http_code in ("400", "422"):
+    elif http_code in ("200", "400", "422") and rejected:
         verdict = "scope_ok"
-    elif http_code == "200":
-        # Any 200 that got past auth means scope is fine (whether success or not).
+    elif http_code == "200" and created_sitekey:
         verdict = "scope_ok"
     else:
         verdict = f"unexpected_{http_code}"
-    # Detect accidental widget creation (safety net if API validation ever
-    # accepts the empty-name/empty-domains probe payload).
-    result = data.get("result")
-    if isinstance(result, dict) and data.get("success") is True:
-        sk = result.get("sitekey", "")
-        if isinstance(sk, str) and sk:
-            created_sitekey = sk
 print(f"{verdict}|{created_sitekey}")
 ' "$edit_code")
 unset probe_body probe_response
@@ -231,19 +229,47 @@ created_sitekey="${probe_output#*|}"
 [ "$created_sitekey" = "$probe_output" ] && created_sitekey=""
 
 # If the probe unexpectedly created a widget (API validation loosened),
-# DELETE it so the probe stays side-effect-free.
+# DELETE only that widget. Never report ok while cleanup remains unconfirmed.
 if [ -n "$created_sitekey" ]; then
   echo "auth-probe: probe unexpectedly created widget $created_sitekey; cleaning up..." >&2
   sk_enc=$(python3 -I -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$created_sitekey")
-  cleanup_code=$(
+  if cleanup_response=$(
     printf 'header = "Authorization: Bearer %s"\n' "$token" |
-      curl --disable --config - --silent --show-error --output /dev/null --write-out "%{http_code}" -X DELETE \
-        "https://api.cloudflare.com/client/v4/accounts/$account_enc/challenges/widgets/$sk_enc" || echo "000"
-  )
-  case "$cleanup_code" in
-    2*) echo "auth-probe: cleanup DELETE for widget $created_sitekey succeeded (HTTP $cleanup_code)." >&2 ;;
-    *)  echo "auth-probe: cleanup DELETE for widget $created_sitekey FAILED (HTTP $cleanup_code). Please remove it from the Turnstile dashboard manually." >&2 ;;
-  esac
+      curl --disable --connect-timeout 10 --max-time 30 --config - --silent --show-error --write-out $'\n%{http_code}' -X DELETE \
+        "https://api.cloudflare.com/client/v4/accounts/$account_enc/challenges/widgets/$sk_enc"
+  ); then
+    cleanup_code="${cleanup_response##*$'\n'}"
+    cleanup_body="${cleanup_response%$'\n'*}"
+    cleanup_reason=$(printf '%s' "$cleanup_body" | python3 -I -c '
+import json, sys
+try:
+    code = int(sys.argv[1])
+    if not 200 <= code < 300:
+        result = "http_error"
+    else:
+        data = json.load(sys.stdin)
+        result = "cleaned" if isinstance(data, dict) and data.get("success") is True else "unexpected_response"
+except (ValueError, TypeError):
+    result = "unexpected_response"
+print(result)
+' "$cleanup_code")
+  else
+    cleanup_code="000"
+    cleanup_reason="network_failure"
+  fi
+  unset cleanup_response cleanup_body
+  if [ "$cleanup_reason" != "cleaned" ]; then
+    echo "auth-probe: cleanup for widget $created_sitekey is unconfirmed ($cleanup_reason). Stop setup and resolve this widget in account $account_id before retrying the probe." >&2
+    emit "$(python3 -I -c '
+import json, sys
+account_id, sitekey, reason, http_code = sys.argv[1:]
+print(json.dumps({
+    "status": "cleanup_failed", "account_id": account_id, "sitekey": sitekey,
+    "reason": reason, "http_code": int(http_code) if http_code.isdigit() else 0,
+}))
+' "$account_id" "$created_sitekey" "$cleanup_reason" "$cleanup_code")"
+  fi
+  echo "auth-probe: cleanup DELETE for widget $created_sitekey confirmed (HTTP $cleanup_code)." >&2
 fi
 
 case "$verdict" in

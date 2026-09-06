@@ -161,7 +161,7 @@ loader() executes
        ↓
 ensureQueryData() checks cache
        ↓
-Fresh cache? → Return cached     Stale/missing? → Fetch and cache
+Cached data? → Return cached      Missing data? → Fetch and cache
        ↓                                    ↓
 Route renders                         Route renders
        ↓                                    ↓
@@ -170,7 +170,7 @@ useSuspenseQuery returns data     useSuspenseQuery returns data
 
 ## Context
 
-- `ensureQueryData` respects staleTime - won't refetch fresh data
+- `ensureQueryData` returns cached data even when stale. Set `revalidateIfStale: true` for background refresh; use `fetchQuery` to await fresh data.
 - `useSuspenseQuery` throws promise to Suspense if data missing
 - Loaders enable preloading on link hover
 - This pattern eliminates loading waterfalls

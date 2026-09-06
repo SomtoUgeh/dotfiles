@@ -8,7 +8,7 @@ Three properties make a plan executable by a weaker model:
 2. **Verification gates** — every step ends with a command and its expected result. The executor never has to *judge* whether it succeeded.
 3. **Hard boundaries and escape hatches** — explicit out-of-scope list, and "STOP and report" conditions instead of letting the model improvise when reality doesn't match the plan.
 
-File naming: `plans/NNN-short-slug.md`, numbered in recommended execution order.
+File naming: `<chosen-plan-directory>/NNN-short-slug.md`, numbered in recommended execution order. Replace every `plans/` example below with that chosen directory before saving a plan.
 
 ---
 
@@ -24,7 +24,7 @@ File naming: `plans/NNN-short-slug.md`, numbered in recommended execution order.
 > in `plans/README.md` — unless a reviewer dispatched you and told you they
 > maintain the index.
 >
-> **Drift check (run first)**: `git diff --stat <planned-at SHA>..HEAD -- <in-scope paths>`
+> **Drift check (run first)**: compare `git diff <planned-at SHA> -- <in-scope paths>` and `git ls-files --others --exclude-standard -- <in-scope paths>` with the recorded source snapshot. Include any relevant uncommitted state recorded when planning.
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
@@ -98,7 +98,7 @@ executor's environment. Skip the section otherwise.)
 (Filled from recon — match the repo's observed conventions.)
 
 - Branch: `advisor/NNN-<slug>` (or the repo's branch-naming convention if one is evident)
-- Commit per step or per logical unit; message style: <match repo, e.g. conventional commits — include an example from `git log`>
+- Commit only if the user explicitly requested it; when authorized, use a coherent logical unit and the repository's message convention.
 - Do NOT push or open a PR unless the operator instructed it.
 
 ## Steps
@@ -132,7 +132,7 @@ Machine-checkable. ALL must hold:
 - [ ] `pnpm typecheck` exits 0
 - [ ] `pnpm test` exits 0; new tests for <X> exist and pass
 - [ ] `grep -rn "<old pattern>" src/` returns no matches
-- [ ] No files outside the in-scope list are modified (`git status`)
+- [ ] Compare the recorded starting snapshot with all committed and uncommitted changes; no newly changed path falls outside scope. Preserve pre-existing unrelated modifications.
 - [ ] `plans/README.md` status row updated
 
 ## STOP conditions

@@ -43,7 +43,7 @@ If a migration failed (e.g., syntax error) and you fixed the SQL or want to retr
 prisma migrate resolve --rolled-back 20240115120000_failed_migration
 ```
 
-This tells Prisma "Forget this migration run, let me try applying it again".
+This changes migration history only; it does not undo SQL or remove objects created before the failure. Inspect and repair any partially applied changes before retrying `prisma migrate deploy`. For example, a failed migration can leave its first `CREATE TABLE` in place, so retrying the same SQL without cleanup would fail again.
 
 ## Use Cases
 

@@ -58,7 +58,7 @@ npx wrangler pipelines create my_pipeline \
 
 Tuning knobs (`--compression`, `--roll-interval`, `--roll-size`, etc.) and their allowed values/defaults change — pull the wrangler-commands and sinks docs rather than hardcoding. Rule of thumb: prod `--roll-interval 300+`, dev `10` (creates many small files).
 
-> **⚠️ Pipelines are immutable.** SQL, schema, and sink config can't be changed — delete and recreate.
+> **⚠️ Pipelines are immutable.** Check which field is changing: stream HTTP settings can be updated; schema changes need a new stream. Drain and reconcile data before retiring resources.
 
 ## Option C: REST API (Programmatic)
 
@@ -69,7 +69,7 @@ Base: `https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/pipelines/v1`
 curl -X POST "$BASE_URL/streams" -H "Authorization: Bearer $API_TOKEN" \
   -H "Content-Type: application/json" -d '{
     "name": "my_stream",
-    "http": {"enabled": true, "authentication": false},
+    "http": {"enabled": true, "authentication": true},
     "schema": {"fields": [{"name": "event_id", "type": "string", "required": true}]}
   }'
 
@@ -117,7 +117,7 @@ resource "cloudflare_pipeline_stream" "my_stream" {
   name           = "my_stream"
   format         = { type = "json" }
   schema         = { fields = [{ name = "value", type = "json", required = true }] }
-  http           = { enabled = true, authentication = false, cors = {} }
+  http           = { enabled = true, authentication = true, cors = {} }
   worker_binding = { enabled = false }
 }
 

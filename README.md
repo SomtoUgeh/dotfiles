@@ -42,7 +42,6 @@ The install script creates this folder layout:
 │   │   └── dotfiles/        # This repo
 │   └── work/                # Swissblock identity (somto-swissblock)
 ├── bin/                     # Custom scripts (in PATH)
-├── .git-hooks/              # -> git/hooks (global core.hooksPath)
 ├── .config/                 # XDG config home
 └── .ssh/                    # Public keys only; private keys live in 1Password
 ```
@@ -99,8 +98,7 @@ dotfiles/
 ├── git/                    # Git configuration
 │   ├── .gitconfig
 │   ├── .gitignore_global
-│   ├── SIGNING.md          # two-identity SSH signing setup
-│   └── hooks/              # global hooks (worm guard pre-commit)
+│   └── SIGNING.md          # two-identity SSH signing setup
 ├── config/
 │   ├── vscode/             # settings, keybindings, extensions.txt
 │   ├── zed/                # settings and keymap
@@ -118,11 +116,13 @@ dotfiles/
 ├── scripts/
 │   ├── setup_ssh_from_1password.sh   # rebuild keys + signing from the vault
 │   ├── scan_repo.sh                  # scan an untrusted repo before opening
+│   ├── scan_remote.sh                # inspect GitHub contents without cloning
 │   ├── apply_github_rulesets.sh      # push branch protection to repos
 │   ├── enable_touchid_sudo.sh
 │   ├── setup_altschool_cloud.sh
 │   ├── install_cloud_dotfiles.sh
 │   └── verify_altschool_cloud.sh
+├── tests/                  # Scanner, installer and agent regression tests
 ├── macos/
 │   └── defaults.sh         # macOS system preferences
 └── templates/              # Templates for sensitive / machine-local files
@@ -136,9 +136,7 @@ dotfiles/
     ├── gh-hosts-personal.yml.template   # gh active account: SomtoUgeh
     ├── gh-hosts-work.yml.template       # gh active account: somto-swissblock
     ├── envrc-personal.template          # -> ~/code/personal/.envrc
-    ├── envrc-work.template              # -> ~/code/work/.envrc
-    ├── env.template
-    └── aws-config.template
+    └── envrc-work.template              # -> ~/code/work/.envrc
 ```
 
 ## Key Configurations
@@ -241,125 +239,101 @@ downloaded manually (e.g. Dia browser).
 ### Browser Extensions
 Install from respective stores after browser setup.
 
-## Security
+## Repository scanning
 
-Defences against a repo you did not write. Prompted by a real git config
-injection worm, which hid a payload behind a long whitespace run in an
-interpreted config file and used `.vscode/tasks.json` with `runOn: folderOpen`
-to run it.
+### New-machine setup
 
-Every live sample padded with **tabs**, not spaces — 273 of them. Every public
-scanner for this campaign matches ` {100,}`, spaces only, and misses all of
-them. The padding checks here use a whitespace class for that reason, and the
-long-line check does not care about padding at all.
+`install.sh` installs the manual scanner commands in `~/bin`, together with
+Git, uv and Python through the Brewfile. The Ubuntu installer installs the two
+scanners in `~/.local/bin` and supplies Python and uv. Both require Python 3.9
+or newer. Tests and helper modules
+stay in the repository. Neither installer enables monitoring or global Git
+scan hooks. Normal commits, pulls and builds use the project's own workflow.
 
-### Scan before you open
+VS Code keeps workspace trust enabled and automatic tasks disabled. Review
+individual repositories before trusting them; trusting a parent directory also
+trusts future clones. Manually starting a build still executes repository code.
 
-```bash
-scan_repo.sh /path/to/untrusted-repo     # 16 checks
-scan_repo.sh --selftest                  # 12/12 detectable groups must fire
-```
-
-The checks cover the dropper (`.vscode` folderOpen tasks, a task running `node`
-against a `.woff2`, fake font magic bytes), the payload (50+ whitespace padding,
-a padding-independent long-line check,
-`global.i="A8-3997-1"` and friends, Unicode-escaped `require`, `createRequire`
-prepended to ESM), the C2 endpoints, the worm's `.gitignore` edits including the
-line that hides itself, the malicious npm dependency, a leaked `gho_` OAuth
-token, and two git-history checks — known dropper blob SHAs, and the
-author/committer timezone mismatch that marks a server-side rewrite.
-
-A detector contains the strings it detects. Any file carrying the marker
-`worm-guard:allow-signatures` is skipped, and the IOC literals in the scanner
-and the hook are assembled from fragments so they do not trip other people's
-scanners either.
-
-Run it before opening an unfamiliar repo in an editor.
-
-**It only sees local clones.** In the documented incident 23 of 42 infected
-repositories had no local copy, and the local scanner said CLEAN every round —
-truthfully. The laptop was never infected. The GitHub repositories were.
-Enumerate from the GitHub API, not from disk.
-
-### Watch the remotes
+### One-time manual scans
 
 ```bash
-watch_remotes.sh                      # every pushable repo, what moved since last run
-watch_remotes.sh --deep               # every branch tip, not just the default
-watch_remotes.sh --repo owner/name    # one repo
-watch_remotes.sh --repo R --ref SHA   # check one commit before you trust it
-watch_remotes.sh --selftest           # prove the patterns can still fail
+scan_repo.sh /absolute/path/to/repository
+scan_remote.sh --account personal --repo OWNER/REPO --ref COMMIT_SHA
+scan_remote.sh --account personal --repo OWNER/REPO
 ```
 
-This answers the question above. It lists your pushable repos from the API,
-saves the last sha it saw for each ref, and next run scans only the refs that
-moved. Every call is a GET, so the script cannot change a repo.
+The local scanner reads the working tree and available Git objects as data.
+Dependencies, unreadable files, oversized files and missing shallow history are
+reported scope limits; inspect the report. It runs Python through uv with
+project discovery, environment-file loading and downloads disabled. The remote
+scanner uses GitHub GET requests, verifies blob hashes and sizes, and never
+clones or executes the repository. Both use the same detection rules.
 
-What it finds on a remote, with no clone:
+Exit codes: **0 = requested checks completed without findings; 1 = findings;
+2 = incomplete.** A signature match needs investigation; it does not prove
+execution or machine compromise. An incomplete scan is not a clean verdict.
+Even a completed scan covers known indicators within its stated scope, not
+all malware. Remote scans exclude full commit history, native binary internals,
+LFS contents and unrequested pull request refs. Explicit `--ref` scans cover
+only that ref. Findings show paths and locations without secret values.
 
-- a ref that moved, including a tip that moved backwards. Every moved ref is
-  scanned, not just the default branch, and a plain fast-forward push counts.
-  A stale feature branch is already behind, so the worm does not need a
-  rewrite to move it — two of the four branches it hit arrived that way
-- `.vscode` folderOpen tasks in the tree listing, and fonts checked by magic
-  bytes rather than by name. The payload was called `fa-solid-400.woff2` in
-  one batch and `fa-solid-500.woff2` in another, while `fa-solid-900.woff2`
-  is the genuine Font Awesome file — so the name proves nothing either way
-- whitespace padding and very long lines inside config file contents
-- a config file it could not read. Configs are fetched as blobs by sha, so
-  size is no limit, and a read that fails three times is reported rather than
-  skipped. There is deliberately no file-size check: an "over 3000 bytes"
-  heuristic lived here for a while and its only hit in practice was a real
-  Tailwind palette, so the content checks below carry that work instead
-- ghost commits: same email, but different author and committer names
-
-It runs every 4 hours from `templates/worm-guard-watch.plist.template`,
-installed as a LaunchAgent so `gh` can read the login keychain. Log:
-`~/.local/state/worm-guard/watch.log`.
-
-Exit codes carry the distinction that matters: **0 means checked and clean,
-1 means findings, 2 means it could not check.** A read that fails is reported
-as a finding, never absorbed into a pass — if the API returns 403, the tree
-comes back truncated, or an account is rate limited, it says so and exits
-non-zero. Zero accounts scanned exits 2. That separation exists because
-during the incident this came from, an exhausted API budget made three
-different code paths print "no indicators found" while reading nothing.
-
-**Zero pushable repos is a blind spot, not a pass.** An org that restricts
-OAuth apps caps the token at public read. Then `permissions.push` is false
-everywhere and the loop checks nothing. The script prints that warning instead
-of a clean result, because during the incident a clean result meant zero files
-checked three times.
-
-### Global pre-commit guard
-
-`git/hooks/` is symlinked to `~/.git-hooks` and set as `core.hooksPath`, so the
-guard runs in every repo. It scans staged content for injection markers and
-padded payloads, then chains to the repo's own `pre-commit` if one exists.
-
-- Setting `core.hooksPath` globally disables repo-local hook paths. The chain
-  at the end of the guard is what keeps repo hooks working.
-- A legitimate file that trips the padding check can opt out with the marker
-  `worm-guard:allow-signatures`.
-
-### Branch protection
+Remote reports live in `~/.local/state/worm-guard`; the local scanner prints
+to the terminal, so redirect its output there when preserving a report. Keep
+incident evidence separate from dotfiles. `WORMGUARD_STATE` selects another state directory for
+an isolated investigation. Remote receipts are in `scan-last-run.json`.
+Scanner changes can be checked offline from this checkout:
 
 ```bash
-apply_github_rulesets.sh --repo dotfiles          # dry run, the default
-apply_github_rulesets.sh --repo dotfiles --apply
-apply_github_rulesets.sh --all --apply            # every repo you admin
+./tests/test_scan_repo.sh
+./tests/test_scan_remote.sh
+./tests/test_scanner_install.sh
 ```
 
-Applies `config/gh/rulesets/*.json` to your repos: block force-push, block
-branch deletion, require signed commits. Safe to run twice — it looks the
-ruleset up by name and updates in place. Archived repos are reported, not
-retried. Private repos need a paid GitHub plan.
+### Manual inventory scans
 
-### Editor hardening
+To scan a selected set of repositories, create
+`~/.local/state/worm-guard/repos.tsv` with only repositories you own or are
+responsible for, one account and repository separated by a literal tab:
 
-VS Code `settings.json` keeps `task.allowAutomaticTasks: "off"` and
-`security.workspace.trust.untrustedFiles: "prompt"`. Both block the worm's
-folder-open path. Do not relax them.
+```text
+personal	SomtoUgeh/dotfiles
+```
+
+`scan_remote.sh` scans every current branch/tag tip in this inventory by default. Missing or empty inventory
+is incomplete; it never silently expands to all accessible repositories.
+`WORMGUARD_REPOS_FILE` selects another inventory. For a deliberate one-time
+account-wide investigation, `--all-readable` adds accessible repositories.
+Do not include repositories whose remediation belongs to another team without
+agreeing that scope with them.
+
+Run the inventory scan explicitly and review its coverage:
+
+```bash
+scan_remote.sh
+```
+
+Scanning is manual. There is no scheduled monitor or health reminder to install.
+
+### GitHub account/repository setup
+
+Branch rulesets are server-side administration, applied once per repository
+and revisited when policy changes. They are unrelated to setting up a new Mac
+and are not malware checks. The two definitions serve different purposes:
+force-push/deletion protection and verified commit signatures. See
+[the ruleset instructions](config/gh/rulesets/README.md) and
+[signing setup](git/SIGNING.md).
+
+```bash
+apply_github_rulesets.sh --repo dotfiles          # dry run
+apply_github_rulesets.sh --repo dotfiles --apply  # deliberately update policy
+```
+
+The scanner's `--account ci --repo OWNER/REPO --ref COMMIT_SHA` interface
+accepts an installation token in `GH_TOKEN`; no CI workflow is installed.
+A required malware check needs a trusted scanner and protected workflow
+inspecting the proposed immutable commit as data. Review deploy keys and
+write-capable integrations separately: other collaborators or CI can
+reintroduce compromised content.
 
 ## Updating
 
@@ -428,7 +402,7 @@ rm ~/.zshrc  # Remove existing file
 
 `install.sh` keeps host-specific paths out of the tracked files:
 
-- `~/.codex/config.toml` and `~/.codex/hooks.json` are rendered from `agents/codex/` with `/Users/<user>` values replaced by `$HOME`.
+- `~/.codex/config.toml` stays host-local. The agent sync script adds missing defaults and refreshes managed hooks while preserving local settings and backing up changes; see [agent setup](agents/README.md).
 - `~/.claude/settings.json` is **symlinked** to `agents/claude/settings.json`. It uses `${HOME}`-relative paths, and Claude resolves the link and writes through it, so the tracked copy always reflects live config and never drifts.
 
 Claude's `installed_plugins.json` / `known_marketplaces.json` are machine-generated caches (absolute paths, timestamps, commit SHAs) and are intentionally **not** tracked. They are rebuilt from `enabledPlugins` + `extraKnownMarketplaces` in `settings.json`, which is the single source of truth for plugins — `install.sh` installs them from there, and Claude re-syncs on launch.

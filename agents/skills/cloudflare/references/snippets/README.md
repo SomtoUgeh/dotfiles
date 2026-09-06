@@ -7,6 +7,7 @@ Expert guidance for **Cloudflare Snippets ONLY** - a lightweight JavaScript-base
 Snippets are JavaScript functions executed at the edge as part of Cloudflare's Ruleset Engine. Key characteristics:
 - **Execution time**: 5ms CPU limit per request
 - **Size limit**: 32KB per snippet
+- **Memory**: 2 MB
 - **Runtime**: V8 isolate (subset of Workers APIs)
 - **Subrequests**: 2-5 fetch calls depending on plan
 - **Cost**: Included with Pro/Business/Enterprise plans
@@ -19,8 +20,8 @@ Snippets are JavaScript functions executed at the edge as part of Cloudflare's R
 | **Execution time** | <5ms sufficient | Need >5ms or variable time |
 | **Subrequests** | 2-5 fetch calls sufficient | Need >5 subrequests or complex orchestration |
 | **Code size** | <32KB sufficient | Need >32KB or npm dependencies |
-| **Cost** | Want zero additional cost | Can afford $5/mo + usage |
-| **APIs** | Need basic fetch, headers, URL | Need KV, D1, R2, Durable Objects, cron triggers |
+| **Cost** | Included in a paid zone plan | Free or Paid Workers plan, depending on usage |
+| **APIs** | Need fetch, headers, URL, Cache API or HTMLRewriter | Need KV, D1, R2, Durable Objects, cron triggers |
 | **Deployment** | Need rule-based triggers | Want custom routing logic |
 
 **Rule of thumb**: Use Snippets for modifications, Workers for applications.
@@ -66,3 +67,5 @@ Deploy via Dashboard (Rules → Snippets) or API/Terraform. See configuration.md
 ## See Also
 
 - [Cloudflare Docs](https://developers.cloudflare.com/rules/snippets/)
+
+[Current Snippets availability and limits](https://developers.cloudflare.com/rules/snippets/) · [Cache example](https://developers.cloudflare.com/rules/snippets/examples/custom-cache/) · [HTMLRewriter example](https://developers.cloudflare.com/rules/snippets/examples/rewrite-site-links/)

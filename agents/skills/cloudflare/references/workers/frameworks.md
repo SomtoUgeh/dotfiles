@@ -16,10 +16,7 @@ import { Hono } from 'hono';
 const app = new Hono();
 
 app.get('/', (c) => c.text('Hello World!'));
-app.post('/api/users', async (c) => {
-  const body = await c.req.json();
-  return c.json({ id: 1, ...body }, 201);
-});
+// For POST bodies use the validated route below; do not spread untrusted JSON into responses.
 
 export default app;
 ```
@@ -27,7 +24,7 @@ export default app;
 ### Typed Environment
 
 ```typescript
-import type { Env } from './.wrangler/types/runtime';
+// Env is declared by worker-configuration.d.ts.
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -50,6 +47,8 @@ app.use('/api/*', cors({ origin: '*' }));
 app.use('/protected/*', async (c, next) => {
   const auth = c.req.header('Authorization');
   if (!auth?.startsWith('Bearer ')) return c.text('Unauthorized', 401);
+  // verifyAccessToken is the application's verifier: signature, expiry, issuer/audience.
+  if (!await verifyAccessToken(auth.slice(7), c.env)) return c.text('Unauthorized', 401);
   await next();
 });
 ```
@@ -89,7 +88,7 @@ app.route('/', api);  // Mounts at /api/*
 ```typescript
 app.onError((err, c) => {
   console.error(err);
-  return c.json({ error: err.message }, 500);
+  return c.json({ error: 'Internal Server Error' }, 500);
 });
 
 app.notFound((c) => c.json({ error: 'Not Found' }, 404));
@@ -161,15 +160,19 @@ const router = Router();
 
 router.get('/users/:id', ({ params }) => new Response(params.id));
 
-export default { fetch: router.handle };
+export default { fetch: router.fetch };
 ```
 
 **Use case**: Tiny bundle size (~500 bytes), simple routing needs
 
 ### Worktop (Advanced)
 
+This example targets Worktop 0.7.3's service-worker format. Its package exports
+hide the bundled declarations from modern TypeScript module resolution; do not
+assume a strict `bundler` or `nodenext` project will typecheck this package.
+
 ```typescript
-import { Router } from 'worktop';
+import { Router, listen } from 'worktop';
 
 const router = new Router();
 
@@ -177,7 +180,7 @@ router.add('GET', '/users/:id', (req, res) => {
   res.send(200, { id: req.params.id });
 });
 
-router.listen();
+listen(router.run);
 ```
 
 **Use case**: Advanced routing, built-in CORS/cache utilities

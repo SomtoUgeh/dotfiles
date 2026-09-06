@@ -30,21 +30,7 @@ Your Network B ──10G CNI v2──> CF CCR Device 2
 
 **Use Case:** DDoS protection, private connectivity, no GRE overhead.
 
-```typescript
-// 1. Create interconnect
-const ic = await client.networkInterconnects.interconnects.create({
-  account_id: id,
-  type: 'direct',
-  facility: 'EWR1',
-  speed: '10G',
-  name: 'magic-transit-primary',
-});
-
-// 2. Poll until active
-const status = await pollUntilActive(id, ic.id);
-
-// 3. Configure Magic Transit tunnel via Dashboard/API
-```
+Follow [api.md](api.md) to create the approved physical or GCP interconnect, retrieve its connection identifier, and poll status with a bounded timeout. Configure routes only after the account-team provisioning steps and health checks are complete.
 
 **Benefits:** 1500 MTU both ways, simplified routing.
 
@@ -74,46 +60,13 @@ await configureStaticRoutes(id, {
 4. Configure custom learned routes in GCP Cloud Router
 ```
 
-**Note:** Dashboard-only. No API/SDK support yet.
+**Note:** Current CNI APIs support GCP pairing-key creation. Check [api.md](api.md); cloud-side ordering and activation still have their own workflow.
 
 ## Pattern: Multi-Location HA
 
-**Use Case:** 99.99%+ uptime.
+**Use Case:** Improve availability through device and location diversity; the design alone does not guarantee an uptime percentage.
 
-```typescript
-// Primary (NY)
-const primary = await client.networkInterconnects.interconnects.create({
-  account_id: id,
-  type: 'direct',
-  facility: 'EWR1',
-  speed: '10G',
-  name: 'primary-ewr1',
-});
-
-// Secondary (NY, different hardware)
-const secondary = await client.networkInterconnects.interconnects.create({
-  account_id: id,
-  type: 'direct',
-  facility: 'EWR2',
-  speed: '10G',
-  name: 'secondary-ewr2',
-});
-
-// Tertiary (LA, different geography)
-const tertiary = await client.networkInterconnects.interconnects.create({
-  account_id: id,
-  type: 'partner',
-  facility: 'LAX1',
-  speed: '10G',
-  name: 'tertiary-lax1',
-});
-
-// BGP local preferences:
-// Primary: 200
-// Secondary: 150
-// Tertiary: 100
-// Internet: Last resort
-```
+Choose three independently provisioned interconnects: primary and secondary on distinct devices, then a third in another geography. Retrieve real slot IDs; do not invent facility/name fields in API create requests. Assign BGP local preferences according to the failover policy (for example 200/150/100), and retain an Internet fallback. See [api.md](api.md) for the current request schema.
 
 ## Pattern: Partner Interconnect (Equinix)
 
@@ -138,7 +91,7 @@ const tertiary = await client.networkInterconnects.interconnects.create({
 - Document runbooks
 
 **Security:**
-- BGP password authentication
+- BGP route/session controls; the current CNI API explicitly does not treat its MD5 key as a security boundary
 - BGP route filtering
 - Monitor unexpected routes
 - Magic Firewall for DDoS/threats

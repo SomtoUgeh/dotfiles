@@ -29,7 +29,7 @@ Paired comparisons showing the better choice and why. Apply these when reviewing
 
 ## Typography
 
-1. Display headline with default metric kerning vs optical kerning enabled — optical removes the awkward gaps between certain letter pairs.
+1. Display headline with poor pair spacing vs suitable font kerning and deliberate optical adjustment — CSS font-kerning uses the font tables; it has no general optical-kerning mode.
 2. Paragraph spacing set to an arbitrary 12px vs set to 1× the line-height — the arbitrary value creates inconsistent rhythm.
 3. Body text stretching full container width vs capped at 65ch — the full-width version creates exhausting line lengths.
 4. Uppercase label with default tracking vs loosened tracking — tight uppercase looks cramped and amateurish.
@@ -38,7 +38,7 @@ Paired comparisons showing the better choice and why. Apply these when reviewing
 7. Two typefaces that are both sans-serif humanists paired vs a sans paired with a serif — same-classification pairs create sameness, not contrast.
 8. Price column with default kerning vs `tabular-nums` — the numbers don't stack and the column looks chaotic.
 9. Long article with a single orphaned word on the last line vs `text-wrap: balance` applied — the widow looks like a mistake.
-10. Font weight fixed on hover vs weight increasing via variable font axis — the variable version feels alive without layout shift.
+10. Font weight fixed on hover vs weight increasing via a variable axis — variable weight can still change glyph widths. Verify metrics before claiming layout stability.
 11. `<sup>` for a footnote marker vs properly sized and baseline-shifted superscript — the default `<sup>` is too large and throws line spacing.
 12. `text-wrap: balance` on a 3-line headline that becomes awkwardly short on line 1 vs left-aligned with manual break — balance isn't always right.
 13. Italic used for emphasis throughout a UI vs bold — italic is for citation and linguistic stress, bold is for UI emphasis; using italic for UI hierarchy is a publishing convention in the wrong context.
@@ -57,7 +57,7 @@ Paired comparisons showing the better choice and why. Apply these when reviewing
 7. Dark mode layering hierarchy: when colors are flipped, you need to retain what is the "brightest" canvas (the lightest dark grey).
 8. Light tint of a colour built by reducing opacity vs built with reduced chroma in OKLCH — the opacity version goes grey and lifeless.
 9. Raw hex values used throughout a codebase vs semantic tokens (`--color-border-subtle`) — hardcoded values break the moment anything changes.
-10. 3:1 contrast ratio dismissed as failing WCAG vs flagged as passing under APCA for large text (trick question: the specs disagree, context matters).
+10. 3:1 contrast may meet WCAG 2.2 AA for large text; normal text usually needs 4.5:1. APCA is a different model and is not a substitute for a WCAG 2.2 conformance check.
 11. UI using blue tones with warm grey neutrals vs cool grey neutrals — the warm greys fight the blue, cool greys complement it.
 12. Pure `#808080` used as a neutral vs a tinted neutral with a slight hue bias — the pure grey looks like a placeholder, the tinted one feels designed.
 13. Success state shown in green on a UI that already uses green as the primary brand colour vs using a distinct confirmation colour — users can't tell if something is a primary action or a success state.
@@ -110,7 +110,7 @@ Paired comparisons showing the better choice and why. Apply these when reviewing
 4. Spinner shown during a long list load vs skeleton layout — the skeleton holds the page shape, the spinner collapses it.
 5. Form submission that waits for server response before updating UI vs optimistic update that reverts on error — the optimistic version feels instant.
 6. Search that fires a request on every keystroke vs debounced at 300ms — the unbounced version hammers the server and creates race conditions.
-7. Touch target sized at 28×28px vs 44×44px — the small one causes mis-taps; the minimum is a guideline, not a suggestion.
+7. A tightly packed 28×28px touch target vs a comfortable 44×44px target — WCAG 2.2 AA sets a 24px-or-spacing baseline, while 44px is the enhanced target and a strong touch-design goal.
 8. Button that triggers an action immediately on `mousedown` vs `mouseup` — mousedown fires before the user has committed; they can't cancel by dragging away.
 9. Input that auto-advances to the next field when full (like a verification code) vs waits for tab — auto-advance feels clever until someone wants to correct a digit.
 10. Copy-to-clipboard button that changes to a checkmark for 1.5s vs one that stays as a clipboard icon — without feedback the user clicks it three more times to check it worked.
@@ -145,7 +145,7 @@ Paired comparisons showing the better choice and why. Apply these when reviewing
 5. `<label>Name</label><input>` without a `for`/`id` connection vs properly associated label — clicking the label on the unconnected version doesn't focus the input.
 6. Modal that lets focus escape to the page behind it vs one that traps focus within — background content becomes reachable and confusing to screen reader users.
 7. Grid items reordered visually with `order: -1` in CSS vs DOM order matching visual order — screen readers follow DOM order, not visual order.
-8. WCAG AA 4.5:1 contrast ratio as the only check vs also checking with APCA (trick question: APCA is more nuanced for large text and UI components; neither spec is complete alone).
+8. Check the applicable WCAG 2.2 criteria for normal/large text and non-text controls. APCA can supplement design evaluation but does not determine WCAG 2.2 conformance.
 
 ## Copywriting
 
@@ -165,4 +165,4 @@ Paired comparisons showing the better choice and why. Apply these when reviewing
 4. Tooltip that appears on hover with a "Learn more" link inside it vs a popover triggered by click — tooltips can't contain interactive elements, the link is unreachable.
 5. Data table with zebra striping but misaligned number columns vs no striping but right-aligned tabular numbers — alignment does the work striping was compensating for.
 6. Toast notification that auto-dismisses after 2 seconds for all messages vs duration calculated from word count (roughly 200–250 words per minute) — short messages and long messages need different timing.
-7. Entire card surface is an `<a>` tag vs card with a distinct CTA link — the full-card link makes text selection impossible and reads the entire card content to screen readers as one link.
+7. Entire card surface is an `<a>` tag vs card with a distinct CTA link — a full-card link can complicate text selection and nested controls and reads the entire card content to screen readers as one link.

@@ -1,147 +1,57 @@
-# Configuration
+# VPC configuration
 
-Setup and configuration for TCP Sockets in Cloudflare Workers.
+Create or select the requested private-network connection using the
+[official Tunnel setup](https://developers.cloudflare.com/workers-vpc/configuration/tunnel/).
+Verify the connector can resolve and reach the destination. A public DNS CNAME
+alone does not establish VPC connectivity.
 
-## Wrangler Configuration
+## Fixed HTTP service
 
-### Basic Setup
+Register a VPC Service with its real Tunnel ID, destination host/IP, service type,
+and HTTP/HTTPS ports. Configure certificate verification for the origin. Creating
+services requires Connectivity Directory Admin; binding an existing service
+requires Connectivity Directory Bind or Admin.
 
-TCP Sockets are available by default in Workers runtime. No special configuration required in `wrangler.jsonc`:
-
-```jsonc
-{
-  "name": "private-network-worker",
-  "main": "src/index.ts",
-  "compatibility_date": "2025-01-01"
-}
-```
-
-### Environment Variables
-
-Store connection details as env vars:
+Merge this into the existing Wrangler configuration using the returned service ID:
 
 ```jsonc
 {
-  "vars": { "DB_HOST": "10.0.1.50", "DB_PORT": "5432" }
+  "vpc_services": [
+    { "binding": "PRIVATE_API", "service_id": "<SERVICE_ID>", "remote": true }
+  ]
 }
 ```
 
-```typescript
-interface Env { DB_HOST: string; DB_PORT: string; }
+## Network access
 
-export default {
-  async fetch(req: Request, env: Env): Promise<Response> {
-    const socket = connect({ hostname: env.DB_HOST, port: parseInt(env.DB_PORT) });
-  }
-};
-```
-
-### Per-Environment Configuration
+Choose one network target per binding. A Tunnel binding requires Connectivity
+Directory Admin:
 
 ```jsonc
 {
-  "vars": { "DB_HOST": "localhost" },
-  "env": {
-    "staging": { "vars": { "DB_HOST": "staging-db.internal.net" } },
-    "production": { "vars": { "DB_HOST": "prod-db.internal.net" } }
-  }
+  "vpc_networks": [
+    { "binding": "PRIVATE_VPC", "tunnel_id": "<TUNNEL_UUID>", "remote": true }
+  ]
 }
 ```
 
-Deploy: `wrangler deploy --env staging` or `wrangler deploy --env production`
+For account-wide Mesh/WAN connectivity, use `network_id: "cf1:network"` in place
+of `tunnel_id`. The account needs an active on-ramp and routes to the target;
+WAN deployments also need the documented return route for Cloudflare source IPs.
+This broader scope is a deliberate choice, not an automatic fallback.
 
-## Integration with Cloudflare Tunnel
+## Development and deployment
 
-To connect Workers to private networks, combine TCP Sockets with Cloudflare Tunnel:
+- Use the project's installed Wrangler and run `wrangler types` after changing
+  bindings. Keep the project's compatibility date unless an upgrade is intended.
+- These binding arrays are not inherited by named environments; configure each
+  selected environment explicitly.
+- `remote: true` makes local development contact the real private service. Use a
+  test destination or local application-level substitute for isolated tests.
+- Keep credentials in server secrets. Destination hostnames are configuration,
+  not proof that callers are authorized.
+- Validate the exact route, DNS, protocol, origin TLS, and a harmless request
+  before reporting connectivity. A dry run verifies configuration only.
 
-```
-Worker (TCP Socket) → Tunnel hostname → cloudflared → Private Network
-```
-
-### Quick Setup
-
-1. **Install cloudflared** on a server inside your private network
-2. **Create tunnel**: `cloudflared tunnel create my-private-network`
-3. **Configure routing** in `config.yml`:
-
-```yaml
-tunnel: <TUNNEL_ID>
-credentials-file: /path/to/<TUNNEL_ID>.json
-ingress:
-  - hostname: db.internal.example.com
-    service: tcp://10.0.1.50:5432
-  - service: http_status:404  # Required catch-all
-```
-
-4. **Run tunnel**: `cloudflared tunnel run my-private-network`
-5. **Connect from Worker**:
-
-```typescript
-const socket = connect(
-  { hostname: "db.internal.example.com", port: 5432 },  // Tunnel hostname
-  { secureTransport: "on" }
-);
-```
-
-For detailed Tunnel setup, see [Tunnel configuration reference](../tunnel/configuration.md).
-
-## Smart Placement Integration
-
-Reduce latency by auto-placing Workers near backends:
-
-```jsonc
-{ "placement": { "mode": "smart" } }
-```
-
-Workers automatically relocate closer to TCP socket destinations after observing connection latency. See [Smart Placement reference](../smart-placement/).
-
-## Secrets Management
-
-Store sensitive credentials as secrets (not in wrangler.jsonc):
-
-```bash
-wrangler secret put DB_PASSWORD  # Enter value when prompted
-```
-
-Access in Worker via `env.DB_PASSWORD`. Use in protocol handshake or authentication.
-
-## Local Development
-
-Test with `wrangler dev`. Note: Local mode may not access private networks. Use public endpoints or mock servers for development:
-
-```typescript
-const config = process.env.NODE_ENV === 'dev' 
-  ? { hostname: 'localhost', port: 5432 }  // Mock
-  : { hostname: 'db.internal.example.com', port: 5432 };  // Production
-```
-
-## Connection String Patterns
-
-Parse connection strings to extract host and port:
-
-```typescript
-function parseConnectionString(connStr: string): SocketAddress {
-  const url = new URL(connStr); // e.g., "postgres://10.0.1.50:5432/mydb"
-  return { hostname: url.hostname, port: parseInt(url.port) || 5432 };
-}
-```
-
-## Hyperdrive Integration
-
-For PostgreSQL/MySQL, prefer Hyperdrive over raw TCP sockets (includes connection pooling):
-
-```jsonc
-{ "hyperdrive": [{ "binding": "DB", "id": "<HYPERDRIVE_ID>" }] }
-```
-
-See [Hyperdrive reference](../hyperdrive/) for complete setup.
-
-## Compatibility
-
-TCP Sockets available in all modern Workers. Use current date: `"compatibility_date": "2025-01-01"`. No special flags required.
-
-## Related Configuration
-
-- **[Tunnel Configuration](../tunnel/configuration.md)** - Detailed cloudflared setup
-- **[Smart Placement](../smart-placement/configuration.md)** - Placement mode options
-- **[Hyperdrive](../hyperdrive/configuration.md)** - Database connection pooling setup
+Sources: [VPC Services](https://developers.cloudflare.com/workers-vpc/configuration/vpc-services/),
+[VPC Networks](https://developers.cloudflare.com/workers-vpc/configuration/vpc-networks/).

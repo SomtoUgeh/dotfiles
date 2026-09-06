@@ -15,8 +15,8 @@ export class MyContainer extends Container {
   onStart() { /* container started */ }
   onStop() { /* container stopping */ }
   onError(error: Error) { /* container error */ }
-  onActivityExpired(): boolean { /* timeout, return true to stay alive */ }
-  async alarm() { /* scheduled task */ }
+  async onActivityExpired(): Promise<void> { await this.stop(); }
+  // Keep the inherited alarm handler for SDK scheduling.
 }
 ```
 
@@ -27,7 +27,7 @@ export class MyContainer extends Container {
 
 ```typescript
 const container = env.MY_CONTAINER.getByName("user-123");
-const container = env.MY_CONTAINER.getRandom();
+const container = await getRandom(env.MY_CONTAINER, 3); // import from @cloudflare/containers
 ```
 
 ## Startup Methods
@@ -59,8 +59,8 @@ Returns when **ports listening**. Use before HTTP/TCP requests.
 ### waitForPort() - Wait for specific port
 
 ```typescript
-await container.waitForPort(8080);
-await container.waitForPort(8080, { timeout: 30000 });
+await container.waitForPort({ portToCheck: 8080 });
+await container.waitForPort({ portToCheck: 8080, retries: 30, waitInterval: 1000 });
 ```
 
 ## Communication
@@ -78,30 +78,34 @@ const response = await container.fetch("http://container/api", {
 
 **Use for:** All HTTP, especially WebSocket.
 
-### containerFetch() - HTTP only (no WebSocket)
+### containerFetch() - HTTP and internal WebSocket forwarding
 
 ```typescript
-// ❌ No WebSocket support
-const response = await container.containerFetch(request);
+// For external WebSocket upgrades prefer stub.fetch(request)
+const response = await container.containerFetch(request); // Inside a DO this also supports WebSockets; external RPC transport differs.
 ```
 
-**⚠️ Critical:** Use `fetch()` for WebSocket, not `containerFetch()`.
+For WebSocket requests originating outside the Durable Object, use `fetch()` with `switchPort(request, port)` when needed. Do not generalize this RPC limitation to internal containerFetch calls.
 
 ### TCP Connections
 
 ```typescript
-const port = this.ctx.container.getTcpPort(8080);
-const conn = port.connect();
+const container = this.ctx.container;
+if (!container) throw new Error("Container binding is missing");
+await this.startAndWaitForPorts({ ports: [8080] });
+const port = container.getTcpPort(8080);
+const conn = port.connect("10.0.0.1:8080");
 await conn.opened;
 
 if (request.body) await request.body.pipeTo(conn.writable);
 return new Response(conn.readable);
 ```
 
-### switchPort() - Change default port
+### switchPort() - Select a port for one request
 
 ```typescript
-this.switchPort(8081);  // Subsequent fetch() uses this port
+// import { switchPort } from "@cloudflare/containers";
+return super.fetch(switchPort(request, 8081)); // Per-request target, no shared mutation
 ```
 
 ## Lifecycle Hooks
@@ -118,11 +122,11 @@ onStart() {
 
 ### onStop()
 
-Called when SIGTERM received. 15 minutes until SIGKILL. Use for graceful shutdown.
+Called after the container shuts down, with exit details. Handle SIGTERM inside the container process; this hook cannot flush a process that has already stopped.
 
 ```typescript
 onStop() {
-  // Save state, close connections, flush logs
+  // Record the stop outcome in Durable Object storage if needed
 }
 ```
 
@@ -138,32 +142,23 @@ onError(error: Error) {
 
 ### onActivityExpired()
 
-Called when `sleepAfter` timeout reached. Return `true` to stay alive, `false` to stop.
-
-```typescript
-onActivityExpired(): boolean {
-  if (this.hasActiveConnections()) return true;  // Keep alive
-  return false;  // OK to stop
-}
-```
+Called when the activity timeout expires. This is an async hook returning `Promise<void>`, not a boolean keep-alive signal. Call `this.renewActivityTimeout()` to extend activity or `await this.stop()` to stop; the default implementation stops.
 
 ## Scheduling
 
 ```typescript
 export class ScheduledContainer extends Container {
   async fetch(request: Request) {
-    await this.schedule(Date.now() + 60000);  // 1 minute
-    await this.schedule("2026-01-28T00:00:00Z");  // ISO string
+    await this.schedule(60, "recordCheck", { requestedAt: Date.now() });
     return new Response("Scheduled");
   }
-
-  async alarm() {
-    // Called when schedule fires (SQLite-backed, survives restarts)
+  async recordCheck(payload: { requestedAt: number }) {
+    await this.ctx.storage.put("last-check", payload.requestedAt);
   }
 }
 ```
 
-**⚠️ Don't override `alarm()` directly when using `schedule()` helper.**
+`schedule` takes a `Date` or delay in seconds, a callback method name, and optional payload. Do not override the SDK's `alarm()` when using this scheduler.
 
 ## State Inspection
 
@@ -171,7 +166,7 @@ export class ScheduledContainer extends Container {
 
 ```typescript
 const state = await container.getState();
-// state.status: "starting" | "running" | "stopping" | "stopped"
+// See installed State: includes running, healthy, stopping, stopped, stopped_with_code.
 ```
 
 ### Internal state check
@@ -179,7 +174,7 @@ const state = await container.getState();
 ```typescript
 export class MyContainer extends Container {
   async fetch(request: Request) {
-    if (this.ctx.container.running) { ... }
+    return Response.json({ running: this.ctx.container?.running ?? false });
   }
 }
 ```

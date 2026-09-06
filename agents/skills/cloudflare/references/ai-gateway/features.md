@@ -12,10 +12,10 @@ headers: { 'cf-aig-cache-ttl': '3600' }
 headers: { 'cf-aig-skip-cache': 'true' }
 
 // Custom cache key
-headers: { 'cf-aig-cache-key': 'greeting-en' }
+headers: { 'cf-aig-cache-key': responseEquivalentKey // Includes tenant, prompt, model, and relevant options }
 ```
 
-**Limits:** TTL 60s - 30 days. **Does NOT work with streaming.**
+**Limits:** TTL 60s - 30 days. Check caching behavior for the selected endpoint and response mode; do not assume all streaming is unsupported.
 
 ## Rate Limiting
 
@@ -41,7 +41,7 @@ Detect PII (emails, SSNs, credit cards). Actions: Flag, Block, or Redact.
 
 | Mode | Description | Setup |
 |------|-------------|-------|
-| **Unified Billing** | Pay through Cloudflare, no provider keys | Use `cf-aig-authorization` header only |
+| **Unified Billing** | Pay through Cloudflare, no provider keys | Use the authentication scheme for the selected Cloudflare endpoint |
 | **BYOK** | Store provider keys in dashboard | Add keys in Provider Keys section |
 | **Pass-through** | Send provider key with each request | Include provider's auth header |
 
@@ -53,7 +53,7 @@ No prompts/responses stored. Request counts and costs still tracked.
 
 ## Logging
 
-Dashboard: Settings → Logs → Enable (up to 10M logs)
+Dashboard: configure logs and verify the current account retention/quota.
 
 Each entry: prompt, response, provider, model, tokens, cost, duration, cache status, metadata.
 
@@ -72,18 +72,9 @@ Dashboard: Gateway → Settings → Custom Costs
 
 Or via API: set `model`, `input_cost`, `output_cost`.
 
-## Supported Providers (22+)
+## Supported providers
 
-| Provider | Unified API | Notes |
-|----------|-------------|-------|
-| OpenAI | `openai/gpt-4o` | Full support |
-| Anthropic | `anthropic/claude-sonnet-4-5` | Full support |
-| Google AI | `google-ai-studio/gemini-2.0-flash` | Full support |
-| Workers AI | `workersai/@cf/meta/llama-3` | Native |
-| Azure OpenAI | `azure-openai/*` | Deployment names |
-| AWS Bedrock | Provider endpoint only | `/bedrock/*` |
-| Groq | `groq/*` | Fast inference |
-| Mistral, Cohere, Perplexity, xAI, DeepSeek, Cerebras | Full support | - |
+Consult the [current model catalog](https://developers.cloudflare.com/ai-gateway/models/) for provider IDs, billing support, and endpoint compatibility. Provider-native, compat, and current REST model names are not interchangeable.
 
 ## Best Practices
 
@@ -94,3 +85,5 @@ Or via API: set `model`, `input_cost`, `output_cost`.
 5. Use unified billing or BYOK for simpler key management
 6. Enable logging for debugging
 7. Use zero data retention when privacy required
+
+A custom cache key opts a request into caching and must be shared only by response-equivalent requests. Never use a constant key across different users or prompts. [Caching documentation](https://developers.cloudflare.com/ai-gateway/features/caching/).

@@ -5,9 +5,9 @@
 ## Quick Decision Tree
 
 **Need to:**
-- **Transform in Worker?** → [api.md](api.md#workers-binding-api-2026-primary-method) (Workers Binding API)
-- **Upload from Worker?** → [api.md](api.md#upload-from-worker) (REST API)
-- **Upload from client?** → [patterns.md](patterns.md#upload-from-client-direct-creator-upload) (Direct Creator Upload)
+- **Transform in Worker?** → [api.md](api.md#workers-binding) (Workers Binding API)
+- **Upload from Worker?** → [api.md](api.md#hosted-images-and-rest) (hosted binding or REST)
+- **Upload from client?** → [patterns.md](api.md#direct-creator-upload) (Direct Creator Upload)
 - **Set up variants?** → [configuration.md](configuration.md#variants-configuration)
 - **Serve responsive images?** → [patterns.md](patterns.md#responsive-images)
 - **Add watermarks?** → [patterns.md](patterns.md#watermarking)
@@ -17,8 +17,8 @@
 
 **For building image upload/transform feature:**
 1. [configuration.md](configuration.md) - Setup Workers binding
-2. [api.md](api.md#workers-binding-api-2026-primary-method) - Learn transform API
-3. [patterns.md](patterns.md#upload-from-client-direct-creator-upload) - Direct upload pattern
+2. [api.md](api.md#workers-binding) - Learn transform API
+3. [patterns.md](api.md#direct-creator-upload) - Direct upload pattern
 4. [gotchas.md](gotchas.md) - Check limits and errors
 
 **For URL-based transforms:**
@@ -50,9 +50,9 @@
 
 - **Automatic Optimization** - AVIF/WebP format negotiation
 - **On-the-fly Transforms** - Resize, crop, blur, sharpen via URL or API
-- **Workers Binding** - Transform images in Workers (2026 primary method)
+- **Workers Binding** - Transform images in Workers (stream transformation API)
 - **Direct Upload** - Secure client-side uploads without backend proxy
-- **Global Delivery** - Cached at 300+ Cloudflare data centers
+- **Global Delivery** - Delivered through Cloudflare
 - **Watermarking** - Overlay images programmatically
 
 ## See Also

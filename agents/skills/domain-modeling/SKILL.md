@@ -37,7 +37,9 @@ If a `CONTEXT-MAP.md` exists at the root, the repo has multiple contexts. The ma
 │       └── docs/adr/
 ```
 
-Create files lazily — only when you have something to write. If no `CONTEXT.md` exists, create one when the first term is resolved. If no `docs/adr/` exists, create it when the first ADR is needed.
+Create or update these files only when the user asks to record the model or ADR
+in the repository. Otherwise, sharpen the terminology in the conversation and
+show the proposed entry without writing it.
 
 ## During the session
 
@@ -57,15 +59,18 @@ When domain relationships are being discussed, stress-test them with specific sc
 
 When the user states how something works, check whether the code agrees. If you find a contradiction, surface it: "Your code cancels entire Orders, but you just said partial cancellation is possible — which is right?"
 
-### Update CONTEXT.md inline
+### Record resolved terms when requested
 
-When a term is resolved, update `CONTEXT.md` right there. Don't batch these up — capture them as they happen. Use the format in [CONTEXT-FORMAT.md](./CONTEXT-FORMAT.md).
+When repository documentation is part of the request, update `CONTEXT.md` as
+terms are resolved and use [CONTEXT-FORMAT.md](./CONTEXT-FORMAT.md). If writing
+was not requested, keep a concise proposed glossary entry in the response.
 
 `CONTEXT.md` should be totally devoid of implementation details. Do not treat `CONTEXT.md` as a spec, a scratch pad, or a repository for implementation decisions. It is a glossary and nothing else.
 
 ### Offer ADRs sparingly
 
-Only offer to create an ADR when all three are true:
+Only recommend an ADR when all three are true; create it only when the user asks
+to record the decision:
 
 1. **Hard to reverse** — the cost of changing your mind later is meaningful
 2. **Surprising without context** — a future reader will wonder "why did they do it this way?"

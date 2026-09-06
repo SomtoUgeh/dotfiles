@@ -1,193 +1,79 @@
-# Tunnel API
+# Cloudflare Tunnel API
 
-## Cloudflare API Access
+Use the project's installed `cloudflare` SDK and a scoped API token. Remotely managed Cloudflare Tunnel operations are under `zeroTrust.tunnels.cloudflared`, not directly on `zeroTrust.tunnels`.
 
-**Base URL**: `https://api.cloudflare.com/client/v4`
-
-**Authentication**:
-```bash
-Authorization: Bearer ${CF_API_TOKEN}
-```
-
-## TypeScript SDK
-
-Install: `npm install cloudflare`
+## SDK lifecycle
 
 ```typescript
-import Cloudflare from 'cloudflare';
+import Cloudflare from "cloudflare";
 
-const cf = new Cloudflare({
-  apiToken: process.env.CF_API_TOKEN,
-});
+const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+if (!accountId) throw new Error("CLOUDFLARE_ACCOUNT_ID is required");
+const cf = new Cloudflare(); // CLOUDFLARE_API_TOKEN from the server environment
 
-const accountId = process.env.CF_ACCOUNT_ID;
-```
-
-## Create Tunnel
-
-### cURL
-```bash
-curl -X POST "https://api.cloudflare.com/client/v4/accounts/{account_id}/tunnels" \
-  -H "Authorization: Bearer ${CF_API_TOKEN}" \
-  -H "Content-Type: application/json" \
-  --data '{
-    "name": "my-tunnel",
-    "tunnel_secret": "<base64-secret>"
-  }'
-```
-
-### TypeScript
-```typescript
-const tunnel = await cf.zeroTrust.tunnels.create({
+// Read-only inventory; automatic pagination.
+for await (const tunnel of cf.zeroTrust.tunnels.cloudflared.list({
   account_id: accountId,
-  name: 'my-tunnel',
-  tunnel_secret: Buffer.from(crypto.randomBytes(32)).toString('base64'),
+  is_deleted: false,
+})) {
+  console.log(tunnel.id, tunnel.name, tunnel.status);
+}
+
+// Creation is a separately authorized infrastructure change.
+const created = await cf.zeroTrust.tunnels.cloudflared.create({
+  account_id: accountId,
+  name: "my-tunnel",
+  config_src: "cloudflare",
 });
-
-console.log(`Tunnel ID: ${tunnel.id}`);
-```
-
-## List Tunnels
-
-### cURL
-```bash
-curl -X GET "https://api.cloudflare.com/client/v4/accounts/{account_id}/tunnels" \
-  -H "Authorization: Bearer ${CF_API_TOKEN}"
-```
-
-### TypeScript
-```typescript
-const tunnels = await cf.zeroTrust.tunnels.list({
+if (!created.id) throw new Error("Create response has no tunnel ID");
+const token = await cf.zeroTrust.tunnels.cloudflared.token.get(created.id, {
   account_id: accountId,
 });
+// Store token in the intended secret manager; never print it.
+```
 
-for (const tunnel of tunnels.result) {
-  console.log(`${tunnel.name}: ${tunnel.id}`);
+A locally managed tunnel instead uses `config_src: "local"` and a base64-encoded random secret of at least 32 bytes. In Node, import `randomBytes` from `node:crypto`; the Web Crypto `crypto` object has no `randomBytes()` method.
+
+## REST endpoints
+
+All paths below are relative to `https://api.cloudflare.com/client/v4` and require account-scoped authentication. Check both HTTP status and Cloudflare's `success`/`errors` envelope.
+
+| Operation | Method and path |
+|---|---|
+| List/create Cloudflare tunnels | `GET` / `POST /accounts/{account_id}/cfd_tunnel` |
+| Get/delete a tunnel | `GET` / `DELETE /accounts/{account_id}/cfd_tunnel/{tunnel_id}` |
+| Update tunnel metadata | `PATCH /accounts/{account_id}/cfd_tunnel/{tunnel_id}` |
+| Read/replace remote ingress config | `GET` / `PUT /accounts/{account_id}/cfd_tunnel/{tunnel_id}/configurations` |
+| Get run token | `GET /accounts/{account_id}/cfd_tunnel/{tunnel_id}/token` |
+| Read/clean connector connections | `GET` / `DELETE /accounts/{account_id}/cfd_tunnel/{tunnel_id}/connections` |
+| List/create private CIDR routes | `GET` / `POST /accounts/{account_id}/teamnet/routes` |
+| Read/delete a private CIDR route | `GET` / `DELETE /accounts/{account_id}/teamnet/routes/{route_id}` |
+
+Remote ingress configuration body:
+
+```json
+{
+  "config": {
+    "ingress": [
+      { "hostname": "app.example.com", "service": "http://localhost:8000" },
+      { "service": "http_status:404" }
+    ]
+  }
 }
 ```
 
-## Get Tunnel Info
+`PUT` replaces configuration: read the existing rules and preserve unrelated routes. SDK versions whose generated type requires `hostname` on the final catch-all may need the documented REST body until that schema mismatch is resolved; do not silence it with an unsafe assertion.
 
-### cURL
-```bash
-curl -X GET "https://api.cloudflare.com/client/v4/accounts/{account_id}/tunnels/{tunnel_id}" \
-  -H "Authorization: Bearer ${CF_API_TOKEN}"
+Private CIDR route body:
+
+```json
+{ "network": "10.20.0.0/16", "tunnel_id": "TUNNEL_UUID" }
 ```
 
-### TypeScript
-```typescript
-const tunnel = await cf.zeroTrust.tunnels.get(tunnelId, {
-  account_id: accountId,
-});
+## DNS is separate
 
-console.log(`Status: ${tunnel.status}`);
-console.log(`Connections: ${tunnel.connections?.length || 0}`);
-```
+A public hostname uses a zone DNS CNAME pointing to `TUNNEL_UUID.cfargotunnel.com`, plus a matching ingress rule. Create/update it with the DNS records API (`/zones/{zone_id}/dns_records`) or the authorized `cloudflared tunnel route dns` command. The tunnel `connections` endpoint manages active connectors; it does not create or delete DNS routes. Private hostname routes also have their own Zero Trust route API and are not public DNS records.
 
-## Update Tunnel Config
+Deleting a tunnel, a route or connector connections interrupts its users. Inspect the exact account, tunnel and route before executing a requested deletion; avoid deleting all connectors merely to fix one replica.
 
-### cURL
-```bash
-curl -X PUT "https://api.cloudflare.com/client/v4/accounts/{account_id}/tunnels/{tunnel_id}/configurations" \
-  -H "Authorization: Bearer ${CF_API_TOKEN}" \
-  -H "Content-Type: application/json" \
-  --data '{
-    "config": {
-      "ingress": [
-        {"hostname": "app.example.com", "service": "http://localhost:8000"},
-        {"service": "http_status:404"}
-      ]
-    }
-  }'
-```
-
-### TypeScript
-```typescript
-const config = await cf.zeroTrust.tunnels.configurations.update(
-  tunnelId,
-  {
-    account_id: accountId,
-    config: {
-      ingress: [
-        { hostname: 'app.example.com', service: 'http://localhost:8000' },
-        { service: 'http_status:404' },
-      ],
-    },
-  }
-);
-```
-
-## Delete Tunnel
-
-### cURL
-```bash
-curl -X DELETE "https://api.cloudflare.com/client/v4/accounts/{account_id}/tunnels/{tunnel_id}" \
-  -H "Authorization: Bearer ${CF_API_TOKEN}"
-```
-
-### TypeScript
-```typescript
-await cf.zeroTrust.tunnels.delete(tunnelId, {
-  account_id: accountId,
-});
-```
-
-## Token-Based Tunnels (Config Source: Cloudflare)
-
-Token-based tunnels store config in Cloudflare dashboard instead of local files.
-
-### Via Dashboard
-1. **Zero Trust** > **Networks** > **Tunnels**
-2. **Create a tunnel** > **Cloudflared**
-3. Configure routes in dashboard
-4. Copy token
-5. Run on origin:
-```bash
-cloudflared service install <TOKEN>
-```
-
-### Via Token
-```bash
-# Run with token (no config file needed)
-cloudflared tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
-
-# Docker
-docker run cloudflare/cloudflared:latest tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
-```
-
-### Get Tunnel Token (TypeScript)
-```typescript
-// Get tunnel to retrieve token
-const tunnel = await cf.zeroTrust.tunnels.get(tunnelId, {
-  account_id: accountId,
-});
-
-// Token available in tunnel.token (only for config source: cloudflare)
-const token = tunnel.token;
-```
-
-## DNS Routes API
-
-```bash
-# Create DNS route
-curl -X POST "https://api.cloudflare.com/client/v4/accounts/{account_id}/tunnels/{tunnel_id}/connections" \
-  -H "Authorization: Bearer ${CF_API_TOKEN}" \
-  --data '{"hostname": "app.example.com"}'
-
-# Delete route
-curl -X DELETE "https://api.cloudflare.com/client/v4/accounts/{account_id}/tunnels/{tunnel_id}/connections/{route_id}" \
-  -H "Authorization: Bearer ${CF_API_TOKEN}"
-```
-
-## Private Network Routes API
-
-```bash
-# Add IP route
-curl -X POST "https://api.cloudflare.com/client/v4/accounts/{account_id}/tunnels/{tunnel_id}/routes" \
-  -H "Authorization: Bearer ${CF_API_TOKEN}" \
-  --data '{"ip_network": "10.0.0.0/8"}'
-
-# List IP routes
-curl -X GET "https://api.cloudflare.com/client/v4/accounts/{account_id}/tunnels/{tunnel_id}/routes" \
-  -H "Authorization: Bearer ${CF_API_TOKEN}"
-```
+[Cloudflared API](https://developers.cloudflare.com/api/resources/zero_trust/subresources/tunnels/subresources/cloudflared/) · [Private routes](https://developers.cloudflare.com/api/resources/zero_trust/subresources/networks/subresources/routes/) · [Tunnel tokens](https://developers.cloudflare.com/tunnel/advanced/tunnel-tokens/)

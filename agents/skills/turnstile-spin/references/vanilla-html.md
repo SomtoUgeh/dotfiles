@@ -1,5 +1,7 @@
 # Vanilla HTML
 
+Copy [verify-turnstile.ts](../templates/verify-turnstile.ts) to `the existing server library` before using the backend examples. Keep it server-only and preserve the handler's existing inputs and business logic. Configure the exact frontend hostnames for each deployment; production must exclude local-development hosts.
+
 For static sites or any project without a JS framework. The widget renders client-side; the form submits to whatever backend handles your form (a Node/PHP/Ruby/Go server, a Cloudflare Worker, a Pages Function, a third-party form host that supports server-side hooks, etc.).
 
 ```html
@@ -33,7 +35,7 @@ When the form submits, the browser includes `cf-turnstile-response` automaticall
 Add this to your existing `/api/subscribe` handler before the rest of its logic:
 
 ```js
-// Node / fetch idiom
+// Fragment inside the existing Node handler; import verifyTurnstile from your server library.
 const expectedHostnames = new Set(
 	(process.env.TURNSTILE_HOSTNAMES ?? '')
 		.split(',')
@@ -42,24 +44,12 @@ const expectedHostnames = new Set(
 );
 if (expectedHostnames.size === 0) return res.status(403).end();
 
-const token = req.body['cf-turnstile-response'];
-const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-	method: 'POST',
-	headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-	body: new URLSearchParams({
-		secret: process.env.TURNSTILE_SECRET,
-		response: token,
-		remoteip: req.ip,
-	}),
-});
-const result = await r.json();
-if (
-	r.ok !== true ||
-	result.success !== true ||
-	result.action !== 'subscribe' ||
-	!expectedHostnames.has(result.hostname)
-) {
-	return res.status(403).end();
+const token = req.body?.['cf-turnstile-response'];
+if (!await verifyTurnstile({
+	token: token, secret: process.env.TURNSTILE_SECRET,
+	hostnames: process.env.TURNSTILE_HOSTNAMES, action: "subscribe",
+})) {
+	return res.status(403).json({ error: "Verification failed" });
 }
 // existing handler logic runs here
 ```
@@ -67,30 +57,63 @@ if (
 Equivalent calls in other backend languages (each also compares `result.hostname` to a `TURNSTILE_HOSTNAMES` allowlist):
 
 ```ruby
-# Ruby
-require 'net/http'; require 'uri'; require 'json'; require 'set'
-expected_hostnames = (ENV['TURNSTILE_HOSTNAMES'] || '').split(',').map(&:strip).reject(&:empty?).to_set
-halt 403 if expected_hostnames.empty?
-res = Net::HTTP.post_form(URI('https://challenges.cloudflare.com/turnstile/v0/siteverify'),
-  secret: ENV['TURNSTILE_SECRET'], response: params['cf-turnstile-response'], remoteip: request.ip)
-result = JSON.parse(res.body)
-halt 403 unless res.is_a?(Net::HTTPSuccess) && result['success'] == true && result['action'] == 'subscribe' && expected_hostnames.include?(result['hostname'])
+# Standalone Ruby verification helper; call from the existing server handler.
+require 'net/http'
+require 'uri'
+require 'json'
+require 'set'
+
+def verify_turnstile(token)
+  secret = ENV['TURNSTILE_SECRET']
+  hosts = (ENV['TURNSTILE_HOSTNAMES'] || '').split(',').map(&:strip).reject(&:empty?).to_set
+  return false unless token.is_a?(String) && token.length.between?(1, 2048)
+  return false unless secret.is_a?(String) && !secret.strip.empty? && !hosts.empty?
+  uri = URI('https://challenges.cloudflare.com/turnstile/v0/siteverify')
+  http = Net::HTTP.new(uri.host, uri.port)
+  http.use_ssl = true
+  http.open_timeout = 5
+  http.read_timeout = 10
+  http.write_timeout = 10
+  request = Net::HTTP::Post.new(uri)
+  request.set_form_data(secret: secret, response: token)
+  response = http.request(request)
+  return false unless response.is_a?(Net::HTTPSuccess)
+  result = JSON.parse(response.body)
+  result.is_a?(Hash) && result['success'] == true && result['action'] == 'subscribe' && hosts.include?(result['hostname'])
+rescue StandardError
+  # This boundary fails closed for transport, timeout, and malformed responses.
+  false
+end
 ```
 
 ```python
-# Python (requests)
-expected_hostnames = {h.strip() for h in os.environ.get('TURNSTILE_HOSTNAMES', '').split(',') if h.strip()}
-if not expected_hostnames:
-    return '', 403
-r = requests.post('https://challenges.cloudflare.com/turnstile/v0/siteverify',
-    data={'secret': os.environ['TURNSTILE_SECRET'],
-          'response': form['cf-turnstile-response'],
-          'remoteip': request.remote_addr})
-result = r.json()
-if (not r.ok or result.get('success') is not True or result.get('action') != 'subscribe'
-        or result.get('hostname') not in expected_hostnames):
-    return '', 403
+# Standalone Python helper using requests; call from the existing handler.
+import os
+import requests
+
+def verify_turnstile(token):
+    secret = os.environ.get("TURNSTILE_SECRET", "")
+    hosts = {h.strip() for h in os.environ.get("TURNSTILE_HOSTNAMES", "").split(",") if h.strip()}
+    if not isinstance(token, str) or not 1 <= len(token) <= 2048 or not secret.strip() or not hosts:
+        return False
+    try:
+        response = requests.post(
+            "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+            data={"secret": secret, "response": token},
+            timeout=(5, 10),
+        )
+        response.raise_for_status()
+        result = response.json()
+        return (isinstance(result, dict) and result.get("success") is True
+                and result.get("action") == "subscribe" and result.get("hostname") in hosts)
+    except (requests.RequestException, ValueError, TypeError):
+        return False
 ```
+
+Keep the existing handler's inputs, business validation, and response format.
+Reject the request when verification returns false. Install `requests` through
+the project's `uv` workflow only if it is not already present and this integration
+is requested. Neither helper replaces auth, authorization, or rate limits.
 
 `subscribe` is the stable action for this surface. Preserve an existing custom migration action and compare the returned action to the same value. Siteverify is mandatory for every widget mode, including pre-clearance. Set `TURNSTILE_HOSTNAMES` to the deployment-specific frontend hostnames; a production value must not include `localhost` or `127.0.0.1`.
 
@@ -102,31 +125,61 @@ For an AJAX flow, replace the native form and API script with explicit rendering
 <form id="subscribe-form">
 	<input name="email" type="email" required />
 	<div id="subscribe-turnstile"></div>
-	<button type="submit">Subscribe</button>
+	<button type="submit" disabled>Subscribe</button>
+	<p id="subscribe-status" role="status"></p>
 </form>
 <script>
 	let subscribeWidgetId;
+	let subscribeToken = "";
+	let subscribePending = false;
+	const subscribeForm = document.getElementById("subscribe-form");
+	const subscribeButton = subscribeForm.querySelector('button[type="submit"]');
+	const subscribeStatus = document.getElementById("subscribe-status");
+	const updateSubscribeButton = () => {
+		subscribeButton.disabled = subscribePending || !subscribeToken;
+	};
+	const clearSubscribeToken = () => {
+		subscribeToken = "";
+		updateSubscribeButton();
+	};
 
 	window.onSubscribeTurnstileLoad = () => {
 		subscribeWidgetId = window.turnstile.render("#subscribe-turnstile", {
 			sitekey: "YOUR_SITEKEY",
 			action: "subscribe",
+			callback: (token) => {
+				subscribeToken = token;
+				updateSubscribeButton();
+			},
+			"expired-callback": clearSubscribeToken,
+			"error-callback": () => {
+				clearSubscribeToken();
+				subscribeStatus.textContent = "Verification failed. Please try again.";
+			},
 		});
 	};
 
-	document.getElementById("subscribe-form").addEventListener("submit", async (event) => {
+	subscribeForm.addEventListener("submit", async (event) => {
 		event.preventDefault();
+		if (subscribePending || !subscribeToken) return;
+		subscribePending = true;
+		updateSubscribeButton();
+		subscribeStatus.textContent = "Submitting…";
 		try {
 			const res = await fetch("/api/subscribe", {
 				method: "POST",
 				body: new FormData(event.currentTarget),
 			});
 			const json = await res.json();
-			if (!res.ok || json.ok !== true) throw new Error("Submission failed");
-			// proceed
+			if (!res.ok || json === null || typeof json !== "object" || json.ok !== true) {
+				throw new Error("Submission failed");
+			}
+			subscribeStatus.textContent = "Subscribed.";
 		} catch {
-			// surface the error
+			subscribeStatus.textContent = "Submission failed. Please verify and try again.";
 		} finally {
+			subscribePending = false;
+			clearSubscribeToken();
 			if (subscribeWidgetId !== undefined) {
 				window.turnstile.reset(subscribeWidgetId);
 			}
@@ -142,11 +195,7 @@ For an AJAX flow, replace the native form and API script with explicit rendering
 
 ## No backend?
 
-If your project is pure-static (no server-side handler — just HTML served from a CDN), Spin doesn't apply. Siteverify is server-side by design. Options:
-
-- Add a Cloudflare Pages Function (`functions/api/subscribe.js`) to host the siteverify call.
-- Deploy a tiny Cloudflare Worker that does siteverify against your existing form host.
-- Use a third-party form host that exposes a server-side webhook where you can wire siteverify.
+If there is no existing server handler, stop before creating a widget and report the missing backend. Selecting or deploying a new backend is a separate user decision. Do not add a Worker or proxy merely to complete this setup.
 
 ## Substitutions
 

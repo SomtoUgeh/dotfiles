@@ -59,7 +59,7 @@ To apply migrations in production, run:
 
 ## Exit Codes
 
-- `0`: Success (may have pending migrations, but command ran successfully)
-- `1`: Error
+- `0`: Local and database migration histories are in sync.
+- `1`: Pending migrations, divergent histories, failed migrations, missing migration table, or connection/error conditions.
 
-To check for pending migrations programmatically, you might need to parse the output or use `migrate diff` with exit code flags.
+Pending migrations are an expected pre-deployment state; do not blindly use `migrate status && migrate deploy`, which prevents applying them. Inspect the output or run deploy directly under the deployment workflow.

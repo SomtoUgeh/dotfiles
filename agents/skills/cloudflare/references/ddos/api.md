@@ -32,20 +32,19 @@ import Cloudflare from "cloudflare";
 const client = new Cloudflare({ apiToken: process.env.CLOUDFLARE_API_TOKEN });
 
 // STEP 1: Discover managed ruleset ID (required for overrides)
-const allRulesets = await client.rulesets.list({ zone_id: zoneId });
-const ddosRuleset = allRulesets.result.find(
-  (r) => r.kind === "managed" && r.phase === "ddos_l7"
-);
+const allRulesets = [];
+for await (const ruleset of client.rulesets.list({ zone_id: zoneId })) allRulesets.push(ruleset);
+const ddosRuleset = allRulesets.find(r => r.kind === "managed" && r.phase === "ddos_l7");
 if (!ddosRuleset) throw new Error("DDoS managed ruleset not found");
 const managedRulesetId = ddosRuleset.id;
 
 // STEP 2: Get current HTTP DDoS configuration
-const entrypointRuleset = await client.zones.rulesets.phases.entrypoint.get("ddos_l7", {
+const entrypointRuleset = await client.rulesets.phases.get("ddos_l7", {
   zone_id: zoneId,
 });
 
 // STEP 3: Update HTTP DDoS ruleset with overrides
-await client.zones.rulesets.phases.entrypoint.update("ddos_l7", {
+await client.rulesets.phases.update("ddos_l7", {
   zone_id: zoneId,
   rules: [
     {
@@ -63,11 +62,10 @@ await client.zones.rulesets.phases.entrypoint.update("ddos_l7", {
 });
 
 // Network DDoS (account level, L3/4)
-const l4Rulesets = await client.rulesets.list({ account_id: accountId });
-const l4DdosRuleset = l4Rulesets.result.find(
-  (r) => r.kind === "managed" && r.phase === "ddos_l4"
-);
-const l4Ruleset = await client.accounts.rulesets.phases.entrypoint.get("ddos_l4", {
+const l4Rulesets = [];
+for await (const ruleset of client.rulesets.list({ account_id: accountId })) l4Rulesets.push(ruleset);
+const l4DdosRuleset = l4Rulesets.find(r => r.kind === "managed" && r.phase === "ddos_l4");
+const l4Ruleset = await client.rulesets.phases.get("ddos_l4", {
   account_id: accountId,
 });
 ```
@@ -78,7 +76,7 @@ const l4Ruleset = await client.accounts.rulesets.phases.entrypoint.get("ddos_l4"
 interface DDoSAlertConfig {
   name: string;
   enabled: boolean;
-  alert_type: "http_ddos_attack_alert" | "layer_3_4_ddos_attack_alert" 
+  alert_type: "http_ddos_attack_alert" | "layer_3_4_ddos_attack_alert"
     | "advanced_http_ddos_attack_alert" | "advanced_layer_3_4_ddos_attack_alert";
   filters?: {
     zones?: string[];
@@ -162,3 +160,5 @@ const adaptiveOverride: RuleOverride = {
 ```
 
 See [patterns.md](./patterns.md) for complete implementation patterns.
+
+Ruleset phase PUT operations replace the entrypoint rules. Fetch the existing configuration, preserve unrelated rules using the current writable request schema, and review the complete resulting payload before applying it. Prefer a targeted rule update where available. Do not submit these fragments as a replacement for an existing production ruleset.

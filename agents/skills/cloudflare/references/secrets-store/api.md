@@ -16,7 +16,7 @@ interface Env {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const apiKey = await env.API_KEY.get();
-    return fetch("https://api.example.com", {
+    return await fetch("https://api.example.com", {
       headers: { "Authorization": `Bearer ${apiKey}` }
     });
   }
@@ -30,7 +30,7 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       const apiKey = await env.API_KEY.get();
-      return fetch("https://api.example.com", {
+      return await fetch("https://api.example.com", {
         headers: { "Authorization": `Bearer ${apiKey}` }
       });
     } catch (error) {
@@ -91,20 +91,20 @@ DELETE /accounts/{account_id}/secrets_store/stores/{store_id}
 # List
 GET /accounts/{account_id}/secrets_store/stores/{store_id}/secrets
 
-# Create (single)
+## Create body is an array even for one secret
 POST /accounts/{account_id}/secrets_store/stores/{store_id}/secrets
-{
+[{
   "name": "my_secret",
   "value": "secret_value",
   "scopes": ["workers"],
   "comment": "Optional"
-}
+}]
 
 # Create (batch)
 POST /accounts/{account_id}/secrets_store/stores/{store_id}/secrets
 [
   {"name": "secret_one", "value": "val1", "scopes": ["workers"]},
-  {"name": "secret_two", "value": "val2", "scopes": ["workers", "ai-gateway"]}
+  {"name": "secret_two", "value": "val2", "scopes": ["workers", "ai_gateway"]}
 ]
 
 # Get metadata
@@ -117,9 +117,8 @@ PATCH /accounts/{account_id}/secrets_store/stores/{store_id}/secrets/{secret_id}
 # Delete (single)
 DELETE /accounts/{account_id}/secrets_store/stores/{store_id}/secrets/{secret_id}
 
-# Delete (batch)
-DELETE /accounts/{account_id}/secrets_store/stores/{store_id}/secrets
-{"secret_ids": ["id-1", "id-2"]}
+# For selected deletion use the explicit per-secret endpoint above.
+# Do not invent a secret_ids body for bulk deletion.
 
 # Duplicate
 POST /accounts/{account_id}/secrets_store/stores/{store_id}/secrets/{secret_id}/duplicate
@@ -154,7 +153,7 @@ Error:
 
 ## TypeScript Helpers
 
-Official types available via `@cloudflare/workers-types`:
+Prefer generated Wrangler runtime types; the workers-types package is an alternative declaration source:
 
 ```typescript
 import type { SecretsStoreSecret } from "@cloudflare/workers-types";

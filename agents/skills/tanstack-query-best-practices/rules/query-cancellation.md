@@ -4,7 +4,7 @@
 
 ## Explanation
 
-TanStack Query provides an `AbortSignal` to cancel in-flight requests when queries become stale or components unmount. Pass this signal to your fetch calls to prevent memory leaks and wasted bandwidth.
+TanStack Query provides an `AbortSignal` to cancel in-flight requests when explicitly cancelled or when the last observer leaves and the signal was consumed. Pass this signal to your fetch calls to prevent memory leaks and wasted bandwidth.
 
 ## Bad Example
 
@@ -138,14 +138,17 @@ const { data } = useQuery({
       const worker = new Worker('computation.js')
       worker.postMessage(params)
 
-      worker.onmessage = (e) => resolve(e.data)
-      worker.onerror = (e) => reject(e)
-
-      // Listen for cancellation
-      signal.addEventListener('abort', () => {
+      const cleanup = () => {
         worker.terminate()
+        signal.removeEventListener('abort', abort)
+      }
+      const abort = () => {
+        cleanup()
         reject(new DOMException('Aborted', 'AbortError'))
-      })
+      }
+      worker.onmessage = (e) => { cleanup(); resolve(e.data) }
+      worker.onerror = (e) => { cleanup(); reject(e) }
+      signal.addEventListener('abort', abort, { once: true })
     })
   },
 })
@@ -155,11 +158,11 @@ const { data } = useQuery({
 
 | Scenario | Cancelled? |
 |----------|------------|
-| Query key changes | Yes |
-| Component unmounts | Yes |
+| Query key changes | Old query cancels only after its last observer leaves and the signal was consumed |
+| Component unmounts | Same condition; other observers keep the request alive |
 | `queryClient.cancelQueries()` called | Yes |
-| Refetch triggered | Previous request cancelled |
-| `enabled` becomes false | Yes |
+| Refetch triggered | Depends on the refetch API and `cancelRefetch`; an initial fetch may be reused |
+| `enabled` becomes false | No; use explicit cancellation when required |
 
 ## Context
 

@@ -15,27 +15,30 @@ return new Response(object.body, { headers });
 
 ## Conditional GET (304 Not Modified)
 
+This example handles only `If-None-Match`, letting R2 parse quoted ETags, lists, and `*` correctly.
+
 ```typescript
-const ifNoneMatch = request.headers.get('if-none-match');
-const object = await env.MY_BUCKET.get(key, {
-  onlyIf: { etagDoesNotMatch: ifNoneMatch?.replace(/"/g, '') || '' }
-});
-
+const conditions = new Headers();
+const etag = request.headers.get('if-none-match');
+if (etag !== null) conditions.set('if-none-match', etag);
+const object = await env.MY_BUCKET.get(key, { onlyIf: conditions });
 if (!object) return new Response('Not found', { status: 404 });
-if (!object.body) return new Response(null, { status: 304, headers: { 'etag': object.httpEtag } });
-
-return new Response(object.body, { headers: { 'etag': object.httpEtag } });
+const headers = new Headers({ etag: object.httpEtag });
+if (!('body' in object)) return new Response(null, { status: 304, headers });
+object.writeHttpMetadata(headers);
+return new Response(object.body, { headers });
 ```
 
 ## Upload with Validation
 
 ```typescript
-const key = url.pathname.slice(1);
-if (!key || key.includes('..')) return new Response('Invalid key', { status: 400 });
+// After authentication, derive userId on the server and enforce upload limits.
+const key = `uploads/${userId}/${crypto.randomUUID()}`;
+if (request.method !== 'PUT' || !request.body) return new Response('PUT body required', { status: 400 });
 
 const object = await env.MY_BUCKET.put(key, request.body, {
   httpMetadata: { contentType: request.headers.get('content-type') || 'application/octet-stream' },
-  customMetadata: { uploadedAt: new Date().toISOString(), ip: request.headers.get('cf-connecting-ip') || 'unknown' }
+  customMetadata: { uploadedAt: new Date().toISOString() }
 });
 
 return Response.json({ key: object.key, size: object.size, etag: object.httpEtag });
@@ -45,6 +48,7 @@ return Response.json({ key: object.key, size: object.size, etag: object.httpEtag
 
 ```typescript
 const PART_SIZE = 5 * 1024 * 1024; // 5MB
+if (file.size === 0) return await env.MY_BUCKET.put(key, file);
 const partCount = Math.ceil(file.size / PART_SIZE);
 const multipart = await env.MY_BUCKET.createMultipartUpload(key, { httpMetadata: { contentType: file.type } });
 
@@ -76,7 +80,7 @@ async function deletePrefix(prefix: string, env: Env) {
       await env.MY_BUCKET.delete(listed.objects.map(o => o.key));
     }
     truncated = listed.truncated;
-    cursor = listed.cursor;
+    cursor = listed.truncated ? listed.cursor : undefined;
   }
 }
 ```
@@ -124,6 +128,8 @@ await fetch(uploadUrl, { method: 'PUT', body: file });
 ```typescript
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    if (request.method !== 'GET') return new Response('Method not allowed', { status: 405 });
+    // This cache is for public, versioned immutable objects only.
     const cache = caches.default;
     const url = new URL(request.url);
     const cacheKey = new Request(url.toString(), request);
@@ -168,8 +174,9 @@ export default {
       });
     }
 
+    if (!['GET', 'HEAD'].includes(request.method)) return new Response('Method not allowed', { status: 405 });
     const key = new URL(request.url).pathname.slice(1);
-    if (!key) return Response.redirect('/index.html', 302);
+    if (!key) return Response.redirect(new URL('/index.html', request.url).href, 302);
 
     const object = await env.MY_BUCKET.get(key);
     if (!object) return new Response('Not found', { status: 404 });
@@ -180,14 +187,14 @@ export default {
     headers.set('access-control-allow-origin', '*');
     headers.set('cache-control', 'public, max-age=31536000, immutable');
 
-    return new Response(object.body, { headers });
+    return new Response(request.method === 'HEAD' ? null : object.body, { headers });
   }
 };
 ```
 
 ## r2.dev Public URLs
 
-Enable r2.dev in dashboard for simple public access: `https://pub-${hashId}.r2.dev/${key}`  
+Enable r2.dev in dashboard for simple public access: `https://pub-${hashId}.r2.dev/${key}`
 Or add custom domain via dashboard: `https://files.example.com/${key}`
 
-**Limitations:** No auth, bucket-level CORS, no cache override.
+**Limitations:** Public unauthenticated access; r2.dev is rate-limited for development. Use a custom domain for production caching. A Worker proxy has its own routing/CORS/cache behavior; attaching a bucket domain does not execute the proxy.

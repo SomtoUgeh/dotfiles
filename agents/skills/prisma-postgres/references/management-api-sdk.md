@@ -30,11 +30,9 @@ const { data: workspaces } = await client.GET('/v1/workspaces')
 ```typescript
 import { createManagementApiSdk, type TokenStorage } from '@prisma/management-api-sdk'
 
-const tokenStorage: TokenStorage = {
-  async getTokens() { return null },
-  async setTokens(tokens) {},
-  async clearTokens() {},
-}
+// Application-owned, per-user encrypted storage implementation.
+// No-op setters lose refresh tokens and break the OAuth flow.
+import { tokenStorage } from './per-user-token-storage'
 
 const api = createManagementApiSdk({
   clientId: process.env.PRISMA_CLIENT_ID!,

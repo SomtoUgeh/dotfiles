@@ -38,7 +38,7 @@ await env.ASSETS.fetch(new Request(new URL("/logo.png", request.url), {
 **Key behaviors:**
 
 - Host/origin is ignored for string/URL inputs (only path is used)
-- Method must be GET (others return 405)
+- Methods GET and HEAD are supported; other methods return 405
 - Request headers pass through (affects response)
 - Returns standard `Response` object
 
@@ -50,7 +50,7 @@ await env.ASSETS.fetch(new Request(new URL("/logo.png", request.url), {
 // All resolve to same asset:
 env.ASSETS.fetch("https://example.com/logo.png")
 env.ASSETS.fetch("https://ignored.host/logo.png")
-env.ASSETS.fetch("/logo.png")
+env.ASSETS.fetch(new URL("/logo.png", request.url))
 ```
 
 Assets are resolved relative to configured `assets.directory`.
@@ -100,13 +100,13 @@ Responses include:
 ```
 Content-Type: <inferred>
 ETag: "<hash>"
-Cache-Control: public, max-age=3600
+Cache-Control: public, max-age=0, must-revalidate
 Content-Encoding: br  (if supported and beneficial)
 ```
 
 **Cache-Control defaults:**
 
-- 1 hour (`max-age=3600`) for most assets
+- Default browser policy is `public, max-age=0, must-revalidate`; see the [headers reference](https://developers.cloudflare.com/workers/static-assets/headers/)
 - Override via Worker response transformation (see patterns.md:27-35)
 
 ### Compression
@@ -156,15 +156,14 @@ Depends on configuration (see configuration.md:45-52):
 
 ```typescript
 const response = await env.ASSETS.fetch(request);
+const headers = new Headers(response.headers);
+headers.set('Cache-Control', 'public, max-age=31536000');
+headers.set('X-Custom', 'value');
 
 // Clone and modify
 return new Response(response.body, {
   status: response.status,
-  headers: {
-    ...Object.fromEntries(response.headers),
-    'Cache-Control': 'public, max-age=31536000',
-    'X-Custom': 'value'
-  }
+  headers
 });
 ```
 
@@ -175,7 +174,7 @@ See patterns.md:27-35 for full example.
 ```typescript
 const response = await env.ASSETS.fetch(request);
 
-if (!response.ok) {
+if (response.status === 404) {
   // Asset not found or error
   return new Response('Custom error page', { status: 404 });
 }
@@ -190,7 +189,7 @@ const url = new URL(request.url);
 
 // Serve different assets based on conditions
 if (url.pathname === '/') {
-  return env.ASSETS.fetch('/index.html');
+  return env.ASSETS.fetch(new URL('/index.html', request.url));
 }
 
 return env.ASSETS.fetch(request);

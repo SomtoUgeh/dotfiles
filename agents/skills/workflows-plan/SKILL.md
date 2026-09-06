@@ -10,11 +10,11 @@ description: Transform feature descriptions into well-structured specs and execu
 When this skill needs user questions, todo/progress tracking, subagents, or another skill, use the active runtime equivalents in [RUNTIME_TOOLS.md](../RUNTIME_TOOLS.md).
 
 
-Adhere to the Builder Ethos (ETHOS.md): Boil the Lake, Search Before Building, User Sovereignty.
+Follow the active shared and project instruction files. `ETHOS.md` is a human reference, not an additional mandatory runtime source.
 
 ## Introduction
 
-**Note: The current year is 2026.** Use this when dating plans and searching for recent documentation.
+Use the current date from the active environment when dating plans. Treat dated examples as illustrative.
 
 Transform feature descriptions, bug reports, or improvement ideas into:
 1. **spec.md** - Human-readable plan with rationale, context, and design decisions
@@ -24,9 +24,7 @@ Transform feature descriptions, bug reports, or improvement ideas into:
 
 <feature_description> $ARGUMENTS </feature_description>
 
-**If the feature description above is empty, ask the user:** "What would you like to plan? Please describe the feature, bug fix, or improvement you have in mind."
-
-Do not proceed until you have a clear feature description from the user.
+Resolve the feature from the invocation, current conversation, or named brainstorm/plan. `$ARGUMENTS` is illustrative input notation, not a shell variable. Ask what to plan only if no objective can be resolved from those sources.
 
 ### 0. Idea Refinement
 
@@ -41,8 +39,8 @@ ls -la docs/plans/*/spec.md 2>/dev/null
 
 **Relevance criteria:** A brainstorm is relevant if:
 - The folder name or brainstorm content semantically matches the feature description
-- Created within the last 14 days
-- If multiple candidates match, use the most recent one
+- The user-selected artifact takes precedence regardless of age
+- Use recency as a discovery aid; verify decisions against the current task rather than discarding an older relevant document
 
 **If a relevant brainstorm exists:**
 1. Read the brainstorm document
@@ -53,7 +51,7 @@ ls -la docs/plans/*/spec.md 2>/dev/null
 **If shaping format detected:**
 - Extract R table → primary source for acceptance criteria
 - Extract selected shape + parts table → technical approach structure
-- Extract flagged unknowns (!) → open questions / spike candidates
+- Extract flagged unknowns (⚠️) → open questions / spike candidates
 - Extract Frame (Source, Problem, Outcome) → spec problem statement
 - Use R table as input to SpecFlow and story generation
 
@@ -66,7 +64,7 @@ Use **structured user-question tool** to ask which brainstorm to use, or whether
 
 **If no brainstorm found (or not relevant), run idea refinement:**
 
-Refine the idea through collaborative dialogue using the **structured user-question tool**; making sure to interview me relentlessly until we reach a shared understanding - walk down each branch of the design tree, resolving dependencies between decisions one-by-one.
+Ask only questions that resolve material uncertainty. Use existing conversation and repository evidence first; continue independent research while awaiting an answer.
 
 - Ask questions one at a time to understand the idea fully
 - Prefer multiple choice questions when natural options exist
@@ -80,14 +78,13 @@ Refine the idea through collaborative dialogue using the **structured user-quest
 - **Topic risk**: Security, payments, external APIs warrant more caution
 - **Uncertainty level**: Is the approach clear or open-ended?
 
-**Skip option:** If the feature description is already detailed, offer:
-"Your description is clear. Should I proceed with research, or would you like to refine it further?"
+If the feature description is already clear, proceed directly to research without another confirmation.
 
 ## Main Tasks
 
 ### 1. Local Research (Always Runs - Parallel)
 
-You MUST run this agent to gather local context. Do not skip:
+Gather local context. Delegate only when a callable researcher can answer a bounded question independently; otherwise research locally:
 
 - Launch subagent `repo-research-analyst` with prompt (feature_description)
 
@@ -116,7 +113,7 @@ Examples:
 
 **Only run if Step 1.5 indicates external research is valuable.**
 
-Run these agents in parallel:
+When independent questions justify delegation and callable roles are available, use the relevant researchers below. Otherwise do this research locally; do not require both agents for the same question:
 
 - Launch subagent `best-practices-researcher` with prompt (feature_description)
 - Launch subagent `framework-docs-researcher` with prompt (feature_description)
@@ -130,22 +127,22 @@ After all research steps complete, consolidate findings:
 - List related PRs discovered
 - Capture active project instruction conventions
 
-**Briefly summarize findings to the user and ask if anything looks off or missing before proceeding to planning.**
+Briefly summarize findings and proceed; ask only about an unresolved decision that changes the plan.
 
 ### 1.7. Choose Detail Level
 
-Use the **structured user-question tool** to determine how comprehensive the spec should be. This decision affects how much work goes into subsequent steps.
+Honor a requested detail level; otherwise choose proportionately from the levels below and state the choice. Ask only when the audience or deliverable is unclear.
 
 **Question:** "What level of detail do you want for this spec?"
 
 **Options:**
 1. **MINIMAL** — Quick spec. Problem + solution + acceptance criteria. Best for simple bugs, small improvements, clear features.
 2. **STANDARD** — Most features. Adds background, technical considerations, success metrics, dependencies/risks.
-3. **COMPREHENSIVE** — Major features, architectural changes. Produces 5 documents: ADR, backend spec, DTO contract, UI design spec, frontend spec. Uses a decision cascade model where you make key architectural decisions and everything else derives automatically.
+3. **COMPREHENSIVE** — Major features, architectural changes. Adds the applicable architecture, backend, contract, UI, and frontend documents to the overview. Record key decisions first, derive dependent choices, and verify those choices against requirements.
 
 **Default recommendation:** STANDARD unless the feature is trivially small (MINIMAL) or involves major architecture, multiple system layers, or complex integrations (COMPREHENSIVE).
 
-**If user picks COMPREHENSIVE:** The planning steps below still run, but Step 4 will trigger an extended collaborative decision-making process that produces 5 spec documents instead of a single spec.md.
+**For COMPREHENSIVE:** The planning steps below still run. Step 4 produces an overview plus the supporting documents the feature needs; do not invent UI or backend scope to fill a template.
 
 ### 2. Planning & Structure
 
@@ -155,16 +152,16 @@ First, extract or ask for the ticket number:
 
 - [ ] Check if feature description contains a ticket URL (e.g., `https://yourorg.atlassian.net/browse/PROJ-1222`)
 - [ ] If URL found, extract ticket number (e.g., `PROJ-1222`)
-- [ ] If no URL/ticket, use **structured user-question tool**: "Is there a ticket for this work? (e.g., PROJ-1234, or 'none')"
+- [ ] If no ticket is supplied or discoverable, use null; a ticket is optional.
 
 **Branch Naming Convention:**
 
-Format: `[ticket-number]-[description-kebab-case]`
+Format: `feat/[ticket-number]-[description-kebab-case]`
 
 Examples:
-- `PROJ-1222-user-authentication`
-- `PROJ-1456-fix-checkout-race-condition`
-- `PROJ-890-refactor-api-client`
+- `feat/PROJ-1222-user-authentication`
+- `fix/PROJ-1456-checkout-race-condition`
+- `refactor/PROJ-890-api-client`
 
 If no ticket: use `type/description-kebab-case` (e.g., `feat/user-authentication`, `fix/checkout-race-condition`)
 
@@ -176,12 +173,7 @@ If no ticket: use `type/description-kebab-case` (e.g., `feat/user-authentication
   - Example: `feat: Add User Authentication` → `2026-01-21-feat-user-authentication/`
   - Keep it descriptive (3-5 words) so plans are findable by context
 
-**Create Branch:**
-
-- [ ] Derive branch name: `[ticket]-[kebab-description]` (e.g., `PROJ-1222-user-authentication`)
-- [ ] Check if branch exists: `git branch --list [branch-name]`
-- [ ] If not exists, create and checkout: `git checkout -b [branch-name]`
-- [ ] If exists, confirm with user before switching
+**Proposed branch:** Record the intended branch name in the plan using the repository convention. Do not create or switch branches during planning; implementation owns workspace setup.
 
 **Stakeholder Analysis:**
 
@@ -197,14 +189,14 @@ If no ticket: use `type/description-kebab-case` (e.g., `feat/user-authentication
 
 ### 3. SpecFlow Analysis
 
-After planning the structure, run SpecFlow Analyzer to validate and refine the feature specification:
+After planning the structure, validate flows and gaps locally or with a callable SpecFlow Analyzer when a separate review is useful:
 
 - Launch subagent `spec-flow-analyzer` with prompt (feature_description, research_findings)
 
 **SpecFlow Analyzer Output:**
 
 - [ ] Review SpecFlow analysis results
-- [ ] Incorporate any identified gaps or edge cases
+- [ ] Verify identified gaps and edge cases; incorporate in-scope corrections and ask before adopting an outside reviewer's direction change
 - [ ] Update acceptance criteria based on SpecFlow findings
 
 ### 3.5. Breadboard
@@ -251,209 +243,9 @@ Add breadboard tables + slice summary as a section in spec.md.
 
 If changes are made, re-render the breadboard tables and update the slice summary before proceeding.
 
-### 4. Generate Spec(s) by Detail Level
+### 4. Generate the chosen spec
 
-Use the detail level chosen in Step 1.7. Simpler is mostly better.
-
-#### MINIMAL (Quick Spec)
-
-**Best for:** Simple bugs, small improvements, clear features
-
-**Includes:**
-
-- Problem statement or feature description
-- Basic acceptance criteria
-- Essential context only
-
-**Structure:**
-
-````markdown
----
-title: [Title]
-type: [feat|fix|refactor]
-date: YYYY-MM-DD
----
-
-# [Title]
-
-## Problem
-
-[Brief problem/feature description]
-
-## Solution
-
-[High-level approach]
-
-## Acceptance Criteria
-
-- [ ] Core requirement 1
-- [ ] Core requirement 2
-
-## Context
-
-[Any critical information]
-
-## References
-
-- Similar pattern: `src/example.ts:42`
-- Documentation: [relevant_docs_url]
-````
-
-#### STANDARD (Most Features)
-
-**Best for:** Most features, complex bugs, team collaboration
-
-**Includes everything from MINIMAL plus:**
-
-- Detailed background and motivation
-- Technical considerations
-- Success metrics
-- Dependencies and risks
-
-**Structure:**
-
-```markdown
----
-title: [Title]
-type: [feat|fix|refactor]
-date: YYYY-MM-DD
----
-
-# [Title]
-
-## Overview
-
-[Comprehensive description]
-
-## Problem Statement
-
-[Why this matters, what pain it solves]
-
-## Proposed Solution
-
-[High-level approach with rationale]
-
-## Technical Considerations
-
-- Architecture impacts
-- Performance implications
-- Security considerations
-
-## Acceptance Criteria
-
-- [ ] Detailed requirement 1
-- [ ] Detailed requirement 2
-- [ ] Testing requirements
-
-## Success Metrics
-
-[How we measure success]
-
-## Dependencies & Risks
-
-[What could block or complicate this]
-
-## References
-
-- Similar pattern: `src/services/example.ts:42`
-- Best practices: [documentation_url]
-- Related PR: #[pr_number]
-```
-
-#### COMPREHENSIVE (Major Features)
-
-**Best for:** Major features, architectural changes, complex integrations spanning backend + frontend
-
-**Produces 5 documents** instead of a single spec.md:
-
-1. **adr.md** — Architecture Decision Record: every significant decision, who made it, why, alternatives rejected
-2. **backend.md** — Backend Tech Spec: data model, API design, business logic, security, testing
-3. **dtos.md** — DTO Contract Spec: shared + feature-specific request/response types with example payloads
-4. **ui-design.md** — UI Design Tech Spec: page layouts, component inventory, responsive behavior, accessibility
-5. **frontend.md** — Frontend Tech Spec: routing, state management, data fetching, forms, error handling, testing
-
-**Decision Cascade Model:**
-
-Every decision falls into one of three categories:
-
-- **USER DECIDES** — Requires judgment, taste, or domain knowledge. Present 2-4 options with pros/cons tied to specific requirements, a recommendation with concrete rationale. Use **structured user-question tool**, one decision at a time. Wait for answer before proceeding.
-- **LLM DERIVES** — Cascades automatically from user decisions. Document what cascaded from which decision. Example: user picks "cursor-based pagination" → derive query parameter names, response envelope shape, cursor encoding, default/max page sizes, UI pagination component props.
-- **LLM DECIDES** — Universal best practices (security, accessibility, error handling, performance). Apply silently, document in specs.
-
-**Decision Queue** (ask in dependency order, skip what codebase already answers):
-
-1. Data model shape and entity relationships
-2. Status/enum definitions and state machines
-3. API design (style, URL structure, endpoints)
-4. Auth and permissions model for this feature
-5. Frontend state management boundaries
-6. Component architecture and granularity
-7. Data fetching and cache strategy
-8. Form management approach
-9. UI interaction patterns (modals vs pages vs drawers)
-10. Business logic placement (validation split, computation location)
-11. Infrastructure decisions (background jobs, file storage, caching)
-
-**Before asking questions:** Summarize conventions found in codebase, decisions already answered by existing patterns, decisions that don't apply, and roughly how many questions remain.
-
-**After each decision:** Record it for ADR, derive cascading details immediately, confirm cascades briefly: "Got it — [choice]. That means I'll [cascade 1], [cascade 2]. Moving on to [next]."
-
-**After all decisions:** Confirm full set of choices, then write all 5 docs + a consolidating spec.md.
-
-**Consolidating spec.md (COMPREHENSIVE only):**
-
-In addition to the 5 detailed docs, always produce a spec.md that serves as the entry point. This is what downstream tools (workflows-plan-review, workflows-deepen-plan, workflows:work) read first.
-
-```markdown
----
-title: [Title]
-type: comprehensive
-date: YYYY-MM-DD
-documents:
-  - adr.md
-  - backend.md
-  - dtos.md
-  - ui-design.md
-  - frontend.md
----
-
-# [Title]
-
-## Overview
-[2-3 paragraph summary of the feature — problem, solution, key decisions]
-
-## Key Architectural Decisions
-[Consolidated from adr.md — the 3-5 most important decisions with rationale]
-
-## API Surface
-[Consolidated from backend.md + dtos.md — endpoints, key types, data flow]
-
-## UI Approach
-[Consolidated from ui-design.md + frontend.md — screens, states, interaction model]
-
-## Acceptance Criteria
-[Consolidated from all docs — the complete testable checklist]
-
-## Technical Considerations
-[Cross-cutting concerns: security, performance, deployment, risks]
-
-## Detailed Documents
-- [adr.md](adr.md) — Full architecture decision record
-- [backend.md](backend.md) — Backend tech spec
-- [dtos.md](dtos.md) — DTO contract spec
-- [ui-design.md](ui-design.md) — UI design tech spec
-- [frontend.md](frontend.md) — Frontend tech spec
-```
-
-This is NOT a thin index — it must contain enough substance that someone reading only spec.md understands the full plan. The 5 detailed docs are the deep-dive reference.
-
-**Cross-reference before finalizing:**
-- Every API endpoint has corresponding DTOs
-- Every DTO is referenced by backend endpoint + frontend query/mutation
-- Every component in UI design has wiring in frontend spec
-- Every data field displayed in UI comes from a response DTO
-- Every validation rule appears in both backend and frontend specs
-- Every decision in ADR is reflected in specs
+Read [spec-templates.md](references/spec-templates.md) for the selected MINIMAL, STANDARD, or COMPREHENSIVE format. Use only the sections the requested scope needs.
 
 ### 5. Spec Formatting
 
@@ -512,7 +304,7 @@ If no breadboard (simple shapes or non-shaping brainstorm), extract stories from
 
 **Story Extraction Rules:**
 
-- [ ] Each story is atomic - single action, no "and"
+- [ ] Each story delivers one coherent, verifiable outcome, including the error paths needed to make it complete; do not split by wording or technical layer alone
 - [ ] Stories have clear acceptance criteria (Given/When/Then format)
 - [ ] Dependencies between stories are explicit
 - [ ] Skills hint at relevant slash commands for implementation
@@ -526,125 +318,7 @@ Each story must have exactly one category:
 - `edge-case` - Error handling, boundary conditions
 - `performance` - Optimization, caching, efficiency
 
-**PRD Schema:**
-
-```json
-{
-  "title": "feature-name",
-  "ticket": "PROJ-1222",
-  "branch": "PROJ-1222-feature-name",
-  "spec_path": "docs/plans/YYYY-MM-DD-<type>-<name>/spec.md",
-  "created_at": "2026-01-30T12:00:00Z",
-  "stories": [
-    {
-      "id": 1,
-      "title": "User can create account",
-      "category": "functional",
-      "skills": [],
-      "validation_agents": [],
-      "depends_on": [],
-      "acceptance_criteria": [
-        "Given signup form, when valid data submitted, account is created",
-        "Given signup form, when email exists, error message displays"
-      ],
-      "status": "pending",
-      "priority": 10,
-      "completed_at": null,
-      "commit": null,
-      "review_findings": []
-    },
-    {
-      "id": 2,
-      "title": "Account creation shows success feedback",
-      "category": "ui",
-      "skills": [],
-      "validation_agents": [],
-      "depends_on": [1],
-      "acceptance_criteria": [
-        "Given successful creation, when complete, success toast appears",
-        "Given successful creation, when complete, user redirected to dashboard"
-      ],
-      "status": "pending",
-      "priority": 20,
-      "completed_at": null,
-      "commit": null,
-      "review_findings": []
-    }
-  ],
-  "log": []
-}
-```
-
-**Note:** `skills` and `validation_agents` are initially empty. Run `/workflows-deepen-plan` to:
-1. Discover all available skills from `~/.agents/skills/` and plugins
-2. Match skills to stories based on category, keywords, and tech stack
-3. Assign validation agents for post-implementation review
-
-**Field Reference:**
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `ticket` | string\|null | Ticket number (e.g., `PROJ-1222`), null if none |
-| `branch` | string | Git branch name: `[ticket]-[description]` or `type/description` |
-| `id` | number | Unique integer, starts at 1 |
-| `title` | string | Single action, imperative, no "and" |
-| `category` | string | One of: functional, ui, integration, edge-case, performance |
-| `skills` | array | Slash command skills for implementation (populated by /workflows-deepen-plan) |
-| `validation_agents` | array | Review agents to run after implementation (populated by /workflows-deepen-plan) |
-| `depends_on` | array | Story IDs that must complete first |
-| `acceptance_criteria` | array | Given/When/Then statements (min 1) |
-| `status` | string | One of: pending, in_progress, blocked, completed |
-| `priority` | number | Unique, spaced by 10 (10, 20, 30...) |
-| `completed_at` | null\|string | ISO8601 timestamp when completed |
-| `commit` | null\|string | Commit SHA that completed the story |
-| `review_findings` | array | Findings from validation_agents or /workflows-review |
-
-**Log Entry Shape (populated during /workflows-work):**
-
-```json
-{
-  "timestamp": "2026-01-30T14:30:00Z",
-  "story_id": 1,
-  "action": "status_change",
-  "from": "pending",
-  "to": "in_progress",
-  "agent": "active-agent"
-}
-```
-
-**Review Finding Shape (populated by validation_agents or /workflows-review):**
-
-```json
-{
-  "severity": "P1",
-  "category": "security",
-  "agent": "security-sentinel",
-  "finding": "SQL injection risk in user input",
-  "file": "src/api/users.ts:42",
-  "suggestion": "Use parameterized queries",
-  "status": "resolved",
-  "resolved_at": "2026-01-30T15:00:00Z"
-}
-```
-
-**Finding status values:**
-- `logged` - Finding recorded, not yet addressed
-- `resolved` - Finding fixed
-- `wontfix` - Intentionally not fixing (with justification)
-
-**PRD Generation Checklist:**
-
-- [ ] `ticket` field set (or null if no ticket)
-- [ ] `branch` field matches created branch name
-- [ ] All acceptance criteria from spec are covered by stories
-- [ ] Stories are ordered by dependency (blockers have lower priority numbers)
-- [ ] No circular dependencies
-- [ ] Initial skills is empty array (populated by /workflows-deepen-plan)
-- [ ] Initial validation_agents is empty array (populated by /workflows-deepen-plan)
-- [ ] Initial review_findings is empty array (populated by validation_agents or /workflows-review)
-- [ ] Initial status is always "pending"
-- [ ] Initial completed_at and commit are always null
-- [ ] Initial log is always empty array
+Read [prd-schema.md](references/prd-schema.md) for the schema, field meanings, examples, and validation checklist. Validate unique IDs, valid dependencies, acyclicity, and coverage of every acceptance criterion.
 
 ### 6.5. Mandatory Diagrams
 
@@ -658,7 +332,7 @@ No non-trivial flow goes undiagrammed. Use ASCII art inline while thinking throu
 5. **Decision tree** — for complex branching logic
 6. **Dependency graph** — what depends on what, build/deploy order
 
-Use `skill: beautiful-mermaid` to render final diagrams as SVG/PNG when needed.
+Use an available Mermaid renderer or `technical-svg-diagrams` when an exported diagram is needed. Do not require an uninstalled skill.
 
 Drawing forces thinking. If you can't diagram it, you don't understand it yet.
 
@@ -685,7 +359,7 @@ docs/plans/2026-01-30-feat-user-authentication/
   prd.json         # machine-executable stories
 ```
 
-**Contents (COMPREHENSIVE):**
+**Contents (COMPREHENSIVE; supporting documents only where applicable):**
 ```
 docs/plans/2026-01-30-feat-user-authentication/
   brainstorm.md    # optional, if created via /workflows-brainstorm
@@ -710,12 +384,10 @@ docs/plans/2026-01-30-feat-user-authentication/
 
 ## Post-Generation Options
 
-After writing spec(s) and prd.json, use the **structured user-question tool**:
-
-**Question:** "Plan ready at `docs/plans/YYYY-MM-DD-<type>-<name>/`. What would you like to do next?"
+Report the plan location and offer relevant next actions in prose. If the user already requested the next stage, continue under that authorization.
 
 **Options:**
-1. **Review specs** - Open spec.md (or list 5 docs for COMPREHENSIVE)
+1. **Review specs** - Open spec.md and list its supporting documents
 2. **Review PRD** - Show prd.json story breakdown
 3. **Run `/workflows-deepen-plan`** - Enhance spec with parallel research agents
 4. **Run `/workflows-plan-review`** - Independent plan review
@@ -724,16 +396,14 @@ After writing spec(s) and prd.json, use the **structured user-question tool**:
 7. **Simplify** - Reduce detail level or story count
 
 **Based on selection:**
-- **Review specs** → For MINIMAL/STANDARD: `open docs/plans/<folder>/spec.md`. For COMPREHENSIVE: list all 5 docs and open the one user picks.
+- **Review specs** → Open `docs/plans/<folder>/spec.md` with the active runtime's file viewer. For COMPREHENSIVE, also list the supporting documents that were produced.
 - **Review PRD** → Display prd.json contents formatted
 - **`/workflows-deepen-plan`** → Call /workflows-deepen-plan with spec path
 - **`/workflows-plan-review`** → Call /workflows-plan-review with folder path. Iterative review loop: review the plan, the active agent revises, repeat until approved.
 - **`/workflows-work`** → Call /workflows-work with folder path
-- **`/workflows-work` on remote** → Run `/workflows-work docs/plans/<folder>/ &`
+- **`/workflows-work` on remote** → Use the available remote harness with its documented invocation and explicit target; a slash command is not a shell executable.
 - **Simplify** → Ask "What should I simplify?" then regenerate
 
-**Note:** If running with ultrathink enabled, automatically run `/workflows-deepen-plan` after creation.
+Deepen the plan when requested or needed to resolve a concrete gap; do not infer a new workflow from a model effort setting.
 
-Loop back to options after Simplify until user selects `/workflows-work`.
-
-NEVER CODE! Just research and write the plan.
+After a requested simplification, report the revised plan. Planning alone does not authorize implementation; if the user requested planning followed by implementation, finish this phase and continue into that authorized workflow.

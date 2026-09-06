@@ -1,24 +1,28 @@
 ---
 name: efficient-frontier
-description: 'Apply the same orchestration as `/efficient-fable` to any high-cost frontier model: delegate research, coding, and testing to cheaper subagents while keeping planning, synthesis, and final review with the expensive model.'
+description: Coordinate broad work through independent, bounded subagents while keeping decomposition, integration, and final review with the lead agent. Use when delegation reduces a concrete research, implementation, or verification bottleneck.
 ---
 
 # Efficient Frontier
 
-Use the expensive frontier model where its marginal judgment matters. Push
-repeatable, bounded, or token-heavy work to cheaper/faster subagents.
+Keep judgment and integration with the lead agent. Delegate independent work
+when the active runtime supports it and useful local work can proceed alongside
+it. Use the selected model and available capabilities; this workflow does not
+require a provider, model tier, or model switch. Resolve tools through
+[runtime equivalents](../RUNTIME_TOOLS.md).
 
 ## Workflow
 
-1. Identify the frontier-only decisions: architecture, prioritization,
+1. Identify the lead's decisions: architecture, prioritization,
    ambiguity resolution, risk, synthesis, and final review.
 2. Identify delegable work: research scans, repository inventory, search, docs
    extraction, browser/testing passes, log reduction, test failure clustering,
    narrow coding, and mechanical edits.
-3. Spawn parallel subagents for independent slices with clear ownership,
-   bounded scope, verification gates, and expected evidence.
+3. Assign independent slices with clear file ownership, bounded scope,
+   verification, and expected evidence. Tell workers they share the workspace
+   and must preserve others' edits. Respect dependencies and concurrency limits.
 4. Require compact returns: findings, changed files, commands run, residual
-   risk, stop conditions hit, and anything the frontier model must decide.
+   risk, stop conditions hit, and anything the lead must decide.
 5. Integrate and review centrally before presenting the result.
 
 ## Handoff Packets
@@ -31,7 +35,8 @@ verification commands, and stop conditions.
 Useful stop conditions:
 
 - The live code does not match the assumption in the handoff.
-- A verification command fails twice after a reasonable fix or retry.
+- A verification command fails repeatedly without new evidence; change the
+  approach or report the blocker rather than repeating it.
 - The work appears to require files outside the assigned scope.
 - The agent cannot produce concrete evidence for its claim.
 
@@ -40,22 +45,23 @@ Useful stop conditions:
 Treat delegated output as evidence to inspect, not a verdict to forward. Reopen
 important cited files, skim high-risk diffs, and rerun or spot-check the
 verification that matters before claiming completion. If delegated agents
-disagree, resolve the disagreement at the frontier-model layer.
+disagree, inspect the conflicting evidence and resolve it with the lead. Keep
+one lead reviewer; do not recursively delegate another full review tree.
 
 ## Common Scenarios
 
 Use these as soft suggestions:
 
 - Research: delegate broad repo scans, docs extraction, and source comparison;
-  the frontier model keeps the judgment about what matters.
+  the lead keeps the judgment about what matters.
 - Coding: delegate bounded patches, refactors, or mechanical edits when file
   ownership is clear; integrate and review centrally.
-- Testing: let the frontier model choose the validation strategy and scripts,
-  then use cheaper agents to run unit checks, browser flows, screenshots, and
-  log reduction. Ask them to return exact commands, failures, likely causes, and
+- Testing: let the lead choose the validation strategy and scripts,
+  then use suitably capable agents to run unit checks, browser flows,
+  screenshots, and log reduction. Ask for exact commands, failures, likely causes, and
   whether the signal looks flaky, environmental, or product-relevant.
 - Debugging: send independent agents after separate theories, logs, or repro
-  paths; keep the final diagnosis with the frontier model.
+  paths; keep the final diagnosis with the lead.
 
 ## Guardrails
 
@@ -63,11 +69,7 @@ Use these as soft suggestions:
 - Do not ask multiple agents to edit the same files at the same time.
 - Do not trust subagent conclusions blindly when the risk is high; inspect the
   important evidence yourself.
-- Do not claim universal savings. The pattern works best when exploration and
-  implementation, testing, or research can be parallelized.
-
-## Default Framing
-
-"I will use the frontier model as the orchestrator and reviewer, and use
-cheaper subagents for token-heavy research, coding, or testing so the expensive
-tokens go to judgment, synthesis, and final quality."
+- Keep tiny or highly coupled tasks local. If delegation is unavailable, do
+  the work locally and disclose when a requested independent check was not possible.
+- Report savings only when measured. Parallelism can reduce elapsed time;
+  coordination and repeated context also cost time and tokens.

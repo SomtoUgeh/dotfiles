@@ -16,9 +16,10 @@ Fetch https://developers.cloudflare.com/agents/api-reference/configuration/ for 
       { "name": "ChatAgent", "class_name": "ChatAgent" }
     ]
   },
-  "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["MyAgent", "ChatAgent"] }
-  ],
+  "exports": {
+    "MyAgent": { "type": "durable-object", "storage": "sqlite" },
+    "ChatAgent": { "type": "durable-object", "storage": "sqlite" }
+  },
   "ai": { "binding": "AI" },
   "assets": {
     "directory": "./dist/client",
@@ -31,11 +32,11 @@ Fetch https://developers.cloudflare.com/agents/api-reference/configuration/ for 
 
 ## Key Rules
 
-- Every agent class needs a DO binding AND a `new_sqlite_classes` migration entry
+- For a new deployment, every agent class needs a Durable Object binding and a SQLite lifecycle entry in `exports`
 - `nodejs_compat` is required
-- Never edit old migrations — add a new tag (e.g. `v2`) for new classes
+- Existing migration-based deployments remain supported; keep adding migration tags there. `migrations` and Durable Object `exports` cannot appear together
 - Do NOT enable `experimentalDecorators` in tsconfig — it breaks `@callable`
-- For Workers AI locally, set `"ai": { "binding": "AI", "remote": true }` in `.dev.vars` or config
+- For Workers AI locally, set `"ai": { "binding": "AI", "remote": true }` in Wrangler config; `.dev.vars` holds secret/environment values, not binding configuration
 - Use `wrangler secret put` for secrets, never hardcode them
 
 ## Vite Setup
@@ -44,7 +45,7 @@ Fetch https://developers.cloudflare.com/agents/api-reference/configuration/ for 
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { cloudflare } from "@cloudflare/vite-plugin";
-import { agents } from "agents/vite";
+import agents from "agents/vite";
 
 export default defineConfig({
   plugins: [react(), cloudflare(), agents()]
@@ -57,7 +58,7 @@ export default defineConfig({
 npx wrangler types
 ```
 
-This generates `env.d.ts` with typed bindings. Regenerate after changing `wrangler.jsonc`.
+By default this generates `worker-configuration.d.ts` with typed bindings (or the output path passed to the command). Regenerate after changing `wrangler.jsonc`.
 
 ## tsconfig
 

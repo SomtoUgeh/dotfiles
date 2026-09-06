@@ -8,7 +8,7 @@ Prefer retrieval over pre-training. Types, config schemas, and APIs change with 
 
 ### Workers types
 
-Fetch the latest `@cloudflare/workers-types` before reviewing. The project may have an older version installed.
+Check the project lockfile, installed Wrangler, generated runtime types, and installed `@cloudflare/workers-types` first. They define the deployed compatibility target. Use current docs to identify potential upgrades; do not judge an existing project against a different package version silently.
 
 ```bash
 mkdir -p /tmp/workers-types-latest && \
@@ -19,7 +19,7 @@ mkdir -p /tmp/workers-types-latest && \
 
 Search this file for the specific type, class, or interface under review. Do not guess type names.
 
-Alternative: `npx wrangler types` generates a typed `Env` interface from the local wrangler config.
+Use the installed `wrangler types` to generate runtime and `Env` types from local config. The package download above is optional research for an authorized upgrade, not a review prerequisite.
 
 Fallback: read `node_modules/@cloudflare/workers-types/index.d.ts`. Note the installed version.
 
@@ -57,14 +57,14 @@ Verify against current type definitions — do not assume signatures are stable.
 - Generic type parameter on base classes (e.g., `DurableObject<Env>`)
 - Binding access pattern: `env.X` in module export handlers, `this.env.X` in classes extending platform base classes
 - `ExecutionContext` as the third param in module export handlers (needed for `ctx.waitUntil()`)
-- `fetch()` handlers must return `Promise<Response>`
+- `fetch()` handlers return `Response` or `Promise<Response>`; verify the installed `ExportedHandler` type
 
 ### Binding access — the most common error
 
 - **Module export handlers** (`fetch`, `scheduled`, `queue`, `email`): bindings via `env.X` parameter
 - **Platform base classes** (`WorkerEntrypoint`, `DurableObject`, `Workflow`, `Agent`): bindings via `this.env.X`
 
-Flag `env.X` inside a class extending a platform base class. Flag `this.env.X` inside a module export handler.
+Check scope before flagging `env.X`: a constructor or method can legitimately receive an `env` parameter. Use `this.env.X` for the inherited class environment. Module export handlers receive `env` as a parameter.
 
 ### Type integrity rules
 
@@ -111,7 +111,7 @@ For executable examples, verify: `name`, `compatibility_date`, `main`. Check the
 | Check | What to look for |
 |-------|-----------------|
 | Stale `compatibility_date` | Should be recent; use `$today` placeholder in docs |
-| Missing DO migrations | Every new DO class needs a migration entry |
+| Missing DO lifecycle | Every new DO class needs a SQLite `exports` entry; preserve migrations in existing migration-based deployments |
 | Binding name mismatch | Config `binding`/`name` must match `env.X` in code |
 | Secrets in config | Never in `vars` — use `wrangler secret put` |
 | Wrong binding key | Verify top-level key name against the schema |
@@ -135,22 +135,21 @@ See the full anti-patterns table in `SKILL.md`. The type-specific ones to watch 
 
 ## Serialization Boundaries
 
-Data crossing these boundaries must be structured-clone serializable:
+Each boundary has its own serialization contract. Do not apply one blanket list:
 
-- **Queue messages**: body passed to `.send()` or `.sendBatch()`
-- **Workflow step return values**: persisted to durable storage
-- **DO storage**: values in `storage.put()` or SQL
-- **`postMessage()`**: WebSocket messages
+- **Queue messages**: check `contentType` and the producer/consumer encoding.
+- **Workflow step return values**: follow the installed `RpcSerializable` types and current Workflows docs.
+- **DO KV storage**: structured clone supports types such as `Map`, `Set`, `Date`, and `ArrayBuffer`; do not reject them categorically.
+- **SQL bindings**: only SQLite scalar/blob values accepted by `sql.exec`, not arbitrary objects.
+- **WebSockets**: `send()` accepts text or binary payloads, not arbitrary structured-clone objects.
 
-Non-serializable types to flag: `Response`, `Request`, `Error`, functions, class instances with methods, `Map`/`Set`, `Symbol`.
-
-Valid: plain objects, arrays, strings, numbers, booleans, null, `ArrayBuffer`, `Date`.
+Functions, symbols, request/response objects, and class behavior need boundary-specific handling. Validate with the actual runtime when unsure.
 
 ---
 
 ## Review Process
 
-1. **Retrieve** — fetch latest workers types, wrangler schema, and best practices page
+1. **Retrieve** — inspect project types/schema and fetch the current best-practices page
 2. **Read full files** — not just diffs; context matters for binding access patterns
 3. **Categorize code** — determines what to check:
    - **Illustrative** (concept demo, comments for most logic): verify correct API names and realistic signatures
@@ -160,7 +159,7 @@ Valid: plain objects, arrays, strings, numbers, booleans, null, `ArrayBuffer`, `
 5. **Check config** — compatibility_date, nodejs_compat, observability, secrets, binding-code consistency
 6. **Check patterns** — streaming, floating promises, global state, serialization boundaries
 7. **Check security** — crypto usage, secret handling, timing-safe comparisons, error handling
-8. **Validate with tools** — `npx tsc --noEmit`, lint for `no-floating-promises`
+8. **Validate with tools** — use the project typecheck/lint scripts; do not download a floating tool for review
 9. **Assess risk** — HIGH (auth, crypto, bindings), MEDIUM (business logic, config), LOW (style, comments)
 
 ### Output format

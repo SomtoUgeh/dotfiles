@@ -12,7 +12,7 @@ Every `UPDATE` creates a new tuple and marks the old one dead; `DELETE` marks tu
 
 ## VACUUM vs VACUUM FULL
 
-`VACUUM` is non-blocking (ShareUpdateExclusive lock) and marks dead space reusable. `VACUUM FULL` rewrites the table and requires an AccessExclusive lock — use only as a last resort. For online bloat reduction prefer `pg_squeeze` or `pg_repack`.
+`VACUUM` permits normal reads/writes but takes ShareUpdateExclusive, which conflicts with some maintenance/DDL locks and marks dead space reusable. `VACUUM FULL` rewrites the table and requires an AccessExclusive lock — use only as a last resort. For online bloat reduction prefer `pg_squeeze` or `pg_repack`.
 
 ## Autovacuum Tuning
 

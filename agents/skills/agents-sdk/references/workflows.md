@@ -62,7 +62,7 @@ export class ProcessingWorkflow extends AgentWorkflow<MyAgent, TaskParams> {
   "durable_objects": {
     "bindings": [{ "name": "MyAgent", "class_name": "MyAgent" }]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MyAgent"] }]
+  "exports": { "MyAgent": { "type": "durable-object", "storage": "sqlite" } }
 }
 ```
 
@@ -70,10 +70,10 @@ export class ProcessingWorkflow extends AgentWorkflow<MyAgent, TaskParams> {
 
 ```typescript
 // Start a workflow
-const instance = await this.runWorkflow("ProcessingWorkflow", { taskId: "123", data: "..." });
+const workflowId = await this.runWorkflow("PROCESSING_WORKFLOW", { taskId: "123", data: "..." });
 
 // Send event to waiting workflow
-await this.sendWorkflowEvent("ProcessingWorkflow", workflowId, { type: "approve" });
+await this.sendWorkflowEvent("PROCESSING_WORKFLOW", workflowId, { type: "approve", payload: { approved: true } });
 
 // Query workflows
 const workflow = await this.getWorkflow(workflowId);
@@ -86,9 +86,9 @@ await this.terminateWorkflow(workflowId);
 await this.pauseWorkflow(workflowId);
 await this.resumeWorkflow(workflowId);
 
-// Delete workflows
+// Delete workflow tracking records (does not terminate a running instance)
 await this.deleteWorkflow(workflowId);
-await this.deleteWorkflows({ status: "complete", before: new Date(...) });
+await this.deleteWorkflows({ status: "complete", createdBefore: new Date("2026-01-01T00:00:00Z") });
 ```
 
 ## Lifecycle Callbacks
@@ -97,14 +97,14 @@ await this.deleteWorkflows({ status: "complete", before: new Date(...) });
 export class MyAgent extends Agent<Env, State> {
   async onWorkflowProgress(workflowName: string, workflowId: string, progress: unknown) {
     // Workflow reported progress via this.reportProgress()
-    this.broadcast({ type: "progress", workflowId, progress });
+    this.broadcast(JSON.stringify({ type: "progress", workflowId, progress }));
   }
 
   async onWorkflowComplete(workflowName: string, workflowId: string, result?: unknown) {
     // Workflow finished successfully
   }
 
-  async onWorkflowError(workflowName: string, workflowId: string, error: Error) {
+  async onWorkflowError(workflowName: string, workflowId: string, error: string) {
     // Workflow failed
   }
 
@@ -118,13 +118,9 @@ export class MyAgent extends Agent<Env, State> {
 
 ```typescript
 // In workflow: wait for approval
-const approved = await step.waitForEvent<{ approved: boolean }>("approval", {
-  timeout: "7d"
-});
-
-if (!approved.approved) {
-  throw new Error("Rejected");
-}
+await this.waitForApproval(step, { timeout: "7 days" });
+// Rejection throws WorkflowRejectedError; timeout throws. Handle according to
+// the workflow failure policy instead of treating an event object as approval.
 
 // From agent: approve or reject
 await this.approveWorkflow(workflowId);  // Sends { approved: true }

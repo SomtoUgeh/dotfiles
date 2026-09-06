@@ -8,7 +8,7 @@ tags: postgres, wal, checkpoints, durability, crash-recovery, fsync, operations
 
 ## WAL Fundamentals
 
-Write-Ahead Logging: logs changes to `pg_wal/` **before** modifying data files. WAL segments are 16MB (fixed at initdb). On COMMIT, PostgreSQL fsyncs WAL to disk and returns SUCCESS — data files are updated lazily. WAL records are written for all changes (including uncommitted transactions and rollbacks). **Never disable `fsync` in production** — power loss without fsync risks unrecoverable data loss.
+Write-Ahead Logging: logs changes to `pg_wal/` **before** modifying data files. WAL segments default to 16MB; initdb can choose another supported size. With synchronous_commit=on and fsync=on, COMMIT waits for the required WAL durability before returning SUCCESS — data files are updated lazily. WAL records cover logged changes, including changes from transactions that later abort; temporary and unlogged relations have different guarantees. **Never disable `fsync` in production** — power loss without fsync risks unrecoverable data loss.
 
 `wal_level`: `minimal` (crash recovery only), `replica` (default; replication + archiving), `logical` (logical replication).
 
@@ -19,7 +19,7 @@ A dirty page is modified in shared_buffers but not yet written to data files. A 
 - `checkpoint_timeout` (default 5 min) and `max_wal_size` (default 1GB) — checkpoint on whichever triggers first.
 - `checkpoint_completion_target=0.9` spreads I/O over 90% of the interval; avoid spikes.
 - "Checkpoints are occurring too frequently" in logs → increase `max_wal_size`.
-- **Target: >90% of checkpoints should be time-based** (`num_timed` in `pg_stat_checkpointer`), not size-based (`num_requested`). If num_requested/(num_timed+num_requested) > 10%, tune `max_wal_size` up.
+- **Target: >90% of checkpoints should be time-based** (`num_timed` in `pg_stat_checkpointer`), rather than requested (`num_requested`, which includes WAL pressure and other explicit requests). If num_requested/(num_timed+num_requested) > 10%, tune `max_wal_size` up.
 
 ## WAL Disk Management
 

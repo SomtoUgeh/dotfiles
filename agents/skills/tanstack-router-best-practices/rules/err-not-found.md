@@ -91,6 +91,8 @@ function PostNotFound() {
 
 ## Good Example: Not Found with Data
 
+Import `z` from `zod`. The not-found payload arrives as the component's `data` prop, not as loader data on `Route.useMatch()`.
+
 ```tsx
 export const Route = createFileRoute('/users/$username')({
   loader: async ({ params }) => {
@@ -109,17 +111,22 @@ export const Route = createFileRoute('/users/$username')({
   notFoundComponent: UserNotFound,
 })
 
-function UserNotFound() {
-  const { data } = Route.useMatch()
+function UserNotFound({ data }: { data?: unknown }) {
+  const parsed = z.object({
+    username: z.string(),
+    suggestions: z.array(z.string()),
+  }).safeParse(data)
+  if (!parsed.success) return <h1>User not found</h1>
+  const { username, suggestions } = parsed.data
 
   return (
     <div>
-      <h1>User @{data?.username} not found</h1>
-      {data?.suggestions?.length > 0 && (
+      <h1>User @{username} not found</h1>
+      {suggestions.length > 0 && (
         <div>
           <p>Did you mean:</p>
           <ul>
-            {data.suggestions.map((username) => (
+            {suggestions.map((username) => (
               <li key={username}>
                 <Link to="/users/$username" params={{ username }}>
                   @{username}

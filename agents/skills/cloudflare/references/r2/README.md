@@ -5,7 +5,7 @@ S3-compatible object storage with zero egress fees, optimized for large file sto
 ## Overview
 
 R2 provides:
-- S3-compatible API (Workers API + S3 REST)
+- S3-compatible API plus a separate native Workers binding API
 - Zero egress fees globally
 - Strong consistency for writes/deletes
 - Storage classes (Standard/Infrequent Access)
@@ -17,7 +17,7 @@ R2 provides:
 
 ```bash
 wrangler r2 bucket create my-bucket --location=enam
-wrangler r2 object put my-bucket/file.txt --file=./local.txt
+wrangler r2 object put my-bucket/file.txt --file=./local.txt --remote
 ```
 
 ```typescript
@@ -48,31 +48,24 @@ if (object) return new Response(object.body);
 
 ## Event Notifications
 
-R2 integrates with Cloudflare Queues for reactive workflows:
+Configure bucket notification rules through Wrangler or the R2 API; `event_notifications` is not a Worker configuration field.
 
-```typescript
-// wrangler.jsonc
-{
-  "event_notifications": [{
-    "queue": "r2-notifications",
-    "actions": ["PutObject", "DeleteObject"]
-  }]
-}
-
-// Consumer
-async queue(batch: MessageBatch, env: Env) {
-  for (const message of batch.messages) {
-    const event = message.body; // { action, bucket, object, timestamps }
-    if (event.action === 'PutObject') {
-      // Process upload: thumbnail generation, virus scan, etc.
-    }
-  }
-}
+```bash
+wrangler queues create r2-events
+wrangler r2 bucket notification create my-bucket --queue r2-events --event-types object-create object-delete
 ```
+
+Configure the consuming Worker separately:
+
+```jsonc
+{ "queues": { "consumers": [{ "queue": "r2-events", "max_batch_size": 10 }] } }
+```
+
+R2 publishes events directly; no producer binding is required. Validate each message against the [event notification schema](https://developers.cloudflare.com/r2/buckets/event-notifications/) and make processing idempotent. Object creation includes `PutObject`, `CopyObject`, and `CompleteMultipartUpload`; do not handle only `PutObject` when all uploads matter.
 
 ## Reading Order
 
-**First-time users:** README → configuration.md → api.md → patterns.md  
+**First-time users:** README → configuration.md → api.md → patterns.md
 **Specific tasks:**
 - Setup: configuration.md
 - Client uploads: patterns.md (presigned URLs)

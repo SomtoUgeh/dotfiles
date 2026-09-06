@@ -1,6 +1,6 @@
 ## API Reference
 
-**Note on Smart Shield:** Argo Smart Routing is being integrated into Cloudflare's Smart Shield product. API endpoints remain stable; existing integrations continue to work without changes.
+Argo Smart Routing is now offered as part of Smart Shield. Check the target zone subscription and current API/provider version.
 
 ### Base Endpoint
 ```
@@ -12,7 +12,6 @@ Use API tokens with Zone:Argo Smart Routing:Edit permissions:
 
 ```bash
 # Headers required
-X-Auth-Email: user@example.com
 Authorization: Bearer YOUR_API_TOKEN
 ```
 
@@ -58,6 +57,7 @@ console.log(`Argo status: ${status.value}, editable: ${status.editable}`);
 
 **Python SDK Example:**
 ```python
+import os
 from cloudflare import Cloudflare
 
 client = Cloudflare(api_token=os.environ.get('CLOUDFLARE_API_TOKEN'))
@@ -113,17 +113,17 @@ print(f"Updated: {result.value} at {result.modified_on}")
 ```typescript
 async function safelyEnableArgo(client: Cloudflare, zoneId: string): Promise<boolean> {
   const status = await client.argo.smartRouting.get({ zone_id: zoneId });
-  
+
   if (!status.editable) {
     console.error('Cannot modify Argo: editable=false (check billing/permissions)');
     return false;
   }
-  
+
   if (status.value === 'on') {
     console.log('Argo already enabled');
     return true;
   }
-  
+
   await client.argo.smartRouting.edit({ zone_id: zoneId, value: 'on' });
   console.log('Argo enabled successfully');
   return true;
@@ -134,15 +134,15 @@ async function safelyEnableArgo(client: Cloudflare, zoneId: string): Promise<boo
 ```python
 def safely_enable_argo(client: Cloudflare, zone_id: str) -> bool:
     status = client.argo.smart_routing.get(zone_id=zone_id)
-    
+
     if not status.editable:
         print('Cannot modify Argo: editable=false (check billing/permissions)')
         return False
-    
+
     if status.value == 'on':
         print('Argo already enabled')
         return True
-    
+
     client.argo.smart_routing.edit(zone_id=zone_id, value='on')
     print('Argo enabled successfully')
     return True
@@ -165,7 +165,7 @@ async function enableArgoWithErrorHandling(client: Cloudflare, zoneId: string) {
     return result;
   } catch (error) {
     if (error instanceof RateLimitError) {
-      console.error('Rate limited. Retry after:', error.response?.headers.get('retry-after'));
+      console.error('Rate limited. Retry after:', error.headers?.get('retry-after'));
       // Implement exponential backoff
     } else if (error instanceof APIError) {
       console.error('API error:', error.status, error.message);
@@ -187,7 +187,7 @@ async function enableArgoWithErrorHandling(client: Cloudflare, zoneId: string) {
 
 **Python Error Handling:**
 ```python
-from cloudflare import Cloudflare, APIError, RateLimitError
+from cloudflare import Cloudflare, APIStatusError, RateLimitError
 
 def enable_argo_with_error_handling(client: Cloudflare, zone_id: str):
     try:
@@ -196,11 +196,11 @@ def enable_argo_with_error_handling(client: Cloudflare, zone_id: str):
     except RateLimitError as e:
         print(f"Rate limited. Retry after: {e.response.headers.get('retry-after')}")
         raise
-    except APIError as e:
-        print(f"API error: {e.status} - {e.message}")
-        if e.status == 403:
+    except APIStatusError as e:
+        print(f"API error: {e.status_code} - {e.message}")
+        if e.status_code == 403:
             print('Permission denied - check API token scopes')
-        elif e.status == 400:
+        elif e.status_code == 400:
             print('Bad request - verify zone_id and payload')
         raise
     except Exception as e:

@@ -1,150 +1,27 @@
-# Terraform Troubleshooting & Best Practices
+# Terraform troubleshooting
 
-Common issues, security considerations, and best practices.
+## Provider and schema drift
 
-## State Drift Issues
+The version constraint selects allowed versions; `.terraform.lock.hcl` records the installed version and checksums. Inspect both. A v4-to-v5 upgrade changes resource names, nested blocks and state schemas; it is not a global string replacement. Worker resources are not all plural: `cloudflare_worker` and `cloudflare_worker_version` exist alongside `cloudflare_workers_script`.
 
-Some resources have known state drift. Add lifecycle blocks to prevent perpetual diffs:
+Do not prescribe `terraform state mv` between resource types without verifying provider support. Follow the [migration guide](https://registry.terraform.io/providers/cloudflare/cloudflare/latest/docs/guides/version-5-migration), retain recoverable state, and review a plan before applying.
 
-| Resource | Drift Attributes | Workaround |
-|----------|------------------|------------|
-| `cloudflare_pages_project` | `deployment_configs.*` | `ignore_changes = [deployment_configs]` |
-| `cloudflare_workers_script` | secrets returned as REDACTED | `ignore_changes = [secret_text_binding]` |
-| `cloudflare_load_balancer` | `adaptive_routing`, `random_steering` | `ignore_changes = [adaptive_routing, random_steering]` |
-| `cloudflare_workers_kv` | special chars in keys (< 5.16.0) | Upgrade to 5.16.0+ |
+## Common failures
 
-```hcl
-# Example: Ignore secret drift
-resource "cloudflare_workers_script" "api" {
-  account_id = var.account_id
-  name = "api-worker"
-  content = file("worker.js")
-  secret_text_binding { name = "API_KEY"; text = var.api_key }
-  
-  lifecycle {
-    ignore_changes = [secret_text_binding]
-  }
-}
-```
+| Failure | Correction |
+|---|---|
+| HCL rejects semicolons or nested blocks | Put arguments on separate lines; use the pinned v5 object/list schema. |
+| Worker fields `name`, `module`, or `*_binding` rejected | Script resources use `script_name`, `main_module` and `bindings = [...]`. |
+| Secret changes disappear from plans | An `ignore_changes` rule may suppress intended rotation. Remove broad ignores; diagnose the actual provider defect/ownership first. |
+| Pages deployment configuration always differs | Compare computed/default fields with the pinned schema. Do not ignore all `deployment_configs`, which would hide binding and security changes. |
+| Resource absent remotely | Decide whether the desired configuration should recreate it or deliberately stop managing it. Import cannot restore an object that does not exist. |
+| Existing DNS record conflicts | Import the correct ID and reconcile its configuration before applying. |
+| Locked state | Confirm no writer still owns the lock. Only unlock the identified stale lock; do not bypass locking during a concurrent run. |
+| D1 is created without tables | Apply the project's migrations to the intended remote database. `wrangler d1 migrations apply NAME --remote` changes that account; omitting `--remote` can target local development instead. |
+| Deployment too large | Measure the built artifact against current Worker limits. Code splitting does not remove dependencies from the deployed total. |
 
-## v5 Breaking Changes
+Use provider diagnostics without dumping credentials or sensitive state into logs. `api_client_logging` is not a general provider setting to copy blindly. API quotas, DNS counts, Pages projects and Worker size limits vary over time and by plan; retrieve the current product limits for the actual account.
 
-Provider v5 is current (auto-generated from OpenAPI). v4→v5 has breaking changes:
+Use the required uppercase R2 location values from the pinned schema. Pinning an old version to work around drift is a temporary choice with a concrete issue and upgrade test, not an indefinite recommendation.
 
-**Resource Renames:**
-
-| v4 Resource | v5 Resource | Notes |
-|-------------|-------------|-------|
-| `cloudflare_record` | `cloudflare_dns_record` | |
-| `cloudflare_worker_script` | `cloudflare_workers_script` | Note: plural |
-| `cloudflare_worker_*` | `cloudflare_workers_*` | All worker resources |
-| `cloudflare_access_*` | `cloudflare_zero_trust_*` | Access → Zero Trust |
-
-**Attribute Changes:**
-
-| v4 Attribute | v5 Attribute | Resources |
-|--------------|--------------|-----------|
-| `zone` | `name` | zone |
-| `account_id` | `account.id` | zone (object syntax) |
-| `key` | `key_name` | KV |
-| `location_hint` | `location` | R2 |
-
-**State Migration:**
-
-```bash
-# Rename resources in state after v5 upgrade
-terraform state mv cloudflare_record.example cloudflare_dns_record.example
-terraform state mv cloudflare_worker_script.api cloudflare_workers_script.api
-```
-
-## Resource-Specific Gotchas
-
-### R2 Location Case Sensitivity
-
-**Problem:** Terraform creates R2 bucket but fails on subsequent applies  
-**Cause:** Location must be UPPERCASE  
-**Solution:** Use `WNAM`, `ENAM`, `WEUR`, `EEUR`, `APAC` (not `wnam`, `enam`, etc.)
-
-```hcl
-resource "cloudflare_r2_bucket" "assets" {
-  account_id = var.account_id
-  name = "assets"
-  location = "WNAM"  # UPPERCASE required
-}
-```
-
-### KV Special Characters (< 5.16.0)
-
-**Problem:** Keys with `+`, `#`, `%` cause encoding issues  
-**Cause:** URL encoding bug in provider < 5.16.0  
-**Solution:** Upgrade to 5.16.0+ or avoid special chars in keys
-
-### D1 Migrations
-
-**Problem:** Terraform creates database but schema is empty  
-**Cause:** Terraform only creates D1 resource, not schema  
-**Solution:** Run migrations via wrangler after Terraform apply
-
-```bash
-# After terraform apply
-wrangler d1 migrations apply <db-name>
-```
-
-### Worker Script Size Limit
-
-**Problem:** Worker deployment fails with "script too large"  
-**Cause:** Worker script + dependencies exceed 10 MB limit  
-**Solution:** Use code splitting, external dependencies, or minification
-
-### Pages Project Drift
-
-**Problem:** Pages project shows perpetual diff on `deployment_configs`  
-**Cause:** Cloudflare API adds default values not in Terraform state  
-**Solution:** Add lifecycle ignore block (see State Drift table above)
-
-## Common Errors
-
-### "Error: couldn't find resource"
-
-**Cause:** Resource was deleted outside Terraform  
-**Solution:** Import resource back into state with `terraform import cloudflare_zone.example <zone-id>` or remove from state with `terraform state rm cloudflare_zone.example`
-
-### "409 Conflict on worker deployment"
-
-**Cause:** Worker being deployed by both Terraform and wrangler simultaneously  
-**Solution:** Choose one deployment method; if using Terraform, remove wrangler deployments
-
-### "DNS record already exists"
-
-**Cause:** Existing DNS record not imported into Terraform state  
-**Solution:** Find record ID in Cloudflare dashboard and import with `terraform import cloudflare_dns_record.example <zone-id>/<record-id>`
-
-### "Invalid provider configuration"
-
-**Cause:** API token missing, invalid, or lacking required permissions  
-**Solution:** Set `CLOUDFLARE_API_TOKEN` environment variable or check token permissions in dashboard
-
-### "State locking errors"
-
-**Cause:** Multiple concurrent Terraform runs or stale lock from crashed process  
-**Solution:** Remove stale lock with `terraform force-unlock <lock-id>` (use with caution)
-
-## Limits
-
-| Resource | Limit | Notes |
-|----------|-------|-------|
-| API token rate limit | Varies by plan | Use `api_client_logging = true` to debug
-| Worker script size | 10 MB | Includes all dependencies
-| KV keys per namespace | Unlimited | Pay per operation
-| R2 storage | Unlimited | Pay per GB
-| D1 databases | 50,000 per account | Free tier: 10
-| Pages projects | 500 per account | 100 for free accounts
-| DNS records | 3,500 per zone | Free plan
-
-## See Also
-
-- [README](./README.md) - Provider setup
-- [Configuration](./configuration.md) - Resources
-- [API](./api.md) - Data sources
-- [Patterns](./patterns.md) - Use cases
-- Provider docs: https://registry.terraform.io/providers/cloudflare/cloudflare/latest/docs
+[Configuration examples](configuration.md) · [Provider reference](https://registry.terraform.io/providers/cloudflare/cloudflare/5.24.0/docs)

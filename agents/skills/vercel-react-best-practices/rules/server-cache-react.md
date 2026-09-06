@@ -23,7 +23,7 @@ export const getCurrentUser = cache(async () => {
 })
 ```
 
-Within a single request, multiple calls to `getCurrentUser()` execute the query only once.
+Within the same React Server Component render/cache context, multiple calls to `getCurrentUser()` reuse the result. Calling a cached function outside that React context (for example an ordinary Node handler) does not provide this memoization.
 
 **Avoid inline objects as arguments:**
 
@@ -56,14 +56,17 @@ getUser(1)  // Cache hit, returns cached result
 If you must pass objects, pass the same reference:
 
 ```typescript
+const getUserByParams = cache(async (params: { uid: number }) =>
+  db.user.findUnique({ where: { id: params.uid } })
+)
 const params = { uid: 1 }
-getUser(params)  // Query runs
-getUser(params)  // Cache hit (same reference)
+getUserByParams(params)  // Query runs
+getUserByParams(params)  // Cache hit (same reference)
 ```
 
 **Next.js-Specific Note:**
 
-In Next.js, the `fetch` API is automatically extended with request memoization. Requests with the same URL and options are automatically deduplicated within a single request, so you don't need `React.cache()` for `fetch` calls. However, `React.cache()` is still essential for other async tasks:
+In Next.js, the `fetch` API is automatically extended with request memoization. GET fetches with the same URL and options can be memoized in the React render tree; ordinary Route Handlers are outside that tree. Check the installed Next.js behavior before assuming requests are deduplicated, so you don't need `React.cache()` for `fetch` calls. However, `React.cache()` is still essential for other async tasks:
 
 - Database queries (Prisma, Drizzle, etc.)
 - Heavy computations

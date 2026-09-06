@@ -5,6 +5,7 @@ set -euo pipefail
 HOST="altschool"
 REQUIRE_AUTH=0
 SMOKE=0
+TOOLCHAIN_ONLY=0
 
 usage() {
   cat <<'EOF'
@@ -12,9 +13,13 @@ Usage: verify_altschool_cloud.sh [options]
 
 Options:
   --host HOST       SSH host alias (default: altschool)
+  --toolchain-only  Check installed tools before dotfiles setup; no auth checks
   --require-auth    Fail if GitHub, Grok, or OpenCode is unauthenticated
   --smoke           Make one live Grok and OpenCode model request
   -h, --help        Show this help
+
+Full verification contacts auth services, may add GitHub's SSH host key, and
+creates/removes a temporary signed Git commit. --smoke adds live model requests.
 EOF
 }
 
@@ -23,6 +28,10 @@ while [ "$#" -gt 0 ]; do
     --host)
       HOST="${2:?--host requires a value}"
       shift 2
+      ;;
+    --toolchain-only)
+      TOOLCHAIN_ONLY=1
+      shift
       ;;
     --require-auth)
       REQUIRE_AUTH=1
@@ -52,11 +61,12 @@ fi
 
 echo "Verifying $HOST..."
 
-ssh -o ClearAllForwardings=yes "$HOST" bash -s -- "$REQUIRE_AUTH" "$SMOKE" <<'REMOTE'
+ssh -o ClearAllForwardings=yes "$HOST" bash -s -- "$REQUIRE_AUTH" "$SMOKE" "$TOOLCHAIN_ONLY" <<'REMOTE'
 set -euo pipefail
 
 REQUIRE_AUTH="$1"
 SMOKE="$2"
+TOOLCHAIN_ONLY="$3"
 failures=0
 warnings=0
 
@@ -90,16 +100,31 @@ for tool in git gh delta git-lfs node npm bun grok opencode gcc g++ make jq rg t
   fi
 done
 
-node_major="$(node --version | tr -d v | cut -d. -f1)"
-if [ "$node_major" -ge 22 ]; then
-  ok "Node $(node --version)"
+if node_version=$(node --version 2>/dev/null); then
+  node_major="${node_version#v}"
+  node_major="${node_major%%.*}"
+  if [[ "$node_major" =~ ^[0-9]+$ ]] && [ "$node_major" -ge 22 ]; then
+    ok "Node $node_version"
+  else
+    fail "Node 22 or newer is required; found $node_version"
+  fi
 else
-  fail "Node 22 or newer is required; found $(node --version)"
+  fail "Node version could not be read"
 fi
 
-ok "Bun $(bun --version)"
-ok "Grok $(grok --version | sed -n '1p')"
-ok "OpenCode $(opencode --version)"
+for tool in bun grok opencode; do
+  if version=$("$tool" --version 2>/dev/null); then
+    ok "$tool: $version"
+  else
+    fail "$tool version could not be read"
+  fi
+done
+
+if [ "$TOOLCHAIN_ONLY" = 1 ]; then
+  echo "Toolchain verification finished with $failures failure(s). Full host verification remains required after dotfiles installation."
+  [ "$failures" -eq 0 ]
+  exit $?
+fi
 
 if systemctl is-active --quiet cloudflared && systemctl is-enabled --quiet cloudflared; then
   ok "cloudflared is active and enabled"

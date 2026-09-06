@@ -221,7 +221,7 @@ function Button({ asChild, ...props }) {
 
 ## Forwarding Refs
 
-Always forward refs for components that wrap DOM elements:
+Expose the ref when callers need the wrapped DOM element. React 19 accepts `ref` as a prop; retain `forwardRef` only for projects supporting React 18 or an API that requires it. This is the React 18 form:
 
 ```jsx
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -300,7 +300,7 @@ function Input({
 <Input defaultValue="hello" />
 
 // Controlled
-<Input value={value} onChange={setValue} />
+<Input value={value} onChange={(event) => setValue(event.target.value)} />
 ```
 
 ## Error Boundaries

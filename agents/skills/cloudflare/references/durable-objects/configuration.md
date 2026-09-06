@@ -20,9 +20,9 @@
       }
     ]
   },
-  "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["MyDO"] }  // Prefer SQLite
-  ]
+  "exports": {
+    "MyDO": { "type": "durable-object", "storage": "sqlite" }
+  }
 }
 ```
 
@@ -43,13 +43,14 @@ Specify jurisdiction at ID creation for data residency compliance:
 
 ```typescript
 // EU data residency
-const id = env.MY_DO.idFromName("user:123", { jurisdiction: "eu" })
+const euNamespace = env.MY_DO.jurisdiction("eu");
+const id = euNamespace.idFromName("user:123");
 
 // Available jurisdictions
 const jurisdictions = ["eu", "fedramp"]  // More may be added
 
 // All operations on this DO stay within jurisdiction
-const stub = env.MY_DO.get(id)
+const stub = euNamespace.get(id)
 await stub.someMethod()  // Data stays in EU
 ```
 
@@ -58,15 +59,16 @@ await stub.someMethod()  // Data stays in EU
 - DO instance physically located within jurisdiction
 - Storage and compute guaranteed within boundary
 - Use for GDPR, FedRAMP, other compliance requirements
-- No cross-jurisdiction access (requests fail if DO in different jurisdiction)
+- Scope the namespace to the required jurisdiction before deriving IDs; clients can call a jurisdiction-scoped object from other locations.
 
-## Migrations
+## Existing migration-based deployments
+
+For new Durable Object classes, use the declarative `exports` lifecycle shown above. The legacy `migrations` format remains supported for deployments that already use it. `exports` and Durable Object `migrations` are mutually exclusive in one Wrangler configuration, so do not add `exports` to an existing migration-based deployment without planning the lifecycle conversion.
 
 ```jsonc
 {
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["MyDO"] },            // Create SQLite (recommended)
-    // { "tag": "v1", "new_classes": ["MyDO"] },                // Create KV (paid only)
     { "tag": "v2", "renamed_classes": [{ "from": "Old", "to": "New" }] },
     { "tag": "v3", "transferred_classes": [{ "from": "Src", "from_script": "old", "to": "Dest" }] },
     { "tag": "v4", "deleted_classes": ["Obsolete"] }           // Destroys ALL data!
@@ -78,7 +80,7 @@ await stub.someMethod()  // Data stays in EU
 - Tags must be unique and sequential (v1, v2, v3...)
 - No rollback supported (test with `--dry-run` first)
 - Auto-applied on deploy
-- `new_sqlite_classes` recommended over `new_classes` (SQLite vs KV)
+- New namespaces must use SQLite. `new_classes` describes historical KV deployments; do not create a new KV namespace.
 - `deleted_classes` immediately destroys ALL data (irreversible)
 
 ## Environment Isolation
@@ -127,12 +129,8 @@ interface Env {
 
 export class MyDO extends DurableObject<Env> {}
 
-type DurableObjectNamespace<T> = {
-  newUniqueId(options?: { jurisdiction?: string }): DurableObjectId;
-  idFromName(name: string): DurableObjectId;
-  idFromString(id: string): DurableObjectId;
-  get(id: DurableObjectId): DurableObjectStub<T>;
-};
+// Use Wrangler's generated DurableObjectNamespace<MyDO> and
+// DurableObjectStub<MyDO> types; do not redeclare the branded SDK types.
 ```
 
 ## Commands
@@ -148,9 +146,8 @@ npx wrangler deploy --dry-run       # Validate migrations without deploying
 npx wrangler deploy --env production
 
 # Management
-npx wrangler durable-objects list                      # List namespaces
-npx wrangler durable-objects info <namespace> <id>     # Inspect specific DO
-npx wrangler durable-objects delete <namespace> <id>   # Delete DO (destroys data)
+# Namespace/object management uses the documented REST API or dashboard.
+# Wrangler 4.129.0 has no durable-objects subcommand.
 ```
 
 ## See Also

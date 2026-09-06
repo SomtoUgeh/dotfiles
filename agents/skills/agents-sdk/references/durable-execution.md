@@ -18,26 +18,31 @@ export class MyAgent extends Agent<Env, State> {
 
       this.setState({ result: step2 });
     });
-    return new Response("Started");
+    return new Response("Completed");
   }
 
-  async onFiberRecovered(ctx) {
-    const checkpoint = ctx.stash;
+  async onFiberRecovered(ctx: FiberRecoveryContext) {
+    if (ctx.name !== "process-data") return;
+    const checkpoint = checkpointSchema.parse(ctx.snapshot);
     if (checkpoint.step === 1) {
       const step2 = await transform(checkpoint.data);
       this.setState({ result: step2 });
+    } else if (checkpoint.step === 2) {
+      this.setState({ result: checkpoint.result });
     }
   }
 }
 ```
+
+Import `FiberRecoveryContext` from `agents`. Define `checkpointSchema` for the application checkpoint shape and handle invalid or missing snapshots explicitly. The recovery callback can run again after another interruption, so external effects must be idempotent.
 
 ## Key APIs
 
 | API | Purpose |
 |-----|---------|
 | `this.runFiber(name, fn)` | Start a named fiber |
-| `ctx.stash` / `this.stash` | Read latest checkpoint |
-| `ctx.stash = data` | Write checkpoint (JSON-serializable) |
+| `ctx.stash(data)` / `this.stash(data)` | Write checkpoint (JSON-serializable) |
+| `ctx.snapshot` in `onFiberRecovered` | Read recovered checkpoint (`unknown` or `null`); validate before use |
 | `onFiberRecovered(ctx)` | Called on DO restart if fiber was in-flight |
 | `keepAlive()` | Prevent hibernation while fiber runs |
 | `keepAliveWhile(fn)` | Keep alive for duration of async function |

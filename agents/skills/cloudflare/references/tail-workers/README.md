@@ -23,7 +23,7 @@ Tail Workers automatically process events from producer Workers (the Workers bei
 
 **Key characteristics:**
 - Invoked AFTER producer finishes executing
-- Capture entire request lifecycle including Service Bindings and Dynamic Dispatch sub-requests
+- Events may include service-binding/dynamic-dispatch execution details; verify producer configuration and event coverage instead of assuming every subrequest is included.
 - Billed by CPU time, not request count
 - Available on Workers Paid and Enterprise tiers
 
@@ -34,8 +34,8 @@ Tail Workers automatically process events from producer Workers (the Workers bei
 For batch exports to observability tools (Sentry, Grafana, Honeycomb):
 - OTEL export sends logs/traces in batches (more efficient)
 - Built-in integrations with popular platforms
-- Lower overhead than Tail Workers
-- **Use Tail Workers only for custom real-time processing**
+- Compare supported destinations, event coverage, and measured overhead
+- Tail Workers are useful when custom filtering, transformation, or delivery is needed.
 
 ## Decision Tree
 
@@ -68,12 +68,12 @@ Need observability for Workers?
 ```typescript
 export default {
   async tail(events, env, ctx) {
-    // Process events from producer Worker
+    // Send an allowlisted event summary; raw events may contain credentials/PII.
     ctx.waitUntil(
       fetch(env.LOG_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(events),
+        body: JSON.stringify(events.map(event => ({ outcome: event.outcome, scriptName: event.scriptName }))),
       })
     );
   }

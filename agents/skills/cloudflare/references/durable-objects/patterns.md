@@ -29,6 +29,7 @@ Single DO ~1K req/s max. Shard for higher throughput:
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const userId = new URL(req.url).searchParams.get("user");
+    if (!userId) return new Response("Missing user", { status: 400 });
     const hash = hashCode(userId) % 100;  // 100 shards
     const id = env.COUNTER.idFromName(`shard:${hash}`);
     return env.COUNTER.get(id).fetch(req);
@@ -51,7 +52,7 @@ function hashCode(str: string): number {
 
 ```typescript
 async checkLimit(key: string, limit: number, windowMs: number): Promise<boolean> {
-  const req = this.ctx.storage.sql.exec("SELECT COUNT(*) as count FROM requests WHERE key = ? AND timestamp > ?", key, Date.now() - windowMs).one();
+  const req = this.ctx.storage.sql.exec<{ count: number }>("SELECT COUNT(*) as count FROM requests WHERE key = ? AND timestamp > ?", key, Date.now() - windowMs).one();
   if (req.count >= limit) return false;
   this.ctx.storage.sql.exec("INSERT INTO requests (key, timestamp) VALUES (?, ?)", key, Date.now());
   return true;
@@ -61,16 +62,33 @@ async checkLimit(key: string, limit: number, windowMs: number): Promise<boolean>
 ## Distributed Lock
 
 ```typescript
-private held = false;
-async acquire(timeoutMs = 5000): Promise<boolean> {
-  if (this.held) return false;
-  this.held = true;
-  await this.ctx.storage.setAlarm(Date.now() + timeoutMs);
+// SQLite-backed DO; stored lease survives eviction.
+async acquire(timeoutMs = 5000): Promise<string | null> {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error("Invalid lease duration");
+  const lease = this.ctx.storage.kv.get<{ owner: string; expiresAt: number }>("lease");
+  if (lease && lease.expiresAt > Date.now()) return null;
+  const owner = crypto.randomUUID();
+  const expiresAt = Date.now() + timeoutMs;
+  this.ctx.storage.kv.put("lease", { owner, expiresAt });
+  await this.ctx.storage.setAlarm(expiresAt);
+  return owner;
+}
+async release(owner: string): Promise<boolean> {
+  const lease = this.ctx.storage.kv.get<{ owner: string; expiresAt: number }>("lease");
+  if (!lease || lease.owner !== owner) return false;
+  this.ctx.storage.kv.delete("lease");
+  await this.ctx.storage.deleteAlarm();
   return true;
 }
-async release() { this.held = false; await this.ctx.storage.deleteAlarm(); }
-async alarm() { this.held = false; }  // Auto-release on timeout
+async alarm() {
+  const lease = this.ctx.storage.kv.get<{ owner: string; expiresAt: number }>("lease");
+  if (!lease) return;
+  if (lease.expiresAt <= Date.now()) this.ctx.storage.kv.delete("lease");
+  else await this.ctx.storage.setAlarm(lease.expiresAt);
+}
 ```
+
+This is a lease, not a guarantee that an external task stopped at expiry. External resources need fencing or idempotent operations to reject stale lease holders.
 
 ## Hibernation-Aware Pattern
 
@@ -80,6 +98,7 @@ Preserve state across hibernation:
 async fetch(req: Request): Promise<Response> {
   const [client, server] = Object.values(new WebSocketPair());
   const userId = new URL(req.url).searchParams.get("user");
+  if (!userId) return new Response("Missing user", { status: 400 });
   server.serializeAttachment({ userId });  // Survives hibernation
   this.ctx.acceptWebSocket(server, ["room:lobby"]);
   server.send(JSON.stringify({ type: "init", state: this.ctx.storage.kv.get("state") }));
@@ -87,9 +106,14 @@ async fetch(req: Request): Promise<Response> {
 }
 
 async webSocketMessage(ws: WebSocket, msg: string) {
-  const { userId } = ws.deserializeAttachment();  // Retrieve after wake
-  const state = this.ctx.storage.kv.get("state") || {};
-  state[userId] = JSON.parse(msg);
+  const attachment: unknown = ws.deserializeAttachment();  // Retrieve after wake
+  if (typeof attachment !== "object" || attachment === null ||
+      !("userId" in attachment) || typeof attachment.userId !== "string") {
+    ws.close(1008, "Missing user metadata");
+    return;
+  }
+  const state = this.ctx.storage.kv.get<Record<string, unknown>>("state") ?? {};
+  state[attachment.userId] = JSON.parse(msg);
   this.ctx.storage.kv.put("state", state);
   for (const c of this.ctx.getWebSockets("room:lobby")) c.send(msg);
 }
@@ -138,16 +162,21 @@ async webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: bool
 async createSession(userId: string, data: object): Promise<string> {
   const id = crypto.randomUUID(), exp = Date.now() + 86400000;
   this.ctx.storage.sql.exec("INSERT INTO sessions VALUES (?, ?, ?, ?)", id, userId, JSON.stringify(data), exp);
-  await this.ctx.storage.setAlarm(exp);
+  const current = await this.ctx.storage.getAlarm();
+  if (current === null || exp < current) await this.ctx.storage.setAlarm(exp);
   return id;
 }
 
 async getSession(id: string): Promise<object | null> {
-  const row = this.ctx.storage.sql.exec("SELECT data FROM sessions WHERE id = ? AND expires_at > ?", id, Date.now()).one();
+  const row = this.ctx.storage.sql.exec<{ data: string }>("SELECT data FROM sessions WHERE id = ? AND expires_at > ?", id, Date.now()).toArray()[0];
   return row ? JSON.parse(row.data) : null;
 }
 
-async alarm() { this.ctx.storage.sql.exec("DELETE FROM sessions WHERE expires_at <= ?", Date.now()); }
+async alarm() {
+  this.ctx.storage.sql.exec("DELETE FROM sessions WHERE expires_at <= ?", Date.now());
+  const next = this.ctx.storage.sql.exec<{ expires_at: number | null }>("SELECT MIN(expires_at) AS expires_at FROM sessions").one().expires_at;
+  if (next !== null) await this.ctx.storage.setAlarm(next);
+}
 ```
 
 ## Multiple Events (Single Alarm)
@@ -162,26 +191,32 @@ async scheduleEvent(id: string, runAt: number) {
 }
 
 async alarm() {
-  const events = await this.ctx.storage.list({ prefix: "event:" }), now = Date.now();
-  let next = null;
+  const events = await this.ctx.storage.list<{ id: string; runAt: number }>({ prefix: "event:" }), now = Date.now();
   for (const [key, ev] of events) {
     if (ev.runAt <= now) {
       await this.processEvent(ev);
-      await this.ctx.storage.delete(key);
-    } else if (!next || ev.runAt < next) next = ev.runAt;
+      const current = await this.ctx.storage.get<{ id: string; runAt: number }>(key);
+      if (current?.runAt === ev.runAt) await this.ctx.storage.delete(key);
+    }
   }
-  if (next) await this.ctx.storage.setAlarm(next);
+  // External processing can admit newly scheduled or rescheduled events.
+  const remaining = await this.ctx.storage.list<{ id: string; runAt: number }>({ prefix: "event:" });
+  let next: number | null = null;
+  for (const ev of remaining.values()) if (next === null || ev.runAt < next) next = ev.runAt;
+  if (next !== null) await this.ctx.storage.setAlarm(next);
 }
 ```
 
+`processEvent` must be idempotent: a failure after its side effect can cause the alarm to retry it. Keep failed events stored, preserve reschedules, and recompute the next alarm from current storage.
+
 ## Graceful Cleanup
 
-Use `ctx.waitUntil()` to complete work after response:
+Synchronous SQL cleanup finishes before the method returns:
 
 ```typescript
 async myMethod() {
   const response = { success: true };
-  this.ctx.waitUntil(this.ctx.storage.sql.exec("DELETE FROM old_data WHERE timestamp < ?", cutoff));
+  this.ctx.storage.sql.exec("DELETE FROM old_data WHERE timestamp < ?", cutoff); // SQL is synchronous
   return response;
 }
 ```

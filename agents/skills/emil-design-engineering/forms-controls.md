@@ -34,7 +34,7 @@ Use appropriate `type` attributes:
 
 ### Autocomplete and Spellcheck
 
-Disable `spellcheck` and `autocomplete` most of the time for cleaner UX:
+Set spellcheck and autocomplete for the field's purpose. Preserve browser/password-manager assistance for names, addresses, and credentials. For an identifier where spelling corrections are inappropriate:
 
 ```html
 <input
@@ -46,7 +46,7 @@ Disable `spellcheck` and `autocomplete` most of the time for cleaner UX:
 
 ### 1Password Integration
 
-Disable 1Password autocomplete when not needed:
+Use password-manager exclusion attributes only for a field that is not a credential or personal-data field and is incorrectly identified. Do not disable password managers on authentication forms:
 
 ```html
 <input data-lpignore="true" data-1p-ignore />
@@ -81,6 +81,8 @@ For clickable icons (like clear button):
 
 ```jsx
 <button
+  type="button"
+  aria-label="Focus search"
   className="input-icon-button"
   onClick={() => inputRef.current?.focus()}
 >
@@ -106,10 +108,9 @@ Inputs smaller than 16px cause iOS Safari to zoom in on focus.
 - Do NOT autofocus inputs on touch devices—it opens the keyboard unexpectedly
 
 ```jsx
-// Check for touch device before autofocus
-const isTouchDevice = 'ontouchstart' in window;
-
-<input autoFocus={!isTouchDevice} />
+// Let the installed dialog primitive manage focus on opening.
+// Keep initial markup SSR-safe; do not read window during render.
+<input aria-label="Search" />
 ```
 
 ## Forms
@@ -127,12 +128,13 @@ Inputs should be wrapped with a `<form>` to submit by pressing Enter:
 
 ### Keyboard Submission
 
-Ensure `Cmd+Enter` (Mac) / `Ctrl+Enter` (Windows) submits the form, especially for textareas:
+Ensure `Cmd+Enter` (Mac) / `Ctrl+Enter` (Windows) submits the form, especially for textareas. Attach this handler to the textarea; requestSubmit preserves native validation and the form submit event:
 
 ```jsx
 function handleKeyDown(e) {
   if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-    handleSubmit();
+    e.preventDefault();
+    e.currentTarget.form?.requestSubmit();
   }
 }
 ```
@@ -168,17 +170,27 @@ Disable buttons after submission to avoid duplicate network requests:
 
 ```jsx
 const [isSubmitting, setIsSubmitting] = useState(false);
+const [error, setError] = useState("");
 
 <button
+  type="button"
   disabled={isSubmitting}
   onClick={async () => {
     setIsSubmitting(true);
-    await submitForm();
-    setIsSubmitting(false);
+    setError(""); // Clear the previous attempt's error before retrying.
+    try {
+      await submitForm();
+    } catch (error) {
+      // Render an actionable error through the form's existing error state.
+      setError(error instanceof Error ? error.message : "Could not submit. Try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }}
 >
   {isSubmitting ? 'Submitting...' : 'Submit'}
 </button>
+{error && <p role="alert">{error}</p>}
 ```
 
 ### Button Shortcuts
@@ -193,11 +205,16 @@ If a button's action can also be performed with a keyboard shortcut, show that s
 
 ### Button Press Feel
 
-Add `transform: scale(0.97)` on `:active` to make buttons feel responsive:
+An occasional button can use a small press scale when it matches the product's
+motion language. Omit it for controls used constantly and when reduced motion
+calls for a non-spatial response. Gate the effect explicitly rather than
+applying it to every button:
 
 ```css
-.button:active {
-  transform: scale(0.97);
+@media (prefers-reduced-motion: no-preference) {
+  .button--press-scale:not(:disabled):active {
+    transform: scale(0.97);
+  }
 }
 ```
 
@@ -233,7 +250,7 @@ Or use a label that wraps everything:
 
 ## Destructive Actions
 
-Ensure destructive actions require confirmation:
+Use confirmation for consequential irreversible actions; reversible actions can offer undo. Follow the product's existing behavior:
 
 ```jsx
 function handleDelete() {
@@ -255,7 +272,8 @@ Colocate errors—show error messages close to the field that caused them:
 
 ```jsx
 <div className="field">
-  <input type="email" aria-invalid={!!error} />
-  {error && <span className="error">{error}</span>}
+  <label htmlFor="contact-email">Email</label>
+  <input id="contact-email" type="email" aria-invalid={!!error} aria-describedby={error ? "contact-email-error" : undefined} />
+  {error && <span id="contact-email-error" className="error">{error}</span>}
 </div>
 ```

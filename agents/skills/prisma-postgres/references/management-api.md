@@ -37,9 +37,9 @@ Authorization: Bearer $TOKEN
 
 ## OAuth flow summary
 
-1. Redirect user to `https://auth.prisma.io/authorize` with `client_id`, `redirect_uri`, `response_type=code`, and scopes.
-2. Receive `code` on callback.
-3. Exchange code at `https://auth.prisma.io/token`.
+1. Redirect user to `https://auth.prisma.io/authorize` with `client_id`, `redirect_uri`, `response_type=code`, and scopes, plus PKCE S256 challenge and an unpredictable state bound to the initiating session.
+2. Validate and consume the session-bound state, then receive `code` on callback.
+3. Exchange code with the matching PKCE verifier at `https://auth.prisma.io/token`. Prefer the SDK and persist tokens per user.
 4. Use returned access token in Management API requests.
 
 ## Common endpoints

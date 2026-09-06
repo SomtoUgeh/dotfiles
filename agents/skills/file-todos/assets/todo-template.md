@@ -6,150 +6,76 @@ tags: []
 dependencies: []
 ---
 
-# Brief Task Title
-
-Replace with a concise title describing what needs to be done.
+# <Brief task title>
 
 ## Problem Statement
 
-What is broken, missing, or needs improvement? Provide clear context about why this matters.
-
-**Example:**
-- Template system lacks comprehensive test coverage for edge cases discovered during PR review
-- Email service is missing proper error handling for rate-limit scenarios
-- Documentation doesn't cover the new authentication flow
+<What is broken, missing, or needs improvement, and why it matters.>
 
 ## Findings
 
-Investigation results, root cause analysis, and key discoveries.
-
-- Finding 1 (with specifics: file, line number if applicable)
-- Finding 2
-- Key discovery with impact assessment
-- Related issues or patterns discovered
-
-**Example format:**
-- Identified 12 missing test scenarios in `app/models/user_test.rb`
-- Current coverage: 60% of code paths
-- Missing: empty inputs, special characters, large payloads
-- Similar issues exist in `app/models/post_test.rb` (~8 scenarios)
+- <Observed evidence, root cause, or key discovery>
+- <Affected path and line when available>
 
 ## Proposed Solutions
 
-Present multiple options with pros, cons, effort estimates, and risk assessment.
+### Option 1: <solution name>
 
-### Option 1: [Solution Name]
-
-**Approach:** Describe the solution clearly.
+**Approach:** <Concrete approach.>
 
 **Pros:**
-- Benefit 1
-- Benefit 2
+- <Benefit>
 
 **Cons:**
-- Drawback 1
-- Drawback 2
+- <Tradeoff, or "None identified">
 
-**Effort:** 2-3 hours
+**Effort:** <Evidence-based estimate, or "Not estimated">
 
-**Risk:** Low / Medium / High
+**Risk:** <Low | Medium | High, with a short reason>
 
----
-
-### Option 2: [Solution Name]
-
-**Approach:** Describe the solution clearly.
-
-**Pros:**
-- Benefit 1
-- Benefit 2
-
-**Cons:**
-- Drawback 1
-- Drawback 2
-
-**Effort:** 4-6 hours
-
-**Risk:** Low / Medium / High
-
----
-
-### Option 3: [Solution Name]
-
-(Include if you have alternatives)
+<!-- Add more options only when materially different approaches exist. -->
 
 ## Recommended Action
 
-**To be filled during triage.** Clear, actionable plan for resolving this todo.
-
-**Example:**
-"Implement both unit tests (covering each scenario) and integration tests (full pipeline) before merging. Estimated 4 hours total effort. Target coverage > 85% for this module."
+<Chosen action when approved, or "Pending triage".>
 
 ## Technical Details
 
-Affected files, related components, database changes, or architectural considerations.
+<!-- Optional. Remove this section when it adds no useful context. -->
 
 **Affected files:**
-- `app/models/user.rb:45` - full_name method
-- `app/services/user_service.rb:12` - validation logic
-- `test/models/user_test.rb` - existing tests
+- `<path>`
 
 **Related components:**
-- UserMailer (depends on user validation)
-- AccountPolicy (authorization checks)
+- <component>
 
-**Database changes (if any):**
-- Migration needed? Yes / No
-- New columns/tables? Describe here
+**Data changes:** <None, unknown, or a concise description.>
 
 ## Resources
 
-Links to errors, tests, PRs, documentation, similar issues.
+<!-- Optional. Remove this section when there are no relevant sources. -->
 
-- **PR:** #1287
-- **Related issue:** #456
-- **Error log:** [link to AppSignal incident]
-- **Documentation:** [relevant docs]
-- **Similar patterns:** Issue #200 (completed, ref for approach)
+- <PR, issue, error, documentation, or related todo>
 
 ## Acceptance Criteria
 
-Testable checklist items for verifying completion.
-
-- [ ] All acceptance criteria checked
-- [ ] Tests pass (unit + integration if applicable)
-- [ ] Code reviewed and approved
-- [ ] (Example) Test coverage > 85%
-- [ ] (Example) Performance metrics acceptable
-- [ ] (Example) Documentation updated
+- [ ] <Testable outcome>
+- [ ] <Required verification and expected result>
 
 ## Work Log
 
-Chronological record of work sessions, actions taken, and learnings.
+### YYYY-MM-DD - Initial discovery
 
-### 2025-11-12 - Initial Discovery
-
-**By:** Agent Runtime
+**By:** <agent or developer>
 
 **Actions:**
-- Identified 12 missing test scenarios
-- Analyzed existing test coverage (file:line references)
-- Reviewed similar patterns in codebase
-- Drafted 3 solution approaches
+- <How the issue was identified and what was verified>
 
 **Learnings:**
-- Similar issues exist in related modules
-- Current test setup supports both unit and integration tests
-- Performance testing would be valuable addition
-
----
-
-(Add more entries as work progresses)
+- <Useful context, or "None">
 
 ## Notes
 
-Additional context, decisions, or reminders.
+<!-- Optional. Remove this section when unused. -->
 
-- Decision: Include both unit and integration tests for comprehensive coverage
-- Blocker: Depends on completion of issue #001
-- Timeline: Priority for sprint due to blocking other work
+- <Decision, blocker, or reminder>

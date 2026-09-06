@@ -25,7 +25,7 @@ Debug: chrome://inspect → Configure → localhost:9229
 
 ```bash
 # Production
-echo "secret-value" | wrangler secret put SECRET_KEY
+wrangler secret put SECRET_KEY  # Enter the value at the prompt, not in shell history
 
 # Local: use .dev.vars (gitignored)
 # SECRET_KEY=local-dev-key
@@ -69,42 +69,19 @@ wrangler deploy --env production
 
 ### Integration Tests with Node.js Test Runner
 
-```typescript
-import { startWorker } from "wrangler";
-import { describe, it, before, after } from "node:test";
-import assert from "node:assert";
-
-describe("API", () => {
-  let worker;
-  
-  before(async () => {
-    worker = await startWorker({ 
-      config: "wrangler.jsonc",
-      remote: "minimal"  // Fast tests with real bindings
-    });
-  });
-  
-  after(async () => await worker.dispose());
-  
-  it("creates user", async () => {
-    const response = await worker.fetch("http://example.com/api/users", {
-      method: "POST",
-      body: JSON.stringify({ name: "Alice" })
-    });
-    assert.strictEqual(response.status, 201);
-  });
-});
-```
+Use the complete [`createTestHarness` example](./api.md#integration-tests). It closes the local runtime even when an assertion fails.
 
 ### Testing with Vitest
 
-Install: `npm install -D vitest @cloudflare/vitest-pool-workers`
+Install the Vitest version supported by the plugin. For `@cloudflare/vitest-plugin@1.1.4`: `npm install -D vitest@^4.1 @cloudflare/vitest-plugin@1.1.4`. Use an ESM project (`"type": "module"` in package.json).
 
 **vitest.config.ts:**
 ```typescript
-import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
-export default defineWorkersConfig({
-  test: { poolOptions: { workers: { wrangler: { configPath: "./wrangler.jsonc" } } } }
+import { cloudflareTest } from "@cloudflare/vitest-plugin";
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  plugins: [cloudflareTest({ wrangler: { configPath: "./wrangler.jsonc" } })]
 });
 ```
 
@@ -124,41 +101,9 @@ it("uses bindings", async () => {
 });
 ```
 
-### Multi-Worker Development (Service Bindings)
+### Multi-Worker Development and External API Mocks
 
-```typescript
-const authWorker = await startWorker({ config: "./auth/wrangler.jsonc" });
-const apiWorker = await startWorker({
-  config: "./api/wrangler.jsonc",
-  bindings: { AUTH: authWorker }  // Service binding
-});
-
-// Test API calling AUTH
-const response = await apiWorker.fetch("http://example.com/api/protected");
-await authWorker.dispose();
-await apiWorker.dispose();
-```
-
-### Mock External APIs
-
-```typescript
-const worker = await startWorker({ 
-  config: "wrangler.jsonc",
-  outboundService: (req) => {
-    const url = new URL(req.url);
-    if (url.hostname === "api.external.com") {
-      return new Response(JSON.stringify({ mocked: true }), {
-        headers: { "content-type": "application/json" }
-      });
-    }
-    return fetch(req);  // Pass through other requests
-  }
-});
-
-// Test Worker that calls external API
-const response = await worker.fetch("http://example.com/proxy");
-// Worker internally fetches api.external.com - gets mocked response
-```
+List all Worker configs in the [test harness](./api.md#integration-tests) and declare service bindings in those configs. For unit tests, use the [Vitest outbound request mocks](https://developers.cloudflare.com/workers/testing/vitest-integration/test-apis/#fetchmock) and disable unmatched network access. Do not pass a Worker instance as a binding or copy Miniflare's `outboundService` into Wrangler options.
 
 ## Monitoring & Versions
 

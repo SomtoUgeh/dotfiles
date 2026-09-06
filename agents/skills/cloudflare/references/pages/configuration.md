@@ -32,7 +32,7 @@
 
 ## Build Config
 
-**Git deployment**: Dashboard → Project → Settings → Build settings  
+**Git deployment**: Dashboard → Project → Settings → Build settings
 Set build command, output dir, env vars. Framework auto-detection configures automatically.
 
 ## Environment Variables
@@ -65,7 +65,7 @@ Place in build output (e.g., `dist/_redirects`):
 /api/* /api-v2/:splat 200        # Proxy (no redirect)
 ```
 
-**Limits**: 2,100 total (2,000 static + 100 dynamic), 1,000 char/line  
+**Limits**: 2,100 total (2,000 static + 100 dynamic), 1,000 char/line
 **Note**: Functions take precedence
 
 ### _headers
@@ -81,7 +81,7 @@ Place in build output (e.g., `dist/_redirects`):
   Cache-Control: public, max-age=31536000, immutable
 ```
 
-**Limits**: 100 rules, 2,000 char/line  
+**Limits**: 100 rules, 2,000 char/line
 **Note**: Only static assets; Functions set headers in Response
 
 ### _routes.json
@@ -91,7 +91,7 @@ Controls which requests invoke Functions (auto-generated for most frameworks):
 {
   "version": 1,
   "include": ["/*"],
-  "exclude": ["/build/*", "/static/*", "/assets/*", "/*.{ico,png,jpg,css,js}"]
+  "exclude": ["/build/*", "/static/*", "/assets/*", "/*.ico", "/*.png", "/*.jpg", "/*.css", "/*.js"]
 }
 ```
 
@@ -100,7 +100,7 @@ Controls which requests invoke Functions (auto-generated for most frameworks):
 ## TypeScript
 
 ```bash
-npx wrangler types --path='./functions/types.d.ts'
+npx wrangler types ./functions/types.d.ts
 ```
 
 Point `types` in `functions/tsconfig.json` to generated file.
@@ -117,45 +117,11 @@ Automatically optimizes function execution location based on request patterns.
 }
 ```
 
-**How it works**: System analyzes traffic over hours/days and places function execution closer to:
-- User clusters (e.g., regional traffic)
-- Data sources (e.g., D1 database primary location)
+**How it works**: Placement considers backend round-trip latency and can move execution closer to services/data when that reduces total request duration. It does not promise user-cluster placement or a fixed 24–48-hour improvement. Compare actual request duration with placement enabled; globally distributed users can still benefit when backend data is centralized.
 
-**Benefits**: 
-- Lower latency for read-heavy apps with centralized databases
-- Better performance for apps with regional traffic patterns
+## Local versus remote resources
 
-**Trade-offs**:
-- Initial learning period: First requests may be slower while system optimizes
-- Optimization time: Performance improves over 24-48 hours
-
-**When to enable**: Global apps with D1/Durable Objects in specific regions, or apps with concentrated geographic traffic.
-
-**When to skip**: Evenly distributed global traffic with no data locality constraints.
-
-## Remote Bindings (Local Dev)
-
-Connect local dev server to production bindings instead of local mocks:
-
-```bash
-# All bindings remote
-npx wrangler pages dev ./dist --remote
-
-# Specific bindings remote (others local)
-npx wrangler pages dev ./dist --remote --kv=KV --d1=DB
-```
-
-**Use cases**:
-- Test against production data (read-only operations)
-- Debug binding-specific behavior
-- Validate changes before deployment
-
-**⚠️ Warning**: 
-- Writes affect **real production data**
-- Use only for read-heavy debugging or with non-production accounts
-- Consider creating separate preview environments instead
-
-**Requirements**: Must be logged in (`npx wrangler login`) with access to bindings.
+`wrangler pages dev` runs Pages locally and does not expose a `--remote` flag in Wrangler 4.129. Do not copy Workers' remote-development command into Pages. Use supported local bindings and separately running Workers for service/DO bindings; test remote-only product behavior in a dedicated preview deployment. Check the current Pages binding documentation before assuming support for Workers-only remote binding options.
 
 ## Local Dev
 
@@ -166,36 +132,12 @@ npx wrangler pages dev ./dist
 # With bindings
 npx wrangler pages dev ./dist --kv KV --d1 DB=local-db-id
 
-# Remote bindings (production data)
-npx wrangler pages dev ./dist --remote
-
 # Persistence
 npx wrangler pages dev ./dist --persist-to=./.wrangler/state/v3
 
-# Proxy mode (SSR frameworks)
-npx wrangler pages dev -- npm run dev
+# Framework dev: use the adapter's documented command; Pages proxy-command mode is deprecated
 ```
 
-## Limits (as of Jan 2026)
+## Limits and billing
 
-| Resource | Free | Paid |
-|----------|------|------|
-| **Functions Requests** | 100k/day | Unlimited (metered) |
-| **Function CPU Time** | 10ms/req | 30s default, 5min max (Workers Paid) |
-| **Function Memory** | 128MB | 128MB |
-| **Script Size** | 1MB compressed | 10MB compressed |
-| **Deployments** | 500/month | 5,000/month |
-| **Files per Deploy** | 20,000 | 20,000 |
-| **File Size** | 25MB | 25MB |
-| **Build Time** | 20min | 20min |
-| **Redirects** | 2,100 (2k static + 100 dynamic) | Same |
-| **Header Rules** | 100 | 100 |
-| **Route Rules** | 100 | 100 |
-| **Subrequests** | 50/request | 10,000/request (Workers Paid) |
-
-**Notes**:
-- Functions use Workers runtime; Workers Paid plan increases limits
-- Free plan sufficient for most projects
-- Static requests always free (not counted toward limits)
-
-[Full limits](https://developers.cloudflare.com/pages/platform/limits/)
+Check [Pages limits](https://developers.cloudflare.com/pages/platform/limits/) and [Workers limits](https://developers.cloudflare.com/workers/platform/limits/) separately. As checked on 2026-09-05: Pages builds/month are 500 Free, 5,000 Pro, 20,000 Business; sites support 20,000 files Free and up to 100,000 on paid plans with `PAGES_WRANGLER_MAJOR_VERSION=4`; each asset is limited to 25 MiB. Build timeout is 20 minutes. Static asset requests are free; Functions use the Workers plan's request/CPU billing.

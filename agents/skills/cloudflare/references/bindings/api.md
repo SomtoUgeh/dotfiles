@@ -2,7 +2,7 @@
 
 ## TypeScript Types
 
-Cloudflare generates binding types via `npx wrangler types`. This creates `.wrangler/types/runtime.d.ts` with your Env interface.
+Cloudflare generates binding types via `npx wrangler types`. This creates `worker-configuration.d.ts` with your Env interface.
 
 ### Generated Env Interface
 
@@ -42,7 +42,8 @@ interface Env {
 | `hyperdrive` | `Hyperdrive` | `@cloudflare/workers-types` |
 | `rate_limiting` | `RateLimit` | `@cloudflare/workers-types` |
 | `workflows` | `Workflow` | `@cloudflare/workers-types` |
-| `mtls_certificates` / `vars` / `text_blobs` / `data_blobs` | `string` | Built-in |
+| `mtls_certificates` | `Fetcher` | Built-in |
+| `vars` / `text_blobs` / `data_blobs` | JSON value / `string` / `ArrayBuffer` | Built-in |
 | `wasm_modules` | `WebAssembly.Module` | Built-in |
 
 ## Accessing Bindings
@@ -77,20 +78,9 @@ export default app;
 
 **Why:** c.env auto-typed, ergonomic for routing-heavy apps.
 
-### Method 3: Module Workers (Legacy)
+### Module-level env access
 
-```typescript
-export async function handleRequest(request: Request, env: Env): Promise<Response> {
-  const value = await env.MY_KV.get('key');
-  return new Response(value);
-}
-
-addEventListener('fetch', (event) => {
-  // env not directly available - requires workarounds
-});
-```
-
-**Avoid:** Use fetch() handler instead (Method 1).
+Modern Workers can import `env` from `cloudflare:workers`. Request-handler injection is convenient for testing, but module-scope access is not universally unavailable. Do not start I/O during module initialization or cache derived clients without considering binding changes and request lifetime.
 
 ## Type Generation Workflow
 
@@ -113,7 +103,7 @@ npx wrangler types
 # TypeScript now sees updated Env interface
 ```
 
-**Note:** `wrangler types` outputs to `.wrangler/types/runtime.d.ts`. TypeScript picks this up automatically if `@cloudflare/workers-types` is in `tsconfig.json` `"types"` array.
+**Note:** `wrangler types` outputs to `worker-configuration.d.ts`. Include the generated file in tsconfig. It contains runtime declarations too; do not load duplicate declarations from `@cloudflare/workers-types`.
 
 ## Key Binding Methods
 
@@ -146,7 +136,7 @@ await env.MY_SERVICE.fetch(new Request('https://fake/path'));
 
 **Workers AI:**
 ```typescript
-await env.AI.run('@cf/meta/llama-3.1-8b-instruct', { prompt: 'Hello' });
+await env.AI.run('@cf/meta/llama-3.1-8b-instruct-fp8', { prompt: 'Hello' });
 ```
 
 **Queues:**
@@ -161,18 +151,9 @@ const stub = env.MY_DO.get(id);
 await stub.fetch(new Request('https://fake/increment'));
 ```
 
-## Runtime vs Build-Time Types
+## Runtime types
 
-| Type Source | When Generated | Use Case |
-|-------------|----------------|----------|
-| `@cloudflare/workers-types` | npm install | Base Workers APIs (Request, Response, etc.) |
-| `wrangler types` | After config change | Your specific bindings (Env interface) |
-
-**Install both:**
-```bash
-npm install -D @cloudflare/workers-types
-npx wrangler types
-```
+Prefer the project's `wrangler types` output, which reflects its compatibility settings and bindings. `@cloudflare/workers-types` is an alternative declaration source when the project needs it, not an additional required runtime library. Secret types depend on the local declarations/configuration used by generation; setting a remote secret does not automatically fetch its value or infer every local type.
 
 ## Type Safety Best Practices
 
@@ -194,7 +175,7 @@ npx wrangler types
 3. **Check generated types match config:**
 ```bash
 # View generated Env interface
-cat .wrangler/types/runtime.d.ts
+cat worker-configuration.d.ts
 ```
 
 ## See Also

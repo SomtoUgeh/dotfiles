@@ -1,6 +1,6 @@
 # SVG Pattern Templates
 
-Complete, copy-ready SVG patterns for technical diagrams.
+Complete, copy-ready SVG patterns for technical diagrams. Text uses darker variants of the accent colors for contrast on the light background; keep labels legible at the final export size. Pale connectors are decorative: strengthen them when they carry information independently of the labels.
 
 ## Base Template
 
@@ -21,12 +21,12 @@ Complete, copy-ready SVG patterns for technical diagrams.
 
   <!-- Title -->
   <text x="40" y="40" font-family="monospace" font-size="14" fill="#333" font-weight="bold">TITLE_HERE</text>
-  <text x="140" y="40" font-family="monospace" font-size="12" fill="#888">[ TAG_HERE ]</text>
+  <text x="140" y="40" font-family="monospace" font-size="12" fill="#666">[ TAG_HERE ]</text>
 
   <!-- Content goes here -->
 
   <!-- Bottom note -->
-  <text x="400" y="360" font-family="monospace" font-size="10" fill="#999" text-anchor="middle">summary note here</text>
+  <text x="400" y="360" font-family="monospace" font-size="10" fill="#666" text-anchor="middle">summary note here</text>
 </svg>
 ```
 
@@ -85,25 +85,25 @@ Complete, copy-ready SVG patterns for technical diagrams.
 **Sandbox/isolated container (dashed border):**
 ```xml
 <rect x="470" y="130" width="120" height="90" fill="none" stroke="#f39c12" stroke-width="2" stroke-dasharray="5,3"/>
-<text x="530" y="115" font-family="monospace" font-size="10" fill="#f39c12" text-anchor="middle">SANDBOX</text>
+<text x="530" y="115" font-family="monospace" font-size="10" fill="#935700" text-anchor="middle">SANDBOX</text>
 ```
 
 **Tool/component box (inside container):**
 ```xml
 <rect x="270" y="155" width="90" height="40" fill="#fff" stroke="#27ae60" stroke-width="2"/>
-<text x="315" y="180" font-family="monospace" font-size="10" fill="#27ae60" text-anchor="middle">tool_name</text>
+<text x="315" y="180" font-family="monospace" font-size="10" fill="#17743d" text-anchor="middle">tool_name</text>
 ```
 
 **Multiple tools stacked:**
 ```xml
 <rect x="300" y="120" width="160" height="45" fill="#fff" stroke="#3498db" stroke-width="1.5"/>
-<text x="380" y="148" font-family="monospace" font-size="10" fill="#3498db" text-anchor="middle">tool_one</text>
+<text x="380" y="148" font-family="monospace" font-size="10" fill="#216a9a" text-anchor="middle">tool_one</text>
 
 <rect x="300" y="177" width="160" height="45" fill="#fff" stroke="#3498db" stroke-width="1.5"/>
-<text x="380" y="205" font-family="monospace" font-size="10" fill="#3498db" text-anchor="middle">tool_two</text>
+<text x="380" y="205" font-family="monospace" font-size="10" fill="#216a9a" text-anchor="middle">tool_two</text>
 
 <rect x="300" y="234" width="160" height="45" fill="#fff" stroke="#3498db" stroke-width="1.5"/>
-<text x="380" y="262" font-family="monospace" font-size="10" fill="#3498db" text-anchor="middle">tool_three</text>
+<text x="380" y="262" font-family="monospace" font-size="10" fill="#216a9a" text-anchor="middle">tool_three</text>
 ```
 
 ## Arrow/Connection Patterns
@@ -111,7 +111,7 @@ Complete, copy-ready SVG patterns for technical diagrams.
 **Horizontal arrow:**
 ```xml
 <path d="M 140 175 L 240 175" stroke="#27ae60" stroke-width="2" fill="none" marker-end="url(#arrowGreen)"/>
-<text x="190" y="195" font-family="monospace" font-size="9" fill="#27ae60" text-anchor="middle">label</text>
+<text x="190" y="195" font-family="monospace" font-size="9" fill="#17743d" text-anchor="middle">label</text>
 ```
 
 **Multiple outgoing arrows (fan out):**
@@ -142,26 +142,26 @@ Complete, copy-ready SVG patterns for technical diagrams.
 **Start/end ellipse:**
 ```xml
 <ellipse cx="300" cy="90" rx="100" ry="25" fill="#fff" stroke="#3498db" stroke-width="2"/>
-<text x="300" y="95" font-family="monospace" font-size="11" fill="#3498db" text-anchor="middle">START_STATE</text>
+<text x="300" y="95" font-family="monospace" font-size="11" fill="#216a9a" text-anchor="middle">START_STATE</text>
 ```
 
 **Process step (rectangle):**
 ```xml
 <rect x="180" y="150" width="240" height="50" fill="#fff" stroke="#9b59b6" stroke-width="2"/>
-<text x="300" y="180" font-family="monospace" font-size="11" fill="#9b59b6" text-anchor="middle">PROCESS_STEP</text>
+<text x="300" y="180" font-family="monospace" font-size="11" fill="#804298" text-anchor="middle">PROCESS_STEP</text>
 ```
 
 **Decision diamond:**
 ```xml
 <polygon points="300,320 380,365 300,410 220,365" fill="#fff" stroke="#e74c3c" stroke-width="2"/>
-<text x="300" y="360" font-family="monospace" font-size="10" fill="#e74c3c" text-anchor="middle">DECISION</text>
-<text x="300" y="375" font-family="monospace" font-size="8" fill="#999" text-anchor="middle">(detail)</text>
+<text x="300" y="360" font-family="monospace" font-size="10" fill="#b82e20" text-anchor="middle">DECISION</text>
+<text x="300" y="375" font-family="monospace" font-size="8" fill="#666" text-anchor="middle">(detail)</text>
 ```
 
 **Reject/fail path from decision:**
 ```xml
 <path d="M 380 365 L 450 365" stroke="#e74c3c" stroke-width="1" stroke-dasharray="3,3"/>
-<text x="470" y="370" font-family="monospace" font-size="9" fill="#e74c3c">REJECT</text>
+<text x="470" y="370" font-family="monospace" font-size="9" fill="#b82e20">REJECT</text>
 ```
 
 **Vertical arrow with polygon head:**
@@ -174,27 +174,27 @@ Complete, copy-ready SVG patterns for technical diagrams.
 
 **Small code snippet:**
 ```xml
-<text x="530" y="158" font-family="monospace" font-size="8" fill="#999" text-anchor="middle">async (api) =&gt; {</text>
+<text x="530" y="158" font-family="monospace" font-size="8" fill="#666" text-anchor="middle">async (api) =&gt; {</text>
 <text x="530" y="172" font-family="monospace" font-size="8" fill="#666" text-anchor="middle">api.readDocument()</text>
-<text x="530" y="186" font-family="monospace" font-size="8" fill="#999" text-anchor="middle">}</text>
+<text x="530" y="186" font-family="monospace" font-size="8" fill="#666" text-anchor="middle">}</text>
 ```
 
 ## Labels and Notes
 
 **Round trip labels:**
 ```xml
-<text x="195" y="125" font-family="monospace" font-size="8" fill="#e74c3c">call_1</text>
-<text x="195" y="145" font-family="monospace" font-size="7" fill="#e74c3c" opacity="0.6">response</text>
+<text x="195" y="125" font-family="monospace" font-size="8" fill="#b82e20">call_1</text>
+<text x="195" y="145" font-family="monospace" font-size="7" fill="#b82e20">response</text>
 ```
 
 **Sub-label (smaller detail):**
 ```xml
-<text x="380" y="158" font-family="monospace" font-size="7" fill="#999" text-anchor="middle">schema + validation + handler</text>
+<text x="380" y="158" font-family="monospace" font-size="7" fill="#666" text-anchor="middle">schema + validation + handler</text>
 ```
 
 **Bottom summary note:**
 ```xml
-<text x="400" y="360" font-family="monospace" font-size="10" fill="#999" text-anchor="middle">3 tools · multiple round trips</text>
+<text x="400" y="360" font-family="monospace" font-size="10" fill="#666" text-anchor="middle">3 tools · multiple round trips</text>
 ```
 
 ## Complete Example: Architecture Diagram
@@ -219,7 +219,7 @@ Complete, copy-ready SVG patterns for technical diagrams.
 
   <!-- Title -->
   <text x="40" y="40" font-family="monospace" font-size="14" fill="#333" font-weight="bold">SYSTEM_NAME</text>
-  <text x="160" y="40" font-family="monospace" font-size="12" fill="#888">[ ARCHITECTURE ]</text>
+  <text x="160" y="40" font-family="monospace" font-size="12" fill="#666">[ ARCHITECTURE ]</text>
 
   <!-- Client Node -->
   <circle cx="100" cy="175" r="35" fill="none" stroke="#ccc" stroke-width="2"/>
@@ -229,7 +229,7 @@ Complete, copy-ready SVG patterns for technical diagrams.
 
   <!-- Arrow to Service -->
   <path d="M 140 175 L 240 175" stroke="#27ae60" stroke-width="2" fill="none" marker-end="url(#arrowGreen)"/>
-  <text x="190" y="195" font-family="monospace" font-size="9" fill="#27ae60" text-anchor="middle">request</text>
+  <text x="190" y="195" font-family="monospace" font-size="9" fill="#17743d" text-anchor="middle">request</text>
 
   <!-- Service Container -->
   <rect x="250" y="130" width="130" height="90" fill="none" stroke="#ccc" stroke-width="2"/>
@@ -237,7 +237,7 @@ Complete, copy-ready SVG patterns for technical diagrams.
 
   <!-- Tool inside Service -->
   <rect x="270" y="155" width="90" height="40" fill="#fff" stroke="#27ae60" stroke-width="2"/>
-  <text x="315" y="180" font-family="monospace" font-size="10" fill="#27ae60" text-anchor="middle">handler</text>
+  <text x="315" y="180" font-family="monospace" font-size="10" fill="#17743d" text-anchor="middle">handler</text>
 
   <!-- Arrow to Database -->
   <path d="M 380 175 L 460 175" stroke="#ccc" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
@@ -247,6 +247,6 @@ Complete, copy-ready SVG patterns for technical diagrams.
   <text x="510" y="180" font-family="monospace" font-size="10" fill="#666" text-anchor="middle">DATABASE</text>
 
   <!-- Bottom note -->
-  <text x="400" y="300" font-family="monospace" font-size="10" fill="#999" text-anchor="middle">simplified architecture · single request flow</text>
+  <text x="400" y="300" font-family="monospace" font-size="10" fill="#666" text-anchor="middle">simplified architecture · single request flow</text>
 </svg>
 ```

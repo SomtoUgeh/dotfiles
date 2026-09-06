@@ -25,8 +25,8 @@ Fetch the relevant doc page when implementing features.
 - Creating new Durable Object classes for stateful coordination
 - Implementing RPC methods, alarms, or WebSocket handlers
 - Reviewing existing DO code for best practices
-- Configuring wrangler.jsonc/toml for DO bindings and migrations
-- Writing tests with `@cloudflare/vitest-pool-workers`
+- Configuring wrangler.jsonc for DO bindings and lifecycle exports
+- Writing tests with `@cloudflare/vitest-plugin`
 - Designing sharding strategies and parent-child relationships
 
 ## Reference Documentation
@@ -65,9 +65,11 @@ Search: `blockConcurrencyWhile`, `idFromName`, `getByName`, `setAlarm`, `sql.exe
   "durable_objects": {
     "bindings": [{ "name": "MY_DO", "class_name": "MyDurableObject" }]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MyDurableObject"] }]
+  "exports": { "MyDurableObject": { "type": "durable-object", "storage": "sqlite" } }
 }
 ```
+
+Use this declarative `exports` lifecycle for new deployments. Existing migration-based deployments remain supported, but Wrangler rejects a configuration that combines Durable Object `exports` with `migrations`.
 
 ### Basic Durable Object Pattern
 
@@ -113,7 +115,7 @@ export default {
 
 1. **Model around coordination atoms** - One DO per chat room/game/user, not one global DO
 2. **Use `getByName()` for deterministic routing** - Same input = same DO instance
-3. **Use SQLite storage** - Configure `new_sqlite_classes` in migrations
+3. **Use SQLite storage** - Configure each new class in `exports` with `"storage": "sqlite"`
 4. **Initialize in constructor** - Use `blockConcurrencyWhile()` for schema setup only
 5. **Use RPC methods** - Not fetch() handler (compatibility date >= 2024-04-03)
 6. **Persist first, cache second** - Always write to storage before updating in-memory state

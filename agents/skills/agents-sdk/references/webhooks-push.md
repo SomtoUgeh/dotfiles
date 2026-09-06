@@ -12,10 +12,11 @@ export default {
     const url = new URL(req.url);
     if (url.pathname.startsWith("/webhooks/")) {
       const entityId = url.pathname.split("/")[2];
-      const agent = getAgentByName(env.MyAgent, entityId);
+      if (!entityId) return new Response("Missing entity ID", { status: 400 });
+      const agent = await getAgentByName(env.MyAgent, entityId);
       return agent.fetch(req);
     }
-    return routeAgentRequest(req, env);
+    return (await routeAgentRequest(req, env)) ?? new Response("Not found", { status: 404 });
   }
 };
 ```
@@ -26,12 +27,23 @@ In the agent:
 export class MyAgent extends Agent<Env, State> {
   async onRequest(request: Request) {
     const signature = request.headers.get("X-Signature");
-    if (!verifySignature(signature, await request.text(), this.env.WEBHOOK_SECRET)) {
+    const body = await request.text();
+    if (!await verifySignature(signature, body, this.env.WEBHOOK_SECRET)) {
       return new Response("Unauthorized", { status: 401 });
     }
-    const payload = JSON.parse(await request.text());
-    this.queue("processWebhook", payload);
+    let payload: unknown;
+    try {
+      payload = JSON.parse(body);
+    } catch {
+      return new Response("Invalid JSON", { status: 400 });
+    }
+    await this.queue("processWebhook", payload);
     return new Response("OK", { status: 202 });
+  }
+
+  async processWebhook(payload: unknown) {
+    // Application validates the provider event and performs idempotent work.
+    await handleVerifiedWebhook(payload);
   }
 }
 ```
@@ -51,16 +63,19 @@ npm install web-push
 ```typescript
 import webpush from "web-push";
 
-export class NotifyAgent extends Agent<Env, State> {
+type NotificationState = { subscriptions: webpush.PushSubscription[] };
+
+export class NotifyAgent extends Agent<Env, NotificationState> {
+  initialState: NotificationState = { subscriptions: [] };
   @callable()
-  async subscribe(subscription: PushSubscription) {
+  async subscribe(subscription: webpush.PushSubscription) {
     this.setState({
       ...this.state,
       subscriptions: [...this.state.subscriptions, subscription]
     });
   }
 
-  async sendReminder(payload: { message: string }, schedule: Schedule) {
+  async sendReminder(payload: { message: string }, schedule: Schedule<{ message: string }>) {
     for (const sub of this.state.subscriptions) {
       try {
         await webpush.sendNotification(sub, JSON.stringify({
@@ -74,8 +89,16 @@ export class NotifyAgent extends Agent<Env, State> {
           }
         });
       } catch (err) {
-        if (err.statusCode === 404 || err.statusCode === 410) {
-          // Remove expired subscription
+        if (err instanceof webpush.WebPushError &&
+            (err.statusCode === 404 || err.statusCode === 410)) {
+          this.setState({
+            ...this.state,
+            subscriptions: this.state.subscriptions.filter(
+              (subscription) => subscription.endpoint !== sub.endpoint
+            )
+          });
+        } else {
+          throw err;
         }
       }
     }

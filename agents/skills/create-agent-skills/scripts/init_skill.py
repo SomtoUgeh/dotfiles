@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
 """
 Skill Initializer - Creates a new skill from template
 
@@ -13,11 +13,12 @@ Examples:
 
 import sys
 from pathlib import Path
+from quick_validate import valid_skill_name
 
 
 SKILL_TEMPLATE = """---
 name: {skill_name}
-description: [TODO: Complete and informative explanation of what the skill does and when to use it. Include WHEN to use this skill - specific scenarios, file types, or tasks that trigger it.]
+description: "TODO: Describe what this skill does and when to use it."
 ---
 
 # {skill_title}
@@ -102,7 +103,7 @@ Files not intended to be loaded into context, but rather used within the output 
 **Any unneeded directories can be deleted.** Not every skill requires all three types of resources.
 """
 
-EXAMPLE_SCRIPT = '''#!/usr/bin/env python3
+EXAMPLE_SCRIPT = '''#!/usr/bin/env -S uv run --script
 """
 Example helper script for {skill_name}
 
@@ -202,7 +203,11 @@ def init_skill(skill_name, path):
     Returns:
         Path to created skill directory, or None if error
     """
-    # Determine skill directory path
+    if not valid_skill_name(skill_name):
+        print("ERROR: Use 1-64 lowercase letters, digits, and single hyphens; no leading or trailing hyphen.")
+        return None
+
+    # Validate before creating any directories, including the requested parent.
     skill_dir = Path(path).resolve() / skill_name
 
     # Check if directory already exists
@@ -271,12 +276,12 @@ def init_skill(skill_name, path):
 
 
 def main():
-    if len(sys.argv) < 4 or sys.argv[2] != '--path':
+    if len(sys.argv) != 4 or sys.argv[2] != '--path':
         print("Usage: init_skill.py <skill-name> --path <path>")
         print("\nSkill name requirements:")
         print("  - Hyphen-case identifier (e.g., 'data-analyzer')")
         print("  - Lowercase letters, digits, and hyphens only")
-        print("  - Max 40 characters")
+        print("  - Max 64 characters")
         print("  - Must match directory name exactly")
         print("\nExamples:")
         print("  init_skill.py my-new-skill --path skills/public")

@@ -175,10 +175,10 @@ Error (numeric codes, not `E_*` string codes like Workers):
 
 | Status | Meaning | Retry? |
 |--------|---------|--------|
-| 200 | Success | N/A |
+| 200 | API accepted; inspect `success` and each recipient outcome | Do not resend recipients already delivered or queued |
 | 400 | Validation error | No — fix the request |
 | 401 | Invalid API token | No — check your token |
 | 429 | Rate limited | Yes — exponential backoff |
 | 500 | Server error | Yes — exponential backoff |
 
-Only retry on 429 and 500. Validation errors (400) won't succeed on retry.
+Use bounded retries for confirmed transient failures, honoring Retry-After where present. A timeout or 5xx may leave delivery uncertain: reconcile logs before resending, because retries can duplicate email. Validation failures require correcting the request.

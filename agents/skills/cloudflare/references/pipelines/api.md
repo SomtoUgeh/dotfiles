@@ -1,12 +1,11 @@
 # Pipelines API Reference
 
-Code templates and verified behavior. For the full SQL function set and HTTP status semantics, pull `https://developers.cloudflare.com/pipelines/sql-reference/` and the streams docs.
+Code templates; account-side behavior requires separate integration verification. For the full SQL function set and HTTP status semantics, pull `https://developers.cloudflare.com/pipelines/sql-reference/` and the streams docs.
 
 ## Worker Binding Interface
 
 ```typescript
-// from cloudflare:pipelines / @cloudflare/workers-types
-interface Pipeline<T = any> { send(records: T[]): Promise<void>; }
+import type { Pipeline } from "cloudflare:pipelines";
 
 interface Env { MY_STREAM: Pipeline; }
 
@@ -65,7 +64,7 @@ curl -X DELETE "$BASE_URL/sinks/{id}"     -H "Authorization: Bearer $API_TOKEN"
 curl -X DELETE "$BASE_URL/streams/{id}"   -H "Authorization: Bearer $API_TOKEN"
 ```
 
-> `wrangler pipelines delete` defaults to "no" non-interactively — use the REST API for automated cleanup. Deleting a stream removes buffered events and dependent pipelines.
+> `wrangler pipelines delete` defaults to "no" non-interactively — use the documented API only for authorized cleanup after verifying delivery. Deleting a stream removes buffered events and dependent pipelines.
 
 ### Pipeline Lifecycle States
 
@@ -116,7 +115,7 @@ curl -s -X POST \
   -d '{"query": "SELECT COUNT(*) AS total FROM my_ns.my_table"}'
 ```
 
-> Expect **3–7 minutes** from first send to first queryable data. Subsequent flushes are much faster.
+> Expect **several minutes (measure the actual pipeline)** from first send to first queryable data. Subsequent flushes are much faster.
 
 ## See Also
 

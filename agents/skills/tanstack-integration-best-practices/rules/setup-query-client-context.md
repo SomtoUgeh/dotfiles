@@ -126,19 +126,21 @@ TanStack Start handles SSR and hydration automatically via the Vite plugin. No s
 
 ```tsx
 // tests/posts.test.tsx
-import { createRouter, RouterProvider } from '@tanstack/react-router'
+import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render } from '@testing-library/react'
 
-function renderWithProviders(route: string) {
+async function renderWithProviders(route: string, posts: Post[]) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
     },
   })
 
+  queryClient.setQueryData(['posts'], posts)
   const router = createRouter({
     routeTree,
+    history: createMemoryHistory({ initialEntries: [route] }),
     context: { queryClient },
     Wrap: ({ children }) => (
       <QueryClientProvider client={queryClient}>
@@ -147,6 +149,7 @@ function renderWithProviders(route: string) {
     ),
   })
 
+  await router.load()
   return {
     ...render(<RouterProvider router={router} />),
     queryClient,
@@ -154,10 +157,7 @@ function renderWithProviders(route: string) {
 }
 
 test('loads posts', async () => {
-  const { queryClient } = renderWithProviders('/posts')
-
-  // Pre-populate cache for testing
-  queryClient.setQueryData(['posts'], mockPosts)
+  const { queryClient } = await renderWithProviders('/posts', mockPosts)
 
   // ... assertions
 })

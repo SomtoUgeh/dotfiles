@@ -1,188 +1,49 @@
 # Wrangler Programmatic API
 
-Node.js APIs for testing and development.
+Use the project's installed Wrangler and inspect its exports/types before selecting an API. Verified with Wrangler 4.129.0: `createTestHarness`, `getPlatformProxy`, and `unstable_startWorker` exist; `startWorker` does not. The unstable API has no stability guarantee.
 
-## startWorker (Testing)
-
-Starts Worker with real local bindings for integration tests. Stable API (replaces `unstable_startWorker`).
+## Integration tests
 
 ```typescript
-import { startWorker } from "wrangler";
-import { describe, it, before, after } from "node:test";
-import assert from "node:assert";
+import { createTestHarness } from "wrangler";
+import assert from "node:assert/strict";
 
-describe("worker", () => {
-  let worker;
-  
-  before(async () => {
-    worker = await startWorker({
-      config: "wrangler.jsonc",
-      environment: "development"
-    });
-  });
-  
-  after(async () => {
-    await worker.dispose();
-  });
-  
-  it("responds with 200", async () => {
-    const response = await worker.fetch("http://example.com");
-    assert.strictEqual(response.status, 200);
-  });
+const server = createTestHarness({
+  workers: [{ configPath: "./wrangler.jsonc" }],
 });
+try {
+  await server.listen();
+  const response = await server.fetch("https://example.test/");
+  assert.equal(response.status, 200);
+} finally {
+  await server.close();
+}
 ```
 
-### Options
+Add other Workers to `workers` and declare their service bindings in config. Use `getWorker(name)` for a particular Worker. Test only local resources by default; remote bindings access real account data. Check support against the installed version before adding remote-resource tests.
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `config` | `string` | Path to wrangler.jsonc |
-| `environment` | `string` | Environment name from config |
-| `persist` | `boolean \| { path: string }` | Enable persistent state |
-| `bundle` | `boolean` | Enable bundling (default: true) |
-| `remote` | `false \| true \| "minimal"` | Remote mode: `false` (local), `true` (full remote), `"minimal"` (remote bindings only) |
-
-### Remote Mode
-
-```typescript
-// Local mode (default) - fast, simulated
-const worker = await startWorker({ config: "wrangler.jsonc" });
-
-// Full remote mode - production-like, slower
-const worker = await startWorker({ 
-  config: "wrangler.jsonc",
-  remote: true 
-});
-
-// Minimal remote mode - remote bindings, local Worker
-const worker = await startWorker({ 
-  config: "wrangler.jsonc",
-  remote: "minimal"
-});
-```
-
-## getPlatformProxy
-
-Emulate bindings in Node.js without starting Worker.
+## Bindings in Node.js
 
 ```typescript
 import { getPlatformProxy } from "wrangler";
 
-const { env, dispose, caches } = await getPlatformProxy<Env>({
-  configPath: "wrangler.jsonc",
-  environment: "production",
-  persist: { path: ".wrangler/state" }
+interface Env { MY_KV: KVNamespace }
+const proxy = await getPlatformProxy<Env>({
+  configPath: "./wrangler.jsonc",
+  persist: false,
 });
-
-// Use bindings
-const value = await env.MY_KV.get("key");
-await env.DB.prepare("SELECT * FROM users").all();
-await env.ASSETS.put("file.txt", "content");
-
-// Platform APIs
-await caches.default.put("https://example.com", new Response("cached"));
-
-await dispose();
+try {
+  await proxy.env.MY_KV.put("test-key", "test-value");
+  console.log(await proxy.env.MY_KV.get("test-key"));
+} finally {
+  await proxy.dispose();
+}
 ```
 
-Use for unit tests (test functions, not full Worker) or scripts that need bindings.
+Generate the binding types with the project-local `wrangler types`. `getPlatformProxy` provides bindings to Node code; it does not execute the Worker's request handler.
 
-## Type Generation
+## Advanced development APIs
 
-Generate types from config: `wrangler types` → creates `worker-configuration.d.ts`
+For a programmatic development server use the Cloudflare Vite plugin and Vite's `createServer`. Existing Wrangler integrations can use `unstable_startWorker` with the installed package's exact parameter types. Do not copy options from Miniflare or `getPlatformProxy`: they use different shapes. In Wrangler 4.129.0, lifecycle events are on `worker.raw`; `worker.on`, top-level `remote: "minimal"`, and `{ bindings: { AUTH: anotherWorker } }` are not supported contracts.
 
-## Event System
-
-Listen to Worker lifecycle events for advanced workflows.
-
-```typescript
-import { startWorker } from "wrangler";
-
-const worker = await startWorker({
-  config: "wrangler.jsonc",
-  bundle: true
-});
-
-// Bundle events
-worker.on("bundleStart", (details) => {
-  console.log("Bundling started:", details.config);
-});
-
-worker.on("bundleComplete", (details) => {
-  console.log("Bundle ready:", details.duration);
-});
-
-// Reconfiguration events
-worker.on("reloadStart", () => {
-  console.log("Worker reloading...");
-});
-
-worker.on("reloadComplete", () => {
-  console.log("Worker reloaded");
-});
-
-await worker.dispose();
-```
-
-### Dynamic Reconfiguration
-
-```typescript
-import { startWorker } from "wrangler";
-
-const worker = await startWorker({ config: "wrangler.jsonc" });
-
-// Replace entire config
-await worker.setConfig({
-  config: "wrangler.staging.jsonc",
-  environment: "staging"
-});
-
-// Patch specific fields
-await worker.patchConfig({
-  vars: { DEBUG: "true" }
-});
-
-await worker.dispose();
-```
-
-## unstable_dev (Deprecated)
-
-Use `startWorker` instead.
-
-## Multi-Worker Registry
-
-Test multiple Workers with service bindings.
-
-```typescript
-import { startWorker } from "wrangler";
-
-const auth = await startWorker({ config: "./auth/wrangler.jsonc" });
-const api = await startWorker({
-  config: "./api/wrangler.jsonc",
-  bindings: { AUTH: auth }  // Service binding
-});
-
-const response = await api.fetch("http://example.com/api/login");
-// API Worker calls AUTH Worker via env.AUTH.fetch()
-
-await api.dispose();
-await auth.dispose();
-```
-
-## Best Practices
-
-- Use `startWorker` for integration tests (tests full Worker)
-- Use `getPlatformProxy` for unit tests (tests individual functions)
-- Use `remote: true` when debugging production-specific issues
-- Use `remote: "minimal"` for faster tests with real bindings
-- Enable `persist: true` for debugging (state survives runs)
-- Run `wrangler types` after config changes
-- Always `dispose()` to prevent resource leaks
-- Listen to bundle events for build monitoring
-- Use multi-worker registry for testing service bindings
-
-## See Also
-
-- [README.md](./README.md) - CLI commands
-- [configuration.md](./configuration.md) - Config
-- [patterns.md](./patterns.md) - Testing patterns
+See the [official API reference](https://developers.cloudflare.com/workers/wrangler/api/) for version-specific reconfiguration and the [test harness guide](https://developers.cloudflare.com/workers/testing/integration-test-harness/) for mocks and storage setup. For in-runtime unit tests use the [Vitest pattern](./patterns.md#testing-with-vitest).

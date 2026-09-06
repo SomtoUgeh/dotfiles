@@ -103,38 +103,16 @@ Bindings without IDs are auto-created:
 
 ### Automatic Type Generation (Recommended)
 
-```bash
-npm install -D @cloudflare/workers-types
-npx wrangler types  # Generates .wrangler/types/runtime.d.ts from wrangler.jsonc
-```
-
-`tsconfig.json`:
+Run the project's installed `wrangler types`. With Wrangler 4, the default output is `worker-configuration.d.ts`, containing the binding and runtime declarations. Include that file in tsconfig; do not import Env from a nonexistent `.wrangler/types/runtime` module or load duplicate runtime declarations from workers-types.
 
 ```jsonc
 {
-  "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["ES2022"],
-    "types": ["@cloudflare/workers-types"]
-  },
-  "include": [".wrangler/types/**/*.ts", "src/**/*"]
+  "compilerOptions": { "target": "ES2022", "lib": ["ES2022"], "strict": true },
+  "include": ["worker-configuration.d.ts", "src/**/*"]
 }
 ```
 
-Import generated types:
-
-```typescript
-import type { Env } from './.wrangler/types/runtime';
-
-export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    await env.MY_KV.get('key');  // Fully typed, autocomplete works
-    return new Response('OK');
-  },
-};
-```
-
-Re-run `npx wrangler types` after changing bindings in wrangler.jsonc
+`Env` is available from the generated declaration. Regenerate after changing bindings, compatibility settings, or environment. Keep the project's existing generation path if it customizes the output.
 
 ### Manual Type Definition (Legacy)
 
@@ -168,7 +146,7 @@ interface Env {
 - CommonJS `require()` for Node modules
 - `node:` imports (e.g., `import { Buffer } from 'node:buffer'`)
 
-**Note:** Adds ~1-2ms cold start overhead. Use Workers APIs (R2, KV) when possible
+**Note:** Supported Node APIs depend on compatibility date and flags. Measure startup cost; there is no universal 1–2 ms overhead.
 
 ## Deployment Commands
 

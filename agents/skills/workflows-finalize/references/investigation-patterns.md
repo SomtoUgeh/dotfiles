@@ -71,9 +71,9 @@ Not all review comments deserve implementation. Evaluate each unresolved comment
 - Points to a real bug, risk, or correctness issue
 - Suggests a meaningful simplification or catches a genuine oversight
 
-**Reply and resolve:**
+**Explain in the conversation; reply or resolve externally only when authorized:**
 - Trivial, nitpicky, or stylistic in a way that does not matter for shipping — explain why not worth addressing here
-- Wrong, outdated, or based on a misunderstanding — reply with the correction
+- Wrong, outdated, or based on a misunderstanding — explain the correction
 - Suggests an out-of-scope refactor or improvement — acknowledge as valid future work if it is
 - Vague, generic, or reads like AI reviewer padding — note that it is not actionable
 
@@ -90,7 +90,7 @@ Good simplification is behavior-preserving and reduces mental load:
 - Tightening APIs, names, or state flow in the changed area
 - Deleting workarounds that no longer serve a purpose
 
-Raise the bar when simplification would remove multiple components, delete helper layers, or collapse public interfaces. Those are not "safe and local." Investigate more, checkpoint first, keep in a reversible commit.
+Raise the bar when simplification removes multiple components, deletes helper layers, or collapses public interfaces. Investigate affected callers and tests and preserve a recoverable local snapshot. Commit only when authorized.
 
 Do not chase elegance for its own sake. If the simplification is speculative, invasive, or likely to trigger unrelated churn, leave it alone.
 

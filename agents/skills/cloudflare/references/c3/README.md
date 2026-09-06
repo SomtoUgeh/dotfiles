@@ -9,10 +9,10 @@ Official CLI for scaffolding Cloudflare Workers and Pages projects with template
 npm create cloudflare@latest my-app
 
 # Worker (API/WebSocket/Cron)
-npm create cloudflare@latest my-api -- --type=hello-world --ts
+npm create cloudflare@latest my-api -- --type=hello-world --lang=ts
 
 # Pages (static/SSG/full-stack)
-npm create cloudflare@latest my-site -- --type=web-app --framework=astro --platform=pages
+npm create cloudflare@latest my-site -- --framework=astro --platform=pages
 ```
 
 ## Platform Decision Tree
@@ -26,7 +26,7 @@ What are you building?
 
 ├─ Static site / SSG / Documentation
 │   └─ Pages - requires --platform=pages
-│       npm create cloudflare@latest my-site -- --type=web-app --framework=astro --platform=pages
+│       npm create cloudflare@latest my-site -- --framework=astro --platform=pages
 
 ├─ Full-stack app (Next.js/Remix/SvelteKit)
 │   ├─ Need Durable Objects, Queues, or Workers-only features?
@@ -35,7 +35,7 @@ What are you building?
 │       └─ Add --platform=pages
 
 └─ Convert existing project
-    └─ npm create cloudflare@latest . -- --type=pre-existing --existing-script=./src/worker.ts
+    └─ npm create cloudflare@latest . -- --type=pre-existing --existing-script=my-existing-worker
 ```
 
 **Critical:** Pages projects require `--platform=pages` flag. Without it, C3 defaults to Workers.
@@ -47,7 +47,7 @@ When run without flags, C3 prompts in this order:
 1. **Project name** - Directory to create (defaults to current dir with `.`)
 2. **Application type** - `hello-world`, `web-app`, `demo`, `pre-existing`, `remote-template`
 3. **Platform** - `workers` (default) or `pages` (for web apps only)
-4. **Framework** - If web-app: `next`, `remix`, `astro`, `react-router`, `solid`, `svelte`, etc.
+4. **Framework** - If web-app: `next`, `tanstack-start`, `astro`, `react-router`, `solid`, `svelte`, etc.
 5. **TypeScript** - `yes` (recommended) or `no`
 6. **Git** - Initialize repository? `yes` or `no`
 7. **Deploy** - Deploy now? `yes` or `no` (requires `wrangler login`)
@@ -109,3 +109,5 @@ npm run deploy
 - **wrangler/README.md** - Wrangler CLI beyond initial setup
 - **d1/README.md** - SQLite database
 - **r2/README.md** - Object storage
+
+`--existing-script` downloads a deployed Worker; it does not convert local source or migrate an existing framework app. For an existing app, follow its current Workers framework guide. Workers Static Assets also support static sites, and Workers Builds supports Git workflows; Pages is an explicit framework-dependent choice. Inspect generated package scripts instead of assuming every framework uses the same names.

@@ -39,3 +39,5 @@ Autonomous, always-on protection against DDoS attacks across L3/4 and L7.
 ## See Also
 - [waf](../waf/) - Application-layer security rules
 - [bot-management](../bot-management/) - Bot detection and mitigation
+
+Ruleset phase PUT operations replace the entrypoint rules. Fetch the existing configuration, preserve unrelated rules using the current writable request schema, and review the complete resulting payload before applying it. Prefer a targeted rule update where available. Do not submit these fragments as a replacement for an existing production ruleset.

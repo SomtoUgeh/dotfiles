@@ -1,60 +1,23 @@
-# Framework Integration
+# Web Analytics framework integration
 
-**Web Analytics is dashboard-only** - no programmatic API. This covers beacon integration.
+Install one beacon at the application's stable document/root layout. Prefer existing framework script/head primitives over injecting a script in every route component.
 
-## Basic HTML
+| Framework | Typical location |
+|---|---|
+| React or Vue with Vite | Root `index.html` |
+| Next.js App Router | `app/layout.tsx`, framework Script component |
+| Next.js Pages Router | Persistent `pages/_app.tsx` for after-interactive Script |
+| Nuxt | Root head configuration / `useHead` |
+| SvelteKit | `src/app.html` |
+| Astro | Shared document layout |
+| Angular | `src/index.html` |
+| Gatsby | Supported browser/SSR script integration |
+| Docusaurus | Site configuration scripts |
 
-```html
-<script defer src='https://static.cloudflareinsights.com/beacon.min.js' 
-        data-cf-beacon='{"token": "YOUR_TOKEN", "spa": true}'></script>
-```
+Use the exact manual snippet and CSP guidance from [configuration.md](configuration.md). Do not suppress hydration warnings as a substitute for fixing duplicated or misplaced scripts.
 
-Place before closing `</body>` tag.
+SPA tracking is automatic: current beacon versions use the Soft Navigations API, Navigation API, or History API depending on browser support. `spa: false` disables it for manual installations; setting `spa: true` is not required. Test actual navigation behavior in the target browser, including any hash-routing requirements, instead of assuming one fallback mechanism describes every browser.
 
-## Framework Examples
+If the application requires consent before loading analytics, integrate with its existing consent manager. Load at most once after consent and apply that manager's withdrawal policy; removing a script element does not undo listeners already installed by executed JavaScript.
 
-| Framework | Location | Notes |
-|-----------|----------|-------|
-| React/Vite | `public/index.html` | Add `spa: true` |
-| Next.js App Router | `app/layout.tsx` | Use `<Script strategy="afterInteractive">` |
-| Next.js Pages | `pages/_document.tsx` | Use `<Script>` |
-| Nuxt 3 | `app.vue` with `useHead()` | Or use plugin |
-| Vue 3/Vite | `index.html` | Add `spa: true` |
-| Gatsby | `gatsby-browser.js` | `onClientEntry` hook |
-| SvelteKit | `src/app.html` | Before `</body>` |
-| Astro | Layout component | Before `</body>` |
-| Angular | `src/index.html` | Add `spa: true` |
-| Docusaurus | `docusaurus.config.js` | In `scripts` array |
-
-## Configuration
-
-```json
-{
-  "token": "YOUR_TOKEN",
-  "spa": true
-}
-```
-
-**Use `spa: true` for:** React Router, Vue Router, Next.js, Nuxt, Gatsby, SvelteKit, Angular
-
-**Use `spa: false` for:** Traditional server-rendered (PHP, Django, Rails, WordPress)
-
-## CSP Headers
-
-```
-script-src 'self' https://static.cloudflareinsights.com;
-connect-src 'self' https://cloudflareinsights.com;
-```
-
-## GDPR Consent
-
-```typescript
-// Load conditionally based on consent
-if (localStorage.getItem('analytics-consent') === 'true') {
-  const script = document.createElement('script');
-  script.src = 'https://static.cloudflareinsights.com/beacon.min.js';
-  script.defer = true;
-  script.setAttribute('data-cf-beacon', '{"token": "YOUR_TOKEN", "spa": true}');
-  document.body.appendChild(script);
-}
-```
+[SPA behavior](https://developers.cloudflare.com/web-analytics/get-started/web-analytics-spa/) · [FAQ](https://developers.cloudflare.com/web-analytics/faq/)

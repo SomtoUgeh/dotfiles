@@ -2,6 +2,8 @@
 
 Store versioned file trees behind a repo-style interface that works from Workers, the REST API, and Git-compatible tooling.
 
+As checked 2026-09-05, Artifacts is in closed beta; request access through the [official overview](https://developers.cloudflare.com/artifacts/) before planning a deployment.
+
 ## Overview
 
 Use **Artifacts** when the thing you need to store is a versioned filesystem tree rather than a single object, key, or SQL row.
@@ -51,7 +53,7 @@ const created = await env.ARTIFACTS.create("starter-repo");
 
 **From the REST API:**
 
-Use the namespace-scoped Artifacts base URL plus a gateway JWT. For imports from existing HTTPS remotes, use the REST API rather than the Workers binding.
+Use the account/namespace-scoped Cloudflare v4 API with a Cloudflare API token. Imports from public HTTPS remotes are supported by both REST and the Workers binding.
 
 ## Reading Order
 
@@ -72,7 +74,7 @@ Use the namespace-scoped Artifacts base URL plus a gateway JWT. For imports from
 
 - [Cloudflare Artifacts Docs](https://developers.cloudflare.com/artifacts/)
 - [Artifacts Git Protocol Docs](https://developers.cloudflare.com/artifacts/api/git-protocol/)
-- [ArtifactFS Docs](https://developers.cloudflare.com/artifacts/api/artifactfs/)
+- [ArtifactFS Docs](https://developers.cloudflare.com/artifacts/guides/artifactfs/)
 - [Cloudflare Workers Docs](https://developers.cloudflare.com/workers/)
 - [Cloudflare Durable Objects Docs](https://developers.cloudflare.com/durable-objects/)
 - [Cloudflare R2 Docs](https://developers.cloudflare.com/r2/)

@@ -15,10 +15,10 @@ const buffer = await env.MY_KV.get("image", "arrayBuffer");
 // Stream for large values
 const stream = await env.MY_KV.get("large-file", "stream");
 
-// With cache TTL (min 60s)
+// With cache TTL (min 30s)
 const value = await env.MY_KV.get("key", { type: "text", cacheTtl: 300 });
 
-// Bulk get (max 100 keys, counts as 1 operation)
+// Bulk get (max 100 keys, counts as one Worker external-service operation; billing counts keys read)
 const keys = ["user:1", "user:2", "user:3", "missing:key"];
 const results = await env.MY_KV.get(keys);
 // Returns Map<string, string | null>
@@ -34,7 +34,7 @@ for (const [key, value] of results) {
   }
 }
 
-// TypeScript with generics (type-safe JSON parsing)
+// TypeScript with generics (static JSON typing; validate untrusted data at runtime)
 interface UserProfile { name: string; email: string; }
 const profile = await env.USERS.get<UserProfile>("user:123", "json");
 // profile is typed as UserProfile | null
@@ -79,7 +79,7 @@ await env.MY_KV.put("temp", value, {
 ```typescript
 // Single key
 const result = await env.MY_KV.getWithMetadata("user:profile");
-// { value: string | null, metadata: any | null }
+// { value: string | null, metadata: unknown | null }
 
 if (result.value && result.metadata) {
   const { version, lastUpdated } = result.metadata;
@@ -100,13 +100,13 @@ for (const [key, result] of results) {
 
 // With type
 const result = await env.MY_KV.getWithMetadata<UserData>("user:123", "json");
-// result: { value: UserData | null, metadata: any | null, cacheStatus?: string }
+// result: { value: UserData | null, metadata: unknown | null, cacheStatus?: string }
 ```
 
 ## Delete Operations
 
 ```typescript
-await env.MY_KV.delete("key"); // Always succeeds (even if key missing)
+await env.MY_KV.delete("key"); // Missing keys are harmless; storage/network failures still reject
 ```
 
 ## List Operations
@@ -121,12 +121,13 @@ const userKeys = await env.MY_KV.list({ prefix: "user:" });
 
 // Pagination
 let cursor: string | undefined;
-let allKeys = [];
-do {
+const allKeys: KVNamespaceListKey<unknown>[] = [];
+while (true) {
   const result = await env.MY_KV.list({ cursor, limit: 1000 });
   allKeys.push(...result.keys);
+  if (result.list_complete) break;
   cursor = result.cursor;
-} while (!result.list_complete);
+}
 ```
 
 ## Performance Considerations

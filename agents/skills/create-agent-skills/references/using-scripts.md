@@ -1,113 +1,11 @@
-# Using Scripts in Skills
+# Using Scripts
 
-<purpose>
-Scripts are executable code that the agent runs as-is rather than regenerating each time. They ensure reliable, error-free execution of repeated operations.
-</purpose>
+Place a reusable helper in `scripts/`. Give it a single concrete responsibility, validated arguments, documented outputs, and explicit failures. Prefer an existing maintained command when it already provides the operation.
 
-<when_to_use>
-Use scripts when:
-- The same code runs across multiple skill invocations
-- Operations are error-prone when rewritten from scratch
-- Complex shell commands or API interactions are involved
-- Consistency matters more than flexibility
+For shell, use an appropriate interpreter and check failures; `set -euo pipefail` is useful but does not replace explicit handling. For Python, use `uv run` and declare dependencies. Inspect any shared script before first execution.
 
-Common script types:
-- **Deployment** - Deploy to Vercel, publish packages, push releases
-- **Setup** - Initialize projects, install dependencies, configure environments
-- **API calls** - Authenticated requests, webhook handlers, data fetches
-- **Data processing** - Transform files, batch operations, migrations
-- **Build processes** - Compile, bundle, test runners
-</when_to_use>
+Link the actual script from the entrypoint and the relevant workflow. Explain when it runs, which inputs it receives, and which result proves success. Resolve from the discovered skill path so it works from an unrelated working directory.
 
-<script_structure>
-Scripts live in `scripts/` within the skill directory:
+A script file is not permission to deploy, publish, or modify an external account. Preserve the user's task authorization and distinguish read-only checks from writes.
 
-```
-skill-name/
-├── SKILL.md
-├── workflows/
-├── references/
-├── templates/
-└── scripts/
-    ├── deploy.sh
-    ├── setup.py
-    └── fetch-data.ts
-```
-
-A well-structured script includes:
-1. Clear purpose comment at top
-2. Input validation
-3. Error handling
-4. Idempotent operations where possible
-5. Clear output/feedback
-</script_structure>
-
-<script_example>
-```bash
-#!/bin/bash
-# deploy.sh - Deploy project to Vercel
-# Usage: ./deploy.sh [environment]
-# Environments: preview (default), production
-
-set -euo pipefail
-
-ENVIRONMENT="${1:-preview}"
-
-# Validate environment
-if [[ "$ENVIRONMENT" != "preview" && "$ENVIRONMENT" != "production" ]]; then
-    echo "Error: Environment must be 'preview' or 'production'"
-    exit 1
-fi
-
-echo "Deploying to $ENVIRONMENT..."
-
-if [[ "$ENVIRONMENT" == "production" ]]; then
-    vercel --prod
-else
-    vercel
-fi
-
-echo "Deployment complete."
-```
-</script_example>
-
-<workflow_integration>
-Workflows reference scripts like this:
-
-```xml
-<process>
-## Step 5: Deploy
-
-1. Ensure all tests pass
-2. Run `scripts/deploy.sh production`
-3. Verify deployment succeeded
-4. Update user with deployment URL
-</process>
-```
-
-The workflow tells the agent WHEN to run the script. The script handles HOW the operation executes.
-</workflow_integration>
-
-<best_practices>
-**Do:**
-- Make scripts idempotent (safe to run multiple times)
-- Include clear usage comments
-- Validate inputs before executing
-- Provide meaningful error messages
-- Use `set -euo pipefail` in bash scripts
-
-**Don't:**
-- Hardcode secrets or credentials (use environment variables)
-- Create scripts for one-off operations
-- Skip error handling
-- Make scripts do too many unrelated things
-- Forget to make scripts executable (`chmod +x`)
-</best_practices>
-
-<security_considerations>
-- Never embed API keys, tokens, or secrets in scripts
-- Use environment variables for sensitive configuration
-- Validate and sanitize any user-provided inputs
-- Be cautious with scripts that delete or modify data
-- Consider adding `--dry-run` options for destructive operations
-</security_considerations>
+Test invalid input, missing dependencies, interrupted operations, repeated execution, and cleanup failures where applicable. Use disposable local fixtures before a live integration. See [executable-code.md](executable-code.md) and [api-security.md](api-security.md).

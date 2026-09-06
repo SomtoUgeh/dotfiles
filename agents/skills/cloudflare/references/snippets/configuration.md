@@ -28,7 +28,7 @@ curl "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/snippets/$SNIPPET_NAME
   --form "files=@example.js" \
   --form "metadata={\"main_module\": \"example.js\"}"
 
-# Create snippet rule
+# Replace the complete snippet rule list (preserve unrelated rules first)
 curl "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/snippets/snippet_rules" \
   --request PUT \
   --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
@@ -63,7 +63,7 @@ terraform {
   required_providers {
     cloudflare = {
       source  = "cloudflare/cloudflare"
-      version = "~> 4.0"
+      version = "~> 5.0"
     }
   }
 }
@@ -75,25 +75,25 @@ provider "cloudflare" {
 # Create snippet
 resource "cloudflare_snippet" "security_headers" {
   zone_id = var.zone_id
-  name    = "security_headers"
-  
-  main_module = "security_headers.js"
-  files {
+  snippet_name = "security_headers"
+
+  metadata = { main_module = "security_headers.js" }
+  files = [{
     name    = "security_headers.js"
     content = file("${path.module}/snippets/security_headers.js")
-  }
+  }]
 }
 
-# Create snippet rule
+# Replace the complete snippet rule list (preserve unrelated rules first)
 resource "cloudflare_snippet_rules" "security_rules" {
   zone_id = var.zone_id
-  
-  rules {
+
+  rules = [{
     description  = "Apply security headers to all requests"
     enabled      = true
     expression   = "true"
-    snippet_name = cloudflare_snippet.security_headers.name
-  }
+    snippet_name = cloudflare_snippet.security_headers.snippet_name
+  }]
 }
 ```
 
@@ -107,8 +107,8 @@ import * as fs from "fs";
 // Create snippet
 const securitySnippet = new cloudflare.Snippet("security-headers", {
   zoneId: zoneId,
-  name: "security_headers",
-  mainModule: "security_headers.js",
+  snippetName: "security_headers",
+  metadata: { mainModule: "security_headers.js" },
   files: [{
     name: "security_headers.js",
     content: fs.readFileSync("./snippets/security_headers.js", "utf8"),
@@ -122,7 +122,7 @@ const snippetRule = new cloudflare.SnippetRules("security-rules", {
     description: "Apply security headers",
     enabled: true,
     expression: "true",
-    snippetName: securitySnippet.name,
+    snippetName: securitySnippet.snippetName,
   }],
 });
 ```
@@ -143,14 +143,14 @@ http.host contains "example"
 http.request.uri.path eq "/api/users"
 starts_with(http.request.uri.path, "/api/")
 ends_with(http.request.uri.path, ".json")
-matches(http.request.uri.path, "^/api/v[0-9]+/")
+http.request.uri.path matches "^/api/v[0-9]+/"
 
 // Query parameters
 http.request.uri.query contains "debug=true"
 
 // Headers
-http.headers["user-agent"] contains "Mobile"
-http.headers["accept-language"] eq "en-US"
+any(http.request.headers["user-agent"][*] contains "Mobile")
+any(http.request.headers["accept-language"][*] eq "en-US")
 
 // Cookies
 http.cookie contains "session="
@@ -169,27 +169,19 @@ http.request.method in {"POST" "PUT" "PATCH"}
 // Combine with logical operators
 http.host eq "example.com" and starts_with(http.request.uri.path, "/api/")
 ip.geoip.country eq "US" or ip.geoip.country eq "CA"
-not http.headers["user-agent"] contains "bot"
+not any(http.request.headers["user-agent"][*] contains "bot")
 ```
 
-### Expression Functions
+### Expression Operators
 
-| Function | Example | Description |
-|----------|---------|-------------|
-| `starts_with()` | `starts_with(http.request.uri.path, "/api/")` | Check prefix |
-| `ends_with()` | `ends_with(http.request.uri.path, ".json")` | Check suffix |
-| `contains()` | `contains(http.headers["user-agent"], "Mobile")` | Check substring |
-| `matches()` | `matches(http.request.uri.path, "^/api/")` | Regex match |
-| `lower()` | `lower(http.host) eq "example.com"` | Convert to lowercase |
-| `upper()` | `upper(http.headers["x-api-key"])` | Convert to uppercase |
-| `len()` | `len(http.request.uri.path) gt 100` | String length |
+`contains` and `matches` are infix operators, not functions. Header values are arrays: use `any(http.request.headers["user-agent"][*] contains "Mobile")`. Functions include `starts_with`, `ends_with`, `lower`, `upper`, and `len`; check type signatures and plan support for regex matching in the current Rules language reference.
 
 ## Deployment Workflow
 
 ### Development
 1. Write snippet code locally
-2. Test syntax with `node snippet.js` or TypeScript compiler
-3. Deploy to Dashboard or use API with `Save as Draft`
+2. Check module syntax with `node --check snippet.mjs`; use runtime tests for behavior
+3. Upload code without associating a production rule; use the dashboard preview where available
 4. Test with Preview/HTTP tabs in Dashboard
 5. Enable rule when ready
 
@@ -205,10 +197,10 @@ not http.headers["user-agent"] contains "bot"
 
 | Resource | Limit | Notes |
 |----------|-------|-------|
-| Snippet size | 32 KB | Per snippet, compressed |
+| Total package size | 32 KB | All uploaded modules |
 | Snippet name | 64 chars | `a-z`, `0-9`, `_` only, immutable |
-| Snippets per zone | 20 | Soft limit, contact support for more |
-| Rules per zone | 20 | One rule per snippet typical |
+| Snippets per zone | 25/50/300 | Pro/Business/Enterprise |
+| Rule association | One rule per snippet | Keep existing rules when updating |
 | Expression length | 4096 chars | Per rule expression |
 
 ## Authentication
@@ -224,4 +216,5 @@ export CLOUDFLARE_API_TOKEN="your_token_here"
 ```bash
 export CLOUDFLARE_EMAIL="your@email.com"
 export CLOUDFLARE_API_KEY="your_global_api_key"
-``` 
+```
+[Current Snippets availability and limits](https://developers.cloudflare.com/rules/snippets/) · [Cache example](https://developers.cloudflare.com/rules/snippets/examples/custom-cache/) · [HTMLRewriter example](https://developers.cloudflare.com/rules/snippets/examples/rewrite-site-links/)

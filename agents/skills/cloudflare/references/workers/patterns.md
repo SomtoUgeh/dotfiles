@@ -33,7 +33,9 @@ if (request.method === 'OPTIONS') return new Response(null, { headers: corsHeade
 ## Routing
 
 ```typescript
-const router = { 'GET /api/users': handleGetUsers, 'POST /api/users': handleCreateUser };
+const router: Record<string, (request: Request, env: Env) => Promise<Response>> = {
+  'GET /api/users': handleGetUsers, 'POST /api/users': handleCreateUser
+};
 
 const handler = router[`${request.method} ${url.pathname}`];
 return handler ? handler(request, env) : new Response('Not Found', { status: 404 });
@@ -62,8 +64,9 @@ async function handleCreateUser(request: Request) {
     });
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return new Response(JSON.stringify({ errors: err.errors }), { status: 400 });
+      return new Response(JSON.stringify({ errors: err.issues }), { status: 400 });
     }
+    if (err instanceof SyntaxError) return Response.json({ error: 'Invalid JSON' }, { status: 400 });
     throw err;
   }
 }
@@ -75,23 +78,22 @@ async function handleCreateUser(request: Request) {
 
 ```typescript
 // ❌ Sequential
-const user = await fetch('/api/user/1');
-const posts = await fetch('/api/posts?user=1');
+const user = await fetch('https://api.example.com/user/1');
+const posts = await fetch('https://api.example.com/posts?user=1');
 
 // ✅ Parallel
-const [user, posts] = await Promise.all([fetch('/api/user/1'), fetch('/api/posts?user=1')]);
+const [user, posts] = await Promise.all([fetch('https://api.example.com/user/1'), fetch('https://api.example.com/posts?user=1')]);
 ```
 
 ## Streaming
 
 ```typescript
-const stream = new ReadableStream({
-  async start(controller) {
-    for (let i = 0; i < 1000; i++) {
-      controller.enqueue(new TextEncoder().encode(`Item ${i}\n`));
-      if (i % 100 === 0) await new Promise(r => setTimeout(r, 0));
-    }
-    controller.close();
+let index = 0;
+const encoder = new TextEncoder();
+const stream = new ReadableStream<Uint8Array>({
+  pull(controller) {
+    if (index === 1000) { controller.close(); return; }
+    controller.enqueue(encoder.encode(`Item ${index++}\n`));
   }
 });
 ```
@@ -99,26 +101,15 @@ const stream = new ReadableStream({
 ## Transform Streams
 
 ```typescript
-response.body.pipeThrough(new TextDecoderStream()).pipeThrough(
+if (!response.body) return response;
+return new Response(response.body.pipeThrough(new TextDecoderStream()).pipeThrough(
   new TransformStream({ transform(chunk, c) { c.enqueue(chunk.toUpperCase()); } })
-).pipeThrough(new TextEncoderStream());
+).pipeThrough(new TextEncoderStream()), response);
 ```
 
 ## Testing
 
-```typescript
-import { describe, it, expect } from 'vitest';
-import worker from '../src/index';
-
-describe('Worker', () => {
-  it('returns 200', async () => {
-    const req = new Request('http://localhost/');
-    const env = { MY_VAR: 'test' };
-    const ctx = { waitUntil: () => {}, passThroughOnException: () => {} };
-    expect((await worker.fetch(req, env, ctx)).status).toBe(200);
-  });
-});
-```
+Use the [executed Wrangler harness](../wrangler/api.md#integration-tests) or Cloudflare Vitest plugin for runtime behavior. Plain object mocks of ExecutionContext omit lifetime handling and runtime fields; they do not validate Workers integration.
 
 ## Deployment
 
@@ -134,9 +125,9 @@ npx wrangler rollback
 ```typescript
 const start = Date.now();
 const response = await handleRequest(request, env);
-ctx.waitUntil(env.ANALYTICS.writeDataPoint({
-  doubles: [Date.now() - start], blobs: [request.url, String(response.status)]
-}));
+env.ANALYTICS.writeDataPoint({
+  doubles: [Date.now() - start], blobs: [new URL(request.url).pathname, String(response.status)]
+});
 ```
 
 ## Security & Rate Limiting
@@ -148,6 +139,8 @@ const security = { 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY
 // Auth
 const auth = request.headers.get('Authorization');
 if (!auth?.startsWith('Bearer ')) return new Response('Unauthorized', { status: 401 });
+if (!await verifyAccessToken(auth.slice(7), env)) return new Response('Unauthorized', { status: 401 });
+// Application verifier must validate signature, expiry, and issuer/audience.
 
 // Gradual rollouts (deterministic user bucketing)
 const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(userId));
@@ -174,21 +167,7 @@ Parallel uploads, resume on failure, handle files > 5GB
 
 ## Workflows (Step Orchestration)
 
-```typescript
-import { WorkflowEntrypoint, WorkflowStep, WorkflowEvent } from 'cloudflare:workers';
-
-export class MyWorkflow extends WorkflowEntrypoint {
-  async run(event: WorkflowEvent<{ userId: string }>, step: WorkflowStep) {
-    const user = await step.do('fetch-user', async () => 
-      fetch(`/api/users/${event.payload.userId}`).then(r => r.json())
-    );
-    await step.sleep('wait', '1 hour');
-    await step.do('notify', async () => sendEmail(user.email));
-  }
-}
-```
-
-Multi-step jobs with automatic retries, state persistence, resume from failure
+Use the [Workflow reference](../workflows/README.md) for durable step orchestration. Every external URL must be absolute; validate fetched data before accessing fields, and give retryable sends an idempotency contract.
 
 ## See Also
 

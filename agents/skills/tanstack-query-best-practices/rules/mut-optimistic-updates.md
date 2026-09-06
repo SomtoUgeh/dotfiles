@@ -30,10 +30,10 @@ const mutation = useMutation({
     await queryClient.cancelQueries({ queryKey: ['todos'] })
 
     // 2. Snapshot previous value for potential rollback
-    const previousTodos = queryClient.getQueryData(['todos'])
+    const previousTodos = queryClient.getQueryData<Todo[]>(['todos'])
 
     // 3. Optimistically update the cache
-    queryClient.setQueryData(['todos'], (old: Todo[]) =>
+    queryClient.setQueryData(['todos'], (old: Todo[] = []) =>
       old.map((todo) =>
         todo.id === todoId ? { ...todo, completed: !todo.completed } : todo
       )
@@ -44,7 +44,11 @@ const mutation = useMutation({
   },
   onError: (err, todoId, context) => {
     // Rollback on error
-    queryClient.setQueryData(['todos'], context?.previousTodos)
+    if (context?.previousTodos !== undefined) {
+      queryClient.setQueryData(['todos'], context.previousTodos)
+    } else {
+      queryClient.removeQueries({ queryKey: ['todos'], exact: true })
+    }
   },
   onSettled: () => {
     // Refetch to ensure consistency regardless of success/failure
@@ -93,33 +97,40 @@ const createTodo = useMutation({
   mutationFn: (newTodo: CreateTodoInput) => api.createTodo(newTodo),
   onMutate: async (newTodo) => {
     await queryClient.cancelQueries({ queryKey: ['todos'] })
-    const previousTodos = queryClient.getQueryData(['todos'])
+    const previousTodos = queryClient.getQueryData<Todo[]>(['todos'])
 
     // Add with temporary ID
     const optimisticTodo = {
-      id: `temp-${Date.now()}`,
+      id: `temp-${crypto.randomUUID()}`,
       ...newTodo,
       completed: false,
       createdAt: new Date().toISOString(),
     }
 
-    queryClient.setQueryData(['todos'], (old: Todo[]) => [...old, optimisticTodo])
+    queryClient.setQueryData(['todos'], (old: Todo[] = []) => [...old, optimisticTodo])
 
     return { previousTodos, optimisticTodo }
   },
   onError: (err, newTodo, context) => {
-    queryClient.setQueryData(['todos'], context?.previousTodos)
+    if (context?.previousTodos !== undefined) {
+      queryClient.setQueryData(['todos'], context.previousTodos)
+    } else {
+      queryClient.removeQueries({ queryKey: ['todos'], exact: true })
+    }
   },
   onSuccess: (data, variables, context) => {
     // Replace temp todo with real one
-    queryClient.setQueryData(['todos'], (old: Todo[]) =>
+    queryClient.setQueryData(['todos'], (old: Todo[] = []) =>
       old.map((todo) =>
         todo.id === context?.optimisticTodo.id ? data : todo
       )
     )
   },
+  onSettled: () => queryClient.invalidateQueries({ queryKey: ['todos'] }),
 })
 ```
+
+These snapshot examples assume no overlapping mutation of the same list. Serialize the UI action or use per-item optimistic patches with mutation-aware reconciliation; a whole-list rollback can erase another pending update.
 
 ## When to Use Each Approach
 

@@ -1,73 +1,25 @@
 ---
-name: {{SKILL_NAME}}
-description: {{What it does}} Use when {{trigger conditions}}.
+name: "{{SKILL_NAME}}"
+description: "{{What it does}} Use when {{trigger conditions}}."
 ---
 
-<essential_principles>
-## {{Core Concept}}
+# {{Skill Title}}
 
-{{Principles that ALWAYS apply, regardless of which workflow runs}}
+## Shared Constraints
+{{Rules that apply to all supported workflows; preserve user authorization}}
 
-### 1. {{First principle}}
-{{Explanation}}
+## Choose a Workflow
+Infer the route from the user's request. Ask only if a material ambiguity remains.
 
-### 2. {{Second principle}}
-{{Explanation}}
+| Intent | Workflow |
+| --- | --- |
+| {{First intent}} | {{Relative link to first workflow}} |
+| {{Second intent}} | {{Relative link to second workflow}} |
 
-### 3. {{Third principle}}
-{{Explanation}}
-</essential_principles>
+Read the chosen workflow and its relevant resources. Resolve tool examples through the active runtime.
 
-<intake>
-**Ask the user:**
+## Resources
+{{Direct relative links to actual references, scripts, and templates}}
 
-What would you like to do?
-1. {{First option}}
-2. {{Second option}}
-3. {{Third option}}
-
-**Wait for response before proceeding.**
-</intake>
-
-<routing>
-| Response | Workflow |
-|----------|----------|
-| 1, "{{keywords}}" | `workflows/{{first-workflow}}.md` |
-| 2, "{{keywords}}" | `workflows/{{second-workflow}}.md` |
-| 3, "{{keywords}}" | `workflows/{{third-workflow}}.md` |
-
-**After reading the workflow, follow it exactly.**
-</routing>
-
-<quick_reference>
-## {{Skill Name}} Quick Reference
-
-{{Brief reference information always useful to have visible}}
-</quick_reference>
-
-<reference_index>
-## Domain Knowledge
-
-All in `references/`:
-- {{reference-1.md}} - {{purpose}}
-- {{reference-2.md}} - {{purpose}}
-</reference_index>
-
-<workflows_index>
-## Workflows
-
-All in `workflows/`:
-
-| Workflow | Purpose |
-|----------|---------|
-| {{first-workflow}}.md | {{purpose}} |
-| {{second-workflow}}.md | {{purpose}} |
-| {{third-workflow}}.md | {{purpose}} |
-</workflows_index>
-
-<success_criteria>
-A well-executed {{skill name}}:
-- {{First criterion}}
-- {{Second criterion}}
-- {{Third criterion}}
-</success_criteria>
+## Completion
+{{Observable outcome and checks; report unavailable integrations separately}}

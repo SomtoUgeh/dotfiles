@@ -4,7 +4,7 @@
 
 ## Explanation
 
-The `select` option transforms query data before it reaches your component. Use it for filtering, sorting, or deriving data. Benefits include memoization (re-runs only when data changes) and reduced component re-renders.
+The `select` option transforms query data before it reaches your component. Use it for filtering, sorting, or deriving data. It can reduce component re-renders. The selector reruns when either the cached data or the selector function reference changes; hoist a pure selector or use `useCallback` for stable references.
 
 ## Bad Example
 
@@ -29,7 +29,7 @@ function CompletedTodos() {
 ## Good Example
 
 ```tsx
-// Using select - runs only when data changes
+// Inline select runs on each render; hoist it if this work is expensive
 function CompletedTodos() {
   const { data: completedTodos } = useQuery({
     queryKey: ['todos'],
@@ -137,7 +137,7 @@ function TodoDetail({ id }: { id: number }) {
 
 ## Context
 
-- `select` leverages structural sharing - only re-runs when data actually changes
+- `select` reruns when data or its function reference changes; structural sharing can preserve unchanged selected results
 - Original query data stays cached; transformation applies to consumer
 - Multiple components can use different `select` on the same query
 - Avoid unstable function references - use `useCallback` when needed

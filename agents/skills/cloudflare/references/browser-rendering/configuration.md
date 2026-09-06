@@ -41,10 +41,10 @@ export default {
 ## Development
 
 ```bash
-wrangler dev --remote  # --remote required for browser binding
+wrangler dev  # Set browser.remote: true to use the hosted browser binding
 ```
 
-**Local mode does NOT support Browser Rendering** - must use `--remote`.
+The Worker can run locally with a hosted browser through `"browser": { "binding": "MYBROWSER", "remote": true }`. This requires account authentication and consumes remote browser usage. See [remote binding setup](https://developers.cloudflare.com/browser-run/get-started/).
 
 ## REST API
 
@@ -62,9 +62,9 @@ curl -X POST \
 | Requirement | Value |
 |-------------|-------|
 | Node.js compatibility | `nodejs_compat` flag |
-| Compatibility date | 2023-03-01+ |
+| Compatibility date | Use a tested modern date supporting the installed package and nodejs_compat |
 | Module format | ES modules only |
-| Browser | Chromium 119+ (no Firefox/Safari) |
+| Browser | Hosted Chromium; inspect the current browser version |
 
 **Not supported:** WebGL, WebRTC, extensions, `file://` protocol, Service Worker syntax.
 
@@ -72,7 +72,9 @@ curl -X POST \
 
 | Error | Solution |
 |-------|----------|
-| `MYBROWSER is undefined` | Use `wrangler dev --remote` |
+| `MYBROWSER is undefined` | Check the browser binding name and use `remote: true` for hosted browser access |
 | `nodejs_compat not enabled` | Add to `compatibility_flags` |
 | `Module not found` | `npm install @cloudflare/puppeteer` |
 | `Browser Rendering not available` | Enable in dashboard |
+
+Current product name: **Browser Run**. The REST path remains `/browser-rendering`. [Official documentation](https://developers.cloudflare.com/browser-run/).

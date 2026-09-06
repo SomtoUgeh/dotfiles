@@ -12,7 +12,10 @@ import { streamText, convertToModelMessages } from "ai";
 import { openai } from "@ai-sdk/openai";
 
 export class Chat extends AIChatAgent<Env> {
-  async onChatMessage(onFinish, options) {
+  async onChatMessage(
+    onFinish: Parameters<AIChatAgent<Env>["onChatMessage"]>[0],
+    options: Parameters<AIChatAgent<Env>["onChatMessage"]>[1]
+  ) {
     const result = streamText({
       model: openai("gpt-4o"),
       system: "You are a helpful assistant.",
@@ -36,13 +39,16 @@ import { z } from "zod";
 const tools = {
   getWeather: tool({
     description: "Get weather for a location",
-    parameters: z.object({ location: z.string() }),
+    inputSchema: z.object({ location: z.string() }),
     execute: async ({ location }) => `Weather in ${location}: 72°F, sunny`
   })
 };
 
 export class Chat extends AIChatAgent<Env> {
-  async onChatMessage(onFinish, options) {
+  async onChatMessage(
+    onFinish: Parameters<AIChatAgent<Env>["onChatMessage"]>[0],
+    options: Parameters<AIChatAgent<Env>["onChatMessage"]>[1]
+  ) {
     const result = streamText({
       model: openai("gpt-4o"),
       messages: await convertToModelMessages(this.messages),
@@ -61,7 +67,10 @@ export class Chat extends AIChatAgent<Env> {
 import { createWorkersAI } from "workers-ai-provider";
 
 export class Chat extends AIChatAgent<Env> {
-  async onChatMessage(onFinish, options) {
+  async onChatMessage(
+    onFinish: Parameters<AIChatAgent<Env>["onChatMessage"]>[0],
+    options: Parameters<AIChatAgent<Env>["onChatMessage"]>[1]
+  ) {
     const workersai = createWorkersAI({ binding: this.env.AI });
     const result = streamText({
       model: workersai("@cf/meta/llama-4-scout-17b-16e-instruct"),
@@ -82,12 +91,16 @@ For more control, use `createUIMessageStream`:
 import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
 
 export class Chat extends AIChatAgent<Env> {
-  async onChatMessage(onFinish) {
+  async onChatMessage(
+    onFinish: Parameters<AIChatAgent<Env>["onChatMessage"]>[0],
+    options: Parameters<AIChatAgent<Env>["onChatMessage"]>[1]
+  ) {
     const stream = createUIMessageStream({
       execute: async ({ writer }) => {
         const result = streamText({
           model: openai("gpt-4o"),
           messages: await convertToModelMessages(this.messages),
+          abortSignal: options?.abortSignal,
           onFinish
         });
         writer.merge(result.toUIMessageStream());
@@ -114,44 +127,10 @@ const { messages } = useAgentChat({ agent, resume: false });
 
 ## React Client
 
-```tsx
-import { useAgent } from "agents/react";
-import { useAgentChat } from "@cloudflare/ai-chat/react";
-
-function ChatUI() {
-  const agent = useAgent({
-    agent: "Chat",
-    name: "my-chat-session"
-  });
-
-  const { 
-    messages, 
-    input, 
-    handleInputChange, 
-    handleSubmit, 
-    status 
-  } = useAgentChat({ agent });
-
-  return (
-    <div>
-      {messages.map((m) => (
-        <div key={m.id}>
-          <strong>{m.role}:</strong> {m.content}
-        </div>
-      ))}
-      
-      <form onSubmit={handleSubmit}>
-        <input 
-          value={input} 
-          onChange={handleInputChange}
-          disabled={status === "streaming"}
-        />
-        <button type="submit">Send</button>
-      </form>
-    </div>
-  );
-}
-```
+Use the complete [React chat client](client-sdk.md#react-useagentchat). Current
+`useAgentChat` returns `messages`, `sendMessage`, and `status`. Keep input text in
+React state and render `message.parts`; legacy `input`, `handleSubmit`, and
+`message.content` examples do not match the current AI SDK.
 
 ## Streaming RPC Methods
 
@@ -165,9 +144,9 @@ export class MyAgent extends Agent<Env> {
   async streamData(stream: StreamingResponse, query: string) {
     for (let i = 0; i < 10; i++) {
       stream.send(`Result ${i}: ${query}`);
-      await sleep(100);
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
-    stream.close();
+    stream.end();
   }
 }
 ```

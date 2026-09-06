@@ -80,3 +80,9 @@ export default {
 - [smart-placement](../smart-placement/) - Optimize multi-query Workers near databases
 - [d1](../d1/) - Serverless SQLite alternative for edge-native apps
 - [workers](../workers/) - Worker runtime with database bindings
+
+## Connection lifetime and freshness
+
+Create clients inside the request. Wrap query work in `try/finally` and close `pg` with `await client.end()`, postgres.js with `await sql.end()`, mysql2 with `await conn.end()`, or Kysely with `await db.destroy()`. Apply this to the abbreviated query fragments above, including error paths. Roll back failed explicit transactions before closing. Never reuse a connection created in another request.
+
+Writes do not invalidate cached SELECT results. Route both writes and freshness-sensitive reads through a cache-disabled Hyperdrive configuration; use the cached binding only where staleness is acceptable. Local driver tests do not verify hosted Hyperdrive caching or pooling.

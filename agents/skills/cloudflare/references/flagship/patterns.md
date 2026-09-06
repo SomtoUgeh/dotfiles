@@ -8,7 +8,7 @@
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const showNewUI = await env.FLAGS.getBooleanValue("new-ui", false, {
-      userId: "user-42",
+      targetingKey: "user-42",
     });
 
     if (showNewUI) {
@@ -25,7 +25,7 @@ export default {
 const checkoutFlow = await env.FLAGS.getStringValue(
   "checkout-flow",
   "original",
-  { userId, country: "US" },
+  { targetingKey: userId, country: "US" },
 );
 
 switch (checkoutFlow) {
@@ -57,7 +57,7 @@ const limits = await env.FLAGS.getObjectValue<RateLimitConfig>(
 
 ```typescript
 const details = await env.FLAGS.getBooleanDetails("new-checkout", false, {
-  userId: "user-42",
+  targetingKey: "user-42",
 });
 
 console.log(details.value);     // true
@@ -73,22 +73,9 @@ console.log(details.errorCode); // undefined (no error)
 ### Binding Passthrough (Recommended)
 
 ```typescript
-import { OpenFeature } from "@openfeature/server-sdk";
-import { FlagshipServerProvider } from "@cloudflare/flagship";
-
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    await OpenFeature.setProviderAndWait(
-      new FlagshipServerProvider({ binding: env.FLAGS }),
-    );
-    const client = OpenFeature.getClient();
-
-    const enabled = await client.getBooleanValue("new-checkout", false, {
-      targetingKey: "user-42",
-      plan: "enterprise",
-      country: "US",
-    });
-
+    const enabled = await env.FLAGS.getBooleanValue("new-checkout", false);
     return new Response(enabled ? "New checkout" : "Standard checkout");
   },
 };
@@ -124,7 +111,7 @@ All examples use `api.cloudflare.com`. Set `CLOUDFLARE_ACCOUNT_ID`, `FLAGSHIP_AP
 ### Create a Boolean Flag
 
 ```bash
-curl -s -X POST \
+curl --fail-with-body -sS -X POST \
   -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -141,7 +128,7 @@ curl -s -X POST \
 ### Create a Flag with Internal-Only Targeting
 
 ```bash
-curl -s -X POST \
+curl --fail-with-body -sS -X POST \
   -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -166,7 +153,7 @@ curl -s -X POST \
 ### Create a JSON Config Flag
 
 ```bash
-curl -s -X POST \
+curl --fail-with-body -sS -X POST \
   -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -194,21 +181,21 @@ curl -s -X POST \
 ### Read a Flag
 
 ```bash
-curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+curl --fail-with-body -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
   "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/flagship/apps/$FLAGSHIP_APP_ID/flags/new-feature" | jq .
 ```
 
 ### List All Flags (with pagination)
 
 ```bash
-curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+curl --fail-with-body -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
   "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/flagship/apps/$FLAGSHIP_APP_ID/flags?limit=50" | jq .
 ```
 
 If `result_info.cursor` is non-null, fetch the next page:
 
 ```bash
-curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+curl --fail-with-body -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
   "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/flagship/apps/$FLAGSHIP_APP_ID/flags?limit=50&cursor=<cursor>" | jq .
 ```
 
@@ -217,15 +204,16 @@ curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
 Updates use PUT with the full `FlagDefinition`. Always GET first, modify, then PUT back.
 
 ```bash
+set -euo pipefail
 # 1. Read current flag
-FLAG=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-  "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/flagship/apps/$FLAGSHIP_APP_ID/flags/new-feature" | jq '.result')
+FLAG=$(curl --fail-with-body -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+  "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/flagship/apps/$FLAGSHIP_APP_ID/flags/new-feature" | jq -e 'if .success == true and (.result | type) == "object" then .result | {key, type, default_variation, variations, rules, description, enabled} else error("Flag read failed") end')
 
 # 2. Modify (e.g., enable the flag)
 UPDATED=$(echo "$FLAG" | jq '.enabled = true')
 
 # 3. PUT back
-echo "$UPDATED" | curl -s -X PUT \
+echo "$UPDATED" | curl --fail-with-body -sS -X PUT \
   -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d @- \
@@ -237,11 +225,12 @@ echo "$UPDATED" | curl -s -X PUT \
 Read-modify-write to set `enabled: true`:
 
 ```bash
+set -euo pipefail
 BASE="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/flagship/apps/$FLAGSHIP_APP_ID/flags"
 
-FLAG=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$BASE/new-feature" | jq '.result')
+FLAG=$(curl --fail-with-body -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$BASE/new-feature" | jq -e 'if .success == true and (.result | type) == "object" then .result | {key, type, default_variation, variations, rules, description, enabled} else error("Flag read failed") end')
 UPDATED=$(echo "$FLAG" | jq '.enabled = true')
-echo "$UPDATED" | curl -s -X PUT \
+echo "$UPDATED" | curl --fail-with-body -sS -X PUT \
   -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d @- "$BASE/new-feature" | jq .
@@ -249,14 +238,15 @@ echo "$UPDATED" | curl -s -X PUT \
 
 ### Toggle a Flag Off (Disable)
 
-Same pattern, set `enabled: false`. The flag immediately returns its default variation for all evaluations.
+Same pattern, set `enabled: false`. After propagation and SDK cache expiry, the disabled flag returns its configured default variation.
 
 ```bash
+set -euo pipefail
 BASE="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/flagship/apps/$FLAGSHIP_APP_ID/flags"
 
-FLAG=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$BASE/new-feature" | jq '.result')
+FLAG=$(curl --fail-with-body -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$BASE/new-feature" | jq -e 'if .success == true and (.result | type) == "object" then .result | {key, type, default_variation, variations, rules, description, enabled} else error("Flag read failed") end')
 UPDATED=$(echo "$FLAG" | jq '.enabled = false')
-echo "$UPDATED" | curl -s -X PUT \
+echo "$UPDATED" | curl --fail-with-body -sS -X PUT \
   -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d @- "$BASE/new-feature" | jq .
@@ -267,15 +257,16 @@ echo "$UPDATED" | curl -s -X PUT \
 Append a rule to the existing rules array. Pick a priority that doesn't collide with existing rules.
 
 ```bash
+set -euo pipefail
 BASE="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/flagship/apps/$FLAGSHIP_APP_ID/flags"
 
-FLAG=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$BASE/new-feature" | jq '.result')
+FLAG=$(curl --fail-with-body -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$BASE/new-feature" | jq -e 'if .success == true and (.result | type) == "object" then .result | {key, type, default_variation, variations, rules, description, enabled} else error("Flag read failed") end')
 UPDATED=$(echo "$FLAG" | jq '.rules += [{
   "priority": 2,
   "conditions": [{ "attribute": "plan", "operator": "equals", "value": "enterprise" }],
   "serve_variation": "on"
 }]')
-echo "$UPDATED" | curl -s -X PUT \
+echo "$UPDATED" | curl --fail-with-body -sS -X PUT \
   -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d @- "$BASE/new-feature" | jq .
@@ -286,11 +277,12 @@ echo "$UPDATED" | curl -s -X PUT \
 Update the rollout percentage on an existing rule (e.g., rule at index 0):
 
 ```bash
+set -euo pipefail
 BASE="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/flagship/apps/$FLAGSHIP_APP_ID/flags"
 
-FLAG=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$BASE/gradual-rollout" | jq '.result')
+FLAG=$(curl --fail-with-body -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$BASE/gradual-rollout" | jq -e 'if .success == true and (.result | type) == "object" then .result | {key, type, default_variation, variations, rules, description, enabled} else error("Flag read failed") end')
 UPDATED=$(echo "$FLAG" | jq '.rules[0].rollout.percentage = 50')
-echo "$UPDATED" | curl -s -X PUT \
+echo "$UPDATED" | curl --fail-with-body -sS -X PUT \
   -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d @- "$BASE/gradual-rollout" | jq .
@@ -299,11 +291,12 @@ echo "$UPDATED" | curl -s -X PUT \
 ### Change Default Variation
 
 ```bash
+set -euo pipefail
 BASE="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/flagship/apps/$FLAGSHIP_APP_ID/flags"
 
-FLAG=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$BASE/new-feature" | jq '.result')
+FLAG=$(curl --fail-with-body -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$BASE/new-feature" | jq -e 'if .success == true and (.result | type) == "object" then .result | {key, type, default_variation, variations, rules, description, enabled} else error("Flag read failed") end')
 UPDATED=$(echo "$FLAG" | jq '.default_variation = "on"')
-echo "$UPDATED" | curl -s -X PUT \
+echo "$UPDATED" | curl --fail-with-body -sS -X PUT \
   -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d @- "$BASE/new-feature" | jq .
@@ -312,11 +305,12 @@ echo "$UPDATED" | curl -s -X PUT \
 ### Add a New Variation
 
 ```bash
+set -euo pipefail
 BASE="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/flagship/apps/$FLAGSHIP_APP_ID/flags"
 
-FLAG=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$BASE/checkout-flow" | jq '.result')
+FLAG=$(curl --fail-with-body -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$BASE/checkout-flow" | jq -e 'if .success == true and (.result | type) == "object" then .result | {key, type, default_variation, variations, rules, description, enabled} else error("Flag read failed") end')
 UPDATED=$(echo "$FLAG" | jq '.variations["treatment-c"] = "minimal"')
-echo "$UPDATED" | curl -s -X PUT \
+echo "$UPDATED" | curl --fail-with-body -sS -X PUT \
   -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d @- "$BASE/checkout-flow" | jq .
@@ -327,11 +321,12 @@ echo "$UPDATED" | curl -s -X PUT \
 Remove a rule by filtering on priority:
 
 ```bash
+set -euo pipefail
 BASE="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/flagship/apps/$FLAGSHIP_APP_ID/flags"
 
-FLAG=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$BASE/new-feature" | jq '.result')
+FLAG=$(curl --fail-with-body -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$BASE/new-feature" | jq -e 'if .success == true and (.result | type) == "object" then .result | {key, type, default_variation, variations, rules, description, enabled} else error("Flag read failed") end')
 UPDATED=$(echo "$FLAG" | jq '.rules = [.rules[] | select(.priority != 2)]')
-echo "$UPDATED" | curl -s -X PUT \
+echo "$UPDATED" | curl --fail-with-body -sS -X PUT \
   -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d @- "$BASE/new-feature" | jq .
@@ -340,7 +335,7 @@ echo "$UPDATED" | curl -s -X PUT \
 ### Delete a Flag
 
 ```bash
-curl -s -X DELETE \
+curl --fail-with-body -sS -X DELETE \
   -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
   "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/flagship/apps/$FLAGSHIP_APP_ID/flags/old-feature" | jq .
 ```
@@ -462,8 +457,10 @@ Key points:
 
 ## Safe Deletion Workflow
 
-1. **Disable** the flag first (`enabled: false`) — confirms nothing depends on it being active
+1. Choose the permanent behavior and verify both the disabled variation and caller fallback. Disabling alone does not prove nothing depends on the feature.
 2. **Monitor** for unexpected behavior
 3. **Remove** flag evaluation code from your application
 4. **Deploy** the code change
 5. **Delete** the flag via API
+
+Initialize each OpenFeature provider once per process/Worker isolate, await readiness before evaluation, and pass user context per evaluation. Do not replace the global provider on every request or store user context globally. Inside Workers, direct env.FLAGS evaluation is the simplest option. Browser evaluation requires an application-owned proxy; implement its authentication, allowed keys, context derivation, and response contract before using the proxy URL above. Flag delivery is not an authorization system.

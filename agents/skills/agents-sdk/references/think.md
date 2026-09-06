@@ -26,7 +26,9 @@ export class MyAgent extends Think<Env> {
 }
 
 export default {
-  fetch: (req, env) => routeAgentRequest(req, env)
+  async fetch(req, env) {
+    return (await routeAgentRequest(req, env)) ?? new Response("Not found", { status: 404 });
+  }
 };
 ```
 
@@ -38,7 +40,7 @@ export default {
   "durable_objects": {
     "bindings": [{ "name": "MyAgent", "class_name": "MyAgent" }]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MyAgent"] }],
+  "exports": { "MyAgent": { "type": "durable-object", "storage": "sqlite" } },
   "ai": { "binding": "AI" }
 }
 ```
@@ -56,7 +58,7 @@ export class MyAgent extends Think<Env> {
     return {
       getWeather: tool({
         description: "Get weather",
-        parameters: z.object({ city: z.string() }),
+        inputSchema: z.object({ city: z.string() }),
         execute: async ({ city }) => `72°F in ${city}`
       })
     };
@@ -75,6 +77,8 @@ export class MyAgent extends Think<Env> {
 | `onChatError(error)` | On LLM error | Error handling |
 
 ```typescript
+import type { TurnContext, TurnConfig } from "@cloudflare/think";
+
 async beforeTurn(ctx: TurnContext): Promise<TurnConfig> {
   if (ctx.continuation) {
     return { model: cheaperModel };
@@ -86,10 +90,20 @@ async beforeTurn(ctx: TurnContext): Promise<TurnConfig> {
 ## Sub-Agents
 
 ```typescript
-const child = this.subAgent(SpecialistAgent, "specialist-1");
-await child.chat("Analyze this data...", (chunk) => {
-  // stream callback
-});
+import { RpcTarget } from "cloudflare:workers";
+import type { StreamCallback, ChatStartEvent } from "@cloudflare/think";
+
+class ChatEvents extends RpcTarget implements StreamCallback {
+  onStart(event: ChatStartEvent) { console.log("Started", event.requestId); }
+  onEvent(json: string) { console.log("Chunk", json); }
+  onDone() { console.log("Completed"); }
+  onError(error: string) { console.error("Chat failed", error); }
+  onInterrupted() { console.log("Interrupted; do not finalize a partial response"); }
+}
+
+// Inside an async method of the parent Think agent:
+const child = await this.subAgent(SpecialistAgent, "specialist-1");
+await child.chat("Analyze this data...", new ChatEvents());
 ```
 
 ## Client
@@ -98,7 +112,8 @@ Same React hooks as `AIChatAgent`:
 
 ```tsx
 const agent = useAgent({ agent: "MyAgent", name: "session-1" });
-const { messages, input, handleInputChange, handleSubmit } = useAgentChat({ agent });
+const { messages, sendMessage, status } = useAgentChat({ agent });
+// Keep input in React state; see client-sdk.md for the complete form.
 ```
 
 ## Think vs AIChatAgent

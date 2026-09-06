@@ -12,11 +12,11 @@ pnpm create cloudflare@latest [name] [-- flags]
 
 | Flag | Values | Description |
 |------|--------|-------------|
-| `--type` | `hello-world`, `web-app`, `demo`, `pre-existing`, `remote-template` | Application type |
+| `--type` | `hello-world`, `hello-world-assets-only`, `hello-world-with-assets`, `scheduled`, `queues`, `pre-existing`, and other values from `--help` | Built-in template |
 | `--platform` | `workers` (default), `pages` | Target platform |
-| `--framework` | `next`, `remix`, `astro`, `react-router`, `solid`, `svelte`, `qwik`, `vue`, `angular`, `hono` | Web framework (requires `--type=web-app`) |
+| `--framework` | `next`, `tanstack-start`, `astro`, `react-router`, `solid`, `svelte`, `qwik`, `vue`, `angular`, `hono` | Web framework (sets the web-framework category) |
 | `--lang` | `ts`, `js`, `python` | Language (for `--type=hello-world`) |
-| `--ts` / `--no-ts` | - | TypeScript for web apps |
+| `--lang=ts` / `--no-ts` | - | TypeScript for web apps |
 
 ## Deployment Flags
 
@@ -30,11 +30,13 @@ pnpm create cloudflare@latest [name] [-- flags]
 
 | Flag | Description |
 |------|-------------|
-| `--template=user/repo` | GitHub template or local path |
-| `--existing-script=./src/worker.ts` | Existing script (requires `--type=pre-existing`) |
-| `--category=ai\|database\|realtime` | Demo filter (requires `--type=demo`) |
-| `--experimental` | Enable experimental features |
-| `--wrangler-defaults` | Skip wrangler prompts |
+| `--template=https://github.com/user/repo` | A degit-compatible repository URL; optionally pin a ref |
+| `--template-mode=git` or `tar` | Template download mechanism |
+| `--existing-script=my-worker` | Download an existing deployed Worker by name, not a local file |
+| `--category` | `hello-world`, `web-framework`, `demo`, or `remote-template` |
+| `--accept-defaults` | Answer unspecified prompts with defaults; pair with `--no-deploy` |
+| `--no-agents` | Do not create an AGENTS.md file |
+| `--no-auto-update` | Use the selected C3 version |
 
 ## Environment Variables
 
@@ -46,7 +48,7 @@ CF_TELEMETRY_DISABLED=1     # Disable telemetry
 
 ## Exit Codes
 
-`0` success, `1` user abort, `2` error
+Check the process exit status and error output; do not assume every release distinguishes cancellation from failure with these specific codes.
 
 ## Examples
 
@@ -54,18 +56,20 @@ CF_TELEMETRY_DISABLED=1     # Disable telemetry
 # TypeScript Worker
 npm create cloudflare@latest my-api -- --type=hello-world --lang=ts --no-deploy
 
-# Next.js on Pages
-npm create cloudflare@latest my-app -- --type=web-app --framework=next --platform=pages --ts
+# Next.js on Workers
+npm create cloudflare@latest my-app -- --framework=next --platform=workers --lang=ts
 
 # Astro blog
-npm create cloudflare@latest my-blog -- --type=web-app --framework=astro --ts --deploy
+npm create cloudflare@latest my-blog -- --framework=astro --lang=ts --deploy
 
 # CI: non-interactive
-npm create cloudflare@latest my-app -- --type=web-app --framework=next --ts --no-git --no-deploy
+npm create cloudflare@latest my-app -- --framework=next --lang=ts --no-git --no-deploy --accept-defaults
 
 # GitHub template
 npm create cloudflare@latest -- --template=cloudflare/templates/worker-openapi
 
 # Convert existing project
-npm create cloudflare@latest . -- --type=pre-existing --existing-script=./build/worker.js
+npm create cloudflare@latest . -- --type=pre-existing --existing-script=my-existing-worker
 ```
+
+`--existing-script` downloads a deployed Worker; it does not convert local source or migrate an existing framework app. For an existing app, follow its current Workers framework guide. Workers Static Assets also support static sites, and Workers Builds supports Git workflows; Pages is an explicit framework-dependent choice. Inspect generated package scripts instead of assuming every framework uses the same names.

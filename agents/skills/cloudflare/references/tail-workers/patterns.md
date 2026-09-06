@@ -1,180 +1,52 @@
-# Tail Workers Common Patterns
+# Tail Workers patterns
 
-## Community Libraries
+Use Tail Workers for custom processing. For standard export to observability tools, first check the platform's [OpenTelemetry destinations](https://developers.cloudflare.com/workers/observability/exporting-opentelemetry-data/): the built-in export may already meet the requirement. Confirm any external SDK against the project's installed package; a vendor name alone is not an API contract.
 
-While most tail Worker implementations are custom, these libraries may help:
+## Filtering and HTTP export
 
-**Logging/Observability:**
-- **Axiom** - `axiom-cloudflare-workers` (npm) - Direct Axiom integration
-- **Baselime** - SDK for Baselime observability platform
-- **LogFlare** - Structured log aggregation
+Start with the safe projection and HTTP status handling in [api.md](api.md). Filter execution failures by `event.outcome` and `event.exceptions.length`; narrow `event.event` before checking response status. For route filtering, parse a validated URL's pathname rather than searching a complete URL string that may match the query or hostname.
 
-**Type Definitions:**
-- **@cloudflare/workers-types** - Official TypeScript types (use `TraceItem`)
+Sampling `events.filter(() => Math.random() < 0.1)` selects individual records. Sampling once outside the loop selects an entire batch and can bias results when batch sizes differ. Record the sampling rate when producing aggregate estimates.
 
-**Note:** Most integrations require custom tail handler implementation. See integration examples below.
+## KV with retention
 
-## Basic Patterns
-
-### HTTP Endpoint Logging
+Inside a handler with a `LOGS_KV` binding and an already redacted projection:
 
 ```typescript
-export default {
-  async tail(events, env, ctx) {
-    const payload = events.map(event => ({
-      script: event.scriptName,
-      timestamp: event.eventTimestamp,
-      outcome: event.outcome,
-      url: event.event?.request?.url,
-      status: event.event?.response?.status,
-      logs: event.logs,
-      exceptions: event.exceptions,
-    }));
-    
-    ctx.waitUntil(
-      fetch(env.LOG_ENDPOINT, {
-        method: "POST",
-        body: JSON.stringify(payload),
-      })
-    );
-  }
-};
+await Promise.all(payloads.map(payload => env.LOGS_KV.put(
+  `log:${crypto.randomUUID()}`,
+  JSON.stringify(payload),
+  { expirationTtl: 86400 },
+)));
 ```
 
-### Error Tracking Only
+Script name plus millisecond timestamp is not a unique event key. Use a collision-resistant identifier; keep batch size bounded by the destination's limits. KV TTL is retention, not replay processing.
+
+## Analytics Engine
+
+`writeDataPoint()` is synchronous and returns `void`; do not build a `Promise.all` or `waitUntil` around it.
 
 ```typescript
+interface MetricsEnv { ANALYTICS: AnalyticsEngineDataset }
 export default {
-  async tail(events, env, ctx) {
-    const errors = events.filter(e => 
-      e.outcome === 'exception' || e.exceptions.length > 0
-    );
-    
-    if (errors.length === 0) return;
-    
-    ctx.waitUntil(
-      fetch(env.ERROR_ENDPOINT, {
-        method: "POST",
-        body: JSON.stringify(errors),
-      })
-    );
-  }
-};
-```
-
-## Storage Integration
-
-### KV Storage with TTL
-
-```typescript
-export default {
-  async tail(events, env, ctx) {
-    ctx.waitUntil(
-      Promise.all(events.map(event =>
-        env.LOGS_KV.put(
-          `log:${event.scriptName}:${event.eventTimestamp}`,
-          JSON.stringify(event),
-          { expirationTtl: 86400 }  // 24 hours
-        )
-      ))
-    );
-  }
-};
-```
-
-### Analytics Engine Metrics
-
-```typescript
-export default {
-  async tail(events, env, ctx) {
-    ctx.waitUntil(
-      Promise.all(events.map(event =>
-        env.ANALYTICS.writeDataPoint({
-          blobs: [event.scriptName, event.outcome],
-          doubles: [1, event.event?.response?.status ?? 0],
-          indexes: [event.event?.request?.cf?.colo ?? 'unknown'],
-        })
-      ))
-    );
-  }
-};
-```
-
-## Filtering & Routing
-
-Filter by route, outcome, or other criteria:
-
-```typescript
-export default {
-  async tail(events, env, ctx) {
-    // Route filtering
-    const apiEvents = events.filter(e => 
-      e.event?.request?.url?.includes('/api/')
-    );
-    
-    // Multi-destination routing
-    const errors = events.filter(e => e.outcome === 'exception');
-    const success = events.filter(e => e.outcome === 'ok');
-    
-    const tasks = [];
-    if (errors.length > 0) {
-      tasks.push(fetch(env.ERROR_ENDPOINT, {
-        method: "POST",
-        body: JSON.stringify(errors),
-      }));
+  tail(events, env) {
+    for (const event of events) {
+      const info = event.event;
+      const status = info && "response" in info ? info.response?.status : undefined;
+      env.ANALYTICS.writeDataPoint({
+        indexes: [event.scriptName ?? "unknown"],
+        blobs: [event.outcome],
+        doubles: [1, status ?? 0],
+      });
     }
-    if (success.length > 0) {
-      tasks.push(fetch(env.SUCCESS_ENDPOINT, {
-        method: "POST",
-        body: JSON.stringify(success),
-      }));
-    }
-    
-    ctx.waitUntil(Promise.all(tasks));
-  }
-};
+  },
+} satisfies ExportedHandler<MetricsEnv>;
 ```
 
-## Sampling
+## Multiple destinations and batching
 
-Reduce costs by processing only a percentage of events:
+Use bounded `Promise.all` when every destination must succeed, or `Promise.allSettled` when outcomes must be recorded independently. Neither makes delivery to multiple systems atomic. Preserve destination-specific failure evidence and avoid replaying a successful destination accidentally.
 
-```typescript
-export default {
-  async tail(events, env, ctx) {
-    if (Math.random() > 0.1) return;  // 10% sample rate
-    ctx.waitUntil(fetch(env.LOG_ENDPOINT, {
-      method: "POST",
-      body: JSON.stringify(events),
-    }));
-  }
-};
-```
+A Durable Object can persist a batch and flush it with an alarm; use durable storage and an idempotent receiver. A single global object can become a throughput bottleneck, so choose a partition key based on actual volume and ordering requirements. See [Durable Objects patterns](../durable-objects/patterns.md).
 
-## Advanced Patterns
-
-### Batching with Durable Objects
-
-Accumulate events before sending:
-
-```typescript
-export default {
-  async tail(events, env, ctx) {
-    const batch = env.BATCH_DO.get(env.BATCH_DO.idFromName("batch"));
-    ctx.waitUntil(batch.fetch("https://batch/add", {
-      method: "POST",
-      body: JSON.stringify(events),
-    }));
-  }
-};
-```
-
-See durable-objects skill for full implementation.
-
-### Workers for Platforms
-
-Dynamic dispatch sends TWO events per request. Filter by `scriptName` to distinguish dispatch vs user Worker events.
-
-### Error Handling
-
-Always wrap external calls. See gotchas.md for fallback storage pattern.
+For dynamic dispatch, inspect `scriptName`/`dispatchNamespace` instead of assuming a fixed number of traces. Service-binding subrequests may add events.

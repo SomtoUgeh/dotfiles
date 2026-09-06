@@ -5,6 +5,13 @@ Configure complex routing in dashboard without code changes. Use route names ins
 ## Usage
 
 ```typescript
+import OpenAI from "openai";
+
+// accountId, gatewayId, and token come from server configuration.
+const client = new OpenAI({
+  apiKey: token,
+  baseURL: `https://gateway.ai.cloudflare.com/v1/${accountId}/${gatewayId}/compat`
+});
 const response = await client.chat.completions.create({
   model: 'dynamic/smart-chat', // Route name from dashboard
   messages: [{ role: 'user', content: 'Hello!' }]
@@ -23,7 +30,7 @@ const response = await client.chat.completions.create({
 
 ## Metadata
 
-Pass via header (max 5 entries, flat only):
+Pass server-verified routing metadata via the header (check current metadata limits):
 ```typescript
 headers: {
   'cf-aig-metadata': JSON.stringify({
@@ -64,7 +71,7 @@ Budget Limit: $100/day per teamId
 ## Version Management
 
 - Save changes as new version
-- Test with `model: 'dynamic/route@v2'`
+- Test a draft using the documented preview mechanism, or a separate test route; do not invent an `@v2` model suffix.
 - Roll back by deploying previous version
 
 ## Monitoring
@@ -76,7 +83,9 @@ Dashboard → Gateway → Dynamic Routes:
 
 ## Limitations
 
-- Max 5 metadata entries
+- Validate current metadata limits
 - Values: string/number/boolean/null only
 - No nested objects
-- Route names: alphanumeric + hyphens
+- Route names and versions follow the current dashboard/API schema
+
+The compat endpoint remains required for dynamic routes. Derive plan, tenant, and budget keys from verified server-side identity; client-supplied metadata must not grant a higher tier. [Current routing docs](https://developers.cloudflare.com/ai-gateway/features/dynamic-routing/).

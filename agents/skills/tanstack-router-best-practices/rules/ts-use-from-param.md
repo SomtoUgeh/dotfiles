@@ -56,7 +56,7 @@ function PostPage() {
 }
 ```
 
-## Using Route.fullPath for Type Safety
+## Using Route.id for Type Safety
 
 ```tsx
 // routes/posts/$postId.tsx
@@ -71,9 +71,9 @@ export const Route = createFileRoute('/posts/$postId')({
 })
 
 function PostComponent() {
-  // Use Route.fullPath for guaranteed type matching
-  const params = useParams({ from: Route.fullPath })
-  const { post } = useLoaderData({ from: Route.fullPath })
+  // Use Route.id for guaranteed type matching
+  const params = useParams({ from: Route.id })
+  const { post } = useLoaderData({ from: Route.id })
 
   // Or use route-specific helper (preferred in same file)
   const { postId } = Route.useParams()
@@ -127,4 +127,4 @@ function Breadcrumbs() {
 - Use `Route.useParams()` / `Route.useLoaderData()` within route files
 - Use `getRouteApi()` in components split from route files
 - Use `strict: false` only in truly generic, cross-route components
-- The `from` path must match exactly (including params like `$postId`)
+- The `from` value is a route ID, including pathless layout segments; it is not always the URL path

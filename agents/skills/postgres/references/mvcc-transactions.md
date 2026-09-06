@@ -13,15 +13,16 @@ tags: postgres, mvcc, transactions, isolation, xid-wraparound, concurrency, seri
 - **REPEATABLE READ**: snapshot at first query; can cause serialization errors on write conflicts.
 - **SERIALIZABLE**: strongest; transactions appear serial; requires retry logic in app code.
 
-Readers never block writers; writers never block readers (only writer-writer conflicts on same row). No lock escalation — row locks never degrade to table locks.
+Ordinary MVCC reads and writes do not block one another for row visibility. Explicit row locks and DDL/table locks can block readers or writers. No lock escalation — row locks never degrade to table locks.
 
 ## XID Wraparound
 
-32-bit transaction IDs wrap at ~2 billion (2^31). `VACUUM FREEZE` replaces old XIDs with FrozenXID (value 2, always visible). Without freeze: after wraparound, old rows appear "in the future" and become **invisible**. Data physically exists but is invisible to all queries — looks like total data loss. PostgreSQL emergency shutdown at 2B XIDs to prevent this. XID wraparound should be avoided at all cost.
+Transaction IDs use a 32-bit space; modular ordering becomes unsafe around 2^31 transactions of age. VACUUM freezes old tuple XIDs, and PostgreSQL prevents new XID-assigning transactions before wraparound. Monitor age and anti-wraparound vacuum well before that limit. Warning/stop thresholds vary by release; follow the installed version's routine-vacuuming documentation rather than a fixed 1.4B threshold.
 
-Warning messages start at ~1.4B XIDs; shutdown at 2B. Recovery requires single-user mode VACUUM — can take hours to days on large DBs. **Never disable autovacuum** — it's your protection against wraparound.
+Keep autovacuum enabled. If protections trigger, investigate old snapshots, prepared transactions and replication slots, then use the documented recovery procedure; do not assume single-user mode is always required.
 
 ## XID Age Monitoring
+
 
 ```sql
 SELECT datname, age(datfrozenxid),
@@ -31,7 +32,7 @@ FROM pg_database ORDER BY age(datfrozenxid) DESC;
 
 ## Long Transaction Impact
 
-A single long-running transaction blocks VACUUM from removing dead tuples across the **entire database**. Causes table bloat, increased disk, slower queries, cache pollution. `idle_in_transaction` connections are the #1 operational MVCC issue. Set `idle_in_transaction_session_timeout` (30s–5min). Dead tuples waste I/O on seq scans and cause useless heap lookups from indexes.
+An old retained snapshot can hold back removal of tuples it may still see. The effect depends on isolation level, snapshot lifetime, prepared transactions and replication slots; an open transaction does not freeze all cleanup unconditionally. Causes table bloat, increased disk, slower queries, cache pollution. `idle_in_transaction` connections are the #1 operational MVCC issue. Set `idle_in_transaction_session_timeout` (30s–5min). Dead tuples waste I/O on seq scans and cause useless heap lookups from indexes.
 
 ## Serialization Errors
 

@@ -1,10 +1,10 @@
 # Plan Template
 
-Every plan is written for an executor with **zero context from the audit and zero taste of its own**. If a value isn't in the plan, the executor will invent one — and it will invent a built-in easing curve and a 300ms duration.
+Every requested plan should be executable without the audit conversation. Specify the proposed values and their rationale using the project's conventions and the canonical motion policy.
 
 Rules for filling this in:
 
-- Inline every number. Never "the curve we discussed", never "a subtle scale", never "an appropriate duration".
+- Include exact proposed values or named existing tokens. Avoid references to values that appear only in the conversation.
 - Quote the current code. The executor should be able to find the site by matching the excerpt, not by trusting a line number.
 - Name an exemplar file in this repo that already does it right, so the executor copies the house style instead of inventing one.
 - Bound the scope explicitly. Say what must not be touched.
@@ -12,7 +12,7 @@ Rules for filling this in:
 
 ---
 
-```markdown
+````markdown
 # NNN — <short imperative title>
 
 - **Commit:** <git rev-parse --short HEAD>
@@ -22,9 +22,9 @@ Rules for filling this in:
 
 ## Problem
 
-<Two or three sentences. What the motion does today, what it feels like, and the
-rule it breaks. Name the rule — "ease-in on a UI interaction delays the exact
-moment the user is watching" — not just "it feels slow".>
+<State the observed behavior, affected interaction, and supporting code or
+runtime evidence. Explain the consequence and the relevant project convention
+or requirement. Identify what remains unverified.>
 
 ## Where
 
@@ -35,8 +35,7 @@ moment the user is watching" — not just "it feels slow".>
 ### Current code
 
 ```tsx
-// src/components/dropdown.tsx:41
-<DropdownMenu.Content className="animate-in fade-in duration-300 ease-in">
+// Paste the actual current component excerpt here.
 ```
 
 ## Target
@@ -44,21 +43,12 @@ moment the user is watching" — not just "it feels slow".>
 <The exact end state. Every value spelled out.>
 
 ```css
-.dropdown-content {
-  transform-origin: var(--radix-dropdown-menu-content-transform-origin);
-  transition:
-    opacity 180ms cubic-bezier(0.19, 1, 0.22, 1),
-    transform 180ms cubic-bezier(0.19, 1, 0.22, 1);
-
-  &[data-starting-style],
-  &[data-ending-style] {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-}
+/* Include the exact target styles or component code, using the installed
+   primitive's documented lifecycle. Do not mix Radix variables with Base UI
+   attributes or assume an unmounting element will finish a transition. */
 ```
 
-**Why these values:** <one line per value — why 180ms, why this curve, why 0.95.>
+**Why these values:** <Tie each proposed value to the interaction, project tokens, or observed problem. Defaults from a guide are not sufficient evidence.>
 
 ## Conventions to follow
 
@@ -87,10 +77,10 @@ moment the user is watching" — not just "it feels slow".>
 **Behavior**
 - [ ] <Observable check — e.g. the panel scales from the trigger, not the center.>
 - [ ] Trigger it rapidly: the motion retargets from its current position instead of restarting.
-- [ ] With `prefers-reduced-motion: reduce` emulated in DevTools, nothing moves; opacity still transitions.
+- [ ] With `prefers-reduced-motion: reduce`, spatial/decorative motion is reduced or removed and state meaning remains clear; an instant change is valid.
 
 **Feel**
-- [ ] Record it and scrub frame by frame. The curve should be steep at the start and settle gently — if it looks flat, the curve is too weak, not the duration.
+- [ ] Observe or record the real interaction; check responsiveness, interruption, and continuity. Report unavailable device or browser checks as not assessed.
 - [ ] <For gestures and drawers:> test on a real device, not just the desktop browser.
 - [ ] Look at it again with fresh eyes before calling it done.
 
@@ -99,4 +89,4 @@ moment the user is watching" — not just "it feels slow".>
 <Anything the audit couldn't judge from code — whether the bounce fits the brand,
 whether the crossfade reads as one object. Say so plainly rather than guessing;
 these are decisions for a human.>
-```
+````

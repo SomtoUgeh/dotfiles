@@ -14,7 +14,8 @@ tags: server, cache, lru, cross-request
 ```typescript
 import { LRUCache } from 'lru-cache'
 
-const cache = new LRUCache<string, any>({
+type CachedUser = NonNullable<Awaited<ReturnType<typeof db.user.findUnique>>>
+const cache = new LRUCache<string, CachedUser>({
   max: 1000,
   ttl: 5 * 60 * 1000  // 5 minutes
 })
@@ -24,7 +25,7 @@ export async function getUser(id: string) {
   if (cached) return cached
 
   const user = await db.user.findUnique({ where: { id } })
-  cache.set(id, user)
+  if (user) cache.set(id, user)
   return user
 }
 
@@ -36,6 +37,6 @@ Use when sequential user actions hit multiple endpoints needing the same data wi
 
 **With Vercel's [Fluid Compute](https://vercel.com/docs/fluid-compute):** LRU caching is especially effective because multiple concurrent requests can share the same function instance and cache. This means the cache persists across requests without needing external storage like Redis.
 
-**In traditional serverless:** Each invocation runs in isolation, so consider Redis for cross-process caching.
+**In serverless:** Warm instances can reuse memory, but no process-local cache is shared or durable across all instances. Use shared storage when that consistency is required. Scope keys to tenant and visibility, authorize every request, and invalidate on mutation; do not cache authorization decisions for five minutes.
 
 Reference: [https://github.com/isaacs/node-lru-cache](https://github.com/isaacs/node-lru-cache)

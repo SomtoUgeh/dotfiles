@@ -109,7 +109,7 @@ Three parts, in this order.
 | `Button.tsx:24` | Hover only, nothing on press | `transform: scale(0.97)` on `:active`, `transition: transform 150ms ease` | Feedback — the interface should feel like it's listening | Every click |
 | `Popover.tsx:41` | Scales from center | `transform-origin: var(--radix-popover-content-transform-origin)`, `scale(0.95)` → `1` + opacity, 150ms strong `ease-out` | Spatial consistency — it should come from the button that opened it | Occasional |
 
-Cite `file:line`. Pull values from the repo's own tokens where they exist; otherwise use a real cubic-bezier, never a built-in named curve on a deliberate animation — built-ins are almost never strong enough. Never propose `scale(0)`; start entrances from `0.9–0.95` with opacity.
+Cite `file:line`. Reuse the repo's easing tokens where they exist. Named curves and custom cubic-beziers are both valid; choose and tune them against the actual interaction. For ordinary surface entrances, start near `scale(0.95)` with opacity. Use larger scale changes only when the intended effect warrants them, and provide a reduced-motion alternative.
 
 **Left alone** — 2–5 rejected candidates, each with the gate question that killed it:
 

@@ -7,7 +7,9 @@
 services:
   cloudflared:
     image: cloudflare/cloudflared:latest
-    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
     restart: unless-stopped
 ```
 
@@ -46,8 +48,6 @@ spec:
         - tunnel
         - --no-autoupdate
         - run
-        - --token
-        - $(TUNNEL_TOKEN)
         env:
         - name: TUNNEL_TOKEN
           valueFrom:
@@ -69,7 +69,7 @@ ingress:
   - service: http_status:404
 ```
 
-Run same config on multiple machines. Cloudflare automatically load balances. Long-lived connections (WebSocket, SSH) may drop during updates.
+Run same config on multiple machines. Cloudflare distributes traffic for availability; replicas do not guarantee an even or geographic load-balancing policy. Long-lived connections (WebSocket, SSH) may drop during updates.
 
 ## Use Cases
 
@@ -95,7 +95,7 @@ Client: `cloudflared access ssh --hostname ssh.example.com`
 ```yaml
 ingress:
   - hostname: grpc.example.com
-    service: http://localhost:50051
+    service: https://localhost:50051
     originRequest:
       http2Origin: true
   - service: http_status:404
@@ -103,78 +103,35 @@ ingress:
 
 ## Infrastructure as Code
 
-### Terraform
+Preserve the project's pinned Terraform/Pulumi provider and resource ownership. For Terraform v5, use these current shapes; the tunnel is remotely managed and no token is printed:
 
 ```hcl
-resource "random_id" "tunnel_secret" {
-  byte_length = 32
-}
-
-resource "cloudflare_tunnel" "app" {
-  account_id = var.cloudflare_account_id
+resource "cloudflare_zero_trust_tunnel_cloudflared" "app" {
+  account_id = var.account_id
   name       = "app-tunnel"
-  secret     = random_id.tunnel_secret.b64_std
+  config_src = "cloudflare"
 }
-
-resource "cloudflare_tunnel_config" "app" {
-  account_id = var.cloudflare_account_id
-  tunnel_id  = cloudflare_tunnel.app.id
-  config {
-    ingress_rule {
-      hostname = "app.example.com"
-      service  = "http://localhost:8000"
-    }
-    ingress_rule { service = "http_status:404" }
+resource "cloudflare_zero_trust_tunnel_cloudflared_config" "app" {
+  account_id = var.account_id
+  tunnel_id  = cloudflare_zero_trust_tunnel_cloudflared.app.id
+  config = {
+    ingress = [
+      { hostname = "app.example.com", service = "http://localhost:8000" },
+      { service = "http_status:404" }
+    ]
   }
 }
-
-resource "cloudflare_record" "app" {
-  zone_id = var.cloudflare_zone_id
-  name    = "app"
-  value   = cloudflare_tunnel.app.cname
+resource "cloudflare_dns_record" "app" {
+  zone_id = var.zone_id
+  name    = "app.example.com"
+  content = "${cloudflare_zero_trust_tunnel_cloudflared.app.id}.cfargotunnel.com"
   type    = "CNAME"
+  ttl     = 1
   proxied = true
 }
-
-output "tunnel_token" {
-  value     = cloudflare_tunnel.app.tunnel_token
-  sensitive = true
-}
 ```
 
-### Pulumi
-
-```typescript
-import * as cloudflare from "@pulumi/cloudflare";
-import * as random from "@pulumi/random";
-
-const secret = new random.RandomId("secret", { byteLength: 32 });
-
-const tunnel = new cloudflare.ZeroTrustTunnelCloudflared("tunnel", {
-  accountId: accountId,
-  name: "app-tunnel",
-  secret: secret.b64Std,
-});
-
-const config = new cloudflare.ZeroTrustTunnelCloudflaredConfig("config", {
-  accountId: accountId,
-  tunnelId: tunnel.id,
-  config: {
-    ingressRules: [
-      { hostname: "app.example.com", service: "http://localhost:8000" },
-      { service: "http_status:404" },
-    ],
-  },
-});
-
-new cloudflare.Record("dns", {
-  zoneId: zoneId,
-  name: "app",
-  value: tunnel.cname,
-  type: "CNAME",
-  proxied: true,
-});
-```
+Retrieve the run token through the dedicated token API into the existing secret mechanism. For Pulumi, use [the maintained Pulumi reference](../pulumi/) and installed provider types; do not reuse v4 `Record`, `value`, `ingressRules` or a nonexistent `tunnel.cname` field with a newer provider.
 
 ## Service Installation
 
@@ -190,3 +147,7 @@ journalctl -u cloudflared -f  # Logs
 sudo cloudflared service install
 sudo launchctl start com.cloudflare.cloudflared
 ```
+
+Pin a tested cloudflared image version/digest in production rather than relying on mutable `latest`. Environment variables avoid token arguments but still belong to the secret-management boundary. Docker `localhost` means that container; route to a reachable service name when the origin is in another container. Kubernetes replicas must each reach the configured origin.
+
+A public gRPC origin requires HTTPS and `http2Origin: true`; provide trusted origin TLS settings. Service installation changes system state and may require privileges: inspect the installed service paths and credentials first. Do not overwrite another tunnel service.

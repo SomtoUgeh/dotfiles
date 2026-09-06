@@ -220,7 +220,9 @@ Cloudflare One must be connected on the device running Termius.
 
 ## Verification
 
-Run read-only verification from the local dotfiles checkout:
+Run verification from the local dotfiles checkout. It contacts authentication
+services, may add GitHub to known hosts, and creates then removes a temporary
+signed Git commit:
 
 ```bash
 ./scripts/verify_altschool_cloud.sh --require-auth
@@ -462,7 +464,10 @@ From the local dotfiles checkout:
 ```
 
 The flow authenticates GitHub over HTTPS, Grok, and OpenCode with xAI
-interactively without storing credentials in the script.
+interactively without storing credentials in the script. `--repo` shallow-clones
+only the default branch, leaves existing checkouts unchanged, and does not
+install dependencies or generate Prisma clients. Before dotfiles exist, setup
+checks only the toolchain; run full verification in step 9 after installation.
 
 Clone and install the Linux dotfiles on the host:
 
@@ -476,7 +481,10 @@ exec zsh
 ```
 
 If the repository already exists, update it with Git rather than deleting it.
-The installer backs up conflicting linked files with a timestamp.
+The installer backs up conflicting linked files with a timestamp. It configures
+Git signing with the VM's `id_ed25519_personal` key and `ssh-keygen`, preserving
+unrelated identity-file settings and backing up the previous configuration.
+Mac 1Password signing settings are not used on Linux.
 
 ### 8. Restore Application Environment Files
 

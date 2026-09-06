@@ -7,10 +7,10 @@ argument-hint: "[findings list or source type]"
 
 <target> $ARGUMENTS </target>
 
-Always load and execute the triage skill for this command:
+Load file-todos and use its triage mode for this command:
 
 ```
-skill: triage
+skill: file-todos
 ```
 
 Do not answer directly from this wrapper; the skill is the command body.

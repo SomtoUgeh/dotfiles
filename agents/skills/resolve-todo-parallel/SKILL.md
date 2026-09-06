@@ -1,34 +1,25 @@
 ---
 name: resolve-todo-parallel
-description: Resolve all pending CLI todos using parallel processing
+description: Resolve a set of repository todo files in dependency-aware waves, using parallel workers only for independent work.
 ---
 
-Resolve all TODO comments using parallel processing.
+# Resolve Todo Files
+
+Finish the requested todo files completely while preserving dependency order and avoiding overlapping edits.
 
 ## Workflow
 
-### 1. Analyze
+1. Find the todo directory from the user's path or repository convention. Read every candidate before changing code.
+2. Build a dependency graph. For each todo, record prerequisites, owned files or modules, completion criteria, and verification.
+3. Show a Mermaid graph only when it makes non-trivial dependencies easier to understand.
+4. Execute ready items in waves. Run independent items concurrently only when the active runtime permits delegation. Cap a wave at the available worker slots and normally at three workers.
+5. Give each worker exclusive file or module ownership and tell it that other workers share the checkout. Keep overlapping or dependent items in the main agent or in later waves.
+6. After each wave, inspect the integrated diff, resolve interactions centrally, and run the focused checks required by those todos.
+7. Update a todo's status or rename its file only after its acceptance criteria pass. Preserve the repository's existing status and naming convention.
+8. Report completed, blocked, and skipped items with evidence.
 
-Get all unresolved TODOs from the /todos/\*.md directory
+## Git Boundary
 
-### 2. Plan
+Do not infer permission to commit or push from a request to resolve todos. Stage, commit, or push only when the user has already authorized that action. If authorized, stage centrally after worker changes are integrated; workers must not create competing commits.
 
-Create a todo/progress tool list of all unresolved items grouped by type.Make sure to look at dependencies that might occur and prioritize the ones needed by others. For example, if you need to change a name, you must wait to do the others. Output a mermaid flow diagram showing how we can do this. Can we do everything in parallel? Do we need to do one first that leads to others in parallel? I'll put the to-dos in the mermaid diagram flow-wise so the agent knows how to proceed in order.
-
-### 3. Implement (PARALLEL)
-
-Spawn a general-purpose agent for each unresolved todo in parallel.
-
-So if there are 3 todos, it will spawn 3 agents in parallel like this:
-
-1. Launch subagent `general-purpose` with prompt (todo1)
-2. Launch subagent `general-purpose` with prompt (todo2)
-3. Launch subagent `general-purpose` with prompt (todo3)
-
-Always run all in parallel subagents for each Todo item.
-
-### 4. Commit & Resolve
-
-- Commit changes
-- Rename the todo file from `*-ready-*` to `*-complete-*` and update frontmatter status
-- Push to remote
+Stop and ask only when a real dependency, conflict, or missing product decision cannot be resolved from the repository or the user's existing instructions.

@@ -1,167 +1,65 @@
-# Configuration
+# Workers for Platforms configuration
 
-## Dispatch Namespace Binding
-
-### wrangler.jsonc
-```jsonc
-{
-  "$schema": "./node_modules/wrangler/config-schema.json",
-  "dispatch_namespaces": [{
-    "binding": "DISPATCHER",
-    "namespace": "production"
-  }]
-}
-```
-
-## Worker Isolation Mode
-
-Workers in a namespace run in **untrusted mode** by default for security:
-- No access to `request.cf` object
-- Isolated cache per Worker (no shared cache)
-- `caches.default` disabled
-
-### Enable Trusted Mode
-
-For internal platforms where you control all code:
-
-```bash
-curl -X PUT \
-  "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/dispatch/namespaces/$NAMESPACE" \
-  -H "Authorization: Bearer $API_TOKEN" \
-  -d '{"name": "'$NAMESPACE'", "trusted_workers": true}'
-```
-
-**Caveats:**
-- Workers share cache within namespace (use cache key prefixes: `customer-${id}:${key}`)
-- `request.cf` object accessible
-- Redeploy existing Workers after enabling trusted mode
-
-**When to use:** Internal platforms, A/B testing platforms, need geolocation data
-
-
-### With Outbound Worker
-```jsonc
-{
-  "dispatch_namespaces": [{
-    "binding": "DISPATCHER",
-    "namespace": "production",
-    "outbound": {
-      "service": "outbound-worker",
-      "parameters": ["customer_context"]
-    }
-  }]
-}
-```
-
-## Wrangler Commands
+## Namespace and dispatcher
 
 ```bash
 wrangler dispatch-namespace list
 wrangler dispatch-namespace get production
 wrangler dispatch-namespace create production
-wrangler dispatch-namespace delete staging
-wrangler dispatch-namespace rename old new
 ```
 
-## Custom Limits
+Create only when absent. Rename/delete are supported commands but affect existing routing and deployments; inspect the exact target before use.
 
-Set CPU time and subrequest limits per invocation:
+Dispatcher configuration:
 
-```typescript
-const userWorker = env.DISPATCHER.get(
-  workerName,
-  {},
-  {
-    limits: { 
-      cpuMs: 10,        // Max CPU ms
-      subRequests: 5    // Max fetch() calls
+```jsonc
+{
+  "name": "platform-dispatcher",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-05",
+  "dispatch_namespaces": [{
+    "binding": "DISPATCHER", "namespace": "production", "remote": true,
+    "outbound": {
+      "service": "platform-outbound",
+      "parameters": ["tenant_context"]
     }
-  }
-);
-```
-
-Handle limit violations:
-```typescript
-try {
-  return await userWorker.fetch(request);
-} catch (e) {
-  if (e.message.includes("CPU time limit")) {
-    return new Response("CPU limit exceeded", { status: 429 });
-  }
-  throw e;
+  }]
 }
 ```
 
-## Static Assets
+Omit outbound when it is not used. Pass a validated `tenant_context` via the third argument of `DISPATCHER.get` when configured. Add the platform's actual routing-store binding separately; do not invent a KV ID from a tenant name.
 
-Deploy HTML/CSS/images with Workers. See [api.md](./api.md#static-assets) for upload process.
+`remote: true` allows local dispatch code to invoke deployed user Workers; it uses real account resources. For offline tests, mock the dispatcher. Generate matching types with `wrangler types`.
 
-### Wrangler
+## User Worker assets
+
+This is a separate project/configuration from the dispatcher:
+
 ```jsonc
 {
   "name": "customer-site",
-  "main": "./src/index.js",
-  "assets": {
-    "directory": "./public",
-    "binding": "ASSETS"
-  }
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-05",
+  "assets": { "directory": "public", "binding": "ASSETS" }
 }
 ```
 
 ```bash
-npx wrangler deploy --name customer-site --dispatch-namespace production
+wrangler deploy --name customer-site --dispatch-namespace production
 ```
 
-### Dashboard Deployment
+The `dispatch_namespaces` binding does not deploy a Worker into that namespace; the deploy flag chooses the upload destination. See [api.md](api.md) for programmatic multipart/asset deployment.
 
-Alternative to CLI:
+## Isolation and limits
 
-1. Upload Worker file in dashboard
-2. Add `--dispatch-namespace` flag: `wrangler deploy --dispatch-namespace production`
-3. Or configure in wrangler.jsonc under `dispatch_namespaces`
+Retain untrusted mode for customer code. Each Worker has isolated cache behavior; the Cache API is not universally disabled. Trusted mode exposes `request.cf` and shared-zone caches and requires platform-controlled code. Use the official namespace update procedure and redeploy existing Workers when changing mode.
 
-See [api.md](./api.md) for programmatic deployment via REST API or SDK.
+Set per-invocation `cpuMs` and `subRequests` in dispatch options. Handle thrown errors without assuming every error has a `.message`, and distinguish platform budget failures from client rate limiting. Test the actual error contract before mapping a string to an HTTP status.
 
-## Tags
+## Tags and bindings
 
-Organize/search Workers (max 8/script):
+Up to eight tags per script can support inventory and cleanup. Tags are selection metadata, not authorization. Inspect all matches before a bulk delete and use the exact documented endpoint/filter shape.
 
-```bash
-# Set tags
-curl -X PUT ".../tags" -d '["customer-123", "pro", "production"]'
+Provision each resource first, then use its returned ID/name in the upload metadata. Supported binding types evolve; refer to the current multipart metadata documentation instead of a fixed “29 types” list. `keep_bindings` preserves the specified types and needs deliberate ownership of the full deployment state.
 
-# Filter by tag
-curl ".../scripts?tags=production%3Ayes"
-
-# Delete by tag
-curl -X DELETE ".../scripts?tags=customer-123%3Ayes"
-```
-
-Common patterns: `customer-123`, `free|pro|enterprise`, `production|staging`
-
-## Bindings
-
-**Supported binding types:** 29 total including KV, D1, R2, Durable Objects, Analytics Engine, Service, Assets, Queue, Vectorize, Hyperdrive, Workflow, AI, Browser, and more.
-
-Add via API metadata (see [api.md](./api.md#deploy-with-bindings)):
-```json
-{
-  "bindings": [
-    {"type": "kv_namespace", "name": "USER_KV", "namespace_id": "..."},
-    {"type": "r2_bucket", "name": "STORAGE", "bucket_name": "..."},
-    {"type": "d1", "name": "DB", "id": "..."}
-  ]
-}
-```
-
-Preserve existing bindings:
-```json
-{
-  "bindings": [{"type": "r2_bucket", "name": "STORAGE", "bucket_name": "new"}],
-  "keep_bindings": ["kv_namespace", "d1"]  // Preserves existing bindings of these types
-}
-```
-
-For complete binding type reference, see [bindings](../bindings/) documentation
-
-See [README.md](./README.md), [api.md](./api.md), [patterns.md](./patterns.md), [gotchas.md](./gotchas.md)
+[Isolation](https://developers.cloudflare.com/cloudflare-for-platforms/workers-for-platforms/reference/worker-isolation/) · [Local development](https://developers.cloudflare.com/cloudflare-for-platforms/workers-for-platforms/reference/local-development/) · [Tags](https://developers.cloudflare.com/cloudflare-for-platforms/workers-for-platforms/configuration/tags/)

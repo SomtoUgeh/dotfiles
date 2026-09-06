@@ -1,12 +1,30 @@
 ---
 name: research
-description: Investigate a question against high-trust primary sources and capture the findings as a Markdown file in the repo. Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent.
+description: Investigate questions using authoritative sources, including version-specific documentation checks for implementation, integrations, upgrades, and API-drift debugging.
 ---
 
-Spin up a **background agent** to do the research, so you keep working while it reads.
+# Research
 
-Its job:
+Investigate the user's question against the sources that own the facts: official documentation, specifications, source code, first-party APIs, or original research. Trace material claims to direct citations and distinguish source facts from inference.
 
-1. Investigate the question against **primary sources** — official docs, source code, specs, first-party APIs — not a secondary write-up of them. Follow every claim back to the source that owns it.
-2. Write the findings to a single Markdown file, citing each claim's source.
-3. Save it where the repo already keeps such notes; match the existing convention, and if there is none, put it somewhere sensible and say where.
+For implementation, integration, upgrades, or errors suggesting API drift, read
+[implementation documentation checks](references/implementation-docs.md).
+That reference adds contract and version verification to this workflow; it is
+not a second research process.
+
+1. Define the question and the facts needed to answer it. Inspect repository
+   docs, schemas, types, and tests for project-specific behavior.
+2. For current or external behavior, read official documentation and release
+   information for the relevant version. Use primary source code or types to
+   resolve missing or contradictory documentation. Follow the active runtime's
+   browsing requirements and the user's requested sources.
+3. Compare evidence with the local implementation. Separate confirmed facts,
+   inference, and unresolved questions; do not silently mix release channels
+   or documentation for different major versions.
+4. Return the answer with direct source links and material limitations. If a
+   source is unavailable, use accessible primary evidence and identify what
+   remains unverified rather than presenting memory as confirmed-current.
+
+Return the findings in the conversation by default. Create or modify a repository document only when the user asks for an artifact or an established task explicitly requires one; then use the repository's existing location and format.
+
+Use background or parallel agents only when the active runtime and session permit delegation and the research has independent branches that justify it. The main agent remains responsible for source quality, contradictions, and the final synthesis.

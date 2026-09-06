@@ -30,7 +30,7 @@ Cloudflare docs: https://developers.cloudflare.com/agents/
 | Resumable streaming | [Resumable streaming](https://developers.cloudflare.com/agents/api-reference/resumable-streaming/) | Stream recovery on disconnect |
 | Email | [Email](https://developers.cloudflare.com/agents/api-reference/email/) | Email routing, secure reply resolver |
 | MCP client | [MCP client](https://developers.cloudflare.com/agents/api-reference/mcp-client-api/) | Connecting to MCP servers |
-| MCP server | [MCP server](https://developers.cloudflare.com/agents/api-reference/mcp-agent-api/) | Building MCP servers with `McpAgent` |
+| MCP server | [MCP server](https://developers.cloudflare.com/agents/api-reference/mcp-agent-api/) | Building new servers with `createMcpHandler`; migrating legacy `McpAgent` deployments |
 | MCP transports | [MCP transports](https://developers.cloudflare.com/agents/api-reference/mcp-transports/) | Streamable HTTP, SSE, RPC transport options |
 | Securing MCP servers | [Securing MCP](https://developers.cloudflare.com/agents/api-reference/securing-mcp-servers/) | OAuth, proxy MCP, hardening |
 | Human-in-the-loop | [Human-in-the-loop](https://developers.cloudflare.com/agents/concepts/human-in-the-loop/) | Approval flows, `needsApproval`, workflows |
@@ -58,7 +58,7 @@ The Agents SDK provides:
 - **Durable execution** — `runFiber()` / `stash()` for work that survives DO eviction
 - **Queue** — Built-in FIFO queue with retries via `queue()`
 - **Retries** — `this.retry()` with exponential backoff and jitter
-- **MCP integration** — Connect to MCP servers or build your own with `McpAgent`
+- **MCP integration** — Connect to MCP servers or build stateless servers with `createMcpHandler`; retain `McpAgent` only for legacy stateful deployments
 - **Email handling** — Receive and reply to emails with secure routing
 - **Streaming chat** — `AIChatAgent` with resumable streams, message persistence, tools
 - **Server-driven messages** — `saveMessages`, `waitUntilStable` for proactive agent turns
@@ -94,20 +94,20 @@ npm install agents @cloudflare/ai-chat ai @ai-sdk/react
   "durable_objects": {
     "bindings": [{ "name": "MyAgent", "class_name": "MyAgent" }]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MyAgent"] }]
+  "exports": { "MyAgent": { "type": "durable-object", "storage": "sqlite" } }
 }
 ```
 
 **Gotchas:**
 - Do NOT enable `experimentalDecorators` in tsconfig (breaks `@callable`)
-- Never edit old migrations — always add new tags
-- Each agent class needs its own DO binding + migration entry
+- Use `exports` for new deployments. Existing migration-based deployments remain supported; do not add `exports` alongside `migrations`
+- Each agent class needs its own Durable Object binding and lifecycle entry in `exports`
 - Add `"ai": { "binding": "AI" }` for Workers AI
 
 ## Agent Class
 
 ```typescript
-import { Agent, routeAgentRequest, callable } from "agents";
+import { Agent, routeAgentRequest, callable, type Connection } from "agents";
 
 type State = { count: number };
 
@@ -118,7 +118,7 @@ export class Counter extends Agent<Env, State> {
     if (nextState.count < 0) throw new Error("Count cannot be negative");
   }
 
-  onStateUpdate(state: State, source: Connection | "server") {
+  onStateChanged(state: State, source: Connection | "server") {
     console.log("State updated:", state);
   }
 
@@ -130,7 +130,9 @@ export class Counter extends Agent<Env, State> {
 }
 
 export default {
-  fetch: (req, env) => routeAgentRequest(req, env) ?? new Response("Not found", { status: 404 })
+  async fetch(req, env) {
+    return (await routeAgentRequest(req, env)) ?? new Response("Not found", { status: 404 });
+  }
 };
 ```
 
@@ -159,7 +161,7 @@ Custom routing: use `getAgentByName(env.MyAgent, "instance-id")` then `agent.fet
 | Schedule (interval) | `await this.scheduleEvery(30, "poll")` |
 | RPC method | `@callable() myMethod() { ... }` |
 | Streaming RPC | `@callable({ streaming: true }) stream(res) { ... }` |
-| Start workflow | `await this.runWorkflow("ProcessingWorkflow", params)` |
+| Start workflow | `await this.runWorkflow("PROCESSING_WORKFLOW", params)` |
 | Durable fiber | `await this.runFiber("name", async (ctx) => { ... })` |
 | Enqueue work | `this.queue("handler", payload)` |
 | Retry with backoff | `await this.retry(fn, { maxAttempts: 5 })` |
@@ -169,12 +171,13 @@ Custom routing: use `getAgentByName(env.MyAgent, "instance-id")` then `agent.fet
 ## React Client
 
 ```tsx
+import { useState } from "react";
 import { useAgent } from "agents/react";
 
 function App() {
   const [state, setLocalState] = useState({ count: 0 });
 
-  const agent = useAgent({
+  const agent = useAgent<State>({
     agent: "Counter",
     name: "my-instance",
     onStateUpdate: (newState) => setLocalState(newState),

@@ -14,7 +14,7 @@ WAL Writer, Background Writer, Checkpointer, Autovacuum Launcher/Workers, Archiv
 
 ## Memory Risk
 
-`work_mem` is per-operation, not per-query. Estimate: `work_mem × operations_per_query × parallel_workers × connections` can grow very large at high concurrency. Scale connections and parallelism before raising `work_mem`.
+`work_mem` is per-operation, not per-query. Estimate: `work_mem × operations_per_query × (parallel_workers + 1) × connections (plus hash_mem_multiplier for hash operations)` can grow very large at high concurrency. Scale connections and parallelism before raising `work_mem`.
 
 ## Connection Pooling (Critical)
 

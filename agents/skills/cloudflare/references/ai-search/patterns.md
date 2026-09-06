@@ -1,85 +1,35 @@
 # AI Search Patterns
 
-## search() vs aiSearch()
+## Tenant isolation
 
-| Use | Method | Returns |
-|-----|--------|---------|
-| Custom UI, analytics | `search()` | Raw chunks only (~100-300ms) |
-| Chatbots, Q&A | `aiSearch()` | AI response + chunks (~500-2000ms) |
-
-## rewrite_query
-
-| Setting | Use When |
-|---------|----------|
-| `true` | User input (typos, vague queries) |
-| `false` | LLM-generated queries (already optimized) |
-
-## Multitenancy (Folder-Based)
+Authenticate the request, authorize access, then choose the instance from server-owned tenant configuration. A tenant name supplied directly by the client must never select an arbitrary namespace instance.
 
 ```typescript
-const answer = await env.AI.autorag("saas-docs").aiSearch({
-  query: "refund policy",
-  model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
-  filters: {
-    column: "folder",
-    operator: "gte",  // "starts with" pattern
-    value: `tenants/${tenantId}/`
-  }
-});
+async function searchAuthorizedInstance(
+  namespace: AiSearchNamespace,
+  authorizedInstanceName: string,
+  query: string
+) {
+  // The caller resolves this name from the authenticated tenant's stored configuration.
+  return namespace.get(authorizedInstanceName).search({
+    messages: [{ role: "user", content: query }],
+    ai_search_options: { retrieval: { return_on_failure: false } }
+  });
+}
 ```
+
+For shared instances, index a tenant metadata field and enforce exact equality server-side on every search and generation request. Test with a known document from another tenant. `folder >= "tenants/a/"` also matches later tenants lexicographically and must not be used for isolation. Cache keys must include tenant identity and all retrieval constraints.
+
+## Retrieval quality
+
+Evaluate a representative query set with known relevant and irrelevant documents. Tune `retrieval.match_threshold`, `max_num_results`, query rewriting, and reranking against measured recall, latency, and cost. Fixed thresholds and latency estimates are not universal guarantees.
+
+Use `return_on_failure: false` where a retrieval outage must be distinguishable from no results. Empty context should result in an explicit no-answer path; instructions in retrieved documents are untrusted content.
 
 ## Streaming
 
-```typescript
-const stream = await env.AI.autorag("docs").aiSearch({
-  query, model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", stream: true
-});
-return new Response(stream, { headers: { "Content-Type": "text/event-stream" } });
-```
+Use `chatCompletions({ messages, stream: true })` and return its stream directly as `text/event-stream`; see [api.md](api.md). Do not buffer the stream into JSON or read `response` from it.
 
-## Score Threshold
+## Freshness
 
-| Threshold | Use |
-|-----------|-----|
-| 0.3 (default) | Broad recall, exploratory |
-| 0.5 | Balanced, production default |
-| 0.7 | High precision, critical accuracy |
-
-## System Prompt Template
-
-```typescript
-const systemPrompt = `You are a documentation assistant.
-- Answer ONLY based on provided context
-- If context doesn't contain answer, say "I don't have information"
-- Include code examples from context`;
-```
-
-## Compound Filters
-
-```typescript
-// OR: Multiple folders
-filters: {
-  operator: "or",
-  filters: [
-    { column: "folder", operator: "gte", value: "docs/api/" },
-    { column: "folder", operator: "gte", value: "docs/auth/" }
-  ]
-}
-
-// AND: Folder + date
-filters: {
-  operator: "and",
-  filters: [
-    { column: "folder", operator: "gte", value: "docs/" },
-    { column: "timestamp", operator: "gte", value: oneWeekAgoSeconds }
-  ]
-}
-```
-
-## Reranking
-
-Enable for high-stakes use cases (adds ~300ms latency):
-
-```typescript
-reranking: { enabled: true, model: "@cf/baai/bge-reranker-base" }
-```
+Track item/job completion and compare returned item metadata with source revisions. Synchronization cadence and ingestion completion are different from query latency. Use [current item and indexing APIs](https://developers.cloudflare.com/ai-search/) when the application needs to upload or refresh content.

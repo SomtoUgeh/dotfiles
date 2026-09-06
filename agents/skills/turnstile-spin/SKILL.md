@@ -1,6 +1,6 @@
 ---
 name: turnstile-spin
-description: Set up Cloudflare Turnstile end-to-end in a project. Scan the codebase, create the widget via the Cloudflare API, embed it where user requests need bot verification (form submissions, SPA actions, API endpoints, download links, comment or vote submissions, etc.), wire canonical server-side siteverify in the customer's existing backend, validate, and persist the skill. Load this when a user asks to add Turnstile, set up CAPTCHA, protect a form or endpoint from bots, or fix a Turnstile integration. Mirrors developers.cloudflare.com/turnstile/spin.
+description: Set up Cloudflare Turnstile end-to-end in a project. Scan the codebase, create the widget via the Cloudflare API, embed it where user requests need bot verification (form submissions, SPA actions, API endpoints, download links, comment or vote submissions, etc.), wire canonical server-side siteverify in the customer's existing backend, validate, and persist the skill. Load this when a user asks to add Turnstile, set up CAPTCHA, protect a form or endpoint from bots, or fix a Turnstile integration. Locally maintained from developers.cloudflare.com/turnstile/spin.
 references:
   - vanilla-html
   - nextjs-app
@@ -16,7 +16,7 @@ Turns the prompt "set up Turnstile" into a working end-to-end integration: a wid
 
 You are the agent. Run the wizard below by invoking the scripts under `scripts/` and branching on their JSON output. The scripts hold the deterministic logic (API calls, retry/error handling); your job is orchestration, codebase reading, confirmation, and the frontend + backend edits.
 
-This file is the canonical machine-readable behavior. Product requirements come from the [Turnstile documentation](https://developers.cloudflare.com/turnstile/), and the hosted prompt must mirror this behavior.
+This file defines this locally maintained bundle's behavior. Product requirements come from the [Turnstile documentation](https://developers.cloudflare.com/turnstile/). The upstream hosted prompt may not contain the local fixes; do not replace this bundle with that prompt during setup.
 
 ## When to load this skill
 
@@ -35,20 +35,21 @@ Inspect the user's prompt before starting the numbered wizard. If it says the wi
 
 ## Conversation flow
 
-The user pasted the prompt. You are in a multi-step dialog. Detect what you can, ask only when you have to, confirm before every irreversible step. Each numbered moment is one agent message. Items marked **[wait for user]** require a user response.
+Use the user's request and existing session authorization. Start read-only local discovery immediately; ask only for missing decisions or authorization for the concrete operation. Items marked **[wait for user]** require a user response unless that exact decision is already authorized. Keep the separate existing-widget secret-manifest confirmation below.
 
-1. **Brief acknowledge.** One sentence: "I'll run Turnstile setup end to end. That's: check auth, scan the codebase, create the widget, embed it where visitor requests need verification, wire server-side siteverify, validate. Proceed?" **[wait for user]** Do NOT present a plan yet. Auth + scan come first.
+1. **Begin local discovery.** State the setup scope briefly, then inspect local framework, handlers, existing CAPTCHA, and candidate domains using the Step 6 checklist. Do not add a generic "Proceed?" gate before this read-only work. Resolve the account and trusted executable before the remote probe.
 
 2. **CLI check.** Spin's helper scripts use `curl` against `api.cloudflare.com`. Account enumeration requires either an explicit `$CLOUDFLARE_ACCOUNT_ID` or a user-approved canonical absolute `WRANGLER_BIN` outside the project with exact `WRANGLER_VERSION`. Never use `npx`, `pnpm exec`, a package script, a project-local binary, or an unapproved executable for a credential-bearing command. Never install Wrangler automatically during the flow.
 
-3. **Auth + scope probe (FIRST irreversible action).** Run `scripts/auth-probe.sh`. If account enumeration needs Wrangler, set `PROJECT_ROOT`, approved canonical `WRANGLER_BIN`, and exact `WRANGLER_VERSION` first. Branch on `status`:
+3. **Auth + Edit-scope probe (remote mutation possible).** Before running `scripts/auth-probe.sh`, explain that it POSTs an intentionally invalid widget payload and deletes only an accidentally created probe widget. This is not a read-only credential check. Confirm authorization for that operation and account if the session has not already supplied it. If account enumeration needs Wrangler, set `PROJECT_ROOT`, approved canonical `WRANGLER_BIN`, and exact `WRANGLER_VERSION` first. Branch on `status`:
    - `ok`: continue to Step 4. The script already picked the account (single-account token, or one matching `$CLOUDFLARE_ACCOUNT_ID`).
+   - `cleanup_failed`: stop the normal setup flow. Report the returned `account_id`, public `sitekey`, `reason`, and `http_code` as pending cleanup; do not report a clean probe or create another widget. Resolve that exact widget through the user's authorized Cloudflare management flow and verify deletion before retrying the probe. A network failure or unknown response leaves deletion unconfirmed; do not assume the widget still exists or was removed.
    - `missing_token` or `missing_scope`: ask the user to create a token at https://dash.cloudflare.com/profile/api-tokens → Custom token → permission `Account.Turnstile:Edit` → include the target account in Account Resources. **Do NOT direct them to `wrangler login`** unless wrangler's OAuth scope includes `Account.Turnstile:Edit` (varies by wrangler version). Offer two ways to provide the token without chat, cleanest first:
      1. **Export + relaunch** (token enters neither chat nor shell history): `read -rsp 'Cloudflare API token: ' token; echo; export CLOUDFLARE_API_TOKEN="$token"; unset token`, then restart the agent from that terminal.
      2. **Save to file** (token in a user-only file): `umask 077; read -rsp 'Cloudflare API token: ' token; echo; printf '%s' "$token" > ~/.cf-turnstile-token; unset token`, then load it without printing it.
      Do not ask the user to paste the API token into chat. When auth is established, re-run `auth-probe.sh` and resume from Step 4.
    - `network_failure`: the probe could not reach `api.cloudflare.com`. Show the diagnostic (VPN/proxy, TLS interception, DNS). Do not treat this as a scope problem. Ask the user to fix connectivity, then re-run `auth-probe.sh`.
-   - `upstream_failure`: the API returned an unexpected response (`http_code` non-4xx). Do not assume the token is bad. Show the code, ask the user to retry after a brief wait, and re-run `auth-probe.sh`.
+   - `upstream_failure`: the API returned an unexpected, malformed, or incomplete response; Edit scope is unverified. Report `http_code` without assuming the token is bad. Stop the setup flow. An incomplete HTTP 200 creation response can leave widget state uncertain; inspect the selected account's widgets through an authorized management flow before deciding whether to retry the probe.
    - `multiple_accounts`: the token covers more than one account and `$CLOUDFLARE_ACCOUNT_ID` is unset. Present the numbered `accounts` list. **[wait for user]** Then export `CLOUDFLARE_ACCOUNT_ID=<chosen>` and re-run `auth-probe.sh`.
    - `account_mismatch`: `$CLOUDFLARE_ACCOUNT_ID` is set but isn't one of the token's accounts. Show the `accounts` list and ask the user to either `unset CLOUDFLARE_ACCOUNT_ID` or set it to one of those IDs.
 
@@ -56,7 +57,7 @@ The user pasted the prompt. You are in a multi-step dialog. Detect what you can,
 
 5. **Domain.** Always include `localhost` and `127.0.0.1`. For production, scan `package.json` `homepage`, `wrangler.toml`, `README.md`, `AGENTS.md`, git remote. Confirm: "I'll register for `localhost`, `127.0.0.1`, and `<domain>`. OK?" **[wait for user]** If no production domain is found, ask. Registering local and production domains on one widget is safe only when each backend deployment validates the exact frontend hostname returned by siteverify. Never include `localhost` or `127.0.0.1` in a production backend's expected-hostname allowlist.
 
-6. **Codebase scan.** Detect three things silently:
+6. **Complete the codebase scan.** Reuse the local discovery from Step 1 and fill any gaps:
    - **Frontend framework** (Next.js, Astro, SvelteKit, Hugo, vanilla, etc.) → drives the widget embed snippet.
    - **Backend handler location** (Express route, Next.js API route, Rails controller, Workers fetch handler, Pages Function, etc.) → drives the siteverify snippet.
    - **Existing CAPTCHA** (reCAPTCHA / hCaptcha) → switches Step 7 to migration mode.
@@ -75,54 +76,13 @@ The user pasted the prompt. You are in a multi-step dialog. Detect what you can,
 
 9. **Wire the integration.** State the contract: "I'll embed the widget at each chosen surface and add a canonical siteverify call inside its existing handler. The handler will require `success === true`, the expected action, and an approved frontend hostname. The existing handler logic stays the same. The secret lives in your env as `TURNSTILE_SECRET`." Ask "yes" / "show". **[wait for user]** If "show", print unified diffs and ask again. Do NOT propose alternate behavior (mail delivery, custom backends).
 
-   Canonical server-side siteverify (Node / fetch idiom; adapt to the detected backend):
-
-   ```js
-   const expectedAction = 'signup';
-   const expectedHostnames = new Set(
-     (process.env.TURNSTILE_HOSTNAMES ?? '')
-       .split(',')
-       .map((hostname) => hostname.trim())
-       .filter(Boolean),
-   );
-
-   if (typeof token !== 'string' || token.length === 0 || token.length > 2048 || expectedHostnames.size === 0) {
-     return res.status(403).send('forbidden');
-   }
-
-   let result;
-   try {
-     const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-       method: 'POST',
-       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-       signal: AbortSignal.timeout(10_000),
-       body: new URLSearchParams({
-         secret: process.env.TURNSTILE_SECRET,
-         response: token,         // cf-turnstile-response from the request
-         remoteip: clientIp,      // X-Forwarded-For / req.ip / etc.
-       }),
-     });
-     if (!r.ok) throw new Error(`siteverify ${r.status}`);
-     result = await r.json();
-   } catch (err) {
-     // Network error, non-2xx, or non-JSON body from siteverify. Fail closed.
-     return res.status(403).send('forbidden');  // adapt to your framework
-   }
-   if (
-     !result.success ||
-     result.action !== expectedAction ||
-     !expectedHostnames.has(result.hostname)
-   ) {
-     return res.status(403).send('forbidden');
-   }
-   // existing handler logic runs here, unchanged
-   ```
+   Copy the [server-only verification helper](templates/verify-turnstile.ts) into the project's server library and use it inside the existing handler. It rejects malformed tokens/configuration, failed HTTP responses, invalid JSON, timeouts, wrong actions, and wrong hostnames. Follow the relevant [framework reference](#framework-references) for the handler contract. Keep the original form fields and business logic. The optional `remoteip` is omitted; add it only from a verified trusted proxy context.
 
    Set `TURNSTILE_HOSTNAMES` to the deployment-specific frontend hostnames. A production value must not include `localhost` or `127.0.0.1`. Write the secret into the user's existing secret store (`.env` for Node/Rails/Python, standard `"$WRANGLER_BIN" secret put TURNSTILE_SECRET` for a confirmed existing Worker, or the platform's secret manager). Before writing to any `.env`-style file, run `git check-ignore -q <path>` from within a git working tree; if the file is not ignored (or the project is not under git), stop and ask the user to add it to `.gitignore` or point you at the platform's secret manager. For Workers, resolve the exact name, configuration, and environment, then run `secret list` with the same target arguments immediately before the write. Never inline the secret or ask the user to paste it into chat. For an existing widget, follow the guarded retrieval flow below.
 
 10. **Validation.** For a newly created widget, set `EXPECTED_DOMAINS_JSON` to the user-approved JSON array and run `(set +x; printf '%s' "$WIDGET_SECRET" | scripts/validate.sh --sitekey "$SITEKEY" --account-id "$ACCOUNT_ID" --expected-domains "$EXPECTED_DOMAINS_JSON")`, then unset `WIDGET_SECRET`. The validator reads the secret only from standard input and never writes it to disk or command arguments. For an existing widget, the guarded flow validates the retrieved secret before storing it. In both flows, exercise the actual protected backend with a fresh real Turnstile token, verify one successful request, then verify that replaying the token is rejected. If the backend cannot be run, report destination validation as pending and do not claim end-to-end success. **[wait for user if anything fails]**
 
-11. **Persist skill.** Ask: "Save the Spin skill to `.claude/skills/turnstile-spin/SKILL.md` so I can reuse it on follow-up tasks?" Default yes. **[wait for user]** For an agent that supports directory-based skill bundles, run `scripts/persist-skill.sh --path <bundle-directory>/SKILL.md`. For a file-oriented rules target, install the hosted `prompt.md` directly instead; do not run `persist-skill.sh`.
+11. **Persist skill.** Ask: "Save the Spin skill to `.claude/skills/turnstile-spin/SKILL.md` so I can reuse it on follow-up tasks?" Default yes. **[wait for user]** For an agent that supports directory-based skill bundles, run `scripts/persist-skill.sh --path <bundle-directory>/SKILL.md`. The helper copies this installed, locally maintained bundle without downloading upstream replacements. For file-oriented rules, point to the installed bundle; do not install the hosted prompt and lose its local fixes.
 
 12. **Final report.** Print the structured summary: what was created, what was validated, what to do next.
 
@@ -327,4 +287,17 @@ Edge cases to surface to the user:
 | `EXPECTED_HOSTNAME` mismatch                   | Update widget domains via PUT, not PATCH (PATCH returns `10405 Method not allowed`): `curl -X PUT .../widgets/$SITEKEY -d '{"name":"...","mode":"managed","domains":[...]}'`                                                          |
 | Token expired mid-flow                         | Stop, re-run `scripts/auth-probe.sh`, prompt for fresh credentials                                                                                                                                                                    |
 | Validation returns `invalid-input-secret`      | The secret didn't reach the backend. Re-check `TURNSTILE_SECRET` in the customer's env / secret manager. If it's a Workers backend, run `wrangler secret list` to confirm the secret is bound to the right script.                    |
-| Validation returns `invalid-input-response`    | Expected for a dummy probe token; that means the secret IS valid. validate.sh treats this as success.                                                                                                                                 |
+| Validation returns `invalid-input-response`    | Expected for a dummy probe token. validate.sh also checks widget metadata and exact secret ownership; this does not prove a real protected submission works.                                                                                                                                 |
+
+## Framework references
+
+- [Vanilla HTML and backend fragments](references/vanilla-html.md)
+- [Next.js App Router](references/nextjs-app.md)
+- [Next.js Pages Router](references/nextjs-pages.md)
+- [Astro](references/astro.md)
+- [SvelteKit](references/sveltekit.md)
+- [Hugo](references/hugo.md)
+
+Read the chosen reference and copy [verify-turnstile.ts](templates/verify-turnstile.ts) into its server-only destination. Keep the sitekey public and the secret in the confirmed server secret store. The helper requires a runtime with `fetch`, `URLSearchParams`, and `AbortSignal.timeout`; adapt to the existing backend's supported APIs when needed. Local tests use mocked Siteverify; only a real token submission and replay rejection verify the live integration.
+
+Cloudflare's dummy test keys are useful for provider success/failure checks, but their response metadata may differ from a real widget. The always-pass dummy response observed on 2026-09-05 omitted `action`; the strict helper correctly rejects it. Use controlled response fixtures to test hostname/action checks and a real widget token for destination validation. Do not remove production checks to make dummy keys pass.

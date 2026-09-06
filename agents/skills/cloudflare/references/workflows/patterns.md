@@ -3,14 +3,21 @@
 ## Image Processing Pipeline
 
 ```typescript
+import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
+type Params = { imageKey: string };
+
 export class ImageProcessingWorkflow extends WorkflowEntrypoint<Env, Params> {
-  async run(event, step) {
-    const imageData = await step.do('fetch', async () => (await this.env.BUCKET.get(event.payload.imageKey)).arrayBuffer());
+  async run(event: WorkflowEvent<Params>, step: WorkflowStep) {
+    const imageData = await step.do('fetch', async () => {
+      const object = await this.env.BUCKET.get(event.payload.imageKey);
+      if (!object) throw new Error('Image not found');
+      return object.arrayBuffer();
+    });
     const description = await step.do('generate description', async () => 
       await this.env.AI.run('@cf/llava-hf/llava-1.5-7b-hf', {image: Array.from(new Uint8Array(imageData)), prompt: 'Describe this image', max_tokens: 50})
     );
-    await step.waitForEvent('await approval', { type: 'approved', timeout: '24h' });
-    await step.do('publish', async () => await this.env.BUCKET.put(`public/${event.payload.imageKey}`, imageData));
+    await step.waitForEvent('await approval', { type: 'approved', timeout: '24 hours' });
+    await step.do('publish', async () => { await this.env.BUCKET.put(`public/${event.payload.imageKey}`, imageData); });
   }
 }
 ```
@@ -18,13 +25,16 @@ export class ImageProcessingWorkflow extends WorkflowEntrypoint<Env, Params> {
 ## User Lifecycle
 
 ```typescript
+import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
+type Params = { email: string; userId: string };
+
 export class UserLifecycleWorkflow extends WorkflowEntrypoint<Env, Params> {
-  async run(event, step) {
+  async run(event: WorkflowEvent<Params>, step: WorkflowStep) {
     await step.do('welcome email', async () => await sendEmail(event.payload.email, 'Welcome!'));
     await step.sleep('trial period', '7 days');
     const hasConverted = await step.do('check conversion', async () => {
-      const user = await this.env.DB.prepare('SELECT subscription_status FROM users WHERE id = ?').bind(event.payload.userId).first();
-      return user.subscription_status === 'active';
+      const user = await this.env.DB.prepare('SELECT subscription_status FROM users WHERE id = ?').bind(event.payload.userId).first<{ subscription_status: string }>();
+      return user?.subscription_status === 'active';
     });
     if (!hasConverted) await step.do('trial expiration email', async () => await sendEmail(event.payload.email, 'Trial ending'));
   }
@@ -34,26 +44,34 @@ export class UserLifecycleWorkflow extends WorkflowEntrypoint<Env, Params> {
 ## Data Pipeline
 
 ```typescript
+import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
+import { z } from "zod";
+type Params = { sourceUrl: string };
+const Items = z.array(z.object({ id: z.string(), value: z.string() }));
+const normalizeData = (item: z.infer<typeof Items>[number]) => item.value.trim();
+
 export class DataPipelineWorkflow extends WorkflowEntrypoint<Env, Params> {
-  async run(event, step) {
-    const rawData = await step.do('extract', {retries: { limit: 10, delay: '30s', backoff: 'exponential' }}, async () => {
+  async run(event: WorkflowEvent<Params>, step: WorkflowStep) {
+    const rawData = await step.do('extract', {retries: { limit: 10, delay: '30 seconds', backoff: 'exponential' }}, async () => {
       const res = await fetch(event.payload.sourceUrl);
       if (!res.ok) throw new Error('Fetch failed');
-      return res.json();
+      return Items.parse(await res.json());
     });
     const transformed = await step.do('transform', async () => 
       rawData.map(item => ({ id: item.id, normalized: normalizeData(item) }))
     );
     const dataRef = await step.do('store', async () => {
-      const key = `processed/${Date.now()}.json`;
+      const key = `processed/${event.instanceId}.json`;
       await this.env.BUCKET.put(key, JSON.stringify(transformed));
       return { key };
     });
     await step.do('load', async () => {
-      const data = await (await this.env.BUCKET.get(dataRef.key)).json();
+      const object = await this.env.BUCKET.get(dataRef.key);
+      if (!object) throw new Error('Processed object not found');
+      const data = await object.json<Array<{ id: string; normalized: string }>>();
       for (let i = 0; i < data.length; i += 100) {
         await this.env.DB.batch(data.slice(i, i + 100).map(item => 
-          this.env.DB.prepare('INSERT INTO records VALUES (?, ?)').bind(item.id, item.normalized)
+          this.env.DB.prepare('INSERT INTO records (id, normalized) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET normalized = excluded.normalized').bind(item.id, item.normalized)
         ));
       }
     });
@@ -64,16 +82,20 @@ export class DataPipelineWorkflow extends WorkflowEntrypoint<Env, Params> {
 ## Human-in-the-Loop Approval
 
 ```typescript
+import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
+type Params = { userId: string };
+
 export class ApprovalWorkflow extends WorkflowEntrypoint<Env, Params> {
-  async run(event, step) {
-    await step.do('create approval', async () => await this.env.DB.prepare('INSERT INTO approvals (id, user_id, status) VALUES (?, ?, ?)').bind(event.instanceId, event.payload.userId, 'pending').run());
-    try {
-      const approval = await step.waitForEvent<{ approved: boolean }>('wait for approval', { type: 'approval-response', timeout: '48h' });
-      if (approval.approved) { await step.do('process approval', async () => {}); } 
-      else { await step.do('handle rejection', async () => {}); }
-    } catch (e) {
-      await step.do('auto reject', async () => await this.env.DB.prepare('UPDATE approvals SET status = ? WHERE id = ?').bind('auto-rejected', event.instanceId).run());
+  async run(event: WorkflowEvent<Params>, step: WorkflowStep) {
+    await step.do('create approval', async () => { await this.env.DB.prepare('INSERT INTO approvals (id, user_id, status) VALUES (?, ?, ?) ON CONFLICT(id) DO NOTHING').bind(event.instanceId, event.payload.userId, 'pending').run(); });
+    const approval = await step.waitForEvent<{ approved: boolean }>('wait for approval', { type: 'approval-response', timeout: '48 hours' });
+    if (approval.payload.approved) {
+      await step.do('process approval', async () => {});
+    } else {
+      await step.do('handle rejection', async () => {});
     }
+    // A timeout remains a workflow failure unless a specific timeout policy is implemented.
+    // Never catch processing failures and relabel them as approval timeouts.
   }
 }
 ```
@@ -84,34 +106,30 @@ export class ApprovalWorkflow extends WorkflowEntrypoint<Env, Params> {
 
 ```typescript
 // vitest.config.ts
-import { defineWorkersConfig } from '@cloudflare/vitest-pool-workers/config';
+import { cloudflareTest } from '@cloudflare/vitest-plugin';
+import { defineConfig } from 'vitest/config';
 
-export default defineWorkersConfig({
-  test: {
-    poolOptions: {
-      workers: {
-        wrangler: { configPath: './wrangler.jsonc' }
-      }
-    }
-  }
+export default defineConfig({
+  plugins: [cloudflareTest({ wrangler: { configPath: './wrangler.jsonc' } })]
 });
 ```
 
 ### Introspection API
 
+For TypeScript `await using`, include `ESNext.Disposable` in the test tsconfig libraries; use a supported modern compiler. This test uses the Cloudflare Vitest integration, not a plain Node environment.
+
 ```typescript
 import { introspectWorkflowInstance } from 'cloudflare:test';
 
-const instance = await env.MY_WORKFLOW.create({ params: { userId: '123' } });
-const introspector = await introspectWorkflowInstance(env.MY_WORKFLOW, instance.id);
-
-// Wait for step completion
-const result = await introspector.waitForStepResult({ name: 'fetch user', index: 0 });
-
-// Mock step behavior
+const id = crypto.randomUUID();
+await using introspector = await introspectWorkflowInstance(env.MY_WORKFLOW, id);
 await introspector.modify(async (m) => {
   await m.mockStepResult({ name: 'api call' }, { mocked: true });
 });
+await env.MY_WORKFLOW.create({ id, params: { userId: '123' } });
+const result = await introspector.waitForStepResult({ name: 'fetch user', index: 1 });
+// Step occurrence indexes are 1-based; omitting index also selects the first.
+// Configure mocks before starting the instance; await using disposes them.
 ```
 
 ## Best Practices
@@ -119,7 +137,7 @@ await introspector.modify(async (m) => {
 ### ✅ DO
 
 1. **Granular steps**: One API call per step (unless proving idempotency)
-2. **Idempotency**: Check-then-execute; use idempotency keys
+2. **Idempotency**: Use atomic writes or a downstream idempotency contract; a separate check followed by a write can race
 3. **Deterministic names**: Use static or step-output-based names
 4. **Return state**: Persist via step returns, not variables
 5. **Always await**: `await step.do()`, avoid dangling promises
@@ -142,17 +160,35 @@ await introspector.modify(async (m) => {
 
 ### Fan-Out (Parallel Processing)
 ```typescript
-const files = await step.do('list', async () => this.env.BUCKET.list());
-await Promise.all(files.objects.map((file, i) => step.do(`process ${i}`, async () => processFile(await (await this.env.BUCKET.get(file.key)).arrayBuffer()))));
+// Process one listed page; repeat with cursor until list.truncated is false.
+const files = await step.do('list page', async () => {
+  const page = await this.env.BUCKET.list();
+  return {
+    objects: page.objects.map(file => ({ key: file.key })),
+    truncated: page.truncated,
+    cursor: page.truncated ? page.cursor : null,
+  };
+});
+await Promise.all(files.objects.map((file) => step.do(`process ${file.key}`, async () => {
+  const object = await this.env.BUCKET.get(file.key);
+  if (!object) throw new Error(`Missing object: ${file.key}`);
+  return processFile(await object.arrayBuffer());
+})));
 ```
 
 ### Parent-Child Workflows
 ```typescript
-const child = await step.do('start child', async () => await this.env.CHILD_WORKFLOW.create({id: `child-${event.instanceId}`, params: { data: result.data }}));
-await step.do('other work', async () => console.log(`Child started: ${child.id}`));
+const childId = await step.do('start child', async () => {
+  const id = `child-${event.instanceId}`;
+  await this.env.CHILD_WORKFLOW.createBatch([{ id, params: { data: result.data } }]);
+  return id;
+});
+await step.do('other work', async () => console.log(`Child started: ${childId}`));
 ```
 
 ### Race Pattern
+
+`Promise.race` does not cancel the losing operation; both side effects can complete. Use only when that behavior is acceptable.
 ```typescript
 const winner = await Promise.race([
   step.do('option A', async () => slowOperation()),
@@ -162,9 +198,13 @@ const winner = await Promise.race([
 
 ### Scheduled Workflow Chain
 ```typescript
-export default { async scheduled(event, env) { await env.DAILY_WORKFLOW.create({id: `daily-${event.scheduledTime}`, params: { timestamp: event.scheduledTime }}); }};
+import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
+type Params = { timestamp: number };
+interface Env { DAILY_WORKFLOW: Workflow<Params> }
+
+export default { async scheduled(event: ScheduledController, env: Env) { await env.DAILY_WORKFLOW.create({id: `daily-${event.scheduledTime}`, params: { timestamp: event.scheduledTime }}); }};
 export class DailyWorkflow extends WorkflowEntrypoint<Env, Params> {
-  async run(event, step) {
+  async run(event: WorkflowEvent<Params>, step: WorkflowStep) {
     await step.do('daily task', async () => {});
     await step.sleep('wait 7 days', '7 days');
     await step.do('weekly followup', async () => {});

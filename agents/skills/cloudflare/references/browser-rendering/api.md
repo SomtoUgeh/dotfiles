@@ -2,7 +2,7 @@
 
 ## REST API
 
-**Base:** `https://api.cloudflare.com/client/v4/accounts/{accountId}/browser-rendering`  
+**Base:** `https://api.cloudflare.com/client/v4/accounts/{accountId}/browser-rendering`
 **Auth:** `Authorization: Bearer <token>` (Browser Rendering - Edit permission)
 
 ### Endpoints
@@ -12,9 +12,9 @@
 | `/content` | Get rendered HTML | `url`, `waitUntil` |
 | `/screenshot` | Capture image | `screenshotOptions: {type, fullPage, clip}` |
 | `/pdf` | Generate PDF | `pdfOptions: {format, landscape, margin}` |
-| `/snapshot` | HTML + inlined resources | `url` |
-| `/scrape` | Extract by selectors | `selectors: ["h1", ".price"]` |
-| `/json` | AI-structured extraction | `schema: {name: "string", price: "number"}` |
+| `/snapshot` | Page content and screenshot | `url` |
+| `/scrape` | Extract by selectors | `elements: [{ selector: "h1" }]` |
+| `/json` | AI-structured extraction | `response_format` with a JSON Schema; see the endpoint reference |
 | `/links` | Get all links | `url` |
 | `/markdown` | Convert to markdown | `url` |
 
@@ -95,7 +95,8 @@ await puppeteer.connect(env.MYBROWSER, sessionId);
 
 // Check limits
 await puppeteer.limits(env.MYBROWSER);
-// { remaining: ms, total: ms, concurrent: n }
+// { activeSessions, maxConcurrentSessions, allowedBrowserAcquisitions,
+//   timeUntilNextAllowedBrowserAcquisition }
 ```
 
 ## Key Options
@@ -106,3 +107,5 @@ await puppeteer.limits(env.MYBROWSER);
 | `keep_alive` | Max 600000ms (10 min) |
 | `screenshot.type` | `png`, `jpeg` |
 | `pdf.format` | `A4`, `Letter`, `Legal` |
+
+Current product name: **Browser Run**. The REST path remains `/browser-rendering`. [Official documentation](https://developers.cloudflare.com/browser-run/).

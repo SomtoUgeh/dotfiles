@@ -5,7 +5,11 @@ description: Find design smells in a breadboard and fix them. Use after breadboa
 
 # Breadboard Analysis
 
-Find design smells in a breadboard and fix them. Works on existing breadboards built with the `/breadboarding` skill.
+Find design smells in a breadboard and fix them. Use the canonical schema and
+validation rules in [../breadboarding/SKILL.md](../breadboarding/SKILL.md); the
+extended guide is background material, not a competing format.
+
+Correct the requested breadboard within its existing scope. Reflection does not authorize refactoring the implementation: for an existing system, report a code/design mismatch and distinguish a faithful map correction from a proposed implementation change. For a proposed system, validate the intended wiring without claiming it already exists in code.
 
 ---
 
@@ -53,14 +57,14 @@ For each affordance:
 |--------|---------|
 | One verb covers all code paths | Boundary is correct |
 | Need "or" to connect two verbs | Likely two affordances bundled together |
-| Name doesn't feel idiomatic | Boundary is wrong |
+| Name doesn't feel idiomatic | Investigate naming and responsibility; wording alone does not prove a bad boundary |
 | Name matches a downstream effect, not this step | You're naming the chain, not the step |
 
 #### Step-Level vs Chain-Level Effects
 
 Name what THIS step does, not the downstream cascade.
 
-**Chain-level** (wrong): An orchestrator that calls validate, find, extract, and insert is named `add_locale` — but it doesn't add anything itself. Adding is the chain's effect.
+An orchestrator may validly be named `add_locale` when that is its public contract. If the breadboard separately exposes internal dispatch, validation, and insertion steps, name those rows for their own effects; do not rename a coherent public operation merely because it delegates.
 
 **Step-level** (right): The orchestrator's own effect is handling/dispatching → `handle_place_locale`. The adding happens downstream.
 
@@ -101,11 +105,11 @@ The inability to find one idiomatic verb was the signal that this was two distin
 
 When the naming test reveals a bundled affordance:
 
-1. **Split in the code first.** Extract distinct operations into separate functions. Even one-liners are valid if they represent a distinct step-level effect.
+1. **Determine the authorized mode.** For an existing-system map, preserve actual code boundaries and report a proposed split separately. For design work, label distinct planned operations as proposed. Change code only if implementation was requested and the split improves the actual contract.
 2. **Then update the tables.** Add rows for new affordances with proper IDs, Wires Out, and Returns To.
 3. **Then update the diagram.** The diagram renders the tables.
 
-Never split only in the diagram (e.g., adding unnamed sub-nodes in a subgraph). If it's not a named function in the code and a row in the table, it's not a real affordance.
+Never invent unlabelled implementation in the diagram. Existing affordances need code evidence; proposed affordances need explicit proposal status and table rows.
 
 ### Fixing Wiring
 
@@ -126,6 +130,6 @@ After any changes:
 2. **Describe the wiring in prose.** Trace every claim against the tables and diagram. If the prose says "N4 calls N13" but the diagram doesn't show that wire, something was missed.
 3. **Check wiring consistency:**
    - Every Wires Out target must exist in the tables
-   - Every Returns To source must have a corresponding Wires Out from its caller
+   - Function return edges match a caller; store reads and subscription outputs have the appropriate reader/event source and need not be synchronous function calls
    - Solid lines for writes/calls (Wires Out), dashed for returns/reads (Returns To)
    - Every node in the diagram has a row in the affordance tables

@@ -1,96 +1,71 @@
-# API Reference
+# Images API
 
-## Workers Binding API
+## Workers binding
 
 ```toml
-# wrangler.toml
 [images]
 binding = "IMAGES"
 ```
 
-### Transform Images
+The type is `ImagesBinding`. Input is a byte stream. Geometry goes in `transform`; MIME format and encoding quality go in `output`. Await output before calling `response()`.
 
 ```typescript
-const imageResponse = await env.IMAGES
-  .input(fileBuffer)
-  .transform({ width: 800, height: 600, fit: "cover", quality: 85, format: "avif" })
-  .output();
-return imageResponse.response();
-```
-
-### Transform Options
-
-```typescript
-interface TransformOptions {
-  width?: number;        height?: number;
-  fit?: "scale-down" | "contain" | "cover" | "crop" | "pad";
-  quality?: number;      // 1-100
-  format?: "avif" | "webp" | "jpeg" | "png";
-  dpr?: number;          // 1-3
-  gravity?: "auto" | "left" | "right" | "top" | "bottom" | "face" | string;
-  sharpen?: number;      // 0-10
-  blur?: number;         // 1-250
-  rotate?: 90 | 180 | 270;
-  background?: string;   // CSS color for pad
-  metadata?: "none" | "copyright" | "keep";
-  brightness?: number;   contrast?: number;   gamma?: number;  // 0-2
+async function resize(images: ImagesBinding, input: ReadableStream<Uint8Array>) {
+  const result = await images.input(input)
+    .transform({ width: 800, height: 600, fit: "cover" })
+    .output({ format: "image/avif", quality: 85 });
+  return result.response();
 }
 ```
 
-### Draw/Watermark
+Use `file.stream()`, an R2 object's `body`, or a non-null fetch response body. Do not pass an ArrayBuffer directly. For bytes held in memory, construct a Blob and use its stream.
+
+## Watermarks
 
 ```typescript
-await env.IMAGES.input(baseImage)
-  .draw(env.IMAGES.input(watermark).transform({ width: 100 }), { top: 10, left: 10, opacity: 0.8 })
-  .output();
+async function watermark(images: ImagesBinding, base: ReadableStream<Uint8Array>, mark: ReadableStream<Uint8Array>) {
+  return images.input(base)
+    .draw(images.input(mark).transform({ width: 100 }), { top: 10, left: 10, opacity: 0.8 })
+    .output({ format: "image/webp", quality: 85 });
+}
 ```
 
-## REST API
+Read the generated `ImageTransform`, `ImageDrawOptions`, and `ImageOutputOptions` types for supported options. URL transformation parameters are not an interchangeable binding interface. Binding output uses MIME strings such as `image/avif`, not `avif` or `auto`.
 
-### Upload Image
+## Hosted Images and REST
+
+Current generated bindings also expose `env.IMAGES.hosted` for supported hosted-image operations; consult the [current hosted binding API](https://developers.cloudflare.com/images/). Existing REST APIs remain available:
 
 ```bash
-curl -X POST https://api.cloudflare.com/client/v4/accounts/{account_id}/images/v1 \
-  -H "Authorization: Bearer {token}" -F file=@image.jpg -F metadata='{"key":"value"}'
+curl --fail-with-body -X POST "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/images/v1" \
+  -H "Authorization: Bearer $IMAGES_TOKEN" \
+  -F file=@image.jpg -F metadata='{"purpose":"example"}'
 ```
 
-### Other Operations
-
-```bash
-GET  /accounts/{account_id}/images/v1/{image_id}      # Get details
-DELETE /accounts/{account_id}/images/v1/{image_id}   # Delete
-GET  /accounts/{account_id}/images/v1?page=1         # List
-```
-
-## URL Transform API
-
-```
-https://imagedelivery.net/{hash}/{id}/width=800,height=600,fit=cover,format=avif
-```
-
-**Params:** `w=`, `h=`, `fit=`, `q=`, `f=`, `dpr=`, `gravity=`, `sharpen=`, `blur=`, `rotate=`, `background=`, `metadata=`
+The v1 image detail/delete path is `/accounts/{account_id}/images/v1/{image_id}`. List endpoints are paginated; check response success and pagination.
 
 ## Direct Creator Upload
 
-```typescript
-// 1. Get upload URL (backend)
-const { result } = await fetch(
-  `https://api.cloudflare.com/client/v4/accounts/${accountId}/images/v2/direct_upload`,
-  { method: 'POST', headers: { 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify({ requireSignedURLs: false }) }
-).then(r => r.json());
+After authenticating the uploader, create a limited upload URL from the backend. The REST endpoint accepts form fields:
 
-// 2. Client uploads to result.uploadURL
-const formData = new FormData();
-formData.append('file', file);
-await fetch(result.uploadURL, { method: 'POST', body: formData });
+```typescript
+async function createUpload(accountId: string, token: string, userId: string) {
+  const form = new FormData();
+  form.set("requireSignedURLs", "true");
+  form.set("metadata", JSON.stringify({ userId }));
+  const response = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${accountId}/images/v2/direct_upload`,
+    { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: form }
+  );
+  if (!response.ok) throw new Error(`Upload URL request failed: ${response.status}`);
+  return response.json(); // Validate the Cloudflare envelope before exposing result.uploadURL.
+}
 ```
 
-## Error Codes
+The client uploads a FormData `file` to the returned `uploadURL` without the account API token. Check upload completion and associate the image ID with the authenticated owner server-side. Choose signed/private or public delivery deliberately.
 
-| Code | Message | Solution |
-|------|---------|----------|
-| 5400 | Invalid format | Use JPEG, PNG, GIF, WebP |
-| 5401 | Too large | Max 100MB |
-| 5403 | Invalid transform | Check params |
-| 9413 | Rate limit | Implement backoff |
+## Delivery URLs
+
+Named variants use `https://imagedelivery.net/{account_hash}/{image_id}/{variant}`. Inline transformation options require flexible variants to be enabled. Transforming remote origin images through `/cdn-cgi/image/...` is a separate delivery path.
+
+Sources: [Workers binding](https://developers.cloudflare.com/images/optimization/binding/), [direct uploads](https://developers.cloudflare.com/images/storage/upload-images/direct-creator-upload/).

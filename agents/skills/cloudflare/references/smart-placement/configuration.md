@@ -69,45 +69,7 @@
 
 ### What Smart Placement Affects
 
-**CRITICAL LIMITATION - Smart Placement ONLY Affects `fetch` Handlers:**
-
-Smart Placement is fundamentally limited to Workers with default `fetch` handlers. This is a key architectural constraint.
-
-- ✅ **Affects:** `fetch` event handlers ONLY (the default export's fetch method)
-- ❌ **Does NOT affect:** 
-  - RPC methods (Service Bindings with `WorkerEntrypoint` - see example below)
-  - Named entrypoints (exports other than `default`)
-  - Workers without `fetch` handlers
-  - Queue consumers, scheduled handlers, or other event types
-
-**Example - Smart Placement ONLY affects `fetch`:**
-```typescript
-// ✅ Smart Placement affects this:
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    // This runs close to backend when Smart Placement enabled
-    const data = await env.DATABASE.prepare('SELECT * FROM users').all();
-    return Response.json(data);
-  }
-}
-
-// ❌ Smart Placement DOES NOT affect these:
-export class MyRPC extends WorkerEntrypoint {
-  async myMethod() { 
-    // This ALWAYS runs at edge, Smart Placement has NO EFFECT
-    const data = await this.env.DATABASE.prepare('SELECT * FROM users').all();
-    return data;
-  }
-}
-
-export async function scheduled(event: ScheduledEvent, env: Env) {
-  // NOT affected by Smart Placement
-}
-```
-
-**Consequence:** If your backend logic uses RPC methods (`WorkerEntrypoint`), Smart Placement cannot optimize those calls. You must use fetch-based patterns for Smart Placement to work.
-
-**Solution:** Convert RPC methods to fetch endpoints, or use a wrapper Worker with `fetch` handler that calls your backend RPC (though this adds latency).
+The current placement documentation explicitly limits optimization to default `fetch` handlers and excludes named entrypoints, RPC methods, and non-fetch events. That same page also includes an RPC placement example. These statements conflict: the examples here use fetch-based service bindings, and RPC placement is not verified. Do not migrate a working RPC API on this reference alone; verify current hosted behavior and guidance first.
 
 ### Baseline Traffic
 Smart Placement automatically routes 1% of requests WITHOUT optimization as baseline for performance comparison.
@@ -123,10 +85,10 @@ Smart Placement automatically routes 1% of requests WITHOUT optimization as base
 { "placement": { "mode": "smart" } }
 
 // ✅ Valid - Explicit Placement (different feature)
-{ "placement": { "region": "us-east1" } }
+{ "placement": { "region": "gcp:us-east1" } }
 
 // ❌ Invalid - Cannot combine
-{ "placement": { "mode": "smart", "region": "us-east1" } }
+{ "placement": { "mode": "smart", "region": "gcp:us-east1" } }
 ```
 
 ## Dashboard Configuration
@@ -143,54 +105,20 @@ interface Env {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const data = await env.DATABASE.prepare('SELECT * FROM table').all();
+    const data = await env.DATABASE.prepare('SELECT * FROM users').all();
     return Response.json(data);
   }
 } satisfies ExportedHandler<Env>;
 ```
 
-## Cloudflare Pages/Assets Warning
+## Static Assets and Placement
 
-**CRITICAL PERFORMANCE ISSUE:** Enabling Smart Placement with `assets.run_worker_first = true` in Pages projects **severely degrades asset serving performance**. This is one of the most common misconfigurations.
+Static assets served directly are delivered near the incoming request. Assets fetched by your code through `env.ASSETS.fetch()` are served where that Worker runs. `run_worker_first` affects which requests execute code; measure the full route before deciding to split frontend/backend Workers. Pages Functions and Workers Static Assets use different configuration models. There is no universal 2–5x penalty or blanket prohibition on combining assets with placement.
 
-**Why this is bad:**
-- Smart Placement routes ALL requests (including static assets) away from edge to remote locations
-- Static assets (HTML, CSS, JS, images) should ALWAYS be served from edge closest to user
-- Result: 2-5x slower asset loading times, poor user experience
-
-**Problem:** Smart Placement routes asset requests away from edge, but static assets should always be served from edge closest to user.
-
-**Solutions (in order of preference):**
-1. **Recommended:** Split into separate Workers (frontend at edge + backend with Smart Placement)
-2. Set `"mode": "off"` to explicitly disable Smart Placement for Pages/Assets Workers
-3. Use `assets.run_worker_first = false` (serves assets first, bypasses Worker for static content)
-
-```jsonc
-// ❌ BAD - Degrades asset performance by 2-5x
-{
-  "name": "pages-app",
-  "placement": { "mode": "smart" },
-  "assets": { "run_worker_first": true }
-}
-
-// ✅ GOOD - Frontend at edge, backend optimized
-// frontend-worker/wrangler.jsonc
-{
-  "name": "frontend",
-  "assets": { "run_worker_first": true }
-  // No placement - runs at edge
-}
-
-// backend-worker/wrangler.jsonc
-{
-  "name": "backend-api",
-  "placement": { "mode": "smart" },
-  "d1_databases": [{ "binding": "DB", "database_id": "xxx" }]
-}
-```
-
-**Key takeaway:** Never enable Smart Placement on Workers that serve static assets with `run_worker_first = true`.
+[Current placement behavior](https://developers.cloudflare.com/workers/configuration/placement/)
 
 ## Local Development
 
 Smart Placement does NOT work in `wrangler dev` (local only). Test by deploying: `wrangler deploy --env staging`
+
+The official placement page currently contains an RPC example that conflicts with its explicit fetch-only limitation. Rely on fetch-based calls for this reference; verify hosted RPC placement before changing architecture based on that example.

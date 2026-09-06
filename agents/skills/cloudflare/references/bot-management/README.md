@@ -5,7 +5,7 @@ Enterprise-grade bot detection, protection, and mitigation using ML/heuristics, 
 ## Overview
 
 Bot Management provides multi-tier protection:
-- **Free (Bot Fight Mode)**: Auto-blocks definite bots, no config
+- **Free (Bot Fight Mode)**: Challenges traffic identified as bots, no config
 - **Pro/Business (Super Bot Fight Mode)**: Configurable actions, static resource protection, analytics groupings
 - **Enterprise (Bot Management)**: Granular 1-99 scores, WAF integration, JA3/JA4 fingerprinting, Workers API, Advanced Analytics
 
@@ -49,13 +49,9 @@ Bot Management provides multi-tier protection:
 
 **Verified Bots**: Allowlisted good bots (search engines, AI crawlers) verified via reverse DNS or Web Bot Auth. Access via `cf.bot_management.verified_bot` or `cf.verified_bot_category`.
 
-## Platform Limits
+## Platform availability
 
-| Plan | Bot Scores | JA3/JA4 | Custom Rules | Analytics Retention |
-|------|------------|---------|--------------|---------------------|
-| Free | No (auto-block only) | No | 5 | N/A (no analytics) |
-| Pro/Business | Groupings only | No | 20/100 | 30 days (72h at a time) |
-| Enterprise | 1-99 granular | Yes | 1,000+ | 30 days (1 week at a time) |
+Consult [current bot plans](https://developers.cloudflare.com/bots/plans/) and the zone entitlement for fields, rules, and analytics retention.
 
 ## Basic Patterns
 
@@ -92,3 +88,5 @@ export default {
 - [waf](../waf/) - WAF custom rules for bot enforcement
 - [workers](../workers/) - Workers request.cf.botManagement API
 - [api-shield](../api-shield/) - API-specific bot protection
+
+Metadata source: [Bot Management variables](https://developers.cloudflare.com/bots/reference/bot-management-variables/). Bot classification, verified-bot status, and corporate-proxy status do not grant application authorization.

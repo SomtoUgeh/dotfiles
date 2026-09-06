@@ -31,11 +31,14 @@ function ProductsPage() {
 export const Route = createFileRoute('/products')({
   validateSearch: (search: Record<string, unknown>) => {
     return {
-      page: Number(search.page) || 1,
+      page: Number.isSafeInteger(Number(search.page)) && Number(search.page) >= 1
+        ? Number(search.page) : 1,
       sort: search.sort === 'desc' ? 'desc' : 'asc',
       category: typeof search.category === 'string' ? search.category : undefined,
-      minPrice: Number(search.minPrice) || undefined,
-      maxPrice: Number(search.maxPrice) || undefined,
+      minPrice: typeof search.minPrice === 'number' && Number.isFinite(search.minPrice) && search.minPrice >= 0
+        ? search.minPrice : undefined,
+      maxPrice: typeof search.maxPrice === 'number' && Number.isFinite(search.maxPrice) && search.maxPrice >= 0
+        ? search.maxPrice : undefined,
     }
   },
   component: ProductsPage,
@@ -56,8 +59,8 @@ function ProductsPage() {
 import { z } from 'zod'
 
 const productSearchSchema = z.object({
-  page: z.number().min(1).catch(1),
-  limit: z.number().min(1).max(100).catch(20),
+  page: z.number().int().min(1).catch(1),
+  limit: z.number().int().min(1).max(100).catch(20),
   sort: z.enum(['name', 'price', 'date']).catch('name'),
   order: z.enum(['asc', 'desc']).catch('asc'),
   category: z.string().optional(),
@@ -86,7 +89,7 @@ function ProductsPage() {
       filters={{
         category: search.category,
         search: search.search,
-        priceRange: search.minPrice && search.maxPrice
+        priceRange: search.minPrice !== undefined && search.maxPrice !== undefined
           ? [search.minPrice, search.maxPrice]
           : undefined,
       }}

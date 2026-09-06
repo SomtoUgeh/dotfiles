@@ -11,17 +11,17 @@ tags: postgres, sql, query-optimization, n-plus-one, pagination
 **SELECT specific columns** — avoids fetching unnecessary data and enables covering indexes:
 ```sql
 -- Bad:
-SELECT * FROM user WHERE status = 'active';
+SELECT * FROM user_account WHERE status = 'active';
 -- Good:
-SELECT id, name, email FROM user WHERE status = 'active';
+SELECT id, name, email FROM user_account WHERE status = 'active';
 ```
 
-**Subqueries → JOINs** — correlated subqueries re-execute per row:
+**Compare subqueries and JOINs with the actual plan** — a correlated aggregate can repeat work; a pre-aggregation or JOIN can help, while an index probe can also be efficient:
 ```sql
 -- Bad
-SELECT id, (SELECT COUNT(*) FROM order WHERE order.user_id = user.id) FROM user;
+SELECT id, (SELECT COUNT(*) FROM purchase_order WHERE purchase_order.user_id = user_account.id) FROM user_account;
 -- Good
-SELECT u.id, COUNT(o.id) FROM user u LEFT JOIN order o ON o.user_id = u.id GROUP BY u.id;
+SELECT u.id, COUNT(o.id) FROM user_account u LEFT JOIN purchase_order o ON o.user_id = u.id GROUP BY u.id;
 ```
 
 **Always LIMIT unbounded queries** — prevent runaway result sets:
@@ -32,9 +32,9 @@ SELECT id, message FROM log WHERE level = 'error' ORDER BY created_at DESC LIMIT
 **Avoid functions on indexed columns (SARGable)** — functions prevent index usage unless a functional index exists:
 ```sql
 -- Bad: Full table scan
-SELECT * FROM user WHERE date_trunc('day', created_at) = '2023-01-01';
+SELECT * FROM user_account WHERE date_trunc('day', created_at) = '2023-01-01';
 -- Good: Index scan
-SELECT * FROM user WHERE created_at >= '2023-01-01' AND created_at < '2023-01-02';
+SELECT * FROM user_account WHERE created_at >= '2023-01-01' AND created_at < '2023-01-02';
 ```
 
 ## N+1 Detection
@@ -43,11 +43,11 @@ SELECT * FROM user WHERE created_at >= '2023-01-01' AND created_at < '2023-01-02
 ```python
 # Bad
 for uid in user_ids:
-    cursor.execute("SELECT name FROM user WHERE id = %s", (uid,))
+    cursor.execute("SELECT name FROM user_account WHERE id = %s", (uid,))
 # Good (Postgres specific)
-cursor.execute("SELECT id, name FROM user WHERE id = ANY(%s)", (list(user_ids),))
-# Good (Standard SQL)
-# cursor.execute("SELECT id, name FROM user WHERE id IN %s", (tuple(user_ids),))
+cursor.execute("SELECT id, name FROM user_account WHERE id = ANY(%s)", (list(user_ids),))
+# ANY with an array also handles an empty user_ids list; placeholder
+# behavior is driver-specific (this example uses psycopg).
 ```
 
 **ORM lazy loading → eager loading:**
@@ -63,10 +63,10 @@ users = User.query.options(joinedload(User.posts)).all()
 
 **UNION → UNION ALL** — skip deduplication when duplicates are impossible or acceptable.
 
-**IN subquery → EXISTS** — EXISTS short-circuits on first match:
+**Use EXISTS for existence checks** — the optimizer may generate the same semi-join plan as IN; it is not universally faster:
 ```sql
-SELECT id, name FROM user u
-WHERE EXISTS (SELECT 1 FROM order o WHERE o.user_id = u.id AND o.total > 100);
+SELECT id, name FROM user_account u
+WHERE EXISTS (SELECT 1 FROM purchase_order o WHERE o.user_id = u.id AND o.total > 100);
 ```
 
 **OFFSET → cursor pagination** — OFFSET scans and discards rows, degrading at depth:

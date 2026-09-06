@@ -11,6 +11,15 @@ metadata:
 
 Complete reference for all Prisma CLI commands. This skill provides guidance on command usage, options, and best practices for Prisma ORM 7.x.
 
+Keep `prisma`, `@prisma/client`, and every driver adapter on the same stable 7.x version. For a new v7 setup, the currently verified compatible target is `7.10.0`; do not use `prisma@latest` while it resolves to the Prisma 8 release candidate. Recheck the v7 CLI documentation and npm dist-tags before changing this pin.
+
+```bash
+npm install --save-dev prisma@7.10.0
+npm install @prisma/client@7.10.0 @prisma/adapter-pg@7.10.0 pg
+```
+
+Prisma 7.10 initializes `prisma7.config.ts` and resolves it before legacy `prisma.config.ts`. Edit the config the CLI reports loading, or pass `--config` explicitly; otherwise changes to datasource or seed settings in the legacy file can be ignored. Earlier 7.x projects may still use the legacy filename.
+
 ## When to Apply
 
 Reference this skill when:
@@ -49,7 +58,7 @@ Reference this skill when:
 ### Project Setup
 
 ```bash
-# Initialize new project (creates prisma/ folder and prisma.config.ts)
+# Initialize new project (creates prisma/ folder and prisma7.config.ts)
 prisma init
 
 # Initialize with specific database
@@ -60,8 +69,6 @@ prisma init --datasource-provider sqlite
 # Initialize with Prisma Postgres (cloud)
 prisma init --db
 
-# Initialize with AI-generated schema
-prisma init --prompt "E-commerce app with users, products, orders"
 ```
 
 ### Client Generation
@@ -72,9 +79,6 @@ prisma generate
 
 # Watch mode for development
 prisma generate --watch
-
-# Generate without engine (for Accelerate/edge)
-prisma generate --no-engine
 
 # Generate specific generator only
 prisma generate --generator client
@@ -180,7 +184,7 @@ prisma format
 
 ### New Configuration File
 
-Prisma 7 uses `prisma.config.ts` for CLI configuration:
+Prisma 7 uses `prisma7.config.ts` for CLI configuration:
 
 ```typescript
 import 'dotenv/config'
@@ -210,7 +214,7 @@ export default defineConfig({
 Environment variables are no longer auto-loaded. Use `dotenv`:
 
 ```typescript
-// prisma.config.ts
+// prisma7.config.ts
 import 'dotenv/config'
 ```
 

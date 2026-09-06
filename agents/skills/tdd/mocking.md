@@ -1,59 +1,37 @@
 # When to Mock
 
-Mock at **system boundaries** only:
+Prefer real internal code. Use controlled doubles at boundaries where real I/O,
+time, randomness, or failures would make a test unreliable or costly. A database
+fixture or local service can prove behavior that a mock cannot, including
+constraints, transactions, serialization, and query syntax.
 
-- External APIs (payment, email, etc.)
-- Databases (sometimes - prefer test DB)
-- Time/randomness
-- File system (sometimes)
+A boundary can be owned by your team and still need a fake, such as another
+service across the network. Ownership alone does not decide the testing method.
+Do not add an abstraction solely to satisfy a blanket ban on internal mocks.
 
-Don't mock:
-
-- Your own classes/modules
-- Internal collaborators
-- Anything you control
-
-## Designing for Mockability
-
-At system boundaries, design interfaces that are easy to mock:
-
-**1. Use dependency injection**
-
-Pass external dependencies in rather than creating them internally:
+## Explicit application port
 
 ```typescript
-// Easy to mock
-function processPayment(order, paymentClient) {
-  return paymentClient.charge(order.total);
-}
+type Order = { total: number; id: string };
+type PaymentClient = {
+  charge: (input: { amount: number; idempotencyKey: string }) => Promise<string>;
+};
 
-// Hard to mock
-function processPayment(order) {
-  const client = new StripeClient(process.env.STRIPE_KEY);
-  return client.charge(order.total);
+export function processPayment(order: Order, client: PaymentClient) {
+  return client.charge({ amount: order.total, idempotencyKey: order.id });
 }
 ```
 
-**2. Prefer SDK-style interfaces over generic fetchers**
+`PaymentClient` is an application-owned example, not a real provider export.
+Test both returned behavior and a relevant external effect such as preserving
+the idempotency key across retries. Verify the real provider adapter separately.
 
-Create specific functions for each external operation instead of one generic function with conditional logic:
+## Choose the right HTTP test boundary
 
-```typescript
-// GOOD: Each function is independently mockable
-const api = {
-  getUser: (id) => fetch(`/users/${id}`),
-  getOrders: (userId) => fetch(`/users/${userId}/orders`),
-  createOrder: (data) => fetch('/orders', { method: 'POST', body: data }),
-};
+Operation-specific ports make domain tests readable. Mocking standard `fetch`
+with an established request-interception tool is also valid when testing HTTP
+paths, headers, serialization, cancellation, and error responses. Do not replace
+every HTTP client with a custom SDK solely to make mocks look simpler.
 
-// BAD: Mocking requires conditional logic inside the mock
-const api = {
-  fetch: (endpoint, options) => fetch(endpoint, options),
-};
-```
-
-The SDK approach means:
-- Each mock returns one specific shape
-- No conditional logic in test setup
-- Easier to see which endpoints a test exercises
-- Type safety per endpoint
+Match the project's runner and mocking library. A passing fake proves only the
+behavior it models; it does not prove that the real external contract matches.

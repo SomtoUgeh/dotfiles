@@ -21,9 +21,12 @@ for zone in client.zones.list():
 
 ```go
 // Go
-iter := client.Zones.ListAutoPaging(ctx, cloudflare.ZoneListParams{})
+iter := client.Zones.ListAutoPaging(ctx, zones.ZoneListParams{})
 for iter.Next() {
     fmt.Println(iter.Current().Name)
+}
+if err := iter.Err(); err != nil {
+    return err // inside a function returning error
 }
 ```
 
@@ -42,7 +45,7 @@ try {
 } catch (err) {
   if (err instanceof Cloudflare.RateLimitError) {
     // Already retried 5 times with backoff
-    const retryAfter = err.headers['retry-after'];
+    const retryAfter = err.headers?.get('retry-after');
     console.log(`Rate limited. Retry after ${retryAfter}s`);
   }
 }
@@ -64,7 +67,9 @@ const records = ['www', 'api', 'cdn'].map(subdomain =>
     content: '192.0.2.1',
   })
 );
-await Promise.all(records);
+const outcomes = await Promise.allSettled(records);
+// Inspect every rejected outcome; successful requests are not rolled back.
+console.log(outcomes);
 ```
 
 **Controlled concurrency** (avoid rate limits):
@@ -99,10 +104,10 @@ const zone = await client.zones.create({
 const fetched = await client.zones.get({ zone_id: zone.id });
 
 // Update
-await client.zones.edit(zone.id, { paused: false });
+await client.zones.edit({ zone_id: zone.id, paused: false });
 
 // Delete
-await client.zones.delete(zone.id);
+await client.zones.delete({ zone_id: zone.id });
 ```
 
 ## DNS Bulk Update
@@ -119,9 +124,8 @@ for await (const record of client.dns.records.list({
 
 // Update all to new IP
 await Promise.all(records.map(record =>
-  client.dns.records.update({
+  client.dns.records.update(record.id, {
     zone_id: 'zone-id',
-    dns_record_id: record.id,
     type: 'A',
     name: record.name,
     content: '203.0.113.1', // New IP
@@ -148,27 +152,7 @@ for await (const record of client.dns.records.list({
 
 ## Error Recovery Pattern
 
-```typescript
-async function createZoneWithRetry(name: string, maxAttempts = 3) {
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      return await client.zones.create({
-        account: { id: 'account-id' },
-        name,
-        type: 'full',
-      });
-    } catch (err) {
-      if (err instanceof Cloudflare.RateLimitError && attempt < maxAttempts) {
-        const retryAfter = parseInt(err.headers['retry-after'] || '5');
-        console.log(`Rate limited, waiting ${retryAfter}s (retry ${attempt}/${maxAttempts})`);
-        await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
-      } else {
-        throw err;
-      }
-    }
-  }
-}
-```
+Use the SDK retry policy shown above instead of wrapping its retry loop. After an uncertain create response, reconcile existing resources before repeating the mutation: a retry is not a transaction or a guarantee of idempotency.
 
 ## Conditional Update Pattern
 
@@ -176,7 +160,7 @@ async function createZoneWithRetry(name: string, maxAttempts = 3) {
 // Only update if zone is active
 const zone = await client.zones.get({ zone_id: 'zone-id' });
 if (zone.status === 'active') {
-  await client.zones.edit(zone.id, { paused: false });
+  await client.zones.edit({ zone_id: zone.id, paused: false });
 }
 ```
 
@@ -192,7 +176,7 @@ results.forEach((result, i) => {
   if (result.status === 'fulfilled') {
     console.log(`Zone ${i}: ${result.value.name}`);
   } else {
-    console.error(`Zone ${i} failed:`, result.reason.message);
+    console.error(`Zone ${i} failed:`, result.reason instanceof Error ? result.reason.message : String(result.reason));
   }
 });
 ```

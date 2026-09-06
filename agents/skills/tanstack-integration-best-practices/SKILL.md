@@ -15,45 +15,14 @@ Guidelines for integrating TanStack Query, Router, and Start together effectivel
 - Coordinating caching between router and query
 - Setting up type-safe data fetching patterns
 
-## Rule Categories by Priority
+## Available local rules
 
-| Priority | Category | Rules | Impact |
-|----------|----------|-------|--------|
-| CRITICAL | Setup | 3 rules | Foundational configuration |
-| CRITICAL | SSR Integration | 1 rule | Router + Query SSR setup |
-| HIGH | Data Flow | 4 rules | Correct data fetching patterns |
-| MEDIUM | Caching | 3 rules | Performance optimization |
-| MEDIUM | SSR | 2 rules | Additional SSR patterns |
+This package contains 4 rule files. Consult the official documentation for topics not covered here, matching the installed package version.
 
-## Quick Reference
-
-### Setup (Prefix: `setup-`)
-
-- `setup-query-client-context` — Pass QueryClient through router context
-- `setup-provider-wrapping` — Correctly wrap with QueryClientProvider
-- `setup-stale-time-coordination` — Coordinate staleTime between router and query
-
-### Data Flow (Prefix: `flow-`)
-
-- `flow-loader-query-pattern` — Use loaders with ensureQueryData
-- `flow-suspense-query-component` — Use useSuspenseQuery in components
-- `flow-mutations-invalidation` — Coordinate mutations with query invalidation
-- `flow-server-functions-queries` — Use server functions for query functions
-
-### Caching (Prefix: `cache-`)
-
-- `cache-single-source` — Let TanStack Query manage caching
-- `cache-preload-coordination` — Coordinate preloading between router and query
-- `cache-invalidation-patterns` — Unified invalidation patterns
-
-### SSR Integration (Prefix: `ssr-`)
-
-- `ssr-dehydrate-hydrate` — Use setupRouterSsrQueryIntegration for automatic SSR
-
-### Additional SSR (Prefix: `ssr-`)
-
-- `ssr-per-request-client` — Create QueryClient per request
-- `ssr-streaming-queries` — Handle streaming with queries
+- [cache-single-source: Let TanStack Query Manage Caching](rules/cache-single-source.md)
+- [flow-loader-query-pattern: Use Loaders with ensureQueryData](rules/flow-loader-query-pattern.md)
+- [setup-query-client-context: Pass QueryClient Through Router Context](rules/setup-query-client-context.md)
+- [ssr-dehydrate-hydrate: Configure SSR Query Integration](rules/ssr-dehydrate-hydrate.md)
 
 ## How to Use
 

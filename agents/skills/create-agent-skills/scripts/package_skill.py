@@ -1,17 +1,22 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["PyYAML==6.0.3"]
+# ///
 """
 Skill Packager - Creates a distributable zip file of a skill folder
 
 Usage:
-    python utils/package_skill.py <path/to/skill-folder> [output-directory]
+    uv run --script scripts/package_skill.py <path/to/skill-folder> [output-directory]
 
 Example:
-    python utils/package_skill.py skills/public/my-skill
-    python utils/package_skill.py skills/public/my-skill ./dist
+    uv run --script scripts/package_skill.py skills/public/my-skill
+    uv run --script scripts/package_skill.py skills/public/my-skill ./dist
 """
 
 import sys
 import zipfile
+import tempfile
 from pathlib import Path
 from quick_validate import validate_skill
 
@@ -55,39 +60,51 @@ def package_skill(skill_path, output_dir=None):
 
     # Determine output location
     skill_name = skill_path.name
-    if output_dir:
-        output_path = Path(output_dir).resolve()
-        output_path.mkdir(parents=True, exist_ok=True)
-    else:
-        output_path = Path.cwd()
-
+    output_path = Path(output_dir).resolve() if output_dir else Path.cwd()
     zip_filename = output_path / f"{skill_name}.zip"
 
-    # Create the zip file
+    # Inspect members before opening output. Never follow bundled symlinks or
+    # include the archive itself when the output directory is inside the skill.
+    temporary_zip = None
     try:
-        with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            # Walk through the skill directory
-            for file_path in skill_path.rglob('*'):
-                if file_path.is_file():
-                    # Calculate the relative path within the zip
-                    arcname = file_path.relative_to(skill_path.parent)
-                    zipf.write(file_path, arcname)
-                    print(f"  Added: {arcname}")
+        members = []
+        for file_path in sorted(skill_path.rglob('*')):
+            if file_path.is_symlink():
+                raise ValueError(f"Symbolic links cannot be packaged: {file_path}")
+            relative = file_path.relative_to(skill_path)
+            if file_path == zip_filename or any(part in {'.git', '__pycache__'} for part in relative.parts):
+                continue
+            if file_path.is_file():
+                members.append(file_path)
+            elif not file_path.is_dir():
+                raise ValueError(f"Unsupported resource type: {file_path}")
+        output_path.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(dir=output_path, suffix='.zip', delete=False) as temporary:
+            temporary_zip = Path(temporary.name)
+        with zipfile.ZipFile(temporary_zip, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for file_path in members:
+                arcname = file_path.relative_to(skill_path.parent)
+                zipf.write(file_path, arcname)
+                print(f"  Added: {arcname}")
+        temporary_zip.replace(zip_filename)
 
         print(f"\nOK: Successfully packaged skill to: {zip_filename}")
         return zip_filename
 
-    except Exception as e:
+    except (OSError, ValueError, zipfile.BadZipFile) as e:
         print(f"ERROR: Error creating zip file: {e}")
         return None
+    finally:
+        if temporary_zip is not None:
+            temporary_zip.unlink(missing_ok=True)
 
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python utils/package_skill.py <path/to/skill-folder> [output-directory]")
+    if len(sys.argv) not in (2, 3):
+        print("Usage: uv run --script scripts/package_skill.py <path/to/skill-folder> [output-directory]")
         print("\nExample:")
-        print("  python utils/package_skill.py skills/public/my-skill")
-        print("  python utils/package_skill.py skills/public/my-skill ./dist")
+        print("  uv run --script scripts/package_skill.py skills/public/my-skill")
+        print("  uv run --script scripts/package_skill.py skills/public/my-skill ./dist")
         sys.exit(1)
 
     skill_path = sys.argv[1]

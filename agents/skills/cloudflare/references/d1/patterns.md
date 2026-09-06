@@ -3,21 +3,26 @@
 ## Pagination
 
 ```typescript
-async function getUsers({ page, pageSize }: { page: number; pageSize: number }, env: Env) {
+interface User { id: number; name: string; email: string; created_at: string }
+async function getUsers({ page, pageSize }: { page: number; pageSize: number }, env: { DB: D1Database }) {
+  if (!Number.isInteger(page) || page < 1 || !Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100) {
+    throw new RangeError("Invalid page or pageSize");
+  }
   const offset = (page - 1) * pageSize;
-  const [countResult, dataResult] = await env.DB.batch([
-    env.DB.prepare('SELECT COUNT(*) as total FROM users'),
-    env.DB.prepare('SELECT * FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?').bind(pageSize, offset)
-  ]);
-  return { data: dataResult.results, total: countResult.results[0].total, page, pageSize, totalPages: Math.ceil(countResult.results[0].total / pageSize) };
+  const session = env.DB.withSession();
+  const total = await session.prepare('SELECT COUNT(*) AS total FROM users').first<number>('total') ?? 0;
+  const data = await session.prepare('SELECT * FROM users ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?')
+    .bind(pageSize, offset).all<User>();
+  return { data: data.results, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
 }
+// Sequential consistency is not snapshot isolation; concurrent writes can change the count between queries.
 ```
 
 ## Conditional Queries
 
 ```typescript
 async function searchUsers(filters: { name?: string; email?: string; active?: boolean }, env: Env) {
-  const conditions: string[] = [], params: (string | number | boolean | null)[] = [];
+  const conditions: string[] = [], params: (string | number | null)[] = [];
   if (filters.name) { conditions.push('name LIKE ?'); params.push(`%${filters.name}%`); }
   if (filters.email) { conditions.push('email = ?'); params.push(filters.email); }
   if (filters.active !== undefined) { conditions.push('active = ?'); params.push(filters.active ? 1 : 0); }
@@ -31,6 +36,7 @@ async function searchUsers(filters: { name?: string; email?: string; active?: bo
 ```typescript
 async function bulkInsertUsers(users: Array<{ name: string; email: string }>, env: Env) {
   const stmt = env.DB.prepare('INSERT INTO users (name, email) VALUES (?, ?)');
+  if (users.length === 0) return [];
   const batch = users.map(user => stmt.bind(user.name, user.email));
   return await env.DB.batch(batch);
 }
@@ -66,7 +72,7 @@ const [user, posts, comments] = await env.DB.batch([
 ]);
 
 // ❌ Avoid N+1 queries
-for (const post of posts) {
+for (const post of posts.results) {
   const author = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(post.user_id).first(); // Bad: multiple round trips
 }
 
@@ -80,16 +86,7 @@ const postsWithAuthors = await env.DB.prepare(`
 
 ## Multi-Tenant SaaS
 
-```typescript
-// Each tenant gets own database
-export default {
-  async fetch(request: Request, env: { [key: `TENANT_${string}`]: D1Database }) {
-    const tenantId = request.headers.get('X-Tenant-ID');
-    const data = await env[`TENANT_${tenantId}`].prepare('SELECT * FROM records').all();
-    return Response.json(data.results);
-  }
-}
-```
+Resolve the tenant database from authenticated identity and server-owned configuration before querying. Never choose `env[TENANT_...]` directly from an `X-Tenant-ID` header. With a shared database, include the authorized tenant ID in every query and enforce it for writes as well as reads.
 
 ## Session Storage
 
@@ -100,7 +97,7 @@ async function createSession(userId: number, token: string, env: Env) {
 }
 
 async function validateSession(token: string, env: Env) {
-  return await env.DB.prepare('SELECT s.*, u.email FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.token = ? AND s.expires_at > CURRENT_TIMESTAMP').bind(token).first();
+  return await env.DB.prepare('SELECT s.*, u.email FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.token = ? AND s.expires_at > ?').bind(token, new Date().toISOString()).first();
 }
 ```
 
@@ -108,7 +105,7 @@ async function validateSession(token: string, env: Env) {
 
 ```typescript
 async function logEvent(event: { type: string; userId?: number; metadata: object }, env: Env) {
-  return await env.DB.prepare('INSERT INTO events (type, user_id, metadata) VALUES (?, ?, ?)').bind(event.type, event.userId || null, JSON.stringify(event.metadata)).run();
+  return await env.DB.prepare('INSERT INTO events (type, user_id, metadata) VALUES (?, ?, ?)').bind(event.type, event.userId ?? null, JSON.stringify(event.metadata)).run();
 }
 
 async function getEventStats(startDate: string, endDate: string, env: Env) {
@@ -116,67 +113,22 @@ async function getEventStats(startDate: string, endDate: string, env: Env) {
 }
 ```
 
-## Read Replication Pattern (Paid Plans)
+## Sessions and read replication
+
+D1 sessions provide sequential consistency across queries; they do not extend query timeouts or reserve a 15-minute connection. A session has no `close()` method.
 
 ```typescript
-interface Env { DB: D1Database; DB_REPLICA: D1Database; }
-
-export default {
-  async fetch(request: Request, env: Env) {
-    if (request.method === 'GET') {
-      // Reads: use replica for lower latency
-      const users = await env.DB_REPLICA.prepare('SELECT * FROM users WHERE active = 1').all();
-      return Response.json(users.results);
-    }
-    
-    if (request.method === 'POST') {
-      const { name, email } = await request.json();
-      const result = await env.DB.prepare('INSERT INTO users (name, email) VALUES (?, ?)').bind(name, email).run();
-      
-      // Read-after-write: use primary for consistency (replication lag <100ms-2s)
-      const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(result.meta.last_row_id).first();
-      return Response.json(user, { status: 201 });
-    }
-  }
-}
+const session = env.DB.withSession("first-primary");
+await session.prepare("UPDATE users SET last_login = ? WHERE id = ?")
+  .bind(Date.now(), userId).run();
+const user = await session.prepare("SELECT * FROM users WHERE id = ?")
+  .bind(userId).first();
+const bookmark = session.getBookmark();
 ```
 
-**Use replicas for**: Analytics dashboards, search results, public queries (eventual consistency OK)  
-**Use primary for**: Read-after-write, financial transactions, authentication (consistency required)
+Use `first-unconstrained` (the default) for an initial read from any eligible replica, `first-primary` when the first query must use the primary, or a previous bookmark to resume from at least that database version. Subsequent queries in that session preserve sequential consistency. Enabling read replication and using `withSession` controls replica routing; adding a second binding with the same database ID does not create a replica.
 
-## Sessions API Pattern (Paid Plans)
-
-```typescript
-// Migration with long-running session (up to 15 min)
-async function runMigration(env: Env) {
-  const session = env.DB.withSession({ timeout: 600 }); // 10 min
-  try {
-    await session.prepare('CREATE INDEX idx_users_email ON users(email)').run();
-    await session.prepare('CREATE INDEX idx_posts_user ON posts(user_id)').run();
-    await session.prepare('ANALYZE').run();
-  } finally {
-    session.close(); // Always close to prevent leaks
-  }
-}
-
-// Bulk transformation with batching
-async function transformLargeDataset(env: Env) {
-  const session = env.DB.withSession({ timeout: 900 }); // 15 min max
-  try {
-    const BATCH_SIZE = 1000;
-    let offset = 0;
-    while (true) {
-      const rows = await session.prepare('SELECT id, data FROM legacy LIMIT ? OFFSET ?').bind(BATCH_SIZE, offset).all();
-      if (rows.results.length === 0) break;
-      const updates = rows.results.map(row => 
-        session.prepare('UPDATE legacy SET new_data = ? WHERE id = ?').bind(transform(row.data), row.id)
-      );
-      await session.batch(updates);
-      offset += BATCH_SIZE;
-    }
-  } finally { session.close(); }
-}
-```
+[Read replication documentation](https://developers.cloudflare.com/d1/best-practices/read-replication/).
 
 ## Time Travel & Backups
 
@@ -187,3 +139,5 @@ wrangler d1 export <db-name> --remote --output=./backup.sql  # Full export
 wrangler d1 export <db-name> --remote --no-schema --output=./data.sql  # Data only
 wrangler d1 execute <db-name> --remote --file=./backup.sql  # Import
 ```
+
+Binding source: [D1 database and sessions API](https://developers.cloudflare.com/d1/worker-api/d1-database/). SQL result generics describe expected rows and do not validate them at runtime.

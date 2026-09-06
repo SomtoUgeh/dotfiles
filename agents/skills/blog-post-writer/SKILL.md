@@ -7,6 +7,8 @@ description: Transform brain dumps into polished blog posts in Nick Nisi's voice
 
 Transform unstructured brain dumps into polished blog posts that sound like Nick Nisi.
 
+Preserve the author's actual experiences, claims, dates, affiliations, and measured results. Style examples are illustrative; do not transplant them into the user's biography or invent vulnerability, anecdotes, metrics, or endorsements. Verify technical instructions against the target project and current primary docs.
+
 ## Process
 
 ### 1. Receive the Brain Dump

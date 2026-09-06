@@ -43,7 +43,7 @@ function ChannelProvider({
   children: React.ReactNode
 }) {
   const { state, update, submit } = useGlobalChannel(channelId)
-  const inputRef = useRef(null)
+  const inputRef = useRef<TextInput>(null)
 
   return (
     <Composer.Provider
@@ -86,11 +86,13 @@ function Channel({ channelId }: { channelId: string }) {
 function ForwardMessageProvider({ children }) {
   const [state, setState] = useState(initialState)
   const forwardMessage = useForwardMessage()
+  const inputRef = useRef<TextInput>(null)
 
   return (
     <Composer.Provider
       state={state}
       actions={{ update: setState, submit: forwardMessage }}
+      meta={{ inputRef }}
     >
       {children}
     </Composer.Provider>
@@ -100,9 +102,10 @@ function ForwardMessageProvider({ children }) {
 // Global synced state for channels
 function ChannelProvider({ channelId, children }) {
   const { state, update, submit } = useGlobalChannel(channelId)
+  const inputRef = useRef<TextInput>(null)
 
   return (
-    <Composer.Provider state={state} actions={{ update, submit }}>
+    <Composer.Provider state={state} actions={{ update, submit }} meta={{ inputRef }}>
       {children}
     </Composer.Provider>
   )

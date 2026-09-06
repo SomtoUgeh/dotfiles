@@ -1,11 +1,13 @@
 # Next.js (App Router)
 
+Copy [verify-turnstile.ts](../templates/verify-turnstile.ts) to `lib/server/verify-turnstile.ts` before using the backend examples. Keep it server-only and preserve the handler's existing inputs and business logic. Configure the exact frontend hostnames for each deployment; production must exclude local-development hosts.
+
 For `app/`-directory Next.js projects. The widget needs to run on the client, so the page or component must be `"use client"`. The siteverify call lives server-side, either in a Server Action or an API route.
 
 ```tsx title="app/signup/page.tsx"
 "use client";
 import Script from "next/script";
-import { type FormEvent, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 type TurnstileWidgetId = string;
 type TurnstileApi = {
@@ -15,14 +17,17 @@ type TurnstileApi = {
 			sitekey: string;
 			action: string;
 			callback: (token: string) => void;
+			"expired-callback": () => void;
+			"error-callback": () => void;
 		},
 	) => TurnstileWidgetId;
 	reset: (widgetId: TurnstileWidgetId) => void;
+	remove: (widgetId: TurnstileWidgetId) => void;
 };
 
 declare global {
 	interface Window {
-		turnstile: TurnstileApi;
+		turnstile?: TurnstileApi;
 	}
 }
 
@@ -31,31 +36,50 @@ export default function SignupPage() {
 	const signupWidgetId = useRef<TurnstileWidgetId | null>(null);
 	const [token, setToken] = useState("");
 
-	function renderTurnstile() {
-		if (!turnstileContainer.current || signupWidgetId.current !== null) return;
+	const renderTurnstile = useCallback(() => {
+		if (!window.turnstile || !turnstileContainer.current || signupWidgetId.current !== null) return;
 		signupWidgetId.current = window.turnstile.render(turnstileContainer.current, {
 			sitekey: "YOUR_SITEKEY",
 			action: "signup",
 			callback: setToken,
+			"expired-callback": () => setToken(""),
+			"error-callback": () => setToken(""),
 		});
-	}
+	}, []);
+	useEffect(() => {
+		renderTurnstile();
+		return () => {
+			if (signupWidgetId.current !== null) window.turnstile?.remove(signupWidgetId.current);
+			signupWidgetId.current = null;
+		};
+	}, [renderTurnstile]);
+
+	const submitting = useRef(false);
+	const [pending, setPending] = useState(false);
+	const [error, setError] = useState("");
 
 	async function handleSubmit(e: FormEvent<HTMLFormElement>) {
 		e.preventDefault();
+		if (!token || submitting.current) return;
+		submitting.current = true;
+		setPending(true);
+		setError("");
 		try {
 			const res = await fetch("/api/signup", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ token }),
+				body: JSON.stringify({ ...Object.fromEntries(new FormData(e.currentTarget)), token }),
 			});
-			const data = await res.json();
-			if (!res.ok || data.ok !== true) throw new Error("Submission failed");
+			const data: unknown = await res.json();
+			if (!res.ok || typeof data !== "object" || data === null || !("ok" in data) || data.ok !== true) throw new Error("Submission failed");
 			// proceed
 		} catch {
-			// surface the error
+			setError("Submission failed. Please retry.");
 		} finally {
+			submitting.current = false;
+			setPending(false);
 			if (signupWidgetId.current !== null) {
-				window.turnstile.reset(signupWidgetId.current);
+				window.turnstile?.reset(signupWidgetId.current);
 				setToken("");
 			}
 		}
@@ -71,7 +95,8 @@ export default function SignupPage() {
 			<form onSubmit={handleSubmit}>
 				<input name="email" type="email" required />
 				<div ref={turnstileContainer} />
-				<button type="submit" disabled={!token}>
+				{error && <p role="alert">{error}</p>}
+				<button type="submit" disabled={!token || pending}>
 					Sign up
 				</button>
 			</form>
@@ -85,6 +110,7 @@ Explicit rendering returns the widget ID for this surface. The `finally` block r
 API route (canonical siteverify):
 
 ```ts title="app/api/signup/route.ts"
+import { verifyTurnstile } from "../../../lib/server/verify-turnstile";
 const expectedHostnames = new Set(
 	(process.env.TURNSTILE_HOSTNAMES ?? "")
 		.split(",")
@@ -93,29 +119,18 @@ const expectedHostnames = new Set(
 );
 
 export async function POST(req: Request) {
-	const { token } = await req.json();
-	const remoteip = req.headers.get("x-forwarded-for") ?? undefined;
+	let body: unknown;
+	try { body = await req.json(); } catch { return new Response("invalid JSON", { status: 400 }); }
+	const token = typeof body === "object" && body !== null && "token" in body ? body.token : undefined;
 
 	if (expectedHostnames.size === 0) {
 		return new Response("forbidden", { status: 403 });
 	}
 
-	const r = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-		method: "POST",
-		headers: { "Content-Type": "application/x-www-form-urlencoded" },
-		body: new URLSearchParams({
-			secret: process.env.TURNSTILE_SECRET!,
-			response: token,
-			...(remoteip ? { remoteip } : {}),
-		}),
-	});
-	const result = await r.json();
-	if (
-		r.ok !== true ||
-		result.success !== true ||
-		result.action !== "signup" ||
-		!expectedHostnames.has(result.hostname)
-	) {
+	if (!await verifyTurnstile({
+		token, secret: process.env.TURNSTILE_SECRET,
+		hostnames: process.env.TURNSTILE_HOSTNAMES, action: "signup",
+	})) {
 		return new Response("forbidden", { status: 403 });
 	}
 
@@ -132,7 +147,7 @@ If you are using Server Actions, do the siteverify call from the action itself. 
 
 ```tsx title="app/signup/actions.ts"
 "use server";
-import { headers } from "next/headers";
+import { verifyTurnstile } from "../../lib/server/verify-turnstile";
 
 export type SignupState = { ok?: true; error?: string } | null;
 
@@ -150,24 +165,11 @@ export async function submitSignup(
 	const token = formData.get("cf-turnstile-response");
 	if (typeof token !== "string") return { error: "Verification failed" };
 	if (expectedHostnames.size === 0) return { error: "Verification failed" };
-	const remoteip = (await headers()).get("x-forwarded-for") ?? undefined;
 
-	const r = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-		method: "POST",
-		headers: { "Content-Type": "application/x-www-form-urlencoded" },
-		body: new URLSearchParams({
-			secret: process.env.TURNSTILE_SECRET!,
-			response: token,
-			...(remoteip ? { remoteip } : {}),
-		}),
-	});
-	const result = await r.json();
-	if (
-		r.ok !== true ||
-		result.success !== true ||
-		result.action !== "signup" ||
-		!expectedHostnames.has(result.hostname)
-	) {
+	if (!await verifyTurnstile({
+		token, secret: process.env.TURNSTILE_SECRET,
+		hostnames: process.env.TURNSTILE_HOSTNAMES, action: "signup",
+	})) {
 		return { error: "Verification failed" };
 	}
 
@@ -179,7 +181,7 @@ export async function submitSignup(
 ```tsx title="app/signup/page.tsx (server-action variant)"
 "use client";
 import Script from "next/script";
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useCallback, useEffect, useRef, useState } from "react";
 import { submitSignup, type SignupState } from "./actions";
 
 type TurnstileWidgetId = string;
@@ -190,14 +192,17 @@ type TurnstileApi = {
 			sitekey: string;
 			action: string;
 			callback: (token: string) => void;
+			"expired-callback": () => void;
+			"error-callback": () => void;
 		},
 	) => TurnstileWidgetId;
 	reset: (widgetId: TurnstileWidgetId) => void;
+	remove: (widgetId: TurnstileWidgetId) => void;
 };
 
 declare global {
 	interface Window {
-		turnstile: TurnstileApi;
+		turnstile?: TurnstileApi;
 	}
 }
 
@@ -209,9 +214,11 @@ export default function SignupPage() {
 		async (previousState: SignupState, formData: FormData) => {
 			try {
 				return await submitSignup(previousState, formData);
+			} catch {
+				return { error: "Submission failed. Please retry." };
 			} finally {
 				if (signupActionWidgetId.current !== null) {
-					window.turnstile.reset(signupActionWidgetId.current);
+					window.turnstile?.reset(signupActionWidgetId.current);
 					setToken("");
 				}
 			}
@@ -219,17 +226,26 @@ export default function SignupPage() {
 		null,
 	);
 
-	function renderTurnstile() {
-		if (!turnstileContainer.current || signupActionWidgetId.current !== null) return;
+	const renderTurnstile = useCallback(() => {
+		if (!window.turnstile || !turnstileContainer.current || signupActionWidgetId.current !== null) return;
 		signupActionWidgetId.current = window.turnstile.render(
 			turnstileContainer.current,
 			{
 				sitekey: "YOUR_SITEKEY",
 				action: "signup",
 				callback: setToken,
+			"expired-callback": () => setToken(""),
+			"error-callback": () => setToken(""),
 			},
 		);
-	}
+	}, []);
+	useEffect(() => {
+		renderTurnstile();
+		return () => {
+			if (signupActionWidgetId.current !== null) window.turnstile?.remove(signupActionWidgetId.current);
+			signupActionWidgetId.current = null;
+		};
+	}, [renderTurnstile]);
 
 	return (
 		<>

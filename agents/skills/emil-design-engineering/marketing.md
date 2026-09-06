@@ -36,13 +36,13 @@ Use `sessionStorage` (not `localStorage`) so animations play again on new sessio
 
 ### Font Preloading
 
-Preload fonts to prevent layout shift:
+Preload only critical fonts to improve discovery; verify fallback metrics and font-display separately for layout shift:
 
 ```jsx
 import { preload } from 'react-dom';
 
 // In your app initialization
-preload('/fonts/inter-var.woff2', { as: 'font', type: 'font/woff2' });
+preload('/fonts/inter-var.woff2', { as: 'font', type: 'font/woff2', crossOrigin: 'anonymous' });
 ```
 
 ### Image Preloading
@@ -55,7 +55,7 @@ Preload above-the-fold images:
 
 ### Static Generation
 
-Generate blog, changelog, docs, and all other frequently updated data at build time with revalidation. Do not fetch at request time:
+Use static generation/revalidation for public content when its freshness requirements permit it. Personalized or real-time content may require request-time work. This App Router example applies to compatible Next.js configurations; check whether Cache Components is enabled before using route-segment revalidate:
 
 ```jsx
 // Next.js example
@@ -69,13 +69,13 @@ export const revalidate = 3600; // Revalidate every hour
 
 ## Header Navigation
 
-Ensure header submenu content on marketing pages is visible even when it shows on hover only. This maintains proper HTML structure for accessibility and SEO:
+Keep header submenu content available to keyboard and touch users. A closed submenu must not remain focusable; synchronize hidden state and aria-expanded through the installed menu primitive. aria-hidden alone does not hide content visually or remove tab stops:
 
 ```html
 <!-- Content exists in DOM, just visually hidden -->
 <nav>
-  <button aria-expanded="false">Products</button>
-  <div class="submenu" aria-hidden="true">
+  <button type="button" aria-expanded="false" aria-controls="products-submenu">Products</button>
+  <div id="products-submenu" class="submenu" hidden>
     <!-- Full content here, not dynamically loaded -->
   </div>
 </nav>

@@ -6,7 +6,7 @@
 // Basic send
 await env.MY_QUEUE.send({ url: request.url, timestamp: Date.now() });
 
-// Options: delay (max 43200s), contentType (json|text|bytes|v8)
+// Options: delay (max 86400s), contentType (json|text|bytes|v8)
 await env.MY_QUEUE.send(message, { delaySeconds: 600 });
 await env.MY_QUEUE.send(message, { delaySeconds: 0 }); // Override queue default
 
@@ -14,7 +14,7 @@ await env.MY_QUEUE.send(message, { delaySeconds: 0 }); // Override queue default
 await env.MY_QUEUE.sendBatch([
   { body: 'msg1' },
   { body: 'msg2' },
-  { body: 'msg3', options: { delaySeconds: 300 } }
+  { body: 'msg3', delaySeconds: 300 }
 ]);
 
 // Non-blocking with ctx.waitUntil - send continues after response
@@ -25,12 +25,13 @@ export default {
   async queue(batch: MessageBatch, env: Env, ctx: ExecutionContext): Promise<void> {
     for (const msg of batch.messages) {
       await processMessage(msg.body);
-      
-      // Fire-and-forget analytics (doesn't block ack)
+
+      // Queue-handler waitUntil work participates in batch completion.
+      // Explicitly ack only when the required processing is safely complete.
       ctx.waitUntil(
         env.ANALYTICS_QUEUE.send({ messageId: msg.id, processedAt: Date.now() })
       );
-      
+
       msg.ack();
     }
   }
@@ -62,50 +63,29 @@ export default {
 } satisfies ExportedHandler<Env>;
 ```
 
-**CRITICAL WARNINGS:**
+**Completion and retry semantics:**
 
-1. **Messages not explicitly ack'd or retry'd will auto-retry indefinitely** until `max_retries` is reached. Always call `msg.ack()` or `msg.retry()` for each message.
-
-2. **Throwing uncaught errors retries the ENTIRE batch**, not just the failed message. Always wrap individual message processing in try/catch and call `msg.retry()` explicitly per message.
-
-```typescript
-// ❌ BAD: Uncaught error retries entire batch
-async queue(batch: MessageBatch): Promise<void> {
-  for (const msg of batch.messages) {
-    await riskyOperation(msg.body); // If this throws, entire batch retries
-    msg.ack();
-  }
-}
-
-// ✅ GOOD: Catch per message, handle individually
-async queue(batch: MessageBatch): Promise<void> {
-  for (const msg of batch.messages) {
-    try {
-      await riskyOperation(msg.body);
-      msg.ack();
-    } catch (error) {
-      msg.retry({ delaySeconds: 60 });
-    }
-  }
-}
-```
+- Successful handler completion automatically acknowledges messages not explicitly retried.
+- An uncaught error (including required background work failure) retries unacknowledged messages. Earlier explicit acknowledgements remain acknowledged.
+- If you catch a processing error, call `msg.retry()`; logging and returning successfully otherwise acknowledges it.
 
 ## Ack/Retry Precedence Rules
 
-1. **Per-message calls take precedence**: If you call both `msg.ack()` and `msg.retry()`, last call wins
-2. **Batch calls don't override**: `batch.ackAll()` only affects messages without explicit ack/retry
-3. **No action = automatic retry**: Messages with no explicit action retry with configured delay
+1. The first `msg.ack()` or `msg.retry()` call wins; later calls on that message are ignored.
+2. Per-message decisions take precedence over `ackAll()` or `retryAll()`.
+3. No explicit action means automatic acknowledgement on success, or retry on failure.
 
 ```typescript
-async queue(batch: MessageBatch): Promise<void> {
+async function consume(batch: MessageBatch): Promise<void> {
   for (const msg of batch.messages) {
-    msg.ack();        // Message marked for ack
-    msg.retry();      // Overrides ack - message will retry
+    msg.ack();
+    msg.retry(); // Ignored: ack was first.
   }
-  
-  batch.ackAll();     // Only affects messages not explicitly handled above
+  batch.retryAll(); // Does not override those per-message acknowledgements.
 }
 ```
+
+See [acknowledgement rules](https://developers.cloudflare.com/queues/configuration/batching-retries/).
 
 ## Batch Operations
 
@@ -128,8 +108,8 @@ async queue(batch: MessageBatch, env: Env): Promise<void> {
       await processMessage(msg.body);
       msg.ack();
     } catch (error) {
-      // 30s, 60s, 120s, 240s, 480s, ... up to 12h max
-      const delay = Math.min(30 * (2 ** msg.attempts), 43200);
+      // 30s, 60s, 120s, 240s, 480s, ... up to 24h max
+      const delay = Math.min(30 * (2 ** Math.max(0, msg.attempts - 1)), 86400);
       msg.retry({ delaySeconds: delay });
     }
   }
@@ -201,6 +181,6 @@ interface Message<Body = unknown> {
 
 interface QueueSendOptions {
   contentType?: 'text' | 'bytes' | 'json' | 'v8';
-  delaySeconds?: number; // 0-43200
+  delaySeconds?: number; // 0-86400
 }
 ```

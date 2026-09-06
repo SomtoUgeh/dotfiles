@@ -14,13 +14,7 @@
       "database_id": "your-database-id",  // UUID from dashboard/CLI
       "migrations_dir": "migrations"      // Optional: default is "migrations"
     },
-    // Read replica (paid plans only)
-    {
-      "binding": "DB_REPLICA",
-      "database_name": "your-db-name",
-      "database_id": "your-database-id"   // Same ID, different binding
-    },
-    // Multiple databases
+    // Multiple independent databases
     {
       "binding": "ANALYTICS_DB",
       "database_name": "analytics-db",
@@ -55,6 +49,7 @@ CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   email TEXT UNIQUE NOT NULL,
   name TEXT NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
@@ -119,10 +114,16 @@ EXPLAIN QUERY PLAN SELECT * FROM users WHERE email = ?;
 
 ```typescript
 // drizzle.config.ts
-export default {
+import { defineConfig } from 'drizzle-kit';
+function required(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`Missing ${name}`);
+  return value;
+}
+export default defineConfig({
   schema: './src/schema.ts', out: './migrations', dialect: 'sqlite', driver: 'd1-http',
-  dbCredentials: { accountId: process.env.CLOUDFLARE_ACCOUNT_ID!, databaseId: process.env.D1_DATABASE_ID!, token: process.env.CLOUDFLARE_API_TOKEN! }
-} satisfies Config;
+  dbCredentials: { accountId: required('CLOUDFLARE_ACCOUNT_ID'), databaseId: required('D1_DATABASE_ID'), token: required('CLOUDFLARE_API_TOKEN') }
+});
 
 // schema.ts
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
@@ -172,10 +173,7 @@ wrangler d1 execute <db-name> --remote --file=./backup.sql
 | Rows written | 100,000 / day | First 50 million / month included |
 | Storage | 5 GB (total) | First 5 GB included |
 | Database size | 500 MB | 10 GB |
-| Batch size | 1,000 statements | 10,000 statements |
 | Time Travel | 7 days | 30 days |
-| Read replicas | ❌ | ✅ |
-| Sessions API | ❌ | ✅ (up to 15 min) |
 | Pricing | Free | $5/mo + usage |
 
 **Usage pricing** (paid plans, beyond included allowances): $0.001 per million rows read + $1.00 per million rows written + $0.75/GB-mo storage
@@ -189,3 +187,5 @@ sqlite3 .wrangler/state/v3/d1/<database-id>.sqlite  # Inspect
 
 # Local dev uses free tier limits by default
 ```
+
+Binding source: [D1 database and sessions API](https://developers.cloudflare.com/d1/worker-api/d1-database/). SQL result generics describe expected rows and do not validate them at runtime.

@@ -82,7 +82,7 @@ function Posts() {
 
 ```tsx
 // Route-level error handling
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { useQueryErrorResetBoundary } from '@tanstack/react-query'
 
 export const Route = createFileRoute('/posts')({
@@ -91,6 +91,7 @@ export const Route = createFileRoute('/posts')({
 
   errorComponent: ({ error, reset }) => {
     const { reset: resetQuery } = useQueryErrorResetBoundary()
+    const router = useRouter()
 
     return (
       <div>
@@ -98,7 +99,7 @@ export const Route = createFileRoute('/posts')({
         <button
           onClick={() => {
             resetQuery()
-            reset()
+            void router.invalidate().then(reset)
           }}
         >
           Retry

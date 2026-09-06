@@ -13,7 +13,7 @@ Agents receive and reply to emails via Cloudflare Email Routing.
   "durable_objects": {
     "bindings": [{ "name": "EmailAgent", "class_name": "EmailAgent" }]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["EmailAgent"] }],
+  "exports": { "EmailAgent": { "type": "durable-object", "storage": "sqlite" } },
   "send_email": [
     { "name": "SEB", "destination_address": "reply@yourdomain.com" }
   ]
@@ -58,7 +58,7 @@ export default {
   },
 
   async fetch(request, env) {
-    return routeAgentRequest(request, env) ?? new Response("Not found", { status: 404 });
+    return (await routeAgentRequest(request, env)) ?? new Response("Not found", { status: 404 });
   }
 };
 ```
@@ -134,10 +134,11 @@ async email(message, env) {
 ## Utilities
 
 ```typescript
-import { isAutoReplyEmail } from "agents/email";
+import { isAutoReplyEmail, type AgentEmail } from "agents/email";
 
 async onEmail(email: AgentEmail) {
-  if (isAutoReplyEmail(email.headers)) {
+  const headers = Array.from(email.headers, ([key, value]) => ({ key, value }));
+  if (isAutoReplyEmail(headers)) {
     // Skip auto-replies (vacation, out-of-office, etc.)
     return;
   }

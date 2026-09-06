@@ -18,14 +18,11 @@ Fetch the **latest** versions before writing or reviewing Workers code. Do not r
 
 ## FIRST: Fetch Latest References
 
-Before reviewing or writing Workers code, retrieve the current best practices page and relevant type definitions. If the project's `node_modules` has an older version, **prefer the latest published version**.
+Before reviewing or writing Workers code, retrieve the current best-practices page when web access is available. Validate code against the project's installed Wrangler and Workers types because those determine what the project can compile and deploy. Consult the latest published types only to discuss a deliberate upgrade.
 
 ```bash
-# Fetch latest workers types
-mkdir -p /tmp/workers-types-latest && \
-  npm pack @cloudflare/workers-types --pack-destination /tmp/workers-types-latest && \
-  tar -xzf /tmp/workers-types-latest/cloudflare-workers-types-*.tgz -C /tmp/workers-types-latest
-# Types at /tmp/workers-types-latest/package/index.d.ts
+# Inspect the installed types and Wrangler schema
+rg --files node_modules/@cloudflare/workers-types node_modules/wrangler 2>/dev/null
 ```
 
 ## Reference Documentation
@@ -72,7 +69,7 @@ mkdir -p /tmp/workers-types-latest && \
 | Rule | Summary |
 |------|---------|
 | No global request state | Never store request-scoped data in module-level variables |
-| Floating promises | Every Promise must be `await`ed, `return`ed, `void`ed, or passed to `ctx.waitUntil()` |
+| Floating promises | Await or return required work; use `ctx.waitUntil()` for background work. `void` alone neither handles rejection nor extends lifetime |
 
 ### Security
 
@@ -98,7 +95,7 @@ mkdir -p /tmp/workers-types-latest && \
 | `any` on `Env` or handler params | Defeats type safety for all binding access |
 | `as unknown as T` double-cast | Hides real type incompatibilities — fix the design |
 | `implements` on platform base classes (instead of `extends`) | Legacy — loses `this.ctx`, `this.env`. Applies to DurableObject, WorkerEntrypoint, Workflow |
-| `env.X` inside platform base class | Should be `this.env.X` in classes extending DurableObject, WorkerEntrypoint, etc. |
+| `env.X` without a scoped `env` variable in a platform class | Use `this.env.X`; a constructor or method parameter named `env` is valid |
 
 ## Review Workflow
 
@@ -108,7 +105,7 @@ mkdir -p /tmp/workers-types-latest && \
 4. **Check config** — compatibility_date, nodejs_compat, observability, secrets, binding-code consistency
 5. **Check patterns** — streaming, floating promises, global state, serialization boundaries
 6. **Check security** — crypto usage, secret handling, timing-safe comparisons, error handling
-7. **Validate with tools** — `npx tsc --noEmit`, lint for `no-floating-promises`
+7. **Validate with project tools** — use the repository's installed typecheck and lint scripts; do not download a floating tool version for review
 8. **Reference rules** — see `references/rules.md` for each rule's correct pattern
 
 ## Scope

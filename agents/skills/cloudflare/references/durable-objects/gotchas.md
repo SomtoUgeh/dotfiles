@@ -17,7 +17,7 @@ async webSocketMessage(ws: WebSocket, msg: string) {
 
 // ✅ Right - persisted
 async webSocketMessage(ws: WebSocket, msg: string) {
-  const count = this.ctx.storage.kv.get("userCount") || 0;
+  const count = this.ctx.storage.kv.get<number>("userCount") ?? 0;
   this.ctx.storage.kv.put("userCount", count + 1);
 }
 ```
@@ -72,7 +72,7 @@ private getHeavyData() {
 
 **Problem:** Write operations failing  
 **Cause:** DO storage exceeding 10GB limit or account quota  
-**Solution:** Cleanup with alarms, use `deleteAll()` for old data, upgrade plan
+**Solution:** Delete selected expired records, archive data, or shard. `deleteAll()` removes all object storage, not just old rows; use it only when all data is intentionally being retired.
 
 ### "CPU Time Exceeded (Terminated)"
 
@@ -108,10 +108,11 @@ private getHeavyData() {
 **Solution:** Use `blockConcurrencyWhile()` for critical sections or atomic storage ops
 
 ```typescript
-// ❌ Wrong - race condition
+// Race appears when external I/O is added between the read and write.
+// Ordinary storage-only await is protected by input gates.
 async incrementCounter() {
-  const count = await this.ctx.storage.get("count") || 0;
-  // ⚠️ Another request could execute here during await
+  const count = (await this.ctx.storage.get<number>("count")) ?? 0;
+  await fetch("https://example.com/work"); // Other requests can now interleave
   await this.ctx.storage.put("count", count + 1);
 }
 
@@ -125,7 +126,7 @@ async incrementCounter() {
 // ✅ Right - explicit locking
 async criticalOperation() {
   await this.ctx.blockConcurrencyWhile(async () => {
-    const count = await this.ctx.storage.get("count") || 0;
+    const count = (await this.ctx.storage.get<number>("count")) ?? 0;
     await this.ctx.storage.put("count", count + 1);
   });
 }
@@ -151,7 +152,7 @@ async criticalOperation() {
 ```typescript
 // Warming strategy (periodically ping critical DOs)
 export default {
-  async scheduled(event: ScheduledEvent, env: Env) {
+  async scheduled(event: ScheduledController, env: Env) {
     const criticalIds = ["auth", "sessions", "locks"];
     await Promise.all(criticalIds.map(name => {
       const id = env.MY_DO.idFromName(name);
@@ -178,7 +179,7 @@ export default {
 | Request throughput | ~1K req/s | ~1K req/s | Per DO (soft limit - shard for more) |
 | Alarms per DO | 1 | 1 | Use queue pattern for multiple events |
 | Total DOs | Unlimited | Unlimited | Create as many instances as needed |
-| WebSockets | Unlimited | Unlimited | Within 128MB memory limit per DO |
+| WebSockets | Check current Hibernation API limit | Check current Hibernation API limit | Also bounded by memory and workload |
 | Memory per DO | 128 MB | 128 MB | In-memory state + WebSocket buffers |
 
 ## Hibernation Caveats

@@ -6,11 +6,11 @@ Expert guidance for implementing unlimited-cardinality analytics at scale using 
 
 Time-series analytics database designed for high-cardinality data (millions of unique dimensions). Write data points from Workers, query via SQL API. Use for:
 - Custom user-facing analytics dashboards
-- Usage-based billing & metering
+- Usage estimation & metering (sampled data is not an exact billing ledger)
 - Per-customer/per-feature monitoring
-- High-frequency instrumentation without performance impact
+- High-frequency instrumentation with low-overhead writes
 
-**Key Capability:** Track metrics with unlimited unique values (e.g., millions of user IDs, API keys) without performance degradation.
+**Key capability:** High-cardinality analytics with adaptive sampling. Store non-secret identifiers rather than credentials.
 
 ## Core Concepts
 
@@ -20,7 +20,7 @@ Time-series analytics database designed for high-cardinality data (millions of u
 | **Data Point** | Single measurement with timestamp | One API request's metrics |
 | **Blobs** | String dimensions (max 20) | endpoint, method, status, user_id |
 | **Doubles** | Numeric values (max 20) | latency_ms, request_count, bytes |
-| **Indexes** | Filtered blobs for efficient queries | customer_id, api_key |
+| **Indexes** | Filtered blobs for efficient queries | customer_id, customer_id |
 
 ## Reading Order
 
@@ -72,7 +72,7 @@ env.ANALYTICS.writeDataPoint({
 
 3. Query via SQL API (HTTP):
 ```sql
-SELECT blob1, SUM(double2) AS total_requests
+SELECT blob1, SUM(double2 * _sample_interval) AS total_requests
 FROM my_events
 WHERE index1 = 'customer_123'
   AND timestamp >= NOW() - INTERVAL '7' DAY
@@ -92,3 +92,5 @@ ORDER BY total_requests DESC
 - [Cloudflare Analytics Engine Docs](https://developers.cloudflare.com/analytics/analytics-engine/)
 - [GraphQL Analytics API Reference](../graphql-api/) - Query built-in Cloudflare analytics (HTTP, Workers, DNS, Firewall, etc.)
 - [Observability Reference](../observability/) - Workers Logs, Traces, and real-time debugging
+
+Sampling reference: [Analytics Engine sampling](https://developers.cloudflare.com/analytics/analytics-engine/sampling/).

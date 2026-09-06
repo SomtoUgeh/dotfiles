@@ -4,194 +4,65 @@
 
 ## Explanation
 
-Route masks let you display one URL while internally routing to another. This is useful for modals, sheets, and overlays where you want a shareable URL that shows the modal, but navigating there directly should show the full page.
+A route mask displays a shareable page URL while the local history entry keeps
+an internal modal route. Copying the address bar copies the displayed URL;
+it does not reveal the internal route. Create separate page and modal routes.
 
-## Bad Example
+## Good Example
+
+The page route `/posts/$postId` renders `PostPage`. A separate internal route
+`/posts/$postId/modal` renders `PostModal` inside the list layout. If the page
+must avoid that layout, use a non-nested file route such as
+`posts_.$postId.tsx`; inspect the generated route IDs for the actual project.
 
 ```tsx
-// Modal without proper URL handling
-function PostList() {
-  const [selectedPost, setSelectedPost] = useState<string | null>(null)
+import { Link } from '@tanstack/react-router'
 
+function PostLink({ post }: { post: { id: string; title: string } }) {
   return (
-    <div>
-      {posts.map(post => (
-        <div key={post.id} onClick={() => setSelectedPost(post.id)}>
-          {post.title}
-        </div>
-      ))}
-
-      {selectedPost && (
-        <Modal onClose={() => setSelectedPost(null)}>
-          <PostDetail postId={selectedPost} />
-        </Modal>
-      )}
-    </div>
+    <Link
+      to="/posts/$postId/modal"
+      params={{ postId: post.id }}
+      mask={{ to: '/posts/$postId', params: { postId: post.id } }}
+      unmaskOnReload
+    >
+      {post.title}
+    </Link>
   )
 }
-
-// Problems:
-// - URL doesn't change when modal opens
-// - Can't share link to modal
-// - Back button doesn't close modal
-// - Refresh loses modal state
 ```
 
-## Good Example: Route Masks for Modal
+This navigates internally to `/posts/123/modal` and displays `/posts/123`.
+Opening the copied URL in another tab renders `PostPage`. Without
+`unmaskOnReload`, a local reload can restore the modal using history state.
+The mask itself does not change which component a route renders.
+
+## Programmatic Navigation
 
 ```tsx
-// routes/posts.tsx
-export const Route = createFileRoute('/posts')({
-  component: PostList,
+const openInModal = () => navigate({
+  to: '/posts/$postId/modal',
+  params: { postId },
+  mask: { to: '/posts/$postId', params: { postId } },
+  unmaskOnReload: true,
 })
 
-function PostList() {
-  const posts = usePosts()
-
-  return (
-    <div>
-      {posts.map(post => (
-        <Link
-          key={post.id}
-          to="/posts/$postId"
-          params={{ postId: post.id }}
-          mask={{
-            to: '/posts',
-            // URL shows /posts but routes to /posts/$postId
-          }}
-        >
-          {post.title}
-        </Link>
-      ))}
-      <Outlet />  {/* Modal renders here */}
-    </div>
-  )
-}
-
-// routes/posts/$postId.tsx
-export const Route = createFileRoute('/posts/$postId')({
-  component: PostModal,
+const expandToFullPage = () => navigate({
+  to: '/posts/$postId',
+  params: { postId },
+  replace: true,
 })
-
-function PostModal() {
-  const { postId } = Route.useParams()
-  const navigate = useNavigate()
-
-  return (
-    <Modal onClose={() => navigate({ to: '/posts' })}>
-      <PostDetail postId={postId} />
-    </Modal>
-  )
-}
-
-// User clicks post:
-// - URL stays /posts (masked)
-// - PostModal renders
-// - Share link goes to /posts/$postId (real URL)
-// - Direct navigation to /posts/$postId shows full page (no mask)
 ```
 
-## Good Example: With Search Params
+The modal needs its own accessible dialog behavior, close destination, focus
+restoration, and background/list layout. Those are application responsibilities.
 
-```tsx
-function PostList() {
-  return (
-    <div>
-      {posts.map(post => (
-        <Link
-          key={post.id}
-          to="/posts/$postId"
-          params={{ postId: post.id }}
-          mask={{
-            to: '/posts',
-            search: { modal: post.id },  // /posts?modal=123
-          }}
-        >
-          {post.title}
-        </Link>
-      ))}
-    </div>
-  )
-}
-```
+| Action | Result |
+| --- | --- |
+| Click masked link | Internal modal route; page URL in address bar |
+| Copy address bar / open elsewhere | Displayed page URL; page route |
+| Local reload with default options | History state can retain modal route |
+| Reload with `unmaskOnReload: true` | Displayed page URL becomes route |
+| Browser Back | Previous history entry |
 
-## Good Example: Programmatic Navigation with Mask
-
-```tsx
-function PostCard({ post }: { post: Post }) {
-  const navigate = useNavigate()
-
-  const openInModal = () => {
-    navigate({
-      to: '/posts/$postId',
-      params: { postId: post.id },
-      mask: {
-        to: '/posts',
-      },
-    })
-  }
-
-  const openFullPage = () => {
-    navigate({
-      to: '/posts/$postId',
-      params: { postId: post.id },
-      // No mask - shows real URL
-    })
-  }
-
-  return (
-    <div>
-      <h3>{post.title}</h3>
-      <button onClick={openInModal}>Quick View</button>
-      <button onClick={openFullPage}>Full Page</button>
-    </div>
-  )
-}
-```
-
-## Good Example: Unmask on Interaction
-
-```tsx
-function PostModal() {
-  const { postId } = Route.useParams()
-  const navigate = useNavigate()
-
-  const expandToFullPage = () => {
-    // Navigate to real URL, removing mask
-    navigate({
-      to: '/posts/$postId',
-      params: { postId },
-      // No mask = real URL
-      replace: true,  // Replace history entry
-    })
-  }
-
-  return (
-    <Modal>
-      <PostDetail postId={postId} />
-      <button onClick={expandToFullPage}>
-        Expand to full page
-      </button>
-    </Modal>
-  )
-}
-```
-
-## Route Mask Behavior
-
-| Scenario | URL Shown | Actual Route |
-|----------|-----------|--------------|
-| Click masked link | Masked URL | Real route |
-| Share/copy URL | Real URL | Real route |
-| Direct navigation | Real URL | Real route |
-| Browser refresh | Depends on URL in bar | Matches URL |
-| Back button | Previous URL | Previous route |
-
-## Context
-
-- Masks are client-side only - shared URLs are the real route
-- Direct navigation to real URL bypasses mask (shows full page)
-- Back button navigates through history correctly
-- Use for modals, side panels, quick views
-- Masks can include different search params
-- Consider UX: users expect shared URLs to work
+Reference: [Official route masking guide](https://tanstack.com/router/latest/docs/guide/route-masking)

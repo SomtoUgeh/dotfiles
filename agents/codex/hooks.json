@@ -6,8 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${HOME}/code/dotfiles/agents/shared/hooks/git_guard.py\"",
-            "timeout": 5
+            "command": "uv run --script \"${DOTFILES_DIR}/agents/shared/hooks/git_guard.py\"",
+            "timeout": 15
           }
         ]
       }
@@ -18,19 +18,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${HOME}/code/dotfiles/agents/skills/shaping/shaping-ripple.sh\"",
+            "command": "\"${HOME}/.agents/skills/shaping/shaping-ripple.sh\"",
             "timeout": 5
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"${HOME}/.local/bin/plannotator\"",
-            "timeout": 345600
           }
         ]
       }

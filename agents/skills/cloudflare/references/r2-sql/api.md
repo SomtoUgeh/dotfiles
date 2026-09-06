@@ -27,7 +27,7 @@ CLI: `npx wrangler r2 sql query "{WAREHOUSE}" "<SQL>"` (with `WRANGLER_R2_SQL_AU
 }
 ```
 
-Error: `{"result": null, "success": false, "errors": [{"code": 40003, "message": "..."}]}`. `bytes_scanned` ≈ billable data.
+Error: `{"result": null, "success": false, "errors": [{"code": 40003, "message": "..."}]}`. use the pricing documentation to interpret billed usage; `bytes_scanned` is a query metric.
 
 ## Query Structure
 

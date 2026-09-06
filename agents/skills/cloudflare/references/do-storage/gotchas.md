@@ -10,7 +10,7 @@ Block new requests during storage reads from CURRENT request:
 ```typescript
 // SAFE: Input gate active during await
 async increment() {
-  const val = await this.ctx.storage.get("counter"); // Input gate blocks other requests
+  const val = (await this.ctx.storage.get<number>("counter")) ?? 0; // Input gate blocks other requests
   await this.ctx.storage.put("counter", val + 1);
   return val;
 }
@@ -22,7 +22,7 @@ Hold response until ALL writes from current request confirm:
 ```typescript
 // SAFE: Output gate waits for put() to confirm before returning response
 async increment() {
-  const val = await this.ctx.storage.get("counter");
+  const val = (await this.ctx.storage.get<number>("counter")) ?? 0;
   this.ctx.storage.put("counter", val + 1); // No await
   return new Response(String(val)); // Response delayed until write confirms
 }
@@ -40,25 +40,24 @@ this.ctx.storage.put("key", 3); // Final value: 3
 
 ### Breaking Gates (DANGER)
 
-**fetch() breaks input/output gates** → allows request interleaving:
+**Awaiting external I/O allows request interleaving**; it does not disable the output gate for pending writes:
 
 ```typescript
 // UNSAFE: fetch() allows another request to interleave
 async unsafe() {
-  const val = await this.ctx.storage.get("counter");
+  const val = (await this.ctx.storage.get<number>("counter")) ?? 0;
   await fetch("https://api.example.com"); // Gate broken!
   await this.ctx.storage.put("counter", val + 1); // Race condition possible
 }
 ```
 
-**Solution:** Use `blockConcurrencyWhile()` or `transaction()`:
+**Solution:** Keep external I/O outside storage critical sections. Claim work durably before external I/O and use idempotency at the remote service; storage rollback cannot undo network effects.
 
 ```typescript
 // SAFE: Block concurrent requests explicitly
 async safe() {
   return await this.ctx.blockConcurrencyWhile(async () => {
-    const val = await this.ctx.storage.get("counter");
-    await fetch("https://api.example.com");
+    const val = (await this.ctx.storage.get<number>("counter")) ?? 0;
     await this.ctx.storage.put("counter", val + 1);
     return val;
   });
@@ -105,7 +104,7 @@ const val = await this.ctx.storage.get("metrics", { allowConcurrency: true });
 ```typescript
 // BAD: Snowflake/Twitter IDs will corrupt
 this.sql.exec("CREATE TABLE events(id INTEGER PRIMARY KEY)");
-this.sql.exec("INSERT INTO events VALUES (?)", 1234567890123456789n); // Corrupts!
+this.sql.exec("INSERT INTO events VALUES (?)", 1234567890123456789); // Number already rounded!
 
 // GOOD: Store as TEXT
 this.sql.exec("CREATE TABLE events(id TEXT PRIMARY KEY)");
@@ -114,8 +113,9 @@ this.sql.exec("INSERT INTO events VALUES (?)", "1234567890123456789");
 
 ### "Alarm Not Deleted with deleteAll()"
 
-**Cause:** `deleteAll()` doesn't delete alarms automatically  
-**Solution:** Call `deleteAlarm()` explicitly before `deleteAll()` to remove alarm
+**Cause:** With a compatibility date before `2026-02-24`, `deleteAll()` leaves alarms set.
+
+**Solution:** For older dates, call `deleteAlarm()` first or enable `delete_all_deletes_alarm`. With a date of `2026-02-24` or later, `deleteAll()` clears both data and alarms. [Behavior change](https://developers.cloudflare.com/changelog/post/2026-02-24-deleteall-deletes-alarms/)
 
 ### "Slow Performance"
 

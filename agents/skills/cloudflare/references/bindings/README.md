@@ -4,7 +4,7 @@ Expert guidance on Cloudflare Workers Bindings - the runtime APIs that connect W
 
 ## What Are Bindings?
 
-Bindings are how Workers access Cloudflare resources (storage, compute, services) via the `env` object. They're configured in `wrangler.jsonc`, type-safe via TypeScript, and zero-overhead at runtime.
+Bindings are how Workers access Cloudflare resources (storage, compute, services) via the `env` object. They're configured in `wrangler.jsonc`, type-safe via TypeScript, and available without embedding Cloudflare API credentials.
 
 ## Reading Order
 
@@ -33,16 +33,16 @@ Bindings are how Workers access Cloudflare resources (storage, compute, services
 |---------|----------|----------------|
 | **Service** | Worker-to-Worker RPC | `env.MY_SERVICE.fetch(req)` |
 | **Workers AI** | LLM inference | `env.AI.run(model, input)` |
-| **Browser Rendering** | Headless Chrome | `env.BROWSER.fetch(url)` |
+| **Browser Rendering** | Headless Chrome | `puppeteer.launch(env.BROWSER)` |
 
 ### Platform Bindings
 
 | Binding | Use Case | Access Pattern |
 |---------|----------|----------------|
 | **Analytics Engine** | Custom metrics | `env.ANALYTICS.writeDataPoint(data)` |
-| **mTLS** | Client certificates | `env.MY_CERT` (string) |
+| **mTLS** | Client certificates | `env.MY_CERT.fetch(request)` |
 | **Hyperdrive** | Database pooling | `env.HYPERDRIVE.connectionString` |
-| **Rate Limiting** | Request throttling | `env.RATE_LIMITER.limit(id)` |
+| **Rate Limiting** | Request throttling | `env.RATE_LIMITER.limit({ key: id })` |
 | **Workflows** | Long-running workflows | `env.MY_WORKFLOW.create()` |
 
 ### Configuration Bindings
@@ -106,12 +106,12 @@ Bindings are fully typed via `wrangler types`. See [api.md](api.md) for details.
 
 ## Limits
 
-- 64 bindings max per Worker (all types combined)
+- Limits differ by binding type and account plan; check the current platform limits.
 - See [gotchas.md](gotchas.md) for per-binding limits
 
 ## Key Concepts
 
-**Zero-overhead access:** Bindings compiled into Worker, no network calls to access
+**Capability access:** Bindings avoid manual API credentials; storage and service operations still have latency, quotas, and possible charges.
 **Type-safe:** Full TypeScript support via `wrangler types`
 **Per-environment:** Different IDs for dev/staging/production
 **Secrets vs Vars:** Secrets encrypted at rest, never in config files

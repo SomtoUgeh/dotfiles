@@ -138,7 +138,9 @@ export async function render(url: string) {
 // client.tsx
 import { hydrate, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { staleTime: 60 * 1000 } },
+})
 hydrate(queryClient, window.__DEHYDRATED_STATE__)
 
 hydrateRoot(
@@ -152,7 +154,7 @@ hydrateRoot(
 ## Context
 
 - Create new QueryClient per request to prevent data sharing between users
-- Set `staleTime > 0` on server to prevent immediate client refetch
+- Set `staleTime > 0` on the receiving client/query options too; dehydration transfers data and timestamps, not the server client's defaults
 - Use a safe serializer (not JSON.stringify) to prevent XSS
 - Failed queries aren't dehydrated by default; use `shouldDehydrateQuery` to override
 - `HydrationBoundary` can be nested for route-level prefetching

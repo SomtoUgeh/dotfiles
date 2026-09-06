@@ -1,8 +1,8 @@
 # Closeout review contract
 
 Adapted from [openclaw/agent-skills autoreview](https://github.com/openclaw/agent-skills/blob/main/skills/autoreview/SKILL.md)
-(MIT ideas; not a vendored 440KB helper). Use with our shared model policy in
-AGENTS.md: **Fable/Sol review**, **Grok implement**, no nested Fable.
+(MIT ideas; not a vendored 440KB helper). Use with the model roles and one lead reviewer
+gate in shared `AGENTS.md`.
 
 This is a **ship/commit gate**, not a permission to rewrite the task, and not
 product behavior-validation (that is separate: running app/CLI against a
@@ -93,20 +93,11 @@ release, beta, stable, hotfix, signing, notarization, package-publish work:
 
 ## Models (this stack)
 
-| Step | Model / harness | Effort |
-|------|-----------------|--------|
-| Primary closeout gate | **fable-5** (Claude session) | high |
-| Independent second opinion | **gpt-5.6-sol** via `codex review` | high |
-| Optional third opinion | **opus-4.8** | high |
-| Apply accepted fixes | **grok-4.5** via `grok -p` | high |
-| Fix if Grok missed / hard bug | **gpt-5.6-sol** via `codex exec` | high / xhigh |
-| UI / polish fixes | **fable-5** or **opus-4.8** | med / high |
-
-**One Fable gate.** Never nest Fable reviewers under Fable. Multi-reviewer
-panels only when the user asks or risk clearly justifies spend; the main agent
-still verifies every accepted finding before fixing.
-
-Never invent Claude model names for Sol or Grok.
+Use the primary reviewer and implementer roles defined in shared `AGENTS.md`.
+The active runtime's configured model is the default. Use an independent model
+only when requested or justified by shared policy, when it is actually available
+through the correct harness. Keep the one lead reviewer. The main agent verifies
+every accepted finding before fixing it.
 
 ## How to run the gate
 
@@ -123,10 +114,9 @@ Do **not** force local/dirty mode after commits are made. Do not push just to re
 
 ### 2. Primary review (pick one path)
 
-**A. Claude / Fable (default high-taste gate)**
+**A. Active-session review**
 
-In a Fable (or high-effort Claude) session, review the collected diff against this
-contract. Output:
+Review the collected diff against this contract in the active runtime. Output:
 
 ```markdown
 ## Summary
@@ -143,7 +133,7 @@ contract. Output:
 
 Default: only emit P0/P1 unless asked for wider.
 
-**B. Codex Sol (independent / Codex-native)**
+**B. Codex-native review**
 
 ```bash
 codex review --uncommitted
@@ -153,16 +143,19 @@ codex review --base main
 codex review --base "origin/$(gh pr view --json baseRefName -q .baseRefName)"
 ```
 
-Investigate only (no edits):
+These commands inherit the configured Codex model. If an explicit independent
+model is required and available, select it rather than assuming the configured
+model is different. Investigate only (no edits):
 
 ```bash
-codex exec -s read-only -m gpt-5.6-sol -c model_reasoning_effort="high" "…"
+codex exec -s read-only -m <available-independent-model> -c model_reasoning_effort="high" "…"
 ```
 
-**C. Optional dual pass**
+**C. Optional independent pass**
 
-Run Fable gate, then Sol. Keep disagreements in a short **Tension** list. Do
-not auto-merge opinions — the synthesizer (you) decides after verifying code.
+Run a second pass only when requested or justified and a distinct model is
+available. Keep disagreements in a short **Tension** list. Do not auto-merge
+opinions; the synthesizer decides after verifying code.
 
 ### 3. Accept / reject loop
 
@@ -170,8 +163,8 @@ For each finding:
 
 1. Read the cited path and surrounding call sites.
 2. Accept (in-scope blocker), defer (follow-up), or reject (wrong / intentional).
-3. Apply accepted fixes with the **implementer** model row above — not the
-   reviewer.
+3. Apply accepted fixes with the implementer role from shared policy, keeping
+   reviewer and implementer distinct when that capability is available.
 4. Rerun focused tests for touched behavior.
 5. Rerun the **same** review gate until no accepted/actionable findings remain
    **or** the two-cycle pause / scope governor trips.
@@ -201,7 +194,7 @@ Do not put secrets in printed commands.
 OpenClaw's `scripts/autoreview` helper (~440KB) covers TruffleHog pre-scan,
 engine isolation sandboxes, panel orchestration, and chunking. We rely on:
 
-- agent-driven diff collection + Fable/Sol review
+- agent-driven diff collection plus the active runtime's reviewer
 - repo CI / hooks for secret scan where configured
 - `codex review` for structured Codex isolation
 

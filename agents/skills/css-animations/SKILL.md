@@ -1,13 +1,16 @@
 ---
 name: css-animations
-description: Animate with CSS alone — transitions, `@keyframes`, transforms, 3D, and `clip-path` — at the craft bar of the "Animations on the Web" course (animations.dev). Use when writing or fixing CSS motion, deciding between a transition and a keyframe animation, building hover and press effects, entering or exiting an element without a library, looping a marquee or spinner, stacking toasts or cards, staggering a text reveal, rotating in 3D, revealing with clip-path, or fixing hover states that misfire on touch. Triggers on — CSS animation, @keyframes, transition, transition-property, timing-function, cubic-bezier, animation-fill-mode, animation-delay, animation-iteration-count, transform, translate, scale, rotate, rotateY, translateZ, perspective, preserve-3d, backface-visibility, transform-origin, clip-path, inset(), @starting-style, marquee, spinner, stagger, :hover, :active, :focus-visible, hover on mobile.
+description: Implement web motion with CSS transitions, keyframes, transforms, 3D, `clip-path`, and `@starting-style`. Use when writing or fixing CSS-only entrances, exits, hover and press feedback, autonomous loops, multi-step sequences, staggers, or touch-safe hover states. Use `animate` for overall direction and focused skills for performance diagnosis or reduced-motion design.
 metadata:
   short-description: Animate with CSS the way the animations.dev course teaches
 ---
 
 # CSS Animations
 
-The CSS Animations module of Emil Kowalski's *Animations on the Web* course ([animations.dev](https://animations.dev/)), as a working reference. Everything here is CSS only — no dependencies, no JavaScript.
+The CSS Animations module of Emil Kowalski's *Animations on the Web* course ([animations.dev](https://animations.dev/)), as a working reference. The animation driver here is CSS; recipes can use JavaScript or React for state and lifecycle.
+
+Follow [../animate/references/canonical-policy.md](../animate/references/canonical-policy.md)
+for the shared motion policy. It wins if this guide conflicts with it.
 
 For the worked patterns (hover reveals, toast stacks, text reveals, orbits, clip-path effects), load **[RECIPES.md](RECIPES.md)**.
 
@@ -26,9 +29,11 @@ For the worked patterns (hover reveals, toast stacks, text reveals, orbits, clip
 - You want it to feel more sophisticated than CSS can manage.
 - It must be **interruptible** and feel natural — real spring physics.
 
-Be honest about the ceiling: **iOS-level polish is not reachable with plain CSS**. CSS has no real springs, and without them motion can feel cheap and pedestrian. Users don't care which technology you used, only how it feels — so if a library gets you a better result, use the library. Bundle size is real but rarely decisive; frame drops are avoidable if you animate the right properties.
+CSS transitions can retarget state changes smoothly. Runtime springs add velocity-aware gesture behavior, while CSS `linear()` can approximate a fixed spring curve. Choose by the actual interaction and existing stack; no driver guarantees polish or frame rate.
 
-The one thing CSS wins outright: **hardware acceleration**. A CSS `transform` animation is usually offloaded to the GPU and stays smooth however busy the main thread is. JS animation driven by `requestAnimationFrame` (Motion included) drops frames as the main thread fills up.
+CSS can let the browser sample eligible animation without per-frame JavaScript,
+which helps during main-thread contention. Compositor promotion and GPU use are
+browser decisions, so confirm important performance claims with a recording.
 
 ## Transition or keyframes — who drives it?
 
@@ -41,7 +46,7 @@ The whole choice reduces to one question: **is the user driving this change, or 
 | | It needs multiple steps (pulse, blink) |
 | | It's a simple enter/exit that never gets interrupted (dialog, popup) |
 
-**Transitions are interruptible; keyframe animations are not.** A transition always interpolates from the element's *current* value, so hovering and unhovering mid-flight glides back instead of snapping. A keyframe animation restarts from its first frame. That single property decides most cases — anything toggled rapidly (toasts arriving while the previous one is still moving) must be a transition.
+**Transitions retarget computed values; keyframes follow a defined timeline.** Keyframe animations can be paused, reversed, or controlled through WAAPI; reapplying a different animation can jump to its starting keyframe. Prefer transitions or springs for frequent retargeting unless the implementation explicitly preserves continuity.
 
 ## Transitions
 
@@ -92,7 +97,7 @@ Rules from the course:
 Use the `animation` shorthand for the first three values only (name, duration, timing-function) and declare the rest separately — it reads better.
 
 - **Omit `0%`/`100%` and CSS uses the element's existing values there.** `@keyframes blink { 50% { visibility: hidden; } }` is a complete blink.
-- **`animation-fill-mode: forwards`** keeps the end state; without it the element snaps back when the animation finishes. Needed for dialogs, popovers, anything that animates in and stays.
+- **`animation-fill-mode: forwards`** keeps the end state; without it the element snaps back when the animation finishes. Needed only when the underlying styles do not already describe the final state; keeping the final state in normal CSS also works.
 - **`animation-fill-mode: backwards`** applies the *first* keyframe before the animation starts — the fix for a delayed enter animation flashing its natural state first. `both` does both.
 - **`animation-iteration-count: infinite`** for loops. Counts between 1 and infinite are rarely worth it.
 - **`animation-direction: alternate`** plays back and forth instead of teleporting to the start.
@@ -118,7 +123,7 @@ Use the `animation` shorthand for the first three values only (name, duration, t
 
 **`transform-origin`** is the anchor every transform runs from — the center by default. **All popovers, dropdowns, and tooltips should animate from their trigger, not from their own center**, so they don't appear out of nowhere. Radix exposes this as a CSS variable.
 
-**Inline elements can't be transformed.** A `<span>` has no box of its own; give it `display: inline-block` before animating it.
+**Inline elements can't be transformed.** A non-replaced inline `<span>` is not a transformable box; give it `display: inline-block` before animating it.
 
 ### 3D
 
@@ -134,12 +139,15 @@ Use the `animation` shorthand for the first three values only (name, duration, t
 ```
 
 - Think of `rotateY` and `rotateX` as screws. Screw one in from the top and turn it — that's `rotateY`, a revolving door. `rotateX` is the same idea sideways: a rotisserie chicken.
-- `translateZ` moves along the z-axis, positive toward the viewer. **Its effect is invisible without `perspective` on the parent.** The closer the viewer, the more dramatic small changes look.
+- `translateZ` moves along the z-axis, positive toward the viewer. Perspective produces size/depth cues; translateZ can still affect 3D placement and occlusion without it. The closer the viewer, the more dramatic small changes look.
 - Without `preserve-3d` there is no depth, so a child can never pass behind its sibling.
 
 ## clip-path
 
-`clip-path` defines a clipping region: content inside is visible, content outside is hidden. Like `transform` it **has no effect on layout**, and it's **hardware-accelerated** — which makes it a better tool than `width`/`height` for most reveals, and it avoids layout shift because the content is already there, merely clipped.
+`clip-path` defines a clipping region: content inside is visible, content outside
+is hidden. Like `transform` it does not change document layout, which often makes
+it a useful reveal tool. Its paint and compositor behavior varies by shape and
+browser, so profile complex or large effects.
 
 Shapes include `circle()`, `ellipse()`, `polygon()`, and `url()` for an SVG path, but **`inset()` does nearly all the animation work**. Its four values are offsets from the top, right, bottom, and left, exactly like `margin`:
 
@@ -159,7 +167,7 @@ Tapping an interactive element on a touch device triggers its hover state — ac
 }
 ```
 
-Tailwind v4 does this by default. In v3, set `future.hoverOnlyWhenSupported` in the config.
+Tailwind v4 gates `hover:` with `(hover: hover)` only; add `(pointer: fine)` separately if the effect needs it. In v3, set `future.hoverOnlyWhenSupported` in the config.
 
 And when hover reveals *information* rather than decoration, pair it with **`:focus-visible`** so keyboard users get it too. (`:focus-visible` fires for keyboard focus; `:focus` also fires on click.)
 

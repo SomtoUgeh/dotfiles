@@ -1,76 +1,26 @@
-# Vectorize Gotchas
+# Vectorize gotchas
 
-## Critical Warnings
+- **Dimension error:** every stored/query vector must match the index dimensions. Changing embedding models may require re-embedding into a new index.
+- **Missing records after mutation:** mutations are asynchronous. Track processing and use bounded visibility checks; fixed sleeps are not proof of completion.
+- **Missing metadata:** explicitly request `"all"` for fields outside metadata indexes. `"indexed"` is intentionally narrower.
+- **Filter surprises:** filters run before top-K. Index the field with the right type and check nested dot notation, UTF-8 prefix behavior, and documented operators.
+- **Tenant overwrite:** namespace is not a separate ID space. Use tenant-qualified IDs, and authorize all `getByIds`, delete, upsert, and backing-store operations.
+- **Duplicate insert ignored:** use upsert when replacing an existing ID.
+- **Partial ingestion:** preserve per-batch errors and mutation IDs and retry deliberately; do not silently truncate vectors or treat one accepted batch as full completion.
 
-### Async Mutations
-Insert/upsert/delete return immediately but vectors aren't queryable for 5-10 seconds.
-
-### Batch Size Limit
-**Workers API: 1,000 vectors max per call (HTTP API: 5,000).** Silently truncates if exceeded.
-
-```typescript
-// ✅ Chunk into 1000 (Workers API limit; HTTP API allows 5000)
-for (let i = 0; i < vectors.length; i += 1000) {
-  await env.VECTORIZE.upsert(vectors.slice(i, i + 1000));
-}
-```
-
-### Metadata Truncation
-`returnMetadata: "indexed"` returns only first 64 bytes of strings. Use `"all"` for complete metadata (but max topK drops to 20).
-
-### topK Limits
-
-| returnMetadata | returnValues | Max topK |
-|----------------|--------------|----------|
-| `"none"` / `"indexed"` | `false` | 100 |
-| `"all"` | any | **20** |
-| any | `true` | **20** |
-
-### Metadata Indexes First
-Create BEFORE inserting - existing vectors not retroactively indexed.
-
-```bash
-# ✅ Create index FIRST
-wrangler vectorize create-metadata-index my-index --property-name=category --type=string
-wrangler vectorize insert my-index --file=data.ndjson
-```
-
-### Index Config Immutable
-Cannot change dimensions/metric after creation. Must create new index and migrate.
-
-## Limits (V2)
+Limits checked against the current documentation; verify again when sizing a deployment:
 
 | Resource | Limit |
-|----------|-------|
-| Vectors per index | 10,000,000 |
-| Max dimensions | 1536 |
-| Batch upsert (Workers / HTTP API) | **1,000 / 5,000** |
-| Indexed string metadata | **64 bytes** |
-| Metadata indexes | 10 |
-| Namespaces | 50,000 (paid) / 1,000 (free) |
+|---|---|
+| Dimensions | 1536 |
+| Vectors per index | 20,000,000 |
+| Vector ID | 64 bytes |
+| Metadata per vector | 10 KiB |
+| Metadata indexes per vector index | 10 |
+| Query top-K, no values/metadata | 100 |
+| Query top-K with values or metadata | 50 |
+| Workers binding batch | 1000 vectors |
+| HTTP batch | 5000 vectors, 100 MB payload ceiling |
+| Namespaces per index | 1000 Free / 50,000 Paid |
 
-## Common Mistakes
-
-1. **Wrong embedding shape:** Extract `result.data[0]` from Workers AI
-2. **Metadata index after data:** Re-upsert all vectors
-3. **Insert vs upsert:** `insert` ignores duplicates, `upsert` overwrites
-4. **Not batching:** Individual inserts ~1K/min, batched ~200K+/min
-
-## Troubleshooting
-
-**No results?**
-- Wait 5-10s after insert
-- Check namespace spelling (case-sensitive)
-- Verify metadata index exists
-- Check dimension mismatch
-
-**Metadata filter not working?**
-- Index must exist before data insert
-- Strings >64 bytes truncated
-- Use dot notation for nested: `"product.category"`
-
-## Model Dimensions
-
-- `@cf/baai/bge-small-en-v1.5`: 384
-- `@cf/baai/bge-base-en-v1.5`: 768
-- `@cf/baai/bge-large-en-v1.5`: 1024
+[Current limits](https://developers.cloudflare.com/vectorize/platform/limits/) remains authoritative for plan quotas and changes.

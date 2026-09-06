@@ -1,5 +1,6 @@
 git/.gitconfig.local
 config/gh/hosts.yml
+/config/github-copilot/
 __pycache__/
 .DS_Store
 .ropeproject/

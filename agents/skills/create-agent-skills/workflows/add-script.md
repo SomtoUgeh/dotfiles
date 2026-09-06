@@ -1,93 +1,13 @@
-# Workflow: Add a Script to a Skill
+# Add a Script
 
-<required_reading>
-**Read these reference files NOW:**
-1. references/using-scripts.md
-</required_reading>
+Read [using scripts](../references/using-scripts.md) and [executable helpers](../references/executable-code.md).
 
-<process>
-## Step 1: Identify the Skill
+Resolve the target skill and operation from existing context. Inspect the relevant files and search for an existing maintained helper before building.
 
-Ask (if not already provided):
-- Which skill needs a script?
-- What operation should the script perform?
+1. Define inputs, outputs, side effects, dependencies, and failure/cleanup behavior.
+2. Add the smallest complete helper under `scripts/`. Validate paths and arguments before writes; preserve prior results on failure.
+3. Use `uv run` for Python and the project's existing runtime elsewhere. Document the actual invocation and working-directory requirements.
+4. Link the helper from the entrypoint and workflow. Explain which output and exit status prove success.
+5. Run isolated valid, invalid, repeat, and failure cases appropriate to the operation. Check that secrets are not logged.
 
-## Step 2: Analyze Script Need
-
-Confirm this is a good script candidate:
-- [ ] Same code runs across multiple invocations
-- [ ] Operation is error-prone when rewritten
-- [ ] Consistency matters more than flexibility
-
-If not a good fit, suggest alternatives (inline code in workflow, reference examples).
-
-## Step 3: Create Scripts Directory
-
-```bash
-mkdir -p ~/.agents/skills/{skill-name}/scripts
-```
-
-## Step 4: Design Script
-
-Gather requirements:
-- What inputs does the script need?
-- What should it output or accomplish?
-- What errors might occur?
-- Should it be idempotent?
-
-Choose language:
-- **bash** - Shell operations, file manipulation, CLI tools
-- **python** - Data processing, API calls, complex logic
-- **node/ts** - JavaScript ecosystem, async operations
-
-## Step 5: Write Script File
-
-Create `scripts/{script-name}.{ext}` with:
-- Purpose comment at top
-- Usage instructions
-- Input validation
-- Error handling
-- Clear output/feedback
-
-For bash scripts:
-```bash
-#!/bin/bash
-set -euo pipefail
-```
-
-## Step 6: Make Executable (if bash)
-
-```bash
-chmod +x ~/.agents/skills/{skill-name}/scripts/{script-name}.sh
-```
-
-## Step 7: Update Workflow to Use Script
-
-Find the workflow that needs this operation. Add:
-```xml
-<process>
-...
-N. Run `scripts/{script-name}.sh [arguments]`
-N+1. Verify operation succeeded
-...
-</process>
-```
-
-## Step 8: Test
-
-Invoke the skill workflow and verify:
-- Script runs at the right step
-- Inputs are passed correctly
-- Errors are handled gracefully
-- Output matches expectations
-</process>
-
-<success_criteria>
-Script is complete when:
-- [ ] scripts/ directory exists
-- [ ] Script file has proper structure (comments, validation, error handling)
-- [ ] Script is executable (if bash)
-- [ ] At least one workflow references the script
-- [ ] No hardcoded secrets or credentials
-- [ ] Tested with real invocation
-</success_criteria>
+Complete when the workflow calls the helper correctly and its behavior is verified. Installing a script does not authorize a live deployment or account mutation.

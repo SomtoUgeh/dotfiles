@@ -1,81 +1,28 @@
-# Zaraz Gotchas
+# Zaraz troubleshooting
 
-## Events Not Firing
+| Symptom | Check |
+| --- | --- |
+| `zaraz` missing | Script injection/manual loader, blockers, CSP, execution timing |
+| Event not routed | Event name, trigger match, tool action, consent purpose, credentials |
+| Consent setter fails | `set` takes an object; `setAll` takes a boolean; use real purpose IDs |
+| Consent listener never fires | Listen for `zarazConsentChoicesUpdated` on document |
+| API used too early | Check `consent.APIReady` or wait for `zarazConsentAPIReady` |
+| Debug mode does not open | Call `zaraz.debug(key)` with the dashboard key |
+| Previous user's identity remains | `set` defaults to persistent storage; remove keys with undefined |
+| Duplicate SPA events | Choose automatic SPA support or manual routing events |
+| Context location is wrong | Use original supplied system context, not the enricher Worker's request metadata |
+| Save unexpectedly goes live | Real-time is the default workflow; use Preview & Publish for staged review |
 
-**Check:**
-1. Tool enabled in dashboard (green dot)
-2. Trigger conditions met
-3. Consent granted for tool's purpose
-4. Tool credentials correct (GA4: `G-XXXXXXXXXX`, FB: numeric only)
+For consent testing, use the actual UI or documented API in an isolated test
+browser. Do not guess a cookie name and delete production preferences. The
+standard consent cookie is `cf_consent`, but administrators may customize it.
 
-**Debug:**
-```javascript
-zaraz.debug = true;
-console.log('Tools:', zaraz.tools);
-console.log('Consent:', zaraz.consent.getAll());
-```
+Inspect the browser request, Zaraz debug output, and the provider's diagnostics.
+Awaiting `track` does not guarantee downstream attribution. Use current provider
+limits and expected delivery timing rather than fixed universal payload/count
+limits. Server-side tracking is supported by the HTTP Events API; Zaraz is not
+an authentication service.
 
-## Consent Issues
-
-**Modal not showing:**
-```javascript
-// Clear consent cookie
-document.cookie = 'zaraz-consent=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-location.reload();
-```
-
-**Tools firing before consent:** Map tool to consent purpose with "Do not load until consent granted".
-
-## SPA Tracking
-
-**Route changes not tracked:**
-1. Configure History Change trigger in dashboard
-2. Hash routing (`#/path`) requires manual tracking:
-```javascript
-window.addEventListener('hashchange', () => {
-  zaraz.track('pageview', { page_path: location.pathname + location.hash });
-});
-```
-
-**React fix:**
-```javascript
-const location = useLocation();
-useEffect(() => {
-  zaraz.track('pageview', { page_path: location.pathname });
-}, [location]); // Include dependency
-```
-
-## Performance
-
-**Slow page load:**
-- Audit tool count (50+ degrades performance)
-- Disable blocking triggers unless required
-- Reduce event payload size (<100KB)
-
-## Tool-Specific Issues
-
-| Tool | Issue | Fix |
-|------|-------|-----|
-| GA4 | Events not in real-time | Wait 5-10 min, use DebugView |
-| Facebook | Invalid Pixel ID | Use numeric only (no `fbpx_` prefix) |
-| Google Ads | Conversions not attributed | Include `send_to: 'AW-XXX/LABEL'` |
-
-## Data Layer
-
-- Properties persist per page only - set on each page load
-- Nested access: `{{client.__zarazTrack.user.plan}}`
-
-## Limits
-
-| Resource | Limit |
-|----------|-------|
-| Request size | 100KB |
-| Consent purposes | 20 |
-| API rate | 1000 req/sec |
-
-## When NOT to Use Zaraz
-
-- Server-to-server tracking (use Workers)
-- Real-time bidirectional communication
-- Binary data transmission
-- Authentication flows
+Sources: [Consent API](https://developers.cloudflare.com/zaraz/consent-management/api/),
+[settings](https://developers.cloudflare.com/zaraz/reference/settings/),
+[HTTP Events API](https://developers.cloudflare.com/zaraz/http-events-api/).

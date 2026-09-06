@@ -35,50 +35,28 @@ interface Env {
   ANALYTICS: AnalyticsEngineDataset;
 }
 
-export default {
-  async fetch(request: Request, env: Env) {
-    // No await - returns void, fire-and-forget
-    env.ANALYTICS.writeDataPoint({
-      blobs: [pathname, method, status],      // String dimensions (max 20)
-      doubles: [latency, 1],                   // Numeric metrics (max 20)
-      indexes: [apiKey]                        // High-cardinality filter (max 1)
-    });
-    return response;
-  }
-};
+function record(env: Env, customerId: string, pathname: string, latency: number) {
+  env.ANALYTICS.writeDataPoint({
+    blobs: [pathname],
+    doubles: [latency, 1],
+    indexes: [customerId]
+  });
+}
 ```
 
 ## Data Point Limits
 
 | Field | Limit | SQL Access |
 |-------|-------|------------|
-| blobs | 20 strings, 16KB each | `blob1`...`blob20` |
+| blobs | 20 strings, 16 KB total across blobs | `blob1`...`blob20` |
 | doubles | 20 numbers | `double1`...`double20` |
-| indexes | 1 string, 16KB | `index1` |
+| indexes | 1 string, 96 bytes | `index1` |
 
-## Write Behavior
+## Write behavior and cost
 
-| Scenario | Behavior |
-|----------|----------|
-| <1M writes/min | All accepted |
-| >1M writes/min | Automatic sampling |
-| Invalid data | Silent failure (check tail logs) |
+Writes and queries can be sampled by index group. Use weighted SQL; do not try to suppress sampling with an isolate-local buffer. Invalid data may throw synchronously. Confirm ingestion and query results separately.
 
-**Mitigate sampling:** Pre-aggregate, use multiple datasets, write only critical metrics.
-
-## Query Limits
-
-| Resource | Limit |
-|----------|-------|
-| Query timeout | 30 seconds |
-| Data retention | 90 days (default) |
-| Result size | ~10MB |
-
-## Cost
-
-**Free tier:** 10M writes/month, 1M reads/month
-
-**Paid:** $0.05 per 1M writes, $1.00 per 1M reads
+Consult [limits](https://developers.cloudflare.com/analytics/analytics-engine/limits/) and [pricing](https://developers.cloudflare.com/analytics/analytics-engine/pricing/) before capacity or cost estimates.
 
 ## Environment-Specific
 
@@ -105,8 +83,10 @@ npx wrangler tail  # Check for sampling/write errors
 
 ```sql
 -- Check write activity
-SELECT DATE_TRUNC('hour', timestamp) AS hour, COUNT(*) AS writes
+SELECT DATE_TRUNC('hour', timestamp) AS hour, SUM(_sample_interval) AS writes
 FROM my_dataset
 WHERE timestamp >= NOW() - INTERVAL '24' HOUR
 GROUP BY hour
 ```
+
+Sampling reference: [Analytics Engine sampling](https://developers.cloudflare.com/analytics/analytics-engine/sampling/).

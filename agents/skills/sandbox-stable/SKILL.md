@@ -45,7 +45,7 @@ Skills install: [Agent setup](https://developers.cloudflare.com/agent-setup/) ·
 - Do **not** apply `@next` argv/`process.output()` APIs while the dependency is still stable.
 - Self-deployed **bridge** stays on the stable package and image. [Bridge](https://developers.cloudflare.com/sandbox/bridge/)
 
-Minimal shape:
+Minimal shape (Python requires the matching `-python` image; the default image contains no Python):
 
 ```ts
 import { getSandbox, proxyToSandbox, Sandbox } from "@cloudflare/sandbox";

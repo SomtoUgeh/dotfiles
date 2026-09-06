@@ -8,7 +8,7 @@
 | **`ctx.env.BINDING` undefined** | Binding not configured or name mismatch | Add to `wrangler.jsonc`, verify exact name (case-sensitive), redeploy |
 | **TypeScript errors on `ctx.env`** | Missing type definition | Run `wrangler types` or define `interface Env {}` |
 | **Middleware not running** | Wrong filename/location or missing `ctx.next()` | Name exactly `_middleware.js`, export `onRequest`, call `ctx.next()` |
-| **Secrets missing in production** | `.dev.vars` not deployed | `.dev.vars` is local only - set production secrets via dashboard or `wrangler secret put` |
+| **Secrets missing in production** | `.dev.vars` not deployed | `.dev.vars` is local only - set production secrets via dashboard or `wrangler pages secret put` |
 | **Type mismatch on binding** | Wrong interface type | See [api.md](./api.md) bindings table for correct types |
 | **"KV key not found" but exists** | Key in wrong namespace or env | Verify namespace binding, check preview vs production env |
 | **Function times out** | Synchronous wait or missing `await` | All I/O must be async/await, use `ctx.waitUntil()` for background tasks |
@@ -17,8 +17,8 @@
 
 ### TypeScript type errors
 
-**Problem:** `ctx.env.MY_BINDING` shows type error  
-**Cause:** No type definition for `Env`  
+**Problem:** `ctx.env.MY_BINDING` shows type error
+**Cause:** No type definition for `Env`
 **Solution:** Run `npx wrangler types` or manually define:
 ```typescript
 interface Env { MY_BINDING: KVNamespace; }
@@ -27,8 +27,8 @@ export const onRequest: PagesFunction<Env> = async (ctx) => { /* ... */ };
 
 ### Secrets not available in production
 
-**Problem:** `ctx.env.SECRET_KEY` is undefined in production  
-**Cause:** `.dev.vars` is local-only, not deployed  
+**Problem:** `ctx.env.SECRET_KEY` is undefined in production
+**Cause:** `.dev.vars` is local-only, not deployed
 **Solution:** Set production secrets:
 ```bash
 echo "value" | npx wrangler pages secret put SECRET_KEY --project-name=my-app
@@ -59,13 +59,7 @@ npx wrangler pages deployment tail --status error
 
 ## Limits
 
-| Resource | Free | Paid |
-|----------|------|------|
-| CPU time | 10ms | 30s (default), 5min (max) |
-| Memory | 128 MB | 128 MB |
-| Script size | 10 MB compressed | 10 MB compressed |
-| Env vars | 5 KB per var, 64 max | 5 KB per var, 64 max |
-| Requests | 100k/day | Unlimited ($0.50/million) |
+Pages Functions use Workers request/CPU limits, while Pages builds/files have separate plan limits. Read [Workers limits](https://developers.cloudflare.com/workers/platform/limits/), [Pages limits](https://developers.cloudflare.com/pages/platform/limits/) and [pricing](https://developers.cloudflare.com/pages/functions/pricing/) before quoting them. As checked on 2026-09-05, Workers bundle size is limited by 64 MiB uncompressed, not a 1/10 MB compressed tier split. Paid usage includes request and CPU charges, not a single flat $0.50/million rate.
 
 ## Best Practices
 

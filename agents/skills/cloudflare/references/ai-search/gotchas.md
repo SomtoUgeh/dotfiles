@@ -1,81 +1,12 @@
 # AI Search Gotchas
 
-## Type Safety
+- Current bindings use `AiSearchInstance` and `AiSearchNamespace`; legacy `Ai.autorag()` has different methods, filters, and response types. Migrate configuration, requests, and response consumers together.
+- Run `wrangler types` after changes. Error interfaces in declarations are not necessarily runtime constructors; do not write `instanceof AutoRAGNotFoundError` unless an actual imported runtime class exists.
+- A lower-bound comparison such as `$gte` is not a prefix test. Never remove tenant filters to debug a production request. Reproduce with controlled data and authorized scope.
+- Custom metadata filters require matching indexed fields and value types. Confirm timestamp units in the actual indexed schema; JavaScript `Date.now()` is milliseconds.
+- Retrieval can return empty results on backend failure by default. Set `return_on_failure: false` when failure must propagate, and handle errors separately from valid empty results.
+- Namespace searches may contain per-instance `errors` alongside `chunks`; inspect both before claiming the complete search succeeded.
+- Ingestion and indexing are asynchronous. Inspect `stats()`, item/job state, format support, and source permissions before lowering retrieval thresholds.
+- The old tables claiming exactly ten instances, 4 MB files, and an immutable six-hour cycle are not a current universal contract. Check [current limits and configuration](https://developers.cloudflare.com/ai-search/) for the selected instance.
 
-**Timestamp precision:** Use seconds (10-digit), not milliseconds.
-```typescript
-const nowInSeconds = Math.floor(Date.now() / 1000); // Correct
-```
-
-**Folder prefix matching:** Use `gte` for "starts with" on paths.
-```typescript
-filters: { column: "folder", operator: "gte", value: "docs/api/" } // Matches nested
-```
-
-## Filter Limitations
-
-| Limit | Value |
-|-------|-------|
-| Max nesting depth | 2 levels |
-| Filters per compound | 10 |
-| `or` operator | Same column, `eq` only |
-
-**OR restriction example:**
-```typescript
-// ✅ Valid: same column, eq only
-{ operator: "or", filters: [
-  { column: "folder", operator: "eq", value: "docs/" },
-  { column: "folder", operator: "eq", value: "guides/" }
-]}
-```
-
-## Indexing Issues
-
-| Problem | Cause | Solution |
-|---------|-------|----------|
-| File not indexed | Unsupported format or >4MB | Check format (.md/.txt/.html/.pdf/.doc/.csv/.json) |
-| Index out of sync | 6-hour index cycle | Wait or use "Force Sync" (30s rate limit) |
-| Empty results | Index incomplete | Check dashboard for indexing status |
-
-## Auth Errors
-
-| Error | Cause | Fix |
-|-------|-------|-----|
-| `AutoRAGUnauthorizedError` | Invalid/missing token | Create Service API token with AI Search permissions |
-| `AutoRAGNotFoundError` | Wrong instance name | Verify exact name from dashboard |
-
-## Performance
-
-**Slow responses (>3s):**
-```typescript
-// Add score threshold + limit results
-ranking_options: { score_threshold: 0.5 },
-max_num_results: 10
-```
-
-**Empty results debug:**
-1. Remove filters, test basic query
-2. Lower `score_threshold` to 0.1
-3. Check index is populated
-
-## Limits
-
-| Resource | Limit |
-|----------|-------|
-| Instances per account | 10 |
-| Files per instance | 100,000 |
-| Max file size | 4 MB |
-| Index frequency | 6 hours |
-
-## Anti-Patterns
-
-**Use env vars for instance names:**
-```typescript
-const answer = await env.AI.autorag(env.AI_SEARCH_INSTANCE).aiSearch({...});
-```
-
-**Handle specific error types:**
-```typescript
-if (error instanceof AutoRAGNotFoundError) { /* 404 */ }
-if (error instanceof AutoRAGUnauthorizedError) { /* 401 */ }
-```
+See [migration documentation](https://developers.cloudflare.com/ai-search/api/migration/workers-binding/), [configuration.md](configuration.md), and [api.md](api.md).

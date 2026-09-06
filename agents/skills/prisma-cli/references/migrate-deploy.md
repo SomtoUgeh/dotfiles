@@ -14,7 +14,7 @@ prisma migrate deploy
 - Updates `_prisma_migrations` table
 - Does NOT generate new migrations
 - Does NOT run seed scripts
-- Safe for CI/CD and production
+- Intended for CI/CD and production; migration SQL can still lock tables or destroy data
 
 ## Options
 
@@ -93,8 +93,8 @@ If a migration fails, `migrate deploy` exits with error. The failed migration is
 
 To fix:
 1. Resolve the issue (fix SQL, database state, etc.)
-2. Mark as resolved: `prisma migrate resolve --applied <migration_name>`
-3. Re-run: `prisma migrate deploy`
+2. If every intended change was completed manually, mark it `--applied`. If partially applied changes were reverted and you need a retry, mark the failed migration `--rolled-back`. These commands update history; they do not execute or undo SQL.
+3. Re-run `prisma migrate deploy` after checking the actual schema and data.
 
 ### Check status first
 
@@ -106,7 +106,7 @@ Shows pending and applied migrations before deploying.
 
 ## Configuration
 
-Ensure `prisma.config.ts` has the production database URL:
+Ensure `prisma7.config.ts` has the production database URL:
 
 ```typescript
 import 'dotenv/config'
@@ -121,7 +121,7 @@ export default defineConfig({
 
 ## Best Practices
 
-1. Always run `migrate status` before `migrate deploy` in CI
+1. Inspect migration status when useful; pending migrations return exit 1, so do not chain status with `&& migrate deploy`
 2. Have a rollback plan (backup before migrations)
 3. Test migrations in staging first
 4. Never use `migrate dev` in production

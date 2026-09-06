@@ -17,9 +17,9 @@ export default {
 ```typescript
 export default {
   async scheduled(controller, env, ctx) {
-    const result = await env.DB.prepare(`DELETE FROM sessions WHERE expires_at < datetime('now')`).run();
+    const result = await env.DB.prepare('DELETE FROM sessions WHERE expires_at < ?').bind(new Date().toISOString()).run();
     console.log(`Deleted ${result.meta.changes} expired sessions`);
-    ctx.waitUntil(env.DB.prepare("VACUUM").run());
+    // Use supported D1 maintenance operations; VACUUM is not a portable D1 query.
   },
 };
 ```
@@ -30,7 +30,7 @@ export default {
 export default {
   async scheduled(controller, env, ctx) {
     const startOfWeek = new Date(); startOfWeek.setDate(startOfWeek.getDate() - 7);
-    const { results } = await env.DB.prepare(`SELECT date, revenue, orders FROM daily_stats WHERE date >= ? ORDER BY date`).bind(startOfWeek.toISOString()).all();
+    const { results } = await env.DB.prepare(`SELECT date, revenue, orders FROM daily_stats WHERE date >= ? ORDER BY date`).bind(startOfWeek.toISOString().slice(0, 10)).all<{ date: string; revenue: number; orders: number }>();
     const report = {period: "weekly", totalRevenue: results.reduce((sum, d) => sum + d.revenue, 0), totalOrders: results.reduce((sum, d) => sum + d.orders, 0), dailyBreakdown: results};
     const reportKey = `reports/weekly-${Date.now()}.json`;
     await env.REPORTS_BUCKET.put(reportKey, JSON.stringify(report));
@@ -51,7 +51,7 @@ export default {
         const response = await fetch(service.url, { signal: AbortSignal.timeout(5000) });
         return {name: service.name, status: response.ok ? "up" : "down", responseTime: Date.now() - start};
       } catch (error) {
-        return {name: service.name, status: "down", responseTime: Date.now() - start, error: error.message};
+        return {name: service.name, status: "down", responseTime: Date.now() - start, error: error instanceof Error ? error.message : String(error)};
       }
     }));
     ctx.waitUntil(env.STATUS_KV.put("health_status", JSON.stringify(checks)));
@@ -61,35 +61,20 @@ export default {
 };
 ```
 
-## Batch Processing (Rate-Limited)
+## Queue integration
+
+Use the producer binding to enqueue work, and a Queue consumer handler to process messages. The Worker Queue binding does not expose `receive()`. A concurrency-limited `Promise.allSettled` over a KV array is not a durable queue and can lose failed items.
 
 ```typescript
+interface Env { JOBS: Queue<{ scheduledTime: number; cron: string }> }
 export default {
-  async scheduled(controller, env, ctx) {
-    const queueData = await env.QUEUE_KV.get("pending_items", "json");
-    if (!queueData || queueData.length === 0) return;
-    const batch = queueData.slice(0, 100);
-    const results = await Promise.allSettled(batch.map(item => fetch("https://api.example.com/process", {method: "POST", headers: {"Authorization": `Bearer ${env.API_KEY}`, "Content-Type": "application/json"}, body: JSON.stringify(item)})));
-    console.log(`Processed ${results.filter(r => r.status === "fulfilled").length}/${batch.length} items`);
-    ctx.waitUntil(env.QUEUE_KV.put("pending_items", JSON.stringify(queueData.slice(100))));
-  },
-};
+  async scheduled(controller, env) {
+    await env.JOBS.send({ scheduledTime: controller.scheduledTime, cron: controller.cron });
+  }
+} satisfies ExportedHandler<Env>;
 ```
 
-## Queue Integration
-
-```typescript
-export default {
-  async scheduled(controller, env, ctx) {
-    const batch = await env.MY_QUEUE.receive({ batchSize: 100 });
-    const results = await Promise.allSettled(batch.messages.map(async (msg) => {
-      await processMessage(msg.body, env);
-      await msg.ack();
-    }));
-    console.log(`Processed ${results.filter(r => r.status === "fulfilled").length}/${batch.messages.length}`);
-  },
-};
-```
+Consumers must validate work, check HTTP responses, and acknowledge only successful processing. External pull consumers use the separate authenticated HTTP pull API.
 
 ## Monitoring & Observability
 
@@ -104,8 +89,8 @@ export default {
       console.log("[SUCCESS]", { ...meta, duration: Date.now() - startTime, count: result.count });
       ctx.waitUntil(env.METRICS.put(`cron:${controller.scheduledTime}`, JSON.stringify({ ...meta, status: "success" }), { expirationTtl: 2592000 }));
     } catch (error) {
-      console.error("[ERROR]", { ...meta, duration: Date.now() - startTime, error: error.message });
-      ctx.waitUntil(fetch(env.ALERT_WEBHOOK, { method: "POST", body: JSON.stringify({ text: `Cron failed: ${controller.cron}`, error: error.message }) }));
+      console.error("[ERROR]", { ...meta, duration: Date.now() - startTime, error: error instanceof Error ? error.message : String(error) });
+      ctx.waitUntil(fetch(env.ALERT_WEBHOOK, { method: "POST", body: JSON.stringify({ text: `Cron failed: ${controller.cron}`, error: error instanceof Error ? error.message : String(error) }) }));
       throw error;
     }
   },
@@ -141,50 +126,32 @@ from workers import WorkerEntrypoint
 
 class Default(WorkerEntrypoint):
     async def scheduled(self, controller, env, ctx):
-        data = await env.MY_KV.get("key")
-        ctx.waitUntil(env.DB.execute("DELETE FROM logs WHERE created_at < datetime('now', '-7 days')"))
+        data = await self.env.MY_KV.get("key")
+        self.ctx.waitUntil(self.env.DB.prepare("DELETE FROM logs WHERE created_at < datetime('now', '-7 days')").run())
 ```
+
+Python entrypoints access bindings and execution context through `self.env` and `self.ctx`. Keep the scheduled arguments for dispatch compatibility; the runtime can pass `None` for `env` and `ctx`.
 
 ## Testing Patterns
 
-**Local testing with /__scheduled:**
+**Local testing with /cdn-cgi/local/scheduled:**
 ```bash
 # Start dev server
 npx wrangler dev
 
 # Test specific cron
-curl "http://localhost:8787/__scheduled?cron=*/5+*+*+*+*"
+curl "http://localhost:8787/cdn-cgi/local/scheduled?cron=*/5+*+*+*+*"
 
 # Test with specific time
-curl "http://localhost:8787/__scheduled?cron=0+2+*+*+*&scheduledTime=1704067200000"
+curl "http://localhost:8787/cdn-cgi/local/scheduled?cron=0+2+*+*+*&time=1704067200000"
 ```
 
-**Unit tests:**
-```typescript
-// test/scheduled.test.ts
-import { describe, it, expect, vi } from "vitest";
-import { env } from "cloudflare:test";
-import worker from "../src/index";
-
-describe("Scheduled Handler", () => {
-  it("executes cron", async () => {
-    const controller = { scheduledTime: Date.now(), cron: "*/5 * * * *", type: "scheduled" as const, noRetry: vi.fn() };
-    const ctx = { waitUntil: vi.fn(), passThroughOnException: vi.fn() };
-    await worker.scheduled(controller, env, ctx);
-    expect(await env.MY_KV.get("last_run")).toBeDefined();
-  });
-  
-  it("calls noRetry on duplicate", async () => {
-    const controller = { scheduledTime: 1704067200000, cron: "0 2 * * *", type: "scheduled" as const, noRetry: vi.fn() };
-    await env.EXECUTIONS.put("0 2 * * *-1704067200000", "1");
-    await worker.scheduled(controller, env, { waitUntil: vi.fn(), passThroughOnException: vi.fn() });
-    expect(controller.noRetry).toHaveBeenCalled();
-  });
-});
-```
+**Unit tests:** Use the Workers Vitest integration and its scheduled-controller/execution-context helpers. Test success, background rejection, duplicate scheduled times, and each schedule branch; await `waitOnExecutionContext(ctx)` before assertions.
 
 ## See Also
 
 - [README.md](./README.md) - Overview
 - [api.md](./api.md) - Handler implementation
 - [gotchas.md](./gotchas.md) - Troubleshooting
+
+Current source: [Cron Triggers](https://developers.cloudflare.com/workers/configuration/cron-triggers/). Local handler tests do not verify hosted scheduling, retries, or global propagation.

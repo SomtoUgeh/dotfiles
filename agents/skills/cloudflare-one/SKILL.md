@@ -100,9 +100,9 @@ Use these to avoid jumping straight to configuration. Ask only the prompts relev
   | DNS filtering only | DNS-only mode | Only DNS queries go to Gateway. No traffic proxying. |
 
 - Include vs exclude is per-profile, not per-entry. You cannot mix modes in the same profile. Switching modes mid-deployment requires re-evaluating every entry.
-- Split tunnel entries must align with tunnel routes bidirectionally. A CIDR in the include list without a matching tunnel route causes a black hole. A tunnel route without a matching device profile entry means traffic never enters the tunnel.
+- Split tunnel entries must align with tunnel routes bidirectionally. A CIDR in the include list without a matching tunnel route causes a black hole. In Include mode, a private destination must match an include entry; in Exclude mode, it must not match an exclusion. Verify the active mode instead of requiring an explicit entry in both cases.
 - MDM parameters (`mdm.xml` / managed preferences) override dashboard-configured profile settings for any setting specified in the file. If dashboard changes appear to have no effect on managed devices, check MDM config. Retrieve [MDM deployment](https://developers.cloudflare.com/cloudflare-one/team-and-resources/devices/cloudflare-one-client/deployment/mdm-deployment/) docs for platform-specific file locations and parameters.
-- If another VPN client or agent controls DNS on the device, the device client's DNS interception will conflict. In coexistence scenarios, use "traffic only" mode to avoid routing table and DNS conflicts.
+- If another VPN client or agent controls DNS on the device, the device client's DNS interception will conflict. In coexistence scenarios, consider [Traffic only mode](https://developers.cloudflare.com/cloudflare-one/team-and-resources/devices/cloudflare-one-client/deployment/vpn/) to avoid DNS ownership conflicts. It still controls IP routing, so reconcile split tunnels separately; domain-based split tunneling and Local Domain Fallback are unavailable in this mode.
 - Captive portal detection temporarily disconnects the client when it detects a portal (hotel WiFi, airport).  This is a common source of end-user friction and should be managed carefully.
 
 ### Private Networking

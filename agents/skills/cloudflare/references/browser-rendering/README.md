@@ -37,11 +37,11 @@
 
 | Limit | Free Tier | Paid Tier |
 |-------|-----------|-----------|
-| Daily browser time | 10 minutes | Unlimited* |
-| Concurrent sessions | 3 | 30 |
-| Requests per minute | 6 | 180 |
+| Daily browser time | 10 minutes | Metered, no fixed hour cap |
+| Concurrent sessions | 3 | 200 |
+| Quick Actions requests | 1 every 10 seconds | 30 per second |
 
-*Subject to fair-use policy. See [gotchas.md](gotchas.md) for details.
+Account defaults and usage charges: [current limits](https://developers.cloudflare.com/browser-run/limits/) and [pricing](https://developers.cloudflare.com/browser-run/pricing/).
 
 ## Reading Order
 
@@ -76,3 +76,5 @@
 ## See Also
 
 - [Cloudflare Docs](https://developers.cloudflare.com/browser-rendering/)
+
+Current product name: **Browser Run**. The REST path remains `/browser-rendering`. [Official documentation](https://developers.cloudflare.com/browser-run/).

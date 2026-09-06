@@ -25,7 +25,8 @@ export default {
     const country = request.cf.country;
     if (["GB", "DE", "FR"].includes(country)) {
       const url = new URL(request.url);
-      url.hostname = url.hostname.replace(".com", ".eu");
+      if (url.hostname !== "www.example.com") return fetch(request);
+      url.hostname = "www.example.eu";
       return Response.redirect(url.toString(), 302);
     }
     return fetch(request);
@@ -35,19 +36,22 @@ export default {
 
 ## A/B Testing
 
+Configure the origin/cache key to separate variants (or disable caching for the experiment). Merely adding X-Variant does not vary Cloudflare cache entries. This example assumes that cache behavior has been configured.
+
 ```javascript
 export default {
   async fetch(request) {
     const cookies = request.headers.get("Cookie") || "";
-    let variant = cookies.match(/ab_test=([AB])/)?.[1] || (Math.random() < 0.5 ? "A" : "B");
-    
+    const existing = cookies.match(/(?:^|;\s*)ab_test=([AB])(?:;|$)/)?.[1];
+    const variant = existing || (Math.random() < 0.5 ? "A" : "B");
+
     const req = new Request(request);
     req.headers.set("X-Variant", variant);
     const response = await fetch(req);
-    
-    if (!cookies.includes("ab_test=")) {
+
+    if (!existing) {
       const newResponse = new Response(response.body, response);
-      newResponse.headers.append("Set-Cookie", `ab_test=${variant}; Path=/; Secure`);
+      newResponse.headers.append("Set-Cookie", `ab_test=${variant}; Path=/; Secure; HttpOnly; SameSite=Lax`);
       return newResponse;
     }
     return response;
@@ -69,21 +73,9 @@ export default {
 
 **Requires:** Bot Management plan
 
-## API Auth Header Injection
+## Origin Authentication
 
-```javascript
-export default {
-  async fetch(request) {
-    if (new URL(request.url).pathname.startsWith("/api/")) {
-      const req = new Request(request);
-      req.headers.set("X-Internal-Auth", "secret_token");
-      req.headers.delete("Authorization");
-      return fetch(req);
-    }
-    return fetch(request);
-  }
-}
-```
+Use a Worker secret binding when you need a private origin credential. Do not hardcode a shared secret in snippet source and inject it into every public request; that grants all callers the same upstream privilege. Authenticate and authorize the caller before accessing a privileged origin.
 
 ## CORS Headers
 
@@ -113,7 +105,6 @@ export default {
 ```javascript
 export default {
   async fetch(request) {
-    if (request.headers.get("X-Bypass-Token") === "admin") return fetch(request);
     return new Response("<h1>Maintenance</h1>", {
       status: 503,
       headers: { "Content-Type": "text/html", "Retry-After": "3600" }
@@ -130,6 +121,8 @@ export default {
 | Geo-Routing | Low | Regional content |
 | A/B Testing | Medium | Experiments |
 | Bot Detection | Medium | Requires Bot Management |
-| API Auth | Low | Backend protection |
+| Origin authentication | Use a Worker secret | Privileged backend access |
 | CORS | Low | API endpoints |
 | Maintenance | Low | Deployments |
+
+[Current Snippets availability and limits](https://developers.cloudflare.com/rules/snippets/) · [Cache example](https://developers.cloudflare.com/rules/snippets/examples/custom-cache/) · [HTMLRewriter example](https://developers.cloudflare.com/rules/snippets/examples/rewrite-site-links/)

@@ -31,7 +31,7 @@ wrangler dev
 ```typescript
 // .all() - Returns all rows; .first() - First row or null; .first(col) - Single column value
 // .run() - INSERT/UPDATE/DELETE; .raw() - Array of arrays (efficient)
-const { results, success, meta } = await env.DB.prepare('SELECT * FROM users WHERE active = ?').bind(true).all();
+const { results, success, meta } = await env.DB.prepare('SELECT * FROM users WHERE active = ?').bind(1).all();
 const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
 ```
 
@@ -46,39 +46,31 @@ const results = await env.DB.batch([
 ]);
 ```
 
-## Sessions API (Paid Plans)
+## Sessions and read replication
+
+D1 sessions provide sequential consistency across queries; they do not extend query timeouts or reserve a 15-minute connection. A session has no `close()` method.
 
 ```typescript
-// Create long-running session for analytics/migrations (up to 15 minutes)
-const session = env.DB.withSession();
-try {
-  await session.prepare('CREATE INDEX idx_heavy ON large_table(column)').run();
-  await session.prepare('ANALYZE').run();
-} finally {
-  session.close(); // Always close to release resources
-}
+const session = env.DB.withSession("first-primary");
+await session.prepare("UPDATE users SET last_login = ? WHERE id = ?")
+  .bind(Date.now(), userId).run();
+const user = await session.prepare("SELECT * FROM users WHERE id = ?")
+  .bind(userId).first();
+const bookmark = session.getBookmark();
 ```
 
-## Read Replication (Paid Plans)
+Use `first-unconstrained` (the default) for an initial read from any eligible replica, `first-primary` when the first query must use the primary, or a previous bookmark to resume from at least that database version. Subsequent queries in that session preserve sequential consistency. Enabling read replication and using `withSession` controls replica routing; adding a second binding with the same database ID does not create a replica.
 
-```typescript
-// Read from nearest replica for lower latency (automatic failover)
-const user = await env.DB_REPLICA.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
-
-// Writes always go to primary
-await env.DB.prepare('UPDATE users SET last_login = ? WHERE id = ?').bind(Date.now(), userId).run();
-```
+[Read replication documentation](https://developers.cloudflare.com/d1/best-practices/read-replication/).
 
 ## Platform Limits
 
 | Limit | Free Tier | Paid Plans |
 |-------|-----------|------------|
 | Database size | 500 MB | 10 GB per database |
-| Row size | 1 MB max | 1 MB max |
+| Row size | 2 MB max | 2 MB max |
 | Query timeout | 30 seconds | 30 seconds |
-| Batch size | 1,000 statements | 10,000 statements |
 | Time Travel retention | 7 days | 30 days |
-| Read replicas | Not available | Yes (paid add-on) |
 
 **Pricing**: $0.001 per million rows read + $1.00 per million rows written + $0.75/GB storage/month (includes free monthly allowance; no per-database fee)
 
@@ -131,3 +123,5 @@ wrangler dev --persist-to=./.wrangler/state
 
 - [workers](../workers/) - Worker runtime and fetch handler patterns
 - [hyperdrive](../hyperdrive/) - Connection pooling for external databases
+
+Binding source: [D1 database and sessions API](https://developers.cloudflare.com/d1/worker-api/d1-database/). SQL result generics describe expected rows and do not validate them at runtime.

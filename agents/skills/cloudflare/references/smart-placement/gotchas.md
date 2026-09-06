@@ -24,7 +24,7 @@
 - Disable Smart Placement: `{ "placement": { "mode": "off" } }`
 - Review whether Worker actually benefits from Smart Placement
 - Consider caching strategy to reduce backend calls
-- For Pages/Assets Workers, use separate backend Worker with Smart Placement
+- For mixed asset/backend workloads, measure whether a separate backend Worker helps
 
 ### "No request duration metrics"
 
@@ -40,45 +40,19 @@
 **Cause:** Smart Placement not enabled, beta feature removed, or Worker not analyzed yet
 **Solution:** Verify Smart Placement enabled, wait for analysis (15min), check if beta feature still available
 
-## Pages/Assets + Smart Placement Performance Degradation
+## Static Assets and Placement
 
-**Problem:** Static assets load 2-5x slower when Smart Placement enabled with `run_worker_first = true`.
+Static assets served directly are delivered near the incoming request. Assets fetched by your code through `env.ASSETS.fetch()` are served where that Worker runs. `run_worker_first` affects which requests execute code; measure the full route before deciding to split frontend/backend Workers. Pages Functions and Workers Static Assets use different configuration models. There is no universal 2–5x penalty or blanket prohibition on combining assets with placement.
 
-**Cause:** Smart Placement routes ALL requests (including static assets like HTML, CSS, JS, images) to remote locations. Static content should ALWAYS be served from edge closest to user.
-
-**Solution:** Split into separate Workers OR disable Smart Placement:
-```jsonc
-// ❌ BAD - Assets routed away from user
-{
-  "name": "pages-app",
-  "placement": { "mode": "smart" },
-  "assets": { "run_worker_first": true }
-}
-
-// ✅ GOOD - Assets at edge, API optimized
-// frontend/wrangler.jsonc
-{
-  "name": "frontend",
-  "assets": { "run_worker_first": true }
-  // No placement field - stays at edge
-}
-
-// backend/wrangler.jsonc
-{
-  "name": "backend-api",
-  "placement": { "mode": "smart" }
-}
-```
-
-This is one of the most common and impactful Smart Placement misconfigurations.
+[Current placement behavior](https://developers.cloudflare.com/workers/configuration/placement/)
 
 ## Monolithic Full-Stack Worker
 
 **Problem:** Frontend and backend logic in single Worker with Smart Placement enabled.
 
-**Cause:** Smart Placement optimizes for backend latency but increases user-facing response time.
+**Cause:** A mixed workload may have different optimal locations. Measure before splitting; placement considers forwarding latency when making decisions.
 
-**Solution:** Split into two Workers:
+**Possible solution after measurement:** Split into two Workers:
 ```jsonc
 // frontend/wrangler.jsonc
 {
@@ -109,34 +83,9 @@ This is one of the most common and impactful Smart Placement misconfigurations.
 
 **Analysis time:** Up to 15 minutes. During analysis, Worker runs at edge. Monitor `placement_status`.
 
-## RPC Methods Not Affected (Critical Limitation)
+## RPC Placement Is Not Verified
 
-**Problem:** Enabled Smart Placement on backend but RPC calls still slow.
-
-**Cause:** Smart Placement ONLY affects `fetch` handlers. RPC methods (Service Bindings with `WorkerEntrypoint`) are NEVER affected.
-
-**Why:** RPC bypasses `fetch` handler - Smart Placement can only route `fetch` requests.
-
-**Solution:** Convert to fetch-based Service Bindings:
-
-```typescript
-// ❌ RPC - Smart Placement has NO EFFECT
-export class BackendRPC extends WorkerEntrypoint {
-  async getData() {
-    // ALWAYS runs at edge
-    return await this.env.DATABASE.prepare('SELECT * FROM table').all();
-  }
-}
-
-// ✅ Fetch - Smart Placement WORKS
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    // Runs close to DATABASE when Smart Placement enabled
-    const data = await env.DATABASE.prepare('SELECT * FROM table').all();
-    return Response.json(data);
-  }
-}
-```
+The official documentation has an explicit fetch-only limitation alongside an RPC placement example. Use fetch-based bindings for the examples in this reference. If an existing RPC backend is slow, measure it and verify hosted placement support before changing the API shape.
 
 ## Requirements
 
@@ -168,7 +117,8 @@ Both behaviors identical - Worker runs at edge closest to user.
 - Workers without significant backend communication
 - Pure edge logic (auth checks, redirects, simple transformations)
 - Workers without fetch event handlers
-- Pages/Assets Workers with `run_worker_first = true`
 - Workers using RPC methods instead of fetch handlers
 
 These scenarios won't benefit and may perform worse with Smart Placement.
+
+The official placement page currently contains an RPC example that conflicts with its explicit fetch-only limitation. Rely on fetch-based calls for this reference; verify hosted RPC placement before changing architecture based on that example.

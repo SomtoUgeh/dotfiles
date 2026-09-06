@@ -1,5 +1,7 @@
 # Hugo
 
+Copy [verify-turnstile.ts](../templates/verify-turnstile.ts) to `functions/_lib/verify-turnstile.ts` before using the backend examples. Keep it server-only and preserve the handler's existing inputs and business logic. Configure the exact frontend hostnames for each deployment; production must exclude local-development hosts.
+
 For Hugo static sites. The widget renders on any page that includes the partial; siteverify happens at whatever backend handles your form submissions (a Cloudflare Pages Function, a Worker, an external API, or a form host with a server-side hook).
 
 ```html title="layouts/partials/turnstile.html"
@@ -28,7 +30,7 @@ turnstileSitekey = "YOUR_SITEKEY"
 turnstileFormEndpoint = "/api/subscribe"  # path to your existing form handler
 ```
 
-Reference the partial from any layout or content file:
+Reference the partial from a layout. For Markdown content, use the shortcode variant below:
 
 ```text
 {{ partial "turnstile.html" . }}
@@ -38,11 +40,15 @@ Reference the partial from any layout or content file:
 
 Hugo doesn't host server-side code, so the form endpoint must live elsewhere. Two common setups:
 
-**Cloudflare Pages Function** (`functions/api/subscribe.js`):
+**Cloudflare Pages Function** (`functions/api/subscribe.ts`):
 
-```js
-export async function onRequestPost({ request, env }) {
-	const form = await request.formData();
+```ts
+import { verifyTurnstile } from "../_lib/verify-turnstile";
+
+type Env = { TURNSTILE_SECRET: string; TURNSTILE_HOSTNAMES: string };
+export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+	let form: FormData;
+	try { form = await request.formData(); } catch { return new Response("invalid form", { status: 400 }); }
 	const token = form.get("cf-turnstile-response");
 
 	const expectedHostnames = new Set(
@@ -55,33 +61,21 @@ export async function onRequestPost({ request, env }) {
 		return new Response("forbidden", { status: 403 });
 	}
 
-	const r = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-		method: "POST",
-		headers: { "Content-Type": "application/x-www-form-urlencoded" },
-		body: new URLSearchParams({
-			secret: env.TURNSTILE_SECRET,
-			response: token,
-			remoteip: request.headers.get("CF-Connecting-IP"),
-		}),
-	});
-	const result = await r.json();
-	if (
-		r.ok !== true ||
-		result.success !== true ||
-		result.action !== "subscribe" ||
-		!expectedHostnames.has(result.hostname)
-	) {
+	if (!await verifyTurnstile({
+		token, secret: env.TURNSTILE_SECRET,
+		hostnames: env.TURNSTILE_HOSTNAMES, action: "subscribe",
+	})) {
 		return new Response("forbidden", { status: 403 });
 	}
 
 	// process subscribe
 	return new Response("ok");
-}
+};
 ```
 
 `subscribe` is the stable action for this surface. Preserve an existing custom migration action and compare the returned action to the same value. Siteverify is mandatory for every widget mode, including pre-clearance. Set `TURNSTILE_HOSTNAMES` to the deployment-specific frontend hostnames; a production value must not include `localhost` or `127.0.0.1`.
 
-After the user approves a canonical absolute `WRANGLER_BIN` outside the project, set the secret with `(set +x; printf '%s' "$WIDGET_SECRET" | "$WRANGLER_BIN" pages secret put TURNSTILE_SECRET)` (or use the dashboard's Pages → your project → Settings → Environment variables → Add secret).
+After the user approves a canonical absolute `WRANGLER_BIN` outside the project, set the secret with `(set +x; printf '%s' "$WIDGET_SECRET" | "$WRANGLER_BIN" pages secret put TURNSTILE_SECRET --project-name "$PAGES_PROJECT_NAME")` (or use the dashboard's Pages → your project → Settings → Environment variables → Add secret).
 
 **External backend**: any Node/Ruby/Python/Go handler can do the same call. See the [vanilla-html reference](./vanilla-html.md) for non-Cloudflare-specific snippets.
 

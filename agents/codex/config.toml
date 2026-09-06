@@ -1,9 +1,5 @@
-model = "gpt-5.5"
+model = "gpt-6-astra"
 model_reasoning_effort = "high"
-notify = [
-    "${HOME}/.codex/plugins/cache/openai-bundled/computer-use/1.0.758/Codex Computer Use.app/Contents/SharedSupport/SkyComputerUseClient.app/Contents/MacOS/SkyComputerUseClient",
-    "turn-ended",
-]
 personality = "pragmatic"
 service_tier = "fast"
 
@@ -15,18 +11,6 @@ js_repl = true
 memories = true
 multi_agent = true
 prevent_idle_sleep = true
-
-[marketplaces.cloudflare]
-last_updated = "2026-05-09T10:55:31Z"
-last_revision = "60147cbb773649eadca89cee92b4e0caf02234b4"
-source_type = "git"
-source = "https://github.com/cloudflare/skills.git"
-
-[marketplaces.shopify-ai-toolkit]
-last_updated = "2026-05-09T10:55:35Z"
-last_revision = "c5c18d86ce7b2a7ca51ebac7c4b1a4eda00c8e25"
-source_type = "git"
-source = "https://github.com/Shopify/shopify-ai-toolkit.git"
 
 [mcp_servers.cloudflare]
 url = "https://mcp.cloudflare.com/mcp"
@@ -40,14 +24,8 @@ CONTEXT7_API_KEY = "CONTEXT7_API_KEY"
 [mcp_servers.exa]
 url = "https://mcp.exa.ai/mcp"
 
-[mcp_servers.figma-remote-mcp]
-url = "https://mcp.figma.com/mcp"
-
 [mcp_servers.granola]
 url = "https://mcp.granola.ai/mcp"
-
-[mcp_servers.neon]
-url = "https://mcp.neon.tech/mcp"
 
 [mcp_servers.openaiDeveloperDocs]
 url = "https://developers.openai.com/mcp"
@@ -65,20 +43,7 @@ url = "https://mcp-eu.posthog.com/mcp"
 [mcp_servers.postman]
 url = "https://mcp.postman.com/mcp"
 
-[mcp_servers.wiretext]
-args = [
-    "-y",
-    "@wiretext/mcp",
-    "-s",
-    "user",
-]
-command = "npx"
-enabled = false
-
 [plugins."canva@openai-curated"]
-enabled = true
-
-[plugins."cloudflare@openai-curated"]
 enabled = true
 
 [plugins."codex-security@openai-curated"]
@@ -139,7 +104,7 @@ enabled = true
 enabled = true
 
 [plugins."frontend-design@claude-plugins-official"]
-enabled = true
+enabled = false
 
 [plugins."codex@openai-codex"]
 enabled = true
@@ -180,6 +145,3 @@ status_line = [
     "weekly-limit",
     "codex-version",
 ]
-
-[tui.model_availability_nux]
-"gpt-5.5" = 4

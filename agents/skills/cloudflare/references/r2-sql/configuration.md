@@ -5,7 +5,7 @@ Auth and setup. For the current permission matrix and wrangler flags, pull `http
 ## Prerequisites
 
 - R2 bucket with Data Catalog enabled ([r2-data-catalog/configuration.md](../r2-data-catalog/configuration.md))
-- R2 API token: **R2 Storage Admin Read & Write** (includes R2 SQL Read), or add **R2 SQL Read** explicitly
+- R2 API token: **R2 Storage Admin Read & Write**, **R2 Data Catalog** access, and **R2 SQL Read**; storage permissions alone do not imply the other grants
 - Wrangler CLI (for CLI queries)
 
 > Open-beta limitation: R2 Storage **Admin Read & Write is required even for read-only R2 SQL queries**.

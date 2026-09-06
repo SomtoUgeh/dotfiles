@@ -27,13 +27,14 @@ they mean code on the branch or a prose draft.
 
 ## Mode: Code
 
-Check the diff against main and remove AI-generated code slop introduced on this
-branch.
+Check the requested change scope and remove code slop introduced there. Discover the repository's default branch instead of assuming `main`. Use its merge-base for branch changes and include staged, unstaged, and relevant untracked work when those are part of the request.
 
 ### Step 1: Get changed files
 
 ```bash
-git diff main --name-only
+# Set review_base to the verified merge-base commit for the requested branch review.
+git diff --name-only "$review_base" --
+git ls-files --others --exclude-standard
 ```
 
 If an argument was provided, focus only on that file.
@@ -45,7 +46,7 @@ Read the new and modified code with fresh eyes.
 For each changed file:
 
 1. Read the current version
-2. Get the original from main: `git show main:<filepath>`
+2. Read the original from the verified base: `git show "$review_base:<filepath>"`. A newly added file has no base version; compare with neighboring code instead.
 3. Compare style, patterns, and conventions. Look for bugs, confusion, and
    drift from the file's existing voice.
 

@@ -24,7 +24,12 @@ if ! sudo -n true 2>/dev/null; then
   exit 1
 fi
 
-DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SELF="${BASH_SOURCE[0]}"
+while [ -L "$SELF" ]; do
+  link=$(readlink "$SELF")
+  case "$link" in /*) SELF="$link" ;; *) SELF="$(dirname "$SELF")/$link" ;; esac
+done
+DOTFILES_DIR="$(cd "$(dirname "$SELF")/.." && pwd)"
 timestamp="$(date +%Y%m%d_%H%M%S)"
 
 link_path() {
@@ -105,10 +110,24 @@ setup_personal_github_ssh() {
     chmod 600 "$ssh_config"
   fi
 
-  if [ "$(git config -f "$personal_config" --get commit.gpgsign 2>/dev/null || true)" != "true" ]; then
-    cp "$DOTFILES_DIR/templates/gitconfig-personal.template" "$personal_config"
-    chmod 0644 "$personal_config"
+  # Change only the cloud identity/signing fields, preserving unrelated options.
+  if [ -f "$personal_config" ]; then
+    cp -p "$personal_config" "$personal_config.backup.$timestamp" || return 1
+    if [ -L "$personal_config" ]; then
+      rm "$personal_config" || return 1
+      cp -p "$personal_config.backup.$timestamp" "$personal_config" || return 1
+    fi
   fi
+  git config -f "$personal_config" user.name 'Somto Odera' || return 1
+  git config -f "$personal_config" user.email "$email" || return 1
+  git config -f "$personal_config" user.signingkey "$key" || return 1
+  git config -f "$personal_config" gpg.format ssh || return 1
+  git config -f "$personal_config" gpg.ssh.program ssh-keygen || return 1
+  git config -f "$personal_config" gpg.ssh.allowedSignersFile "$allowed" || return 1
+  git config -f "$personal_config" commit.gpgsign true || return 1
+  git config -f "$personal_config" tag.gpgSign true || return 1
+  git config -f "$personal_config" core.sshCommand "ssh -i $key -o IdentitiesOnly=yes" || return 1
+  chmod 600 "$personal_config"
 
   pub_line="$(awk '{print $1, $2}' "$pub")"
   touch "$allowed"
@@ -131,12 +150,12 @@ setup_personal_github_ssh() {
   if ! add_github_ssh_key "$pub" "$title" authentication; then
     echo "Could not upload the authentication key. Grant scopes and retry:" >&2
     echo "  gh auth refresh -h github.com -s admin:public_key,admin:ssh_signing_key" >&2
-    return 1
+    return 0
   fi
   if ! add_github_ssh_key "$pub" "$title signing" signing; then
     echo "Could not upload the signing key. Grant scopes and retry:" >&2
     echo "  gh auth refresh -h github.com -s admin:public_key,admin:ssh_signing_key" >&2
-    return 1
+    return 0
   fi
 }
 
@@ -162,6 +181,7 @@ sudo apt-get install -y \
   fzf \
   git-delta \
   git-lfs \
+  python3 \
   shellcheck \
   tree \
   zsh
@@ -232,18 +252,23 @@ link_path "$DOTFILES_DIR/shell/.zshrc.cloud" "$HOME/.zshrc"
 link_path "$DOTFILES_DIR/config/starship/starship.toml" "$HOME/.config/starship.toml"
 link_path "$DOTFILES_DIR/git/.gitconfig" "$HOME/.gitconfig"
 link_path "$DOTFILES_DIR/git/.gitignore_global" "$HOME/.gitignore_global"
+# Manual scanners only: no global Git hooks or scheduled monitoring.
+for script_name in scan_repo.sh scan_remote.sh; do
+  link_path "$DOTFILES_DIR/scripts/$script_name" "$HOME/.local/bin/$script_name"
+done
+if [ -L "$HOME/.git-hooks" ] && [ "$(readlink "$HOME/.git-hooks")" = "$DOTFILES_DIR/git/hooks" ]; then
+  rm "$HOME/.git-hooks"
+fi
+
 seed_git_identity_file \
   "$DOTFILES_DIR/templates/gitconfig-local.template" \
   "$HOME/.gitconfig.local"
-seed_git_identity_file \
-  "$DOTFILES_DIR/templates/gitconfig-personal.template" \
-  "$HOME/.gitconfig-personal"
-if ! setup_personal_github_ssh; then
-  echo "Personal GitHub SSH key is on disk; upload it after granting gh scopes."
-fi
+# Call directly so errexit remains active for local key/configuration failures.
+setup_personal_github_ssh
 
 link_path "$DOTFILES_DIR/agents/skills" "$HOME/.agents/skills"
 link_path "$DOTFILES_DIR/agents/skills" "$HOME/.grok/skills"
+link_path "$DOTFILES_DIR/agents/shared/AGENTS.md" "$HOME/.grok/AGENTS.md"
 link_path "$DOTFILES_DIR/agents/opencode/AGENTS.md" "$HOME/.config/opencode/AGENTS.md"
 link_path "$DOTFILES_DIR/agents/shared/ETHOS.md" "$HOME/.config/opencode/ETHOS.md"
 link_path "$DOTFILES_DIR/agents/opencode/opencode.cloud.jsonc" "$HOME/.config/opencode/opencode.jsonc"

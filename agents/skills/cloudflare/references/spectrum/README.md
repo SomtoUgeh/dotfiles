@@ -8,14 +8,7 @@ Cloudflare Spectrum provides security and acceleration for ANY TCP or UDP-based 
 
 ## Plan Capabilities
 
-| Capability | Pro/Business | Enterprise |
-|------------|--------------|------------|
-| TCP protocols | Selected ports only | All ports (1-65535) |
-| UDP protocols | Selected ports only | All ports (1-65535) |
-| Port ranges | ❌ | ✅ |
-| Argo Smart Routing | ✅ | ✅ |
-| IP Firewall | ✅ | ✅ |
-| Load balancer origins | ✅ | ✅ |
+As checked 2026-09-05: Pro supports one Minecraft app and one SSH app; Business adds one RDP app. Custom TCP/UDP and HTTP/HTTPS Spectrum applications require Enterprise with the appropriate paid add-on. Do not assume Pro/Business supports arbitrary UDP or any selected port. [Current protocols per plan](https://developers.cloudflare.com/spectrum/protocols-per-plan/).
 
 ## Decision Tree
 

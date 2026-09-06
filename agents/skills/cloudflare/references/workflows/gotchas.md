@@ -10,7 +10,7 @@
 ### "waitForEvent Timeout"
 
 **Cause:** Event not received within timeout period (check docs for default/max)  
-**Solution:** Wrap in try-catch to handle timeout gracefully and proceed with default behavior
+**Solution:** Catch only the wait operation if a specific timeout policy exists; do not turn unrelated processing errors into default approval/rejection behavior.
 
 ### "Non-Deterministic Step Names"
 
@@ -40,12 +40,12 @@
 ### "Idempotency Violation"
 
 **Cause:** Step operations not idempotent, causing duplicate charges or actions on retry  
-**Solution:** Check if operation already completed before executing (e.g., check if customer already charged)
+**Solution:** Use an atomic uniqueness constraint or downstream idempotency key. A separate read/check followed by a write can duplicate side effects on retries.
 
 ### "Instance ID Collision"
 
 **Cause:** Reusing instance IDs causing conflicts  
-**Solution:** Use unique IDs with timestamp: `await env.MY_WORKFLOW.create({ id: \`${userId}-${Date.now()}\`, params: {} })`
+**Solution:** For a new independent run use a UUID; for retried delivery use a stable event ID and idempotent batch creation. Do not deduplicate with a fresh timestamp: `await env.MY_WORKFLOW.create({ id: \`${userId}-${Date.now()}\`, params: {} })`
 
 ### "Instance Data Disappeared After Completion"
 

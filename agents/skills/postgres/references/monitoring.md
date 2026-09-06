@@ -29,7 +29,7 @@ SELECT state, count(*) FROM pg_stat_activity GROUP BY state;
 
 -- Dead tuples (vacuum candidates)
 SELECT relname, n_dead_tup, last_autovacuum FROM pg_stat_user_tables ORDER BY n_dead_tup DESC;
--- last_autovacuum = <null> means autovacuum has not run on this table
+-- NULL means no autovacuum is recorded in the current statistics history.
 ```
 
 Blocking: use `pg_blocking_pids(pid)` with `pg_stat_activity` to find blocked and blocking sessions.
@@ -42,7 +42,7 @@ Key settings: `log_min_duration_statement` (OLTP: 1–3s, analytics: 30–60s, d
 
 ## pg_activity
 
-Interactive top-like tool (pip install pg_activity). Run on DB host for OS metrics alongside PG metrics. Combines `pg_stat_activity` with CPU/memory/I/O context.
+Interactive top-like tool (uv tool install pg_activity). Run on DB host for OS metrics alongside PG metrics. Combines `pg_stat_activity` with CPU/memory/I/O context.
 
 ## Host Metrics — Critical
 
@@ -56,4 +56,4 @@ PostgreSQL cannot report these. **Monitor them yourself:**
 
 ## Statistics Management
 
-Stats accumulate since last reset or restart; check `stats_reset` timestamp. `pg_stat_statements_reset()` clears query stats; `pg_stat_reset()` clears database stats. Reset after major maintenance, config changes, or perf testing — not routinely. Prefer snapshotting stats to external monitoring (Prometheus, Datadog) over resetting. **Always confirm with a human before resetting statistics** — resetting destroys historical performance baselines and can make it harder to identify unused indexes or regressions.
+Cumulative stats normally survive a clean restart but can reset after an unclean shutdown or explicit reset; check `stats_reset` timestamp. `pg_stat_statements_reset()` clears query stats; `pg_stat_reset()` clears database stats. Reset after major maintenance, config changes, or perf testing — not routinely. Prefer snapshotting stats to external monitoring (Prometheus, Datadog) over resetting. **Always confirm with a human before resetting statistics** — resetting destroys historical performance baselines and can make it harder to identify unused indexes or regressions.

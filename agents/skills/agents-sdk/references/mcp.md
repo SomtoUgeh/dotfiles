@@ -2,7 +2,7 @@
 
 Fetch https://developers.cloudflare.com/agents/api-reference/mcp-client-api/ and https://developers.cloudflare.com/agents/api-reference/mcp-agent-api/ for complete documentation.
 
-Agents include a multi-server MCP client for connecting to external MCP servers, and `McpAgent` for building MCP servers.
+Agents include a multi-server MCP client for connecting to external MCP servers and `createMcpHandler` for building new stateless MCP servers. `McpAgent` is a deprecated, feature-frozen path for existing stateful servers.
 
 ## Add an MCP Server
 
@@ -74,84 +74,53 @@ await this.removeMcpServer(serverId);
 
 ## Building an MCP Server
 
-Use `McpAgent` from the SDK to create an MCP server.
+New servers should use the SDK v2 factory API with `createMcpHandler` from the isolated `agents/mcp/server` entry point. A factory gives each concurrent request its own server instance and does not require a Durable Object binding or migration.
 
 **Install dependencies:**
 ```bash
-npm install @modelcontextprotocol/sdk zod
-```
-
-**Wrangler config:**
-```jsonc
-{
-  "durable_objects": {
-    "bindings": [{ "name": "MyMCP", "class_name": "MyMCP" }]
-  },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MyMCP"] }]
-}
+npm install agents @modelcontextprotocol/server@2.0.0 zod
 ```
 
 **Server implementation:**
 ```typescript
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { McpAgent } from "agents/mcp";
+import { McpServer } from "@modelcontextprotocol/server";
+import { createMcpHandler } from "agents/mcp/server";
 import { z } from "zod";
 
-type State = { counter: number };
-
-export class MyMCP extends McpAgent<Env, State, {}> {
-  server = new McpServer({
+function createServer() {
+  const server = new McpServer({
     name: "MyMCPServer",
     version: "1.0.0"
   });
 
-  initialState = { counter: 0 };
+  server.registerTool(
+    "increment",
+    {
+      description: "Increment a value",
+      inputSchema: { value: z.number(), amount: z.number().default(1) }
+    },
+    async ({ value, amount }) => ({
+      content: [{ text: String(value + amount), type: "text" }]
+    })
+  );
 
-  async init() {
-    // Register a resource
-    this.server.resource("counter", "mcp://resource/counter", (uri) => ({
-      contents: [{ text: String(this.state.counter), uri: uri.href }]
-    }));
-
-    // Register a tool
-    this.server.registerTool(
-      "increment",
-      {
-        description: "Increment the counter",
-        inputSchema: { amount: z.number().default(1) }
-      },
-      async ({ amount }) => {
-        this.setState({ counter: this.state.counter + amount });
-        return {
-          content: [{ text: `Counter: ${this.state.counter}`, type: "text" }]
-        };
-      }
-    );
-  }
+  return server;
 }
-```
 
-## Serve MCP Server
+const mcpHandler = createMcpHandler(createServer);
 
-```typescript
 export default {
   fetch(request: Request, env: Env, ctx: ExecutionContext) {
-    const url = new URL(request.url);
-
-    // Streamable HTTP transport (recommended)
-    if (url.pathname.startsWith("/mcp")) {
-      return MyMCP.serve("/mcp", { binding: "MyMCP" }).fetch(request, env, ctx);
-    }
-
-    // SSE transport (legacy, deprecated)
-    if (url.pathname.startsWith("/sse")) {
-      return MyMCP.serveSSE("/sse", { binding: "MyMCP" }).fetch(request, env, ctx);
-    }
-
-    return new Response("Not found", { status: 404 });
+    return mcpHandler(request, env, ctx);
   }
-};
+} satisfies ExportedHandler<Env>;
 ```
+
+### Existing stateful MCP servers
+
+`McpAgent` from `agents/mcp` is deprecated and feature-frozen. Keep it only when an existing deployment depends on Durable Object state, resumable event storage, or legacy sessionful transports. Migrate by adding a stateless `createMcpHandler` route beside the legacy route, moving clients to it, and retiring the Durable Object only after legacy sessions drain.
+
+Do not convert an existing `McpAgent` deployment in place without planning state and client migration. Its Durable Object binding and migration remain necessary while the legacy route is served.
 
 ## Transports
 
@@ -159,8 +128,8 @@ Fetch https://developers.cloudflare.com/agents/api-reference/mcp-transports/ for
 
 | Transport | Use for |
 |-----------|---------|
-| Streamable HTTP (`serve`) | External/public clients (recommended) |
-| SSE (`serveSSE`) | Legacy clients only (deprecated) |
+| Stateless Streamable HTTP (`createMcpHandler`) | New external/public servers (recommended) |
+| `McpAgent.serve` / `serveSSE` | Existing stateful legacy servers only (deprecated) |
 | RPC (`addMcpServer(name, env.Binding)`) | Same-Worker internal calls (fastest) |
 
 ### RPC Transport (Same Worker)

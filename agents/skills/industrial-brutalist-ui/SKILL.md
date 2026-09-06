@@ -1,9 +1,11 @@
 ---
 name: industrial-brutalist-ui
-description: Raw mechanical interfaces fusing Swiss typographic print with military terminal aesthetics. Rigid grids, extreme type scale contrast, utilitarian color, analog degradation effects. For data-heavy dashboards, portfolios, or editorial sites that need to feel like declassified blueprints.
+description: Apply a raw industrial-brutalist web style with Swiss print and military-terminal cues when the user explicitly requests that aesthetic.
 ---
 
 # SKILL: Industrial Brutalism & Tactical Telemetry UI
+
+Treat this as an explicitly selected style. Preserve real content, semantic meaning, branding, and accessibility. Verify contrast, zoom/reflow, legibility, keyboard/touch use, and reduced motion; degradation effects must not obscure functional text. Use only available/licensed fonts and assets.
 
 ## 1. Skill Meta
 **Name:** Industrial Brutalism & Tactical Telemetry Interface Engineering
@@ -76,8 +78,8 @@ Standard web UI conventions are replaced with utilitarian, industrial graphic el
 *   **Syntax Decoration:** Utilization of ASCII characters to frame data points.
     *   *Framing:* `[ DELIVERY SYSTEMS ]`, `< RE-IND >`
     *   *Directional:* `>>>`, `///`, `\\\\`
-*   **Industrial Markers:** Prominent integration of registration (`®`), copyright (`©`), and trademark (`™`) symbols functioning as structural geometric elements rather than legal text.
-*   **Technical Assets:** Integration of crosshairs (`+`) at grid intersections, repeating vertical lines (barcodes), thick horizontal warning stripes, and randomized string data (e.g., `REV 2.6`, `UNIT / D-01`) to simulate active mechanical processes.
+*   **Industrial Markers:** Use geometric registration/crop marks for decoration. Use `®`, `©`, or `™` only where the supplied brand/content supports their meaning; do not invent legal-status claims as decoration.
+*   **Technical Assets:** Integration of crosshairs (`+`) at grid intersections, repeating vertical lines (barcodes), thick horizontal warning stripes, and clearly labelled demonstration identifiers (e.g., `REV 2.6`, `UNIT / D-01`) in prototypes. Never imply live telemetry when none exists.
 
 ## 7. Textural and Post-Processing Effects
 To prevent the design from appearing purely digital, simulated analog degradation is engineered into the frontend via CSS and SVG filters.

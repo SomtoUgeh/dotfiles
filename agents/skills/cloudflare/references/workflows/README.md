@@ -31,8 +31,10 @@ export class MyWorkflow extends WorkflowEntrypoint<Env, Params> {
   async run(event: WorkflowEvent<Params>, step: WorkflowStep) {
     const user = await step.do('fetch user', async () => {
       return await this.env.DB.prepare('SELECT * FROM users WHERE id = ?')
-        .bind(event.payload.userId).first();
+        .bind(event.payload.userId).first<{ email: string }>();
     });
+
+    if (!user) throw new Error('User not found');
     
     await step.sleep('wait 7 days', '7 days');
     
@@ -50,11 +52,11 @@ export class MyWorkflow extends WorkflowEntrypoint<Env, Params> {
 - **Events**: `waitForEvent()` for webhooks/approvals (configurable timeout)
 - **Sleep**: `sleep()` / `sleepUntil()` for scheduling
 - **Parallel**: `Promise.all()` for concurrent steps
-- **Idempotency**: Check-then-execute patterns
+- **Idempotency**: Atomic writes or downstream idempotency keys for retryable side effects
 
 ## Retrieval
 
-These reference files cover API shapes, code patterns, and debugging — things that are stable. For **limits, pricing, and other values that change**, always fetch the latest from the official docs:
+These reference files cover API shapes, code patterns, and debugging. APIs also change: verify them against installed generated types. For **limits, pricing, and other values that change**, always fetch the latest from the official docs:
 
 - **Limits:** https://developers.cloudflare.com/workflows/reference/limits/
 - **Pricing:** https://developers.cloudflare.com/workflows/reference/pricing/

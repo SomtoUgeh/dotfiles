@@ -1,6 +1,6 @@
 # R2 Data Catalog Gotchas
 
-Common failure modes and operational behavior. For limits, recommendations, and supported settings, pull `https://developers.cloudflare.com/r2/data-catalog/` and `.../table-maintenance/`.
+Common failure modes and operational behavior. For limits, recommendations, and supported settings, pull `https://developers.cloudflare.com/r2-data-catalog/` and `.../table-maintenance/`.
 
 ## Connection / Auth
 
@@ -11,15 +11,15 @@ Common failure modes and operational behavior. For limits, recommendations, and 
 
 ## Maintenance Behavior (updated)
 
-- **No throughput cap on compaction.** The former 2 GB/hour/table limit is **lifted** — compaction triggers hourly and processes the backlog with no hard cap. Large small-file backlogs still take multiple hourly cycles.
-- **Snapshot expiration deletes data files** (since April 2026), not just metadata. Manual `remove_orphan_files` is rarely needed.
+- **Compaction is asynchronous.** Measure job progress; the current maintenance reference does not promise a fixed cadence or unlimited throughput. Target size is 64–512 MB.
+- **Snapshot expiration deletes data files** (since April 2026), not just metadata. Files never referenced by a snapshot are not removed automatically.
 - **Compaction requires a stored credential.** `wrangler ... compaction enable` and the dashboard wizard store it automatically; pure-API setups must POST `/credential`.
 - Compaction is **Parquet-only**.
 
 ## Tables & Schema
 
 - `TableAlreadyExistsError` / `NamespaceAlreadyExistsError` → use `create_*_if_not_exists` / load existing.
-- `422 Validation` on schema update → only add nullable columns and widen types (int→long, float→double).
+- `422 Validation` on schema update → inspect the schema operation and Iceberg compatibility rules; schema evolution also supports renames and deletions, not just additions.
 - `TypeError: Cannot cast` on append → PyArrow type ≠ Iceberg schema; cast to int64 (Iceberg default); check `table.schema()`.
 
 ## Concurrency
@@ -33,7 +33,7 @@ Common failure modes and operational behavior. For limits, recommendations, and 
 |-------|-----|
 | Catalog auth fails | Add header `X-Iceberg-Access-Delegation: vended-credentials` |
 | `NoAuthWithAWSException` on orphan removal | Supply S3 access/secret keys (vended creds don't work here) |
-| Version mismatch | Use Iceberg `1.6.1` |
+| Version mismatch | Match Iceberg runtime artifacts to the installed Spark and Scala versions |
 | Slow first run (~30–60s) | JAR download; cached after |
 | Remote signing errors | Set `s3.remote-signing-enabled=false` |
 
@@ -43,7 +43,7 @@ Control-plane URL separator for nested namespaces is **`%1F`** (Unit Separator),
 
 ## Debug Checklist
 
-1. `npx wrangler r2 bucket catalog status <bucket>` — enabled?
+1. `npx wrangler r2 bucket catalog get <bucket>` — enabled?
 2. Token has R2 Storage (Admin R&W) + R2 Data Catalog (R&W)?
 3. `catalog.list_namespaces()` succeeds?
 4. Catalog URI = `catalog.cloudflarestorage.com/{ACCOUNT_ID}/{BUCKET}`, warehouse = `{ACCOUNT_ID}_{BUCKET}`?

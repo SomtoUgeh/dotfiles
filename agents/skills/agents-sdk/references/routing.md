@@ -10,8 +10,9 @@ Fetch https://developers.cloudflare.com/agents/api-reference/routing/ for comple
 import { routeAgentRequest } from "agents";
 
 export default {
-  fetch: (req, env) =>
-    routeAgentRequest(req, env) ?? new Response("Not found", { status: 404 })
+  async fetch(req, env) {
+    return (await routeAgentRequest(req, env)) ?? new Response("Not found", { status: 404 });
+  }
 };
 ```
 
@@ -26,16 +27,16 @@ Subpaths after the instance name (e.g. `/agents/my-agent/default/api/data`) rout
 ## Custom Routing with `getAgentByName`
 
 ```typescript
-import { getAgentByName } from "agents";
+import { getAgentByName, routeAgentRequest } from "agents";
 
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     if (url.pathname.startsWith("/api/")) {
-      const agent = getAgentByName(env.MyAgent, "singleton");
+      const agent = await getAgentByName(env.MyAgent, "singleton");
       return agent.fetch(req);
     }
-    return routeAgentRequest(req, env);
+    return (await routeAgentRequest(req, env)) ?? new Response("Not found", { status: 404 });
   }
 };
 ```
@@ -43,9 +44,9 @@ export default {
 ## Options
 
 ```typescript
-routeAgentRequest(req, env, {
+await routeAgentRequest(req, env, {
   cors: true,
-  prefix: "/api/agents",
+  prefix: "api/agents",
   locationHint: "enam",
   jurisdiction: "eu",
   props: { userId: "123" },
@@ -54,7 +55,7 @@ routeAgentRequest(req, env, {
 });
 ```
 
-`props` are delivered to `onStart(props)` on first access.
+`props` are delivered to `onStart(props)` on first access. The server `prefix` has no leading slash.
 
 ## Client Side
 
@@ -63,10 +64,12 @@ useAgent({
   agent: "MyAgent",
   name: "instance-1",
   host: "https://my-worker.workers.dev",
-  basePath: "/api/agents",
-  path: "/custom-subpath"
+  basePath: "api/agents/my-agent/instance-1",
+  path: "custom-subpath"
 });
 ```
+
+The client `basePath` replaces the complete default route, so include the class and instance. Keep `basePath` and `path` relative (no leading slash).
 
 ## Common Mistakes
 

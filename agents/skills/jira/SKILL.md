@@ -7,6 +7,10 @@ description: This skill provides workflows for managing Jira tickets using Atlas
 
 This skill enables efficient Jira ticket management using Atlassian's official `acli` command-line tool.
 
+Read-only requests authorize inspection. Create, edit, assign, transition, link, comment, archive, and delete only within the user's requested operation and scope. For bulk writes, first inspect the exact matching keys; do not expand the JQL scope during mutation. Prefer `--description-file`, `--body-file`, or structured JSON for multiline content.
+
+The examples were checked against ACLI 1.3.36-stable. Check the installed command's `--help` before applying a version-sensitive flag. Replace placeholders with actual values; link types must match the site's outward description.
+
 ## Prerequisites
 
 Verify acli is installed and authenticated:
@@ -85,7 +89,7 @@ acli jira workitem search --jql "<query>" --count       # Count only
 ```bash
 acli jira workitem edit --key <KEY-123> --summary "<new title>"
 acli jira workitem edit --key <KEY-123> --description "<new desc>"
-acli jira workitem edit --key "<KEY-1,KEY-2>" --label "<labels>"  # Bulk
+acli jira workitem edit --key "<KEY-1,KEY-2>" --labels "<labels>"  # Bulk
 ```
 
 ### Transitions
@@ -109,15 +113,15 @@ acli jira workitem assign --key <KEY-123> --assignee "default"
 ```bash
 acli jira workitem comment create --key <KEY-123> --body "<text>"
 acli jira workitem comment list --key <KEY-123>
-acli jira workitem comment update --key <KEY-123> --comment-id <id> --body "<text>"
-acli jira workitem comment delete --key <KEY-123> --comment-id <id>
+acli jira workitem comment update --key <KEY-123> --id <id> --body "<text>"
+acli jira workitem comment delete --key <KEY-123> --id <id>
 ```
 
 ### Other Operations
 
 ```bash
 acli jira workitem clone --key <KEY-123>
-acli jira workitem link create --key <KEY-123> --link-key <KEY-456> --type "blocks"
+acli jira workitem link create --out "<KEY-123>" --in "<KEY-456>" --type "Blocks"
 acli jira workitem archive --key <KEY-123>
 acli jira workitem delete --key <KEY-123>
 ```

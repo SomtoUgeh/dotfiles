@@ -13,7 +13,7 @@ prisma db pull [options]
 - Connects to your database
 - Reads the database schema (tables, columns, relations, indexes)
 - Updates `schema.prisma` with corresponding Prisma models
-- For MongoDB, samples data to infer schema
+- Prisma 7 does not support MongoDB; consult a MongoDB-supported Prisma version separately
 
 ## Options
 
@@ -54,7 +54,7 @@ Replaces schema file, losing any manual customizations.
 
 ## Prerequisites
 
-Configure database connection in `prisma.config.ts`:
+Configure database connection in `prisma7.config.ts`:
 
 ```typescript
 import 'dotenv/config'
@@ -166,16 +166,6 @@ After `db pull`, consider:
      email String @unique
    }
    ```
-
-## MongoDB Introspection
-
-For MongoDB, `db pull` samples documents to infer schema:
-
-```bash
-prisma db pull
-```
-
-May require manual refinement since MongoDB is schemaless.
 
 ## Warning
 

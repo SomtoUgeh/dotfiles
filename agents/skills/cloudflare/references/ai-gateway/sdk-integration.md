@@ -1,114 +1,74 @@
 # AI Gateway SDK Integration
 
-## Vercel AI SDK (Recommended)
+## OpenAI SDK: current Cloudflare REST endpoint
 
 ```typescript
-import { createAiGateway } from 'ai-gateway-provider';
-import { createOpenAI } from '@ai-sdk/openai';
-import { generateText } from 'ai';
+import OpenAI from "openai";
 
-const gateway = createAiGateway({
-  accountId: process.env.CF_ACCOUNT_ID,
-  gateway: process.env.CF_GATEWAY_ID,
-  apiKey: process.env.CF_API_TOKEN // Optional for auth gateways
-});
-
-const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-// Single model
-const { text } = await generateText({
-  model: gateway(openai('gpt-4o')),
-  prompt: 'Hello'
-});
-
-// Automatic fallback array
-const { text } = await generateText({
-  model: gateway([
-    openai('gpt-4o'),
-    anthropic('claude-sonnet-4-5'),
-    openai('gpt-4o-mini')
-  ]),
-  prompt: 'Complex task'
-});
+function gatewayClient(accountId: string, gatewayId: string, cloudflareToken: string) {
+  return new OpenAI({
+    apiKey: cloudflareToken,
+    baseURL: `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1`,
+    defaultHeaders: { "cf-aig-gateway-id": gatewayId },
+    maxRetries: 2
+  });
+}
 ```
 
-### Options
+Use provider-prefixed model IDs from the current model catalog with `chat.completions.create` or a supported Responses API model. Store the Cloudflare credential in a server secret. Confirm the selected model's billing and stored-key configuration before sending requests.
+
+The provider-native route `gateway.ai.cloudflare.com/v1/{account}/{gateway}/openai` instead uses an OpenAI key, an unprefixed OpenAI model ID, and `cf-aig-authorization` when gateway authentication is enabled. Do not interchange those credentials or model formats.
+
+## AI SDK 7 and ai-gateway-provider 4
 
 ```typescript
-model: gateway(openai('gpt-4o'), {
-  cacheKey: 'my-key',
-  cacheTtl: 3600,
-  metadata: { userId: 'u123', team: 'eng' }, // Max 5 entries
-  retries: { maxAttempts: 3, backoff: 'exponential' }
-})
+import { createAiGateway } from "ai-gateway-provider";
+import { createOpenAI } from "ai-gateway-provider/providers/openai";
+import { generateText } from "ai";
+
+async function generate(accountId: string, gatewayId: string, token: string, providerKey: string) {
+  const gateway = createAiGateway({
+    accountId,
+    gateway: gatewayId,
+    apiKey: token,
+    options: {
+      cacheTtl: 3600,
+      metadata: { requestType: "example" },
+      retries: { maxAttempts: 3, retryDelayMs: 1000, backoff: "exponential" }
+    }
+  });
+  const openai = createOpenAI({ apiKey: providerKey });
+  return generateText({
+    model: gateway(openai.chat("gpt-4.1-mini")),
+    prompt: "Hello",
+    maxRetries: 0 // Let the configured gateway retry policy own this request.
+  });
+}
 ```
 
-## OpenAI SDK
+Use this package's provider adapters, including the explicit `.chat()` model for OpenAI chat completions. Gateway request options belong in `createAiGateway({ options: ... })`, not a second argument to the model wrapper. For fallback, pass an array of compatible adapter models to `gateway([...])`; test the failing-primary path and avoid multiplying retries across layers.
 
-```typescript
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  baseURL: `https://gateway.ai.cloudflare.com/v1/${accountId}/${gatewayId}/openai`,
-  defaultHeaders: { 'cf-aig-authorization': `Bearer ${cfToken}` }
-});
-
-// Unified API - switch providers via model name
-model: 'openai/gpt-4o'  // or 'anthropic/claude-sonnet-4-5'
-```
-
-## Anthropic SDK
-
-```typescript
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-  baseURL: `https://gateway.ai.cloudflare.com/v1/${accountId}/${gatewayId}/anthropic`,
-  defaultHeaders: { 'cf-aig-authorization': `Bearer ${cfToken}` }
-});
-```
-
-## Workers AI Binding
+## Workers AI binding
 
 ```toml
-# wrangler.toml
 [ai]
 binding = "AI"
-[[ai.gateway]]
-id = "my-gateway"
 ```
+
+Select the gateway in the call options, not a nonexistent `[[ai.gateway]]` Wrangler section:
 
 ```typescript
-await env.AI.run('@cf/meta/llama-3-8b-instruct', 
-  { messages: [...] },
-  { gateway: { id: 'my-gateway', metadata: { userId: '123' } } }
-);
+async function run(env: { AI: Ai }) {
+  return env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
+    messages: [{ role: "user", content: "Hello" }]
+  }, { gateway: { id: "my-gateway" } });
+}
 ```
 
-## LangChain / LlamaIndex
+For supported AI SDK adapters, `createAiGateway({ binding: env.AI.gateway("my-gateway") })` uses the binding transport.
 
-```typescript
-// Use OpenAI SDK pattern with custom baseURL
-new ChatOpenAI({
-  configuration: {
-    baseURL: `https://gateway.ai.cloudflare.com/v1/${accountId}/${gatewayId}/openai`
-  }
-});
-```
+## Dynamic routes
 
-## HTTP / cURL
+Use `/compat` and `dynamic/route-name`; see [dynamic-routing.md](dynamic-routing.md). This remains supported for routes even though single-model use of that endpoint is deprecated.
 
-```bash
-curl https://gateway.ai.cloudflare.com/v1/{account}/{gateway}/openai/chat/completions \
-  -H "Authorization: Bearer $OPENAI_KEY" \
-  -H "cf-aig-authorization: Bearer $CF_TOKEN" \
-  -H "cf-aig-metadata: {\"userId\":\"123\"}" \
-  -d '{"model":"gpt-4o","messages":[...]}'
-```
-
-## Headers Reference
-
-| Header | Purpose |
-|--------|---------|
-| `cf-aig-authorization` | Gateway auth token |
-| `cf-aig-metadata` | JSON object (max 5 keys) |
-| `cf-aig-cache-ttl` | Cache TTL in seconds |
-| `cf-aig-skip-cache` | `true` to bypass cache |
+Sources: [Cloudflare REST API](https://developers.cloudflare.com/ai-gateway/usage/rest-api/), [AI Gateway provider source](https://github.com/cloudflare/ai/tree/main/packages/ai-gateway-provider).

@@ -77,7 +77,7 @@ const mutation = useMutation({
 queryClient.invalidateQueries({
   predicate: (query) =>
     query.queryKey[0] === 'todos' &&
-    query.state.data?.userId === currentUserId,
+    query.queryKey[1] === currentUserId, // Keys are ['todos', userId, ...]
 })
 ```
 

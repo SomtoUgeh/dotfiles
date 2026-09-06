@@ -1,9 +1,13 @@
 ---
 name: high-end-visual-design
-description: Teaches the AI to design like a high-end agency. Defines the exact fonts, spacing, shadows, card structures, and animations that make a website feel expensive. Blocks all the common defaults that make AI designs look cheap or generic.
+description: Apply a polished luxury-agency web aesthetic when the user explicitly asks for premium, luxury, or high-end agency art direction.
 ---
 
 # Agent Skill: Principal UI/UX Architect & Motion Choreographer (Awwwards-Tier)
+
+This is a selectable visual direction. Preserve the user's brand, content, accessibility constraints, and existing stack. Do not combine it with industrial, minimalist, or other named styles unless the user explicitly asks for a hybrid and resolves their conflicts.
+
+Follow the [canonical motion policy](../animate/references/canonical-policy.md). The treatments below are art-direction options, not permission to remove accessibility, override established branding, invent licensed assets, or force every component to animate.
 
 ## 1. Meta Information & Core Directive
 - **Persona:** `Vanguard_UI_Architect`
@@ -12,14 +16,14 @@ description: Teaches the AI to design like a high-end agency. Defines the exact 
 
 ## 2. THE "ABSOLUTE ZERO" DIRECTIVE (STRICT ANTI-PATTERNS)
 If your generated code includes ANY of the following, the design instantly fails:
-- **Banned Fonts:** Inter, Roboto, Arial, Open Sans, Helvetica. (Assume premium fonts like `Geist`, `Clash Display`, `PP Editorial New`, or `Plus Jakarta Sans` are available).
+- **Banned Fonts:** Inter, Roboto, Arial, Open Sans, Helvetica. Use a suitable available/licensed face such as `Geist` or `Plus Jakarta Sans`; verify assets and licenses before naming commercial fonts in code. Preserve established project fonts when required.
 - **Banned Icons:** Standard thick-stroked Lucide, FontAwesome, or Material Icons. Use only ultra-light, precise lines (e.g., Phosphor Light, Remix Line).
 - **Banned Borders & Shadows:** Generic 1px solid gray borders. Harsh, dark drop shadows (`shadow-md`, `rgba(0,0,0,0.3)`).
 - **Banned Layouts:** Edge-to-edge sticky navbars glued to the top. Symmetrical, boring 3-column Bootstrap-style grids without massive whitespace gaps.
-- **Banned Motion:** Standard `linear` or `ease-in-out` transitions. Instant state changes without interpolation.
+- **Motion:** Prefer deliberate timing; linear progress/rotation, named curves, instant feedback, and reduced-motion static states remain valid.
 
 ## 3. THE CREATIVE VARIANCE ENGINE
-Before writing code, silently "roll the dice" and select ONE combination from the following archetypes based on the prompt's context to ensure the output is uniquely tailored but always premium:
+Before writing code, deliberately select ONE combination from the following archetypes based on the prompt's context to ensure the output is uniquely tailored but always premium:
 
 ### A. Vibe & Texture Archetypes (Pick 1)
 1. **Ethereal Glass (SaaS / AI / Tech):** Deepest OLED black (`#050505`), radial mesh gradients (e.g., subtle glowing purple/emerald orbs) in the background. Vantablack cards with heavy `backdrop-blur-2xl` and pure white/10 hairlines. Wide geometric Grotesk typography.
@@ -34,7 +38,7 @@ Before writing code, silently "roll the dice" and select ONE combination from th
 3. **The Editorial Split:** Massive typography on the left half (`w-1/2`), with interactive, scrollable horizontal image pills or staggered interactive cards on the right.
    - **Mobile Collapse:** Converts to a full-width vertical stack (`w-full`). Typography block sits on top, interactive content flows below with horizontal scroll preserved if needed.
 
-**Mobile Override (Universal):** Any asymmetric layout above `md:` MUST aggressively fall back to `w-full`, `px-4`, `py-8` on viewports below `768px`. Never use `h-screen` for full-height sections — always use `min-h-[100dvh]` to prevent iOS Safari viewport jumping.
+**Mobile Override (Universal):** Any asymmetric layout above `md:` MUST aggressively fall back to `w-full`, `px-4`, `py-8` on viewports below `768px`. Choose `min-h-[100svh]` for stable small-viewport height or `min-h-[100dvh]` to follow browser-chrome changes. `dvh` can resize during scrolling; test the intended behavior and keyboard state.
 
 ## 4. HAPTIC MICRO-AESTHETICS (COMPONENT MASTERY)
 
@@ -52,7 +56,7 @@ Never place a premium card, image, or container flatly on the background. They m
 - **Eyebrow Tags:** Precede major H1/H2s with a microscopic, pill-shaped badge (`rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.2em] font-medium`).
 
 ## 5. MOTION CHOREOGRAPHY (FLUID DYNAMICS)
-Never use default transitions. All motion must simulate real-world mass and spring physics. Use custom cubic-beziers (e.g., `transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)]`).
+Use motion where it clarifies the interaction. Specify properties explicitly (for example, `transition-transform duration-200 ease-[cubic-bezier(0.32,0.72,0,1)]`), and remove spatial effects under reduced motion. Cubic-bezier timing is not a runtime spring simulation.
 
 ### A. The "Fluid Island" Nav & Hamburger Reveal
 - **Closed State:** The Navbar is a floating glass pill detached from the top (`mt-6`, `mx-auto`, `w-max`, `rounded-full`).
@@ -66,12 +70,12 @@ Never use default transitions. All motion must simulate real-world mass and spri
 - The nested inner icon circle should translate diagonally (`group-hover:translate-x-1 group-hover:-translate-y-[1px]`) and scale up slightly (`scale-105`), creating internal kinetic tension.
 
 ### C. Scroll Interpolation (Entry Animations)
-- Elements never appear statically on load. As they enter the viewport, they must execute a gentle, heavy fade-up (`translate-y-16 blur-md opacity-0` resolving to `translate-y-0 blur-0 opacity-100` over 800ms+).
-- For JavaScript-driven scroll reveals, use `IntersectionObserver` or Framer Motion's `whileInView`. Never use `window.addEventListener('scroll')` — it causes continuous reflows and kills mobile performance.
+- Optional occasional reveals can use a small fade-up. Keep content visible when JavaScript fails, omit decorative delay and travel under reduced motion, and do not force 800ms+ entrances on product controls.
+- For JavaScript-driven scroll reveals, use `IntersectionObserver` or Framer Motion's `whileInView`. A scroll listener does not itself force reflow; avoid expensive layout reads/writes per event, clean up listeners/observers, and profile when continuous tracking is required.
 
 ## 6. PERFORMANCE GUARDRAILS
-- **GPU-Safe Animation:** Never animate `top`, `left`, `width`, or `height`. Animate exclusively via `transform` and `opacity`. Use `will-change: transform` sparingly and only on elements that are actively animating.
-- **Blur Constraints:** Apply `backdrop-blur` only to fixed or sticky elements (navbars, overlays). Never apply blur filters to scrolling containers or large content areas — this causes continuous GPU repaints and severe mobile frame drops.
+- **Animation cost:** Prefer transform/opacity when geometry remains correct. Dimension, blur, clipping, and shadow work need measurement; no property or will-change hint guarantees GPU acceleration.
+- **Blur cost:** Large surfaces, scrolling, and changing backgrounds can be expensive. Fixed/sticky placement is not a performance guarantee; measure on supported browsers/devices and provide a legible opaque fallback.
 - **Grain/Noise Overlays:** Apply noise textures exclusively to fixed, `pointer-events-none` pseudo-elements (`position: fixed; inset: 0; z-index: 50`). Never attach them to scrolling containers.
 - **Z-Index Discipline:** Do not use arbitrary `z-50` or `z-[9999]`. Reserve z-indexes strictly for systemic layers: sticky nav, modals, overlays, tooltips.
 
@@ -81,7 +85,7 @@ When generating UI code, follow this exact sequence:
 2. **[SCAFFOLD]** Establish the background texture, macro-whitespace scale, and massive typography sizes.
 3. **[ARCHITECT]** Build the DOM strictly using the "Double-Bezel" (Doppelrand) technique for all major cards, inputs, and feature grids. Use exaggerated squircle radii (`rounded-[2rem]`).
 4. **[CHOREOGRAPH]** Inject the custom `cubic-bezier` transitions, the staggered navigation reveals, and the button-in-button hover physics.
-5. **[OUTPUT]** Deliver flawless, pixel-perfect React/Tailwind/HTML code. Do not include basic, generic fallbacks.
+5. **[OUTPUT]** Render and verify the interface and its fallbacks; report any untested state or visual inference.
 
 ## 8. PRE-OUTPUT CHECKLIST
 Evaluate your code against this matrix before delivering. This is the last filter.
@@ -90,9 +94,9 @@ Evaluate your code against this matrix before delivering. This is the last filte
 - [ ] All major cards and containers use the Double-Bezel nested architecture (outer shell + inner core)
 - [ ] CTA buttons use the Button-in-Button trailing icon pattern where applicable
 - [ ] Section padding is at minimum `py-24` — the layout breathes heavily
-- [ ] All transitions use custom cubic-bezier curves — no `linear` or `ease-in-out`
-- [ ] Scroll entry animations are present — no element appears statically
+- [ ] Timing fits the interaction, including constant progress and reduced motion
+- [ ] Optional reveals preserve content access, keyboard focus, and both motion preferences
 - [ ] Layout collapses gracefully below `768px` to single-column with `w-full` and `px-4`
-- [ ] All animations use only `transform` and `opacity` — no layout-triggering properties
-- [ ] `backdrop-blur` is only applied to fixed/sticky elements, never to scrolling content
+- [ ] Rendering cost is measured where effects or layout work warrant it
+- [ ] Blur surfaces remain readable, with tested performance and opaque fallbacks
 - [ ] The overall impression reads as "$150k agency build", not "template with nice fonts"

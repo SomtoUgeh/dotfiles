@@ -5,7 +5,7 @@ Globally-distributed, eventually-consistent key-value store optimized for high r
 ## Overview
 
 KV provides:
-- Eventual consistency (60s global propagation)
+- Eventual consistency (updates can take 60 seconds or longer)
 - Read-optimized performance
 - 25 MiB value limit per key
 - Auto-replication to Cloudflare edge
@@ -23,14 +23,7 @@ KV provides:
 | High read, low write volume | → KV ✅ |
 | Sub-10ms global reads | → KV ✅ |
 
-**Quick comparison:**
-
-| Feature | KV | D1 | Durable Objects |
-|---------|----|----|-----------------|
-| Consistency | Eventual | Strong | Strong |
-| Read latency | <10ms | ~50ms | <1ms |
-| Write limit | 1/s per key | Unlimited | Unlimited |
-| Use case | Config, cache | Relational data | Coordination |
+D1 provides relational queries; Durable Objects provide coordination and strongly consistent object-local storage. Latency and quotas depend on workload and location. KV is unsuitable for locks, exact counters, or immediately revocable authorization.
 
 ## Quick Start
 
@@ -61,7 +54,7 @@ const json = await env.MY_KV.get<Config>("config", "json");
 
 ## Consistency Model
 
-- **Write visibility:** Immediate in same location, ≤60s globally
+- **Write visibility:** Usually visible locally, but not guaranteed; globally 60 seconds or longer depending on cacheTtl
 - **Read path:** Eventually consistent
 - **Write rate:** 1 write/second per key (429 on exceed)
 

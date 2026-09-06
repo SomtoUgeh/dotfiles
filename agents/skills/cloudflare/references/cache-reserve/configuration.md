@@ -13,7 +13,7 @@ https://dash.cloudflare.com/caching/cache-reserve
 
 **Prerequisites:**
 - Paid Cache Reserve plan or Smart Shield Advanced required
-- Tiered Cache **required** for Cache Reserve to function optimally
+- Tiered Cache recommended for Cache Reserve to function optimally
 
 ## API Configuration
 
@@ -59,10 +59,11 @@ console.log(status.value); // 'on' or 'off'
 ### Python SDK
 
 ```bash
-pip install cloudflare
+uv pip install cloudflare
 ```
 
 ```python
+import os
 from cloudflare import Cloudflare
 
 client = Cloudflare(api_token=os.environ.get("CLOUDFLARE_API_TOKEN"))
@@ -85,7 +86,7 @@ terraform {
   required_providers {
     cloudflare = {
       source  = "cloudflare/cloudflare"
-      version = "~> 4.0"
+      version = "~> 5.0"
     }
   }
 }
@@ -96,13 +97,13 @@ provider "cloudflare" {
 
 resource "cloudflare_zone_cache_reserve" "example" {
   zone_id = var.zone_id
-  enabled = true
+  value = "on"
 }
 
-# Tiered Cache is required for Cache Reserve
-resource "cloudflare_tiered_cache" "example" {
-  zone_id    = var.zone_id
-  cache_type = "smart"
+# Tiered Cache is recommended for Cache Reserve
+resource "cloudflare_argo_tiered_caching" "example" {
+  zone_id = var.zone_id
+  value = "on"
 }
 ```
 
@@ -114,13 +115,13 @@ import * as cloudflare from "@pulumi/cloudflare";
 // Enable Cache Reserve
 const cacheReserve = new cloudflare.ZoneCacheReserve("example", {
   zoneId: zoneId,
-  enabled: true,
+  value: "on",
 });
 
-// Enable Tiered Cache (required)
-const tieredCache = new cloudflare.TieredCache("example", {
+// Enable Tiered Cache (recommended)
+const tieredCache = new cloudflare.ArgoTieredCaching("example", {
   zoneId: zoneId,
-  cacheType: "smart",
+  value: "on",
 });
 ```
 
@@ -140,7 +141,7 @@ Control Cache Reserve eligibility via Cache Rules:
 {
   action: 'set_cache_settings',
   action_parameters: {
-    cache_reserve: { eligible: true, minimum_file_ttl: 86400 },
+    cache_reserve: { eligible: true, minimum_file_size: 0 },
     edge_ttl: { mode: 'override_origin', default: 86400 },
     cache: true
   },

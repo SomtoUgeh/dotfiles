@@ -1,91 +1,21 @@
-# Web Analytics Patterns
+# Web Analytics analysis patterns
 
-## Core Web Vitals Debugging
+## Investigate Core Web Vitals
 
-Dashboard → Core Web Vitals → Click metric → Debug View shows top 5 problematic elements.
+Use the dashboard's metric dimensions and element diagnostics to identify affected routes, devices, and cohorts before changing code. LCP should be at most 2.5 seconds, INP at most 200 ms, and CLS at most 0.1 at the recommended percentile. Diagnose field data alongside a reproducible local trace.
 
-### LCP Fixes
+- For LCP images, set dimensions and consider appropriate preload/fetch priority; avoid lazy-loading the measured hero.
+- For CLS, reserve layout space for images, ads, and asynchronously loaded content.
+- For INP, reduce long tasks and expensive synchronous work. Debouncing or yielding helps only when it addresses the measured cause.
 
-```html
-<!-- Priority hints -->
-<img src="hero.jpg" loading="eager" fetchpriority="high" />
-<link rel="preload" as="image" href="/hero.jpg" fetchpriority="high" />
-```
+## Reports and multiple sites
 
-### CLS Fixes
+Use the GraphQL API for programmatic aggregate extraction. Discover account-accessible RUM dataset names, filters, retention windows, and sampling fields through the schema/settings. Bound time windows and paginate or partition according to the selected dataset. Check both HTTP errors and GraphQL `errors`; do not call an incomplete query a complete report.
 
-```css
-/* Reserve space */
-.ad-container { min-height: 250px; }
-img { width: 400px; height: 300px; } /* Explicit dimensions */
-```
+Keep beacon pageviews distinct from edge HTTP requests. Cache hits, assets, bots, blockers, delivery losses, and navigation semantics make them different counts. Report the source, period, sampling, and known omissions; do not apply an invented fixed ad-blocker correction percentage.
 
-### INP Fixes
+## Product limitations
 
-```typescript
-// Debounce expensive operations
-const handleInput = debounce(search, 300);
+The FAQ currently states no custom event or UTM query-parameter tracking. Use another appropriate event source for funnels or user-level workflows. Web Analytics does support GraphQL access and notifications; do not reject an integration solely because an old reference called it dashboard-only.
 
-// Yield to main thread
-await task(); await new Promise(r => setTimeout(r, 0)); await task2();
-
-// Move to Web Worker for heavy computation
-```
-
-| Metric | Good | Poor |
-|--------|------|------|
-| LCP | ≤2.5s | >4s |
-| INP | ≤200ms | >500ms |
-| CLS | ≤0.1 | >0.25 |
-
-## GDPR Consent
-
-```typescript
-// Load beacon only after consent
-const consent = localStorage.getItem('analytics-consent');
-if (consent === 'accepted') {
-  const script = document.createElement('script');
-  script.src = 'https://static.cloudflareinsights.com/beacon.min.js';
-  script.setAttribute('data-cf-beacon', '{"token": "TOKEN", "spa": true}');
-  document.body.appendChild(script);
-}
-```
-
-Alternative: Dashboard → "Enable, excluding visitor data in the EU"
-
-## SPA Navigation
-
-```html
-<!-- REQUIRED for React/Vue/etc routing -->
-<script data-cf-beacon='{"token": "TOKEN", "spa": true}' ...></script>
-```
-
-Without `spa: true`: only initial pageload tracked.
-
-## Staging/Production Separation
-
-```typescript
-// Use env-specific tokens
-const token = process.env.NEXT_PUBLIC_CF_ANALYTICS_TOKEN;
-// .env.production: production token
-// .env.staging: staging token (or empty to disable)
-```
-
-## Bot Filtering
-
-Dashboard → Filters → "Exclude Bot Traffic"
-
-Filters: Search crawlers, monitoring services, known bots.  
-Not filtered: Headless browsers (Playwright/Puppeteer).
-
-## Ad-Blocker Impact
-
-~25-40% of users may block `cloudflareinsights.com`. No official workaround.
-Dashboard shows minimum baseline; use server logs for complete picture.
-
-## Limitations
-
-- No UTM parameter tracking
-- No webhooks/alerts/API
-- No custom beacon domains
-- Max 10 non-proxied sites
+[Data FAQ](https://developers.cloudflare.com/web-analytics/faq/) · [GraphQL discovery](https://developers.cloudflare.com/analytics/graphql-api/features/discovery/) · [Notifications](https://developers.cloudflare.com/web-analytics/get-started/notifications/)

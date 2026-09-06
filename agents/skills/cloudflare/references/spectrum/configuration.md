@@ -1,194 +1,47 @@
-## Origin Types
+# Spectrum Configuration
 
-### Direct IP Origin
+## Public Origin
 
-Use when origin is a single server with static IP.
+Terraform Cloudflare provider 5.x uses nested object attributes:
 
-**TypeScript SDK:**
-```typescript
-const app = await client.spectrum.apps.create({
-  zone_id: 'your-zone-id',
-  protocol: 'tcp/22',
-  dns: { type: 'CNAME', name: 'ssh.example.com' },
-  origin_direct: ['tcp://192.0.2.1:22'],
-  ip_firewall: true,
-  tls: 'off',
-});
-```
-
-**Terraform:**
 ```hcl
 resource "cloudflare_spectrum_application" "ssh" {
-  zone_id  = var.zone_id
+  zone_id = var.zone_id
   protocol = "tcp/22"
-
-  dns {
-    type = "CNAME"
-    name = "ssh.example.com"
-  }
-
-  origin_direct      = ["tcp://192.0.2.1:22"]
-  ip_firewall        = true
-  tls                = "off"
-  argo_smart_routing = true
+  dns = { type = "CNAME", name = "ssh.example.com" }
+  origin_direct = ["tcp://192.0.2.1:22"]
+  traffic_type = "direct"
+  tls = "off"
+  proxy_protocol = "off"
+  ip_firewall = true
 }
 ```
 
-### CNAME Origin
+Replace the documentation IP with a reachable origin. DNS origins use `origin_dns = { name = "origin.example.com" }` and `origin_port = "22"`; use the provider's declared field type. Keep origin DNS unproxied for direct TCP origins to avoid an unsupported double-proxy path.
 
-Use when origin is a hostname (not static IP). Spectrum resolves DNS dynamically.
+## Private Origins
 
-**TypeScript SDK:**
-```typescript
-const app = await client.spectrum.apps.create({
-  zone_id: 'your-zone-id',
-  protocol: 'tcp/3306',
-  dns: { type: 'CNAME', name: 'db.example.com' },
-  origin_dns: { name: 'db-primary.internal.example.com' },
-  origin_port: 3306,
-  tls: 'full',
-});
-```
+Private addresses are not reachable merely because they appear in `origin_direct`. The [current configuration reference](https://developers.cloudflare.com/spectrum/reference/configuration-options/#virtual-network-origin) documents `virtual_network_id`: use an existing routed virtual network, one direct IP origin, one port, TCP/UDP, and `proxy_protocol = "off"`. Verify plan availability and configured routes. A raw `<tunnel-id>.cfargotunnel.com` hostname is not a valid arbitrary TCP origin. Private Network Load Balancing is another supported topology; see its current guide before configuring pools.
 
-**Terraform:**
-```hcl
-resource "cloudflare_spectrum_application" "database" {
-  zone_id  = var.zone_id
-  protocol = "tcp/3306"
+## TLS and Application Protocols
 
-  dns {
-    type = "CNAME"
-    name = "db.example.com"
-  }
+- `off` means TLS passthrough, not unencrypted application traffic. SSH/RDP and database/SMTP protocol encryption can still operate end-to-end.
+- `flexible` terminates immediate TLS at the edge and forwards plaintext to origin.
+- `full` uses TLS to origin without verifying its certificate.
+- `strict` verifies origin TLS when immediate TLS termination is suitable.
 
-  origin_dns {
-    name = "db-primary.internal.example.com"
-  }
+Spectrum does not understand STARTTLS or upgrade protocol negotiation. Use passthrough for PostgreSQL SSL negotiation, MySQL negotiation, and SMTP STARTTLS unless you have a specifically designed TLS-wrapped service. Do not set `strict` blindly on ports 5432, 3306, or 587. Use application-native encryption and authentication.
 
-  origin_port        = 3306
-  tls                = "full"
-  argo_smart_routing = true
-}
-```
+## Client IP and Access Rules
 
-### Load Balancer Origin
+Enable Proxy Protocol only when the immediate origin listener explicitly parses it. Stock OpenSSH does not parse a PROXY header. A compatible HAProxy/nginx front proxy can consume it before forwarding to SSH, but this does not magically expose the original IP to unmodified sshd.
 
-Use for high availability and failover.
+`ip_firewall` applies supported IP Access rules (allow/block by IP, CIDR, ASN, or country). WAF custom rules do not inspect arbitrary Spectrum TCP/UDP traffic. Edge IPv4/IPv6 connectivity is independent of the origin address family; a dual-stack edge can proxy to an IPv4 origin.
 
-**Terraform:**
-```hcl
-resource "cloudflare_load_balancer" "game_lb" {
-  zone_id          = var.zone_id
-  name             = "game-lb.example.com"
-  default_pool_ids = [cloudflare_load_balancer_pool.game_pool.id]
-}
+## Port Ranges
 
-resource "cloudflare_load_balancer_pool" "game_pool" {
-  name    = "game-primary"
-  origins { name = "game-1"; address = "192.0.2.1" }
-  monitor = cloudflare_load_balancer_monitor.tcp_monitor.id
-}
+The number of edge and origin ports must match. Direct origin example: `protocol = "tcp/1000-2000"`, `origin_direct = ["tcp://192.0.2.1:3000-4000"]`. For DNS origins use `origin_port = "3000-4000"`. Virtual-network direct origins do not support ranges.
 
-resource "cloudflare_load_balancer_monitor" "tcp_monitor" {
-  type = "tcp"; port = 25565; interval = 60; timeout = 5
-}
+For load balancing use a configured load balancer hostname as `origin_dns`; define account IDs, monitors, origin pools, default pools, and fallback pool with the current provider schema. A TCP health check only proves a listener accepts connections; database failover also requires primary-role correctness.
 
-resource "cloudflare_spectrum_application" "game" {
-  zone_id  = var.zone_id
-  protocol = "tcp/25565"
-  dns { type = "CNAME"; name = "game.example.com" }
-  origin_dns { name = cloudflare_load_balancer.game_lb.name }
-  origin_port = 25565
-}
-```
-
-## TLS Configuration
-
-| Mode | Description | Use Case | Origin Cert |
-|------|-------------|----------|-------------|
-| `off` | No TLS | Non-encrypted (SSH, gaming) | No |
-| `flexible` | TLS client→CF, plain CF→origin | Testing | No |
-| `full` | TLS end-to-end, self-signed OK | Production | Yes (any) |
-| `strict` | Full + valid cert verification | Max security | Yes (CA) |
-
-**Example:**
-```typescript
-const app = await client.spectrum.apps.create({
-  zone_id: 'your-zone-id',
-  protocol: 'tcp/3306',
-  dns: { type: 'CNAME', name: 'db.example.com' },
-  origin_direct: ['tcp://192.0.2.1:3306'],
-  tls: 'strict',  // Validates origin certificate
-});
-```
-
-## Proxy Protocol
-
-Forwards real client IP to origin. Origin must support parsing.
-
-| Version | Protocol | Use Case |
-|---------|----------|----------|
-| `off` | - | Origin doesn't need client IP |
-| `v1` | TCP | Most TCP apps (SSH, databases) |
-| `v2` | TCP | High-performance TCP |
-| `simple` | UDP | UDP applications |
-
-**Compatibility:**
-- **v1**: HAProxy, nginx, SSH, most databases
-- **v2**: HAProxy 1.5+, nginx 1.11+
-- **simple**: Cloudflare-specific UDP format
-
-**Enable:**
-```typescript
-const app = await client.spectrum.apps.create({
-  // ...
-  proxy_protocol: 'v1',  // Origin must parse PROXY header
-});
-```
-
-**Origin Config (nginx):**
-```nginx
-stream {
-    server {
-        listen 22 proxy_protocol;
-        proxy_pass backend:22;
-    }
-}
-```
-
-## IP Access Rules
-
-Enable `ip_firewall: true` then configure zone-level firewall rules.
-
-```typescript
-const app = await client.spectrum.apps.create({
-  // ...
-  ip_firewall: true,  // Applies zone firewall rules
-});
-```
-
-## Port Ranges (Enterprise Only)
-
-```hcl
-resource "cloudflare_spectrum_application" "game_cluster" {
-  zone_id  = var.zone_id
-  protocol = "tcp/25565-25575"
-
-  dns {
-    type = "CNAME"
-    name = "games.example.com"
-  }
-
-  origin_direct = ["tcp://192.0.2.1"]
-  
-  origin_port {
-    start = 25565
-    end   = 25575
-  }
-}
-```
-
-## See Also
-
-- [patterns.md](patterns.md) - Protocol-specific examples
-- [api.md](api.md) - REST/SDK reference
+[API](api.md) · [Patterns](patterns.md) · [Troubleshooting](gotchas.md)

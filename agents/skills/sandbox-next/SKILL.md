@@ -44,7 +44,7 @@ Skills install: [Agent setup](https://developers.cloudflare.com/agent-setup/) ·
 - Do **not** invent removed stable APIs (`gitCheckout` on core, string-`exec` completion, session execution, `sandbox.terminal(request)`).
 - Do **not** use one retry loop for every error (see Errors docs).
 
-Minimal shape:
+Minimal shape (Python requires the matching `-python` image; the default image contains no Python):
 
 ```ts
 import { getSandbox, proxyToSandbox, Sandbox } from "@cloudflare/sandbox";

@@ -1,120 +1,12 @@
-# Workflow: Add a Workflow to Existing Skill
+# Add a Workflow
 
-<required_reading>
-**Read these reference files NOW:**
-1. references/recommended-structure.md
-2. references/workflows-and-validation.md
-</required_reading>
+Read [recommended structure](../references/recommended-structure.md) and [validation](../references/workflows-and-validation.md).
 
-<process>
-## Step 1: Select the Skill
+1. Resolve and read the target skill. Identify the requested intent and distinguish it from existing routes.
+2. Keep a small skill inline when practical; add a router only if distinct procedures justify it. Preserve the existing behavior.
+3. Write the workflow with required reading, prerequisites, ordered actions, failure handling, and observable completion criteria.
+4. Add a direct entrypoint link and route from the user's intent. Do not require an intake answer when the request already selects the route.
+5. Add only genuinely missing references or helpers; validate their external claims and compatibility.
+6. Test the new route and a previously supported route, including missing input and unavailable-tool behavior where relevant.
 
-**DO NOT use structured user-question tool** - there may be many skills.
-
-```bash
-ls ~/.agents/skills/
-```
-
-Present numbered list, ask: "Which skill needs a new workflow?"
-
-## Step 2: Analyze Current Structure
-
-Read the skill:
-```bash
-cat ~/.agents/skills/{skill-name}/SKILL.md
-ls ~/.agents/skills/{skill-name}/workflows/ 2>/dev/null
-```
-
-Determine:
-- **Simple skill?** → May need to upgrade to router pattern first
-- **Already has workflows/?** → Good, can add directly
-- **What workflows exist?** → Avoid duplication
-
-Report current structure to user.
-
-## Step 3: Gather Workflow Requirements
-
-Ask using structured user-question tool or direct question:
-- What should this workflow do?
-- When would someone use it vs existing workflows?
-- What references would it need?
-
-## Step 4: Upgrade to Router Pattern (if needed)
-
-**If skill is currently simple (no workflows/):**
-
-Ask: "This skill needs to be upgraded to the router pattern first. Should I restructure it?"
-
-If yes:
-1. Create workflows/ directory
-2. Move existing process content to workflows/main.md
-3. Rewrite SKILL.md as router with intake + routing
-4. Verify structure works before proceeding
-
-## Step 5: Create the Workflow File
-
-Create `workflows/{workflow-name}.md`:
-
-```markdown
-# Workflow: {Workflow Name}
-
-<required_reading>
-**Read these reference files NOW:**
-1. references/{relevant-file}.md
-</required_reading>
-
-<process>
-## Step 1: {First Step}
-[What to do]
-
-## Step 2: {Second Step}
-[What to do]
-
-## Step 3: {Third Step}
-[What to do]
-</process>
-
-<success_criteria>
-This workflow is complete when:
-- [ ] Criterion 1
-- [ ] Criterion 2
-- [ ] Criterion 3
-</success_criteria>
-```
-
-## Step 6: Update SKILL.md
-
-Add the new workflow to:
-
-1. **Intake question** - Add new option
-2. **Routing table** - Map option to workflow file
-3. **Workflows index** - Add to the list
-
-## Step 7: Create References (if needed)
-
-If the workflow needs domain knowledge that doesn't exist:
-1. Create `references/{reference-name}.md`
-2. Add to reference_index in SKILL.md
-3. Reference it in the workflow's required_reading
-
-## Step 8: Test
-
-Invoke the skill:
-- Does the new option appear in intake?
-- Does selecting it route to the correct workflow?
-- Does the workflow load the right references?
-- Does the workflow execute correctly?
-
-Report results to user.
-</process>
-
-<success_criteria>
-Workflow addition is complete when:
-- [ ] Skill upgraded to router pattern (if needed)
-- [ ] Workflow file created with required_reading, process, success_criteria
-- [ ] SKILL.md intake updated with new option
-- [ ] SKILL.md routing updated
-- [ ] SKILL.md workflows_index updated
-- [ ] Any needed references created
-- [ ] Tested and working
-</success_criteria>
+Complete when both the new workflow and preserved workflows remain reachable and correct.

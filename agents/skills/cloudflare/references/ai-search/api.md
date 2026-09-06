@@ -1,87 +1,75 @@
-# AI Search API Reference
+# AI Search API
 
-## Workers Binding
-
-```typescript
-const answer = await env.AI.autorag("instance-name").aiSearch(options);
-const results = await env.AI.autorag("instance-name").search(options);
-const instances = await env.AI.autorag("_").listInstances();
-```
-
-## aiSearch() Options
+## Retrieval
 
 ```typescript
-interface AiSearchOptions {
-  query: string;                          // User query
-  model: string;                          // Workers AI model ID
-  system_prompt?: string;                 // LLM instructions
-  rewrite_query?: boolean;                // Fix typos (default: false)
-  max_num_results?: number;               // Max chunks (default: 10)
-  ranking_options?: { score_threshold?: number }; // 0.0-1.0 (default: 0.3)
-  reranking?: { enabled: boolean; model: string };
-  stream?: boolean;                       // Stream response (default: false)
-  filters?: Filter;                       // Metadata filters
-  page?: string;                          // Pagination token
+async function searchDocs(instance: AiSearchInstance, query: string) {
+  const result = await instance.search({
+    messages: [{ role: "user", content: query }],
+    ai_search_options: {
+      retrieval: {
+        max_num_results: 10,
+        match_threshold: 0.4,
+        return_on_failure: false
+      },
+      query_rewrite: { enabled: true }
+    }
+  });
+  return result.chunks.map(chunk => ({
+    id: chunk.id,
+    text: chunk.text,
+    key: chunk.item.key,
+    score: chunk.score
+  }));
 }
 ```
 
-## Response
+Current types also support `query` instead of `messages` for retrieval; supply exactly one. A chunk contains `id`, `type`, `score`, `text`, and `item` metadata. It is not the legacy `data[].content[]` shape.
+
+## Generation and streaming
 
 ```typescript
-interface AiSearchResponse {
-  search_query: string;      // Query used (rewritten if enabled)
-  response: string;          // AI-generated answer
-  data: SearchResult[];      // Retrieved chunks
-  has_more: boolean;
-  next_page?: string;
+async function answer(instance: AiSearchInstance, query: string) {
+  return instance.chatCompletions({
+    messages: [{ role: "user", content: query }],
+    ai_search_options: { retrieval: { return_on_failure: false } }
+  });
 }
 
-interface SearchResult {
-  id: string;
-  score: number;
-  content: string;
-  metadata: { filename: string; folder: string; timestamp: number };
+async function streamAnswer(instance: AiSearchInstance, query: string) {
+  const stream = await instance.chatCompletions({
+    messages: [{ role: "user", content: query }],
+    stream: true,
+    ai_search_options: { retrieval: { return_on_failure: false } }
+  });
+  return new Response(stream, {
+    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" }
+  });
 }
 ```
 
-## Filters
+Non-streaming responses expose `choices[].message.content` and `chunks`. Check for empty choices and nullable content. The instance's model can be used, or pass a supported `model`.
+
+## Metadata filtering
+
+Filters live at `ai_search_options.retrieval.filters` and use Vectorize metadata syntax:
 
 ```typescript
-// Comparison
-{ column: "folder", operator: "gte", value: "docs/" }
-
-// Compound
-{ operator: "and", filters: [
-  { column: "folder", operator: "gte", value: "docs/" },
-  { column: "timestamp", operator: "gte", value: 1704067200 }
-]}
+const options = {
+  retrieval: {
+    filters: {
+      tenant_id: { $eq: "tenant-123" },
+      timestamp: { $gte: 1704067200 }
+    },
+    return_on_failure: false
+  }
+} satisfies AiSearchOptions;
 ```
 
-**Operators:** `eq`, `ne`, `gt`, `gte`, `lt`, `lte`
+Configure and populate the metadata fields used by filters. Comparison operators include `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, and `$nin`; consult the current filter documentation for supported combinations. A lower-bound comparison is not a path-prefix match.
 
-**Built-in metadata:** `filename`, `folder`, `timestamp` (Unix seconds)
+## Management
 
-## Streaming
+`AiSearchNamespace` exposes `get`, `list`, `create`, and `delete`. An instance exposes `info`, `stats`, `update`, `items`, and `jobs`. Management calls change real resources; distinguish them from search calls. There is no `env.AI.autorag("_").listInstances()` method.
 
-```typescript
-const stream = await env.AI.autorag("docs").aiSearch({ query, model, stream: true });
-return new Response(stream, { headers: { "Content-Type": "text/event-stream" } });
-```
-
-## Error Types
-
-| Error | Cause |
-|-------|-------|
-| `AutoRAGNotFoundError` | Instance doesn't exist |
-| `AutoRAGUnauthorizedError` | Invalid/missing token |
-| `AutoRAGValidationError` | Invalid parameters |
-
-## REST API
-
-```bash
-curl https://api.cloudflare.com/client/v4/accounts/{ACCOUNT_ID}/autorag/rags/{NAME}/ai-search \
-  -H "Authorization: Bearer {TOKEN}" \
-  -d '{"query": "...", "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast"}'
-```
-
-Requires Service API token with "AI Search - Read" permission.
+Use current [API documentation](https://developers.cloudflare.com/ai-search/) for REST routes and token permissions. The old `/autorag/rags/...` API belongs to the legacy interface; do not send current binding-shaped payloads to it.

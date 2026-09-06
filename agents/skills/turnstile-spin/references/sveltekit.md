@@ -1,191 +1,133 @@
 # SvelteKit
 
-For SvelteKit projects. The widget renders in the page; siteverify is called from a SvelteKit form action (or a `+server.ts` endpoint) server-side.
+Copy [verify-turnstile.ts](../templates/verify-turnstile.ts) to `src/lib/server/verify-turnstile.ts`. Use the project's existing server adapter, form fields, action, and business logic. Configure `TURNSTILE_SECRET` and `TURNSTILE_HOSTNAMES` in its server environment. Production hostnames must exclude local-development hosts.
+
+The following Svelte 5 component uses explicit rendering, handles script reuse, and removes its widget when unmounted. Declare the browser API in the project's existing `src/app.d.ts`:
+
+```ts
+export {};
+declare global {
+  interface Window {
+    turnstile?: {
+      render(container: HTMLElement, options: {
+        sitekey: string; action: string; callback(token: string): void;
+        "expired-callback"(): void; "error-callback"(): void;
+      }): string;
+      reset(id: string): void;
+      remove(id: string): void;
+    };
+  }
+}
+```
 
 ```svelte title="src/routes/signup/+page.svelte"
-<script>
-	import { enhance } from "$app/forms";
-	import { onMount } from "svelte";
+<script lang="ts">
+  import { enhance } from "$app/forms";
+  import { onMount } from "svelte";
 
-	let turnstileContainer;
-	let signupWidgetId;
+  let { form } = $props<{ form: { error?: string; ok?: boolean } | null }>();
+  let container: HTMLDivElement;
+  let widgetId: string | undefined;
+  let token = $state("");
+  let pending = $state(false);
 
-	onMount(() => {
-		const render = () => {
-			signupWidgetId = window.turnstile.render(turnstileContainer, {
-				sitekey: "YOUR_SITEKEY",
-				action: "signup",
-			});
-			delete window.onSignupTurnstileLoad;
-		};
-
-		if (window.turnstile) {
-			render();
-			return;
-		}
-
-		window.onSignupTurnstileLoad = render;
-		const script = document.createElement("script");
-		script.src =
-			"https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onSignupTurnstileLoad&render=explicit";
-		script.async = true;
-		document.head.appendChild(script);
-
-		return () => {
-			delete window.onSignupTurnstileLoad;
-		};
-	});
+  onMount(() => {
+    let active = true;
+    const render = () => {
+      if (!active || !window.turnstile || widgetId !== undefined) return;
+      widgetId = window.turnstile.render(container, {
+        sitekey: "YOUR_SITEKEY", action: "signup", callback: value => token = value,
+        "expired-callback": () => token = "",
+        "error-callback": () => token = "",
+      });
+    };
+    let script = document.querySelector<HTMLScriptElement>('script[src^="https://challenges.cloudflare.com/turnstile/v0/api.js"]');
+    if (window.turnstile) {
+      render();
+    } else {
+      const needsScript = !script;
+      script ??= document.createElement("script");
+      script.addEventListener("load", render);
+      if (needsScript) {
+        script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+        script.async = true;
+        document.head.appendChild(script);
+      }
+    }
+    return () => {
+      active = false;
+      script?.removeEventListener("load", render);
+      if (widgetId !== undefined) window.turnstile?.remove(widgetId);
+      widgetId = undefined;
+    };
+  });
 </script>
 
-<form
-	method="POST"
-	use:enhance={() => {
-		return async ({ result, update }) => {
-			try {
-				await update();
-			} finally {
-				if (result.type !== "redirect" && signupWidgetId !== undefined) {
-					window.turnstile.reset(signupWidgetId);
-				}
-			}
-		};
-	}}
->
-	<input name="email" type="email" required />
-	<div bind:this={turnstileContainer}></div>
-	<button type="submit">Sign up</button>
+<form method="POST" use:enhance={({ cancel }) => {
+  if (!token || pending) { cancel(); return; }
+  pending = true;
+  return async ({ result, update }) => {
+    try { await update(); }
+    finally {
+      pending = false;
+      token = "";
+      if (result.type !== "redirect" && widgetId !== undefined) window.turnstile?.reset(widgetId);
+    }
+  };
+}}>
+  <input name="email" type="email" required />
+  <div bind:this={container}></div>
+  {#if form?.error}<p role="alert">{form.error}</p>{/if}
+  <button type="submit" disabled={!token || pending}>Sign up</button>
 </form>
 ```
 
-Form action (canonical siteverify):
+## Form action
+
+`use:enhance` works with a form action, not an arbitrary JSON endpoint. Preserve the existing action's validation and display its failure state in the existing UI.
 
 ```ts title="src/routes/signup/+page.server.ts"
 import type { Actions } from "./$types";
 import { fail } from "@sveltejs/kit";
-import { TURNSTILE_SECRET, TURNSTILE_HOSTNAMES } from "$env/static/private";
-
-const expectedHostnames = new Set(
-	(TURNSTILE_HOSTNAMES ?? "")
-		.split(",")
-		.map((h) => h.trim())
-		.filter(Boolean),
-);
+import { env } from "$env/dynamic/private";
+import { verifyTurnstile } from "$lib/server/verify-turnstile";
 
 export const actions: Actions = {
-	default: async ({ request, getClientAddress }) => {
-		const data = await request.formData();
-		const token = data.get("cf-turnstile-response");
-		if (typeof token !== "string" || expectedHostnames.size === 0) {
-			return fail(403, { error: "Verification failed" });
-		}
-
-		const verify = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-			method: "POST",
-			headers: { "Content-Type": "application/x-www-form-urlencoded" },
-			body: new URLSearchParams({
-				secret: TURNSTILE_SECRET,
-				response: token,
-				remoteip: getClientAddress(),
-			}),
-		});
-		const result = await verify.json();
-		if (
-			verify.ok !== true ||
-			result.success !== true ||
-			result.action !== "signup" ||
-			!expectedHostnames.has(result.hostname)
-		) {
-			return fail(403, { error: "Verification failed" });
-		}
-
-		// process signup
-		return { ok: true };
-	},
+  default: async ({ request }) => {
+    let data: FormData;
+    try { data = await request.formData(); }
+    catch { return fail(400, { error: "Invalid form" }); }
+    if (!await verifyTurnstile({
+      token: data.get("cf-turnstile-response"), secret: env.TURNSTILE_SECRET,
+      hostnames: env.TURNSTILE_HOSTNAMES, action: "signup",
+    })) return fail(403, { error: "Verification failed" });
+    // Existing signup logic uses the original data, including email.
+    return { ok: true };
+  },
 };
 ```
 
-`signup` is the stable action for this surface. Preserve an existing custom migration action and compare the returned action to the same value. Siteverify is mandatory for every widget mode, including pre-clearance. Set `TURNSTILE_HOSTNAMES` to the deployment-specific frontend hostnames; a production value must not include `localhost` or `127.0.0.1`.
+## JSON endpoint variant
 
-In `.env`:
-
-```text
-TURNSTILE_SECRET=YOUR_SECRET
-```
-
-The `$env/static/private` import enforces that the secret never reaches the client bundle.
-
-## Variant: client-side fetch to an endpoint
-
-If you need a JSON API rather than progressive-enhancement form post, use `+server.ts`:
+Use this only when the existing client already submits JSON. Retain its original fields and add the token; reset this surface's widget in `finally` after the request. Set `Content-Type: application/json`. Do not attach `use:enhance` to this endpoint.
 
 ```ts title="src/routes/api/signup/+server.ts"
 import type { RequestHandler } from "./$types";
-import { TURNSTILE_SECRET, TURNSTILE_HOSTNAMES } from "$env/static/private";
+import { env } from "$env/dynamic/private";
+import { verifyTurnstile } from "$lib/server/verify-turnstile";
 
-const expectedHostnames = new Set(
-	(TURNSTILE_HOSTNAMES ?? "")
-		.split(",")
-		.map((h) => h.trim())
-		.filter(Boolean),
-);
-
-export const POST: RequestHandler = async ({ request, getClientAddress }) => {
-	const { token } = await request.json();
-	if (expectedHostnames.size === 0) {
-		return new Response("forbidden", { status: 403 });
-	}
-	const verify = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-		method: "POST",
-		headers: { "Content-Type": "application/x-www-form-urlencoded" },
-		body: new URLSearchParams({
-			secret: TURNSTILE_SECRET,
-			response: token,
-			remoteip: getClientAddress(),
-		}),
-	});
-	const result = await verify.json();
-	if (
-		verify.ok !== true ||
-		result.success !== true ||
-		result.action !== "signup" ||
-		!expectedHostnames.has(result.hostname)
-	) {
-		return new Response("forbidden", { status: 403 });
-	}
-	// process signup
-	return new Response(JSON.stringify({ ok: true }), { status: 200 });
+export const POST: RequestHandler = async ({ request }) => {
+  let body: unknown;
+  try { body = await request.json(); }
+  catch { return new Response("invalid JSON", { status: 400 }); }
+  const token = typeof body === "object" && body !== null && "token" in body ? body.token : undefined;
+  if (!await verifyTurnstile({ token, secret: env.TURNSTILE_SECRET,
+    hostnames: env.TURNSTILE_HOSTNAMES, action: "signup" })) {
+    return new Response("forbidden", { status: 403 });
+  }
+  // Existing signup logic validates and uses the remaining body fields.
+  return Response.json({ ok: true });
 };
 ```
 
-The explicit renderer above retains `signupWidgetId`. Reset it in `finally` when calling this endpoint so every completion path gets a fresh token:
-
-```svelte
-<script>
-	async function submit(e) {
-		e.preventDefault();
-		try {
-			const token = new FormData(e.currentTarget).get("cf-turnstile-response");
-			const res = await fetch("/api/signup", {
-				method: "POST",
-				body: JSON.stringify({ token }),
-			});
-			const result = await res.json();
-			if (!res.ok || result.ok !== true) throw new Error("Submission failed");
-			// proceed
-		} catch {
-			// surface error
-		} finally {
-			if (signupWidgetId !== undefined) {
-				window.turnstile.reset(signupWidgetId);
-			}
-		}
-	}
-</script>
-```
-
-## Substitutions
-
-| Placeholder         | Replace with                                                         |
-| ------------------- | -------------------------------------------------------------------- |
-| `YOUR_SITEKEY`      | The widget site key from Step 8                                      |
-| `YOUR_SECRET`       | The secret captured in Step 8. Stays in env, never inlined.          |
+The helper handles Siteverify HTTP, timeout, JSON, action, and hostname failures. Local mock tests cannot prove a live token works: validate an actual submission and replay rejection before reporting end-to-end completion.

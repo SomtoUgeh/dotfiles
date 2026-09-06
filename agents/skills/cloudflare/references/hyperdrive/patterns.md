@@ -30,7 +30,7 @@ if (req.method === "GET") {
   const products = await sql`SELECT * FROM products WHERE category = ${cat}`;
 }
 
-// Writes: no cache (immediate consistency)
+// Writes bypass caching; existing cached reads are NOT invalidated
 if (req.method === "POST") {
   const sql = postgres(env.HYPERDRIVE_REALTIME.connectionString, {prepare: true});
   await sql`INSERT INTO orders ${sql(data)}`;
@@ -44,14 +44,14 @@ const client = new Client({connectionString: env.HYPERDRIVE.connectionString});
 await client.connect();
 
 // Aggregate queries cached (use fixed timestamps for caching)
-const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+const thirtyDaysAgo = new Date(Math.floor(Date.now() / 86_400_000) * 86_400_000 - 30 * 86_400_000).toISOString();
 const dailyStats = await client.query(`
   SELECT DATE(created_at) as date, COUNT(*) as orders, SUM(amount) as revenue
   FROM orders WHERE created_at >= $1
   GROUP BY DATE(created_at) ORDER BY date DESC
 `, [thirtyDaysAgo]);
 
-const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+const sevenDaysAgo = new Date(Math.floor(Date.now() / 86_400_000) * 86_400_000 - 7 * 86_400_000).toISOString();
 const topProducts = await client.query(`
   SELECT p.name, COUNT(oi.id) as count, SUM(oi.quantity * oi.price) as revenue
   FROM order_items oi JOIN products p ON oi.product_id = p.id
@@ -65,12 +65,12 @@ const topProducts = await client.query(`
 ## Multi-Tenant
 
 ```typescript
-const tenantId = req.headers.get("X-Tenant-ID");
+const tenantId = authenticatedSession.tenantId; // Verified by your authentication layer
 const sql = postgres(env.HYPERDRIVE.connectionString, {prepare: true});
 
 // Tenant-scoped queries cached separately
 const docs = await sql`
-  SELECT * FROM documents 
+  SELECT * FROM documents
   WHERE tenant_id = ${tenantId} AND deleted_at IS NULL
   ORDER BY updated_at DESC LIMIT 50
 `;
@@ -168,9 +168,9 @@ const sql = postgres(connectionString, {prepare: true});  // Default, enables ca
 **Optimize connection settings:**
 ```typescript
 const sql = postgres(connectionString, {
-  max: 5,             // Stay under Workers' 6 connection limit
+  max: 5,             // Bound query concurrency
   fetch_types: false, // Reduce latency if not using arrays
-  idle_timeout: 60,   // Match Worker lifetime
+  idle_timeout: 60,   // Driver idle timeout; still close at request end
 });
 ```
 
@@ -183,8 +183,14 @@ await sql`SELECT * FROM products WHERE category = 'electronics' LIMIT 10`;
 await sql`SELECT * FROM logs WHERE created_at > NOW()`;
 
 // ✅ Cacheable (parameterized timestamp)
-const ts = Date.now();
+const ts = new Date(Math.floor(Date.now() / 60_000) * 60_000);
 await sql`SELECT * FROM logs WHERE created_at > ${ts}`;
 ```
 
 See [gotchas.md](./gotchas.md) for limits, troubleshooting.
+
+## Connection lifetime and freshness
+
+Create clients inside the request. Wrap query work in `try/finally` and close `pg` with `await client.end()`, postgres.js with `await sql.end()`, mysql2 with `await conn.end()`, or Kysely with `await db.destroy()`. Apply this to the abbreviated query fragments above, including error paths. Roll back failed explicit transactions before closing. Never reuse a connection created in another request.
+
+Writes do not invalidate cached SELECT results. Route both writes and freshness-sensitive reads through a cache-disabled Hyperdrive configuration; use the cached binding only where staleness is acceptable. Local driver tests do not verify hosted Hyperdrive caching or pooling.

@@ -6,7 +6,7 @@
 wrangler kv namespace create MY_NAMESPACE
 # Output: { binding = "MY_NAMESPACE", id = "abc123..." }
 
-wrangler kv namespace create MY_NAMESPACE --preview  # For local dev
+wrangler kv namespace create MY_NAMESPACE --preview  # Separate remote preview namespace
 ```
 
 ## Workers Binding
@@ -17,11 +17,8 @@ wrangler kv namespace create MY_NAMESPACE --preview  # For local dev
   "kv_namespaces": [
     {
       "binding": "MY_KV",
-      "id": "abc123xyz789"
-    },
-    // Optional: Different namespace for preview/development
-    {
-      "binding": "MY_KV",
+      "id": "abc123xyz789",
+      // Optional remote preview namespace; local dev uses local storage.
       "preview_id": "preview-abc123"
     }
   ]
@@ -59,7 +56,7 @@ interface UserProfile {
 }
 
 const profile = await env.USERS.get<UserProfile>("user:123", "json");
-// profile: UserProfile | null (type-safe!)
+// profile: UserProfile | null (compile-time type only)
 if (profile) {
   console.log(profile.name); // TypeScript knows this is a string
 }
@@ -83,7 +80,7 @@ wrangler kv key list --binding=MY_KV --prefix="user:"
 
 # Bulk operations (max 10,000 keys per file)
 wrangler kv bulk put data.json --binding=MY_KV
-wrangler kv bulk get keys.json --binding=MY_KV
+# Bulk reads use binding get(keys) or the REST bulkGet endpoint.
 wrangler kv bulk delete keys.json --binding=MY_KV --force
 ```
 
@@ -105,13 +102,13 @@ wrangler dev --remote       # Remote KV (production)
 import Cloudflare from 'cloudflare';
 
 const client = new Cloudflare({
-  apiEmail: process.env.CLOUDFLARE_EMAIL,
-  apiKey: process.env.CLOUDFLARE_API_KEY
+  apiToken: process.env.CLOUDFLARE_API_TOKEN
 });
 
 // Single key operations
-await client.kv.namespaces.values.update(namespaceId, 'key', {
+await client.kv.namespaces.values.update('key', {
   account_id: accountId,
+  namespace_id: namespaceId,
   value: 'value',
   expiration_ttl: 3600
 });
@@ -139,6 +136,6 @@ const results = await client.kv.namespaces.bulkGet(namespaceId, {
 // Bulk delete (up to 10,000 keys)
 await client.kv.namespaces.bulkDelete(namespaceId, {
   account_id: accountId,
-  keys: ["key1", "key2", "key3"]
+  body: ["key1", "key2", "key3"]
 });
 ```

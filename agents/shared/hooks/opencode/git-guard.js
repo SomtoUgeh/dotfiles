@@ -1,7 +1,8 @@
 import { runCommand } from "./shared-hooks.js";
+import { fileURLToPath } from "node:url";
 
-const AGENTS_ROOT = new URL("../../..", import.meta.url).pathname.replace(/\/$/, "");
-const GIT_GUARD = new URL("../git_guard.py", import.meta.url).pathname;
+const AGENTS_ROOT = fileURLToPath(new URL("../../..", import.meta.url));
+const GIT_GUARD = fileURLToPath(new URL("../git_guard.py", import.meta.url));
 
 function runGitGuard(command) {
   const payload = JSON.stringify({
@@ -11,12 +12,12 @@ function runGitGuard(command) {
     },
   });
 
-  const result = runCommand("python3", [GIT_GUARD], payload, AGENTS_ROOT);
-  if (result.status !== 2) {
+  const result = runCommand("uv", ["run", "--script", GIT_GUARD], payload, AGENTS_ROOT);
+  if (result.status === 0) {
     return "";
   }
 
-  return result.stderr || "Blocked by git guard";
+  return result.stderr || "Git guard could not inspect the command";
 }
 
 export const GitGuardPlugin = async ({ client }) => {
@@ -48,7 +49,7 @@ export const GitGuardPlugin = async ({ client }) => {
         body: {
           service: "shared-hooks",
           level: "warn",
-          message: `Blocked destructive command: ${command.slice(0, 100)}`,
+          message: "Git guard blocked a shell command",
           extra: { message },
         },
       });

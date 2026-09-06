@@ -1,239 +1,79 @@
-# TURN API Reference
+# TURN credential API
 
-Complete API documentation for Cloudflare TURN service credentials and key management.
+Credential operations use the TURN key secret, not the account API token used to manage keys. Run these calls only on the server.
 
-## Authentication
-
-All endpoints require Cloudflare API token with "Calls Write" permission.
-
-Base URL: `https://api.cloudflare.com/client/v4`
-
-## TURN Key Management
-
-### List TURN Keys
-
-```
-GET /accounts/{account_id}/calls/turn_keys
+```bash
+curl --fail-with-body \
+  "https://rtc.live.cloudflare.com/v1/turn/keys/$TURN_KEY_ID/credentials/generate-ice-servers" \
+  -H "Authorization: Bearer $TURN_KEY_SECRET" \
+  -H 'Content-Type: application/json' \
+  -d '{"ttl":3600}'
 ```
 
-### Get TURN Key Details
-
-```
-GET /accounts/{account_id}/calls/turn_keys/{key_id}
-```
-
-### Create TURN Key
-
-```
-POST /accounts/{account_id}/calls/turn_keys
-Content-Type: application/json
-
-{
-  "name": "my-turn-key"
-}
-```
-
-**Response includes**:
-- `uid`: Key identifier
-- `key`: The actual secret key (only returned on creation—save immediately)
-- `name`: Human-readable name
-- `created`: ISO 8601 timestamp
-- `modified`: ISO 8601 timestamp
-
-### Update TURN Key
-
-```
-PUT /accounts/{account_id}/calls/turn_keys/{key_id}
-Content-Type: application/json
-
-{
-  "name": "updated-name"
-}
-```
-
-### Delete TURN Key
-
-```
-DELETE /accounts/{account_id}/calls/turn_keys/{key_id}
-```
-
-## Generate Temporary Credentials
-
-```
-POST https://rtc.live.cloudflare.com/v1/turn/keys/{key_id}/credentials/generate
-Authorization: Bearer {key_secret}
-Content-Type: application/json
-
-{
-  "ttl": 86400
-}
-```
-
-### Credential Constraints
-
-| Parameter | Min | Max | Default | Notes |
-|-----------|-----|-----|---------|-------|
-| ttl | 1 | 172800 (48hrs) | varies | API rejects values >172800 |
-
-**CRITICAL**: Maximum TTL is 48 hours (172800 seconds). API will reject requests exceeding this limit.
-
-### Response Schema
-
-```json
-{
-  "iceServers": {
-    "urls": [
-      "stun:stun.cloudflare.com:3478",
-      "turn:turn.cloudflare.com:3478?transport=udp",
-      "turn:turn.cloudflare.com:3478?transport=tcp",
-      "turn:turn.cloudflare.com:53?transport=udp",
-      "turn:turn.cloudflare.com:80?transport=tcp",
-      "turns:turn.cloudflare.com:5349?transport=tcp",
-      "turns:turn.cloudflare.com:443?transport=tcp"
-    ],
-    "username": "1738035200:user123",
-    "credential": "base64encodedhmac=="
-  }
-}
-```
-
-**Port 53 Warning**: Filter port 53 URLs for browser clients—blocked by Chrome/Firefox. See [gotchas.md](./gotchas.md#using-port-53-in-browsers).
-
-## Revoke Credentials
-
-```
-POST https://rtc.live.cloudflare.com/v1/turn/keys/{key_id}/credentials/revoke
-Authorization: Bearer {key_secret}
-Content-Type: application/json
-
-{
-  "username": "1738035200:user123"
-}
-```
-
-**Response**: 204 No Content
-
-Billing stops immediately. Active connection drops after short delay (~seconds).
-
-## TypeScript Types
+## Validated TypeScript helper
 
 ```typescript
-interface CloudflareTURNConfig {
-  keyId: string;
-  keySecret: string;
-  ttl?: number; // Max 172800 (48 hours)
-}
-
-interface TURNCredentialsRequest {
-  ttl?: number; // Max 172800 seconds
-}
-
-interface TURNCredentialsResponse {
-  iceServers: {
-    urls: string[];
-    username: string;
-    credential: string;
-  };
-}
-
-interface RTCIceServer {
-  urls: string | string[];
+export interface IceServer {
+  urls: string[];
   username?: string;
   credential?: string;
-  credentialType?: "password";
 }
 
-interface TURNKeyResponse {
-  uid: string;
-  key: string; // Only present on creation
-  name: string;
-  created: string;
-  modified: string;
+export function parseIceServers(value: unknown): IceServer[] {
+  if (!value || typeof value !== "object" || !("iceServers" in value) ||
+      !Array.isArray(value.iceServers)) throw new Error("Invalid ICE response");
+  const servers: IceServer[] = [];
+  for (const server of value.iceServers) {
+    if (!server || typeof server !== "object" || !("urls" in server) ||
+        !Array.isArray(server.urls) ||
+        !server.urls.every((url: unknown) => typeof url === "string")) {
+      throw new Error("Invalid ICE server");
+    }
+    const urls = server.urls.filter((url: string) => !/:53(?:\?|$)/.test(url));
+    if (!urls.every((url: string) => /^(stun|stuns|turn|turns):/.test(url))) {
+      throw new Error("Invalid ICE URL");
+    }
+    if (!urls.length) continue;
+    const username: unknown = "username" in server ? server.username : undefined;
+    const credential: unknown = "credential" in server ? server.credential : undefined;
+    const usesTurn = urls.some((url: string) => /^turns?:/.test(url));
+    if (usesTurn && (typeof username !== "string" || !username ||
+                    typeof credential !== "string" || !credential)) {
+      throw new Error("Missing TURN credentials");
+    }
+    if (username !== undefined && typeof username !== "string") throw new Error("Invalid username");
+    if (credential !== undefined && typeof credential !== "string") throw new Error("Invalid credential");
+    servers.push({ urls, ...(username === undefined ? {} : { username }),
+      ...(credential === undefined ? {} : { credential }) });
+  }
+  if (!servers.some(server => server.urls.some(url => /^turns?:/.test(url)))) {
+    throw new Error("No usable TURN server");
+  }
+  return servers;
 }
-```
 
-## Validation Function
-
-```typescript
-function validateRTCIceServer(obj: unknown): obj is RTCIceServer {
-  if (!obj || typeof obj !== 'object') {
-    return false;
-  }
-
-  const server = obj as Record<string, unknown>;
-
-  if (typeof server.urls !== 'string' && !Array.isArray(server.urls)) {
-    return false;
-  }
-
-  if (server.username && typeof server.username !== 'string') {
-    return false;
-  }
-
-  if (server.credential && typeof server.credential !== 'string') {
-    return false;
-  }
-
-  return true;
-}
-```
-
-## Type-Safe Credential Generation
-
-```typescript
-async function fetchTURNServers(
-  config: CloudflareTURNConfig
-): Promise<RTCIceServer[]> {
-  // Validate TTL constraint
-  const ttl = config.ttl ?? 3600;
-  if (ttl > 172800) {
-    throw new Error('TTL cannot exceed 172800 seconds (48 hours)');
-  }
-
+export async function generateIceServers(
+  keyId: string, secret: string, ttl: number,
+): Promise<IceServer[]> {
+  if (!keyId || !secret) throw new Error("TURN configuration missing");
+  if (!Number.isInteger(ttl) || ttl < 1 || ttl > 172800) throw new Error("Invalid TTL");
   const response = await fetch(
-    `https://rtc.live.cloudflare.com/v1/turn/keys/${config.keyId}/credentials/generate`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${config.keySecret}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ ttl })
-    }
+    `https://rtc.live.cloudflare.com/v1/turn/keys/${encodeURIComponent(keyId)}/credentials/generate-ice-servers`,
+    { method: "POST", headers: { Authorization: `Bearer ${secret}`,
+      "Content-Type": "application/json" }, body: JSON.stringify({ ttl }),
+      signal: AbortSignal.timeout(10000) },
   );
-
   if (!response.ok) {
-    throw new Error(`TURN credential generation failed: ${response.status}`);
+    await response.body?.cancel();
+    throw new Error(`TURN credential generation failed (${response.status})`);
   }
-
-  const data = await response.json();
-  
-  // Filter port 53 for browser clients
-  const filteredUrls = data.iceServers.urls.filter(
-    (url: string) => !url.includes(':53')
-  );
-
-  const iceServers = [
-    { urls: 'stun:stun.cloudflare.com:3478' },
-    {
-      urls: filteredUrls,
-      username: data.iceServers.username,
-      credential: data.iceServers.credential,
-      credentialType: 'password' as const
-    }
-  ];
-
-  // Validate before returning
-  if (!iceServers.every(validateRTCIceServer)) {
-    throw new Error('Invalid ICE server configuration received');
-  }
-
-  return iceServers;
+  const body: unknown = await response.json();
+  return parseIceServers(body);
 }
 ```
 
-## See Also
+## Revoke a credential
 
-- [configuration.md](./configuration.md) - Worker setup, environment variables
-- [patterns.md](./patterns.md) - Implementation examples using these APIs
-- [gotchas.md](./gotchas.md) - Security best practices, common mistakes
+POST to `/v1/turn/keys/{keyId}/credentials/{username}/revoke`, with the TURN key secret as bearer authorization. URL-encode both path components. A successful response is `204 No Content`; do not parse it as JSON. There is no username-in-body `/credentials/revoke` endpoint. Treat usernames and credentials as sensitive and omit them from logs.
+
+[Official API and TTL guidance](https://developers.cloudflare.com/realtime/turn/generate-credentials/)

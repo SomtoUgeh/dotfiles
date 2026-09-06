@@ -6,7 +6,7 @@ The binding is available as `env.FLAGS` (type `Flagship` from `@cloudflare/worke
 
 ### Evaluation Methods
 
-All methods are async, never throw, and return the `defaultValue` on errors.
+All evaluation methods are async and use the provided default on documented evaluation/type failures. Inspect Details errorCode/errorMessage to distinguish a fallback from a successful decision; retain error handling at the application boundary.
 
 | Method | Signature | Returns |
 |--------|-----------|---------|
@@ -26,7 +26,7 @@ All methods are async, never throw, and return the `defaultValue` on errors.
 |-----------|------|----------|-------------|
 | `flagKey` | `string` | Yes | Flag key to evaluate |
 | `defaultValue` | varies | Yes (except `get`) | Fallback if evaluation fails or flag not found |
-| `context` | `FlagshipEvaluationContext` | No | Attributes for targeting rules (`{ userId: "user-42", country: "US" }`) |
+| `context` | `FlagshipEvaluationContext` | No | Attributes for targeting rules (`{ targetingKey: "user-42", country: "US" }`) |
 
 ### Types
 
@@ -49,7 +49,7 @@ interface FlagshipEvaluationDetails<T> {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const enabled = await env.FLAGS.getBooleanValue("new-feature", false, {
-      userId: "user-42",
+      targetingKey: "user-42",
     });
     return new Response(enabled ? "Feature on" : "Feature off");
   },
@@ -70,7 +70,7 @@ For Workers, Node.js, and server-side JavaScript.
 
 ```typescript
 import { OpenFeature } from "@openfeature/server-sdk";
-import { FlagshipServerProvider } from "@cloudflare/flagship";
+import { FlagshipServerProvider } from "@cloudflare/flagship/server";
 
 await OpenFeature.setProviderAndWait(
   new FlagshipServerProvider({ binding: env.FLAGS }),
@@ -85,7 +85,7 @@ const enabled = await client.getBooleanValue("new-checkout", false, {
 
 ```typescript
 import { OpenFeature } from "@openfeature/server-sdk";
-import { FlagshipServerProvider } from "@cloudflare/flagship";
+import { FlagshipServerProvider } from "@cloudflare/flagship/server";
 
 await OpenFeature.setProviderAndWait(
   new FlagshipServerProvider({
@@ -106,13 +106,11 @@ For browser applications. Pre-fetches flags on init, evaluates synchronously.
 
 ```typescript
 import { OpenFeature } from "@openfeature/web-sdk";
-import { FlagshipClientProvider } from "@cloudflare/flagship";
+import { FlagshipClientProvider } from "@cloudflare/flagship/web";
 
 await OpenFeature.setProviderAndWait(
   new FlagshipClientProvider({
-    appId: "<APP_ID>",
-    accountId: "<ACCOUNT_ID>",
-    authToken: "<API_TOKEN>",
+    endpoint: "/api/flags/evaluate", // Your authenticated, allowlisted server proxy
     prefetchFlags: ["promo-banner", "dark-mode"],
   }),
 );
@@ -128,8 +126,9 @@ const showBanner = client.getBooleanValue("promo-banner", false);
 ### SDK Hooks
 
 ```typescript
-import { LoggingHook, TelemetryHook } from "@cloudflare/flagship";
-OpenFeature.addHooks(new LoggingHook(), new TelemetryHook());
+import { OpenFeature } from "@openfeature/server-sdk";
+import { LoggingHook, TelemetryHook } from "@cloudflare/flagship/server";
+OpenFeature.addHooks(new LoggingHook(), new TelemetryHook(event => console.log(event.flagKey, event.type)));
 ```
 
 ---
@@ -152,11 +151,11 @@ Check with:
 
 ```bash
 echo "CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID:-(not set)}"
-echo "CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:-(not set)}"
+test -n "${CLOUDFLARE_API_TOKEN:-}" && echo "CLOUDFLARE_API_TOKEN is set" || echo "CLOUDFLARE_API_TOKEN is missing"
 echo "FLAGSHIP_APP_ID=${FLAGSHIP_APP_ID:-(not set)}"
 ```
 
-**If any are missing, ask the user to provide them before proceeding.**
+If configuration is missing, use the established credential mechanism or continue offline validation. Do not request that the user paste a secret into chat.
 
 ### Base URL and Auth
 
@@ -388,3 +387,5 @@ Nesting supported up to 6 levels deep.
 | 404 | Flag or app not found |
 | 409 | Flag key already exists (create) |
 | 429 | Rate limited |
+
+Initialize each OpenFeature provider once per process/Worker isolate, await readiness before evaluation, and pass user context per evaluation. Do not replace the global provider on every request or store user context globally. Inside Workers, direct env.FLAGS evaluation is the simplest option. Browser evaluation requires an application-owned proxy; implement its authentication, allowed keys, context derivation, and response contract before using the proxy URL above. Flag delivery is not an authorization system.

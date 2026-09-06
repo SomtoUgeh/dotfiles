@@ -97,9 +97,12 @@ const router = createRouter({
 ```tsx
 function PostLink({ post }: { post: Post }) {
   const queryClient = useQueryClient()
-  const timeoutRef = useRef<NodeJS.Timeout>()
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  useEffect(() => () => clearTimeout(timeoutRef.current), [])
 
   const handleMouseEnter = () => {
+    clearTimeout(timeoutRef.current)
     // Delay prefetch to avoid unnecessary requests on quick mouse movements
     timeoutRef.current = setTimeout(() => {
       queryClient.prefetchQuery(postQueries.detail(post.id))

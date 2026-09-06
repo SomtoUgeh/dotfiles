@@ -19,7 +19,7 @@ bunx --bun prisma init
 ## What It Creates
 
 - `prisma/schema.prisma` - Your Prisma schema file
-- `prisma.config.ts` - TypeScript configuration for Prisma CLI
+- `prisma7.config.ts` - TypeScript configuration for Prisma CLI
 - `.env` - Environment variables (DATABASE_URL)
 - `.gitignore` - Ignores node_modules, .env, and generated files
 
@@ -27,7 +27,7 @@ bunx --bun prisma init
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--datasource-provider` | Database provider: `postgresql`, `mysql`, `sqlite`, `sqlserver`, `mongodb`, `cockroachdb` | `postgresql` |
+| `--datasource-provider` | Database provider: `postgresql`, `mysql`, `sqlite`, `sqlserver`, `cockroachdb` | `postgresql` |
 | `--db` | Provisions a fully managed Prisma Postgres database on the Prisma Data Platform | - |
 | `--url` | Define a custom datasource url | - |
 | `--generator-provider` | Define the generator provider to use | `prisma-client` |
@@ -65,18 +65,10 @@ prisma init --db
 
 Opens browser for authentication, creates cloud database instance.
 
-### AI-generated schema
-
-```bash
-prisma init --prompt "Blog with users, posts, comments, and tags"
-```
-
-Generates schema based on description and deploys to Prisma Postgres.
-
 ### With preview features
 
 ```bash
-prisma init --preview-feature relationJoins --preview-feature fullTextSearch
+prisma init --preview-feature relationJoins --preview-feature fullTextSearchPostgres
 ```
 
 ## Generated Schema (v7)
@@ -95,7 +87,8 @@ datasource db {
 ## Generated Config (v7)
 
 ```typescript
-// prisma.config.ts
+// prisma7.config.ts
+import 'dotenv/config'
 import { defineConfig, env } from 'prisma/config'
 
 export default defineConfig({
@@ -111,7 +104,7 @@ export default defineConfig({
 
 ## Next Steps After Init
 
-1. Configure `DATABASE_URL` in `prisma.config.ts` or `.env`
+1. Configure `DATABASE_URL` in `prisma7.config.ts` or `.env`
 2. Define your models in `prisma/schema.prisma`
 3. Run `prisma dev` for local development or connect to remote DB
 4. Run `prisma migrate dev` to create migrations

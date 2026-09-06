@@ -1,6 +1,6 @@
 ---
 name: animation-accessibility
-description: Reduced motion for web animation — ship every animation as two variants so motion never makes someone sick or distracted. Use when adding or reviewing `prefers-reduced-motion` handling; when deciding what an animation should become under reduced motion; when a page has autoplaying video, GIFs, looping animation, or smooth scrolling; or when wiring up `useReducedMotion` / `MotionConfig`. Triggers on — accessibility, a11y, prefers-reduced-motion, reduced motion, motion sensitivity, vestibular, motion sickness, dizzy, distracting animation, motion-safe, motion-reduce, useReducedMotion, MotionConfig, scroll-behavior, autoplay, autoplaying GIF, looping animation, animation-play-state, accessible animation.
+description: Design and verify reduced-motion behavior for web interfaces. Use when adding or reviewing `prefers-reduced-motion`, replacing spatial motion with a safer state change, handling autoplaying or looping media, smooth scrolling, or configuring framework hooks such as `useReducedMotion` and `MotionConfig`.
 metadata:
   short-description: Ship animations that respect reduced motion (animations.dev course)
 ---
@@ -11,6 +11,9 @@ Animations are used to strategically improve an experience. **To some people, th
 
 Distilled from Emil Kowalski's *Animations on the Web* course ([animations.dev](https://animations.dev/)). This skill covers **reduced motion**: reading the user's preference and deciding what each animation becomes when it's set.
 
+Follow [../animate/references/canonical-policy.md](../animate/references/canonical-policy.md)
+for the shared motion policy. It wins if this guide conflicts with it.
+
 ## The preference
 
 Most devices let users state a preference for animation, and browsers expose it through the `prefers-reduced-motion` media query:
@@ -20,9 +23,10 @@ Most devices let users state a preference for animation, and browsers expose it 
 
 Because the preference exists at the OS level, a user who set it once expects *every* site to honor it. There is no per-site opt-in to wait for.
 
-## Gentler, not zero
+## Preserve meaning and reduce motion
 
-**`reduce` does not mean "no animations."** Animations exist to make UI easier to understand; deleting them wholesale makes the interface *harder* to follow, which is the opposite of accessible. Animation should still convey meaningful information.
+`reduce` can mean an instant change, a non-spatial transition, or no decorative
+animation. Choose the least motion that preserves the interaction's meaning.
 
 The transformation is: **remove the motion, keep the meaning.**
 
@@ -37,10 +41,10 @@ So a modal that scales in becomes a modal that fades in. A sidebar that slides f
 
 ## Workflow
 
-Follow this order — reduced motion is a second pass, not a constraint to design around:
+Design both preference states from the start:
 
-1. **Build the animation.** Get it feeling right first.
-2. **Adjust for `prefers-reduced-motion`.** Apply the table above. Test it with the preference on — [Chrome DevTools can emulate it](https://developer.chrome.com/docs/devtools/rendering/emulate-css#emulate_css_media_feature_prefers-reduced-motion) (Rendering panel → *Emulate CSS media feature prefers-reduced-motion*).
+1. **Design both preference states.** Decide what information the motion carries.
+2. **Implement `prefers-reduced-motion`.** Apply the table above. Test it with the preference on — [Chrome DevTools can emulate it](https://developer.chrome.com/docs/devtools/rendering/emulate-css#emulate_css_media_feature_prefers-reduced-motion) (Rendering panel → *Emulate CSS media feature prefers-reduced-motion*).
 3. **Ship two variants.** One for `no-preference`, one for `reduce`.
 
 You're done when every animation you touched has both variants and you have watched the `reduce` variant with emulation on. Reasoning about it is not the same as seeing it — the common failure is a "reduced" variant that still moves, because one `transform` was left behind in a shared class or a spring config.
@@ -49,7 +53,8 @@ You're done when every animation you touched has both variants and you have watc
 
 ### CSS
 
-Swap the animation, don't delete it:
+Replace spatial motion when meaning benefits from a transition; otherwise disable
+the animation:
 
 ```css
 .element {
@@ -68,7 +73,7 @@ Swap the animation, don't delete it:
 `motion-safe:` and `motion-reduce:` variants map to the two media queries:
 
 ```html
-<svg class="motion-safe:animate-bounce motion-reduce:animate-fade" viewBox="0 0 24 24">
+<svg class="motion-safe:animate-bounce motion-reduce:animate-none" viewBox="0 0 24 24">
   <!-- ... -->
 </svg>
 ```
@@ -84,15 +89,15 @@ export function Sidebar({ isOpen }) {
   const shouldReduceMotion = useReducedMotion();
   const closedX = shouldReduceMotion ? 0 : "-100%";
 
-  return <motion.div animate={{ opacity: isOpen ? 1 : 0, x: isOpen ? 0 : closedX }} />;
+  return <motion.div inert={!isOpen} aria-hidden={!isOpen} animate={{ opacity: isOpen ? 1 : 0, x: isOpen ? 0 : closedX }} />;
 }
 ```
 
-The same hook branches whole **variant sets**, which is cleaner than patching values one at a time — see the worked example in [SNIPPETS.md](SNIPPETS.md). It also gates the properties CSS can't reach: skip `animate={{ height }}` and pass `layout={false}` under `reduce`, since layout animations move things by definition.
+Motion 13.2's built-in hook reads the preference on mount. For live preference changes, use the external-store hook and worked example in [SNIPPETS.md](SNIPPETS.md). A preference hook can also branch whole **variant sets** and gate properties CSS can't reach: skip height animation and pass `layout={false}` under `reduce`, since layout animations move things by definition.
 
 ### Framer Motion — `MotionConfig` (app-wide safety net)
 
-`reducedMotion="user"` makes Framer Motion respect the preference everywhere below it, animating only `opacity` and `backgroundColor`:
+`reducedMotion="user"` makes Framer Motion respect the preference everywhere below it, disabling transform and layout animations while preserving other values, such as `opacity` and `backgroundColor`. It does not disable every possible spatial effect (for example, explicit height animation needs its own handling):
 
 ```jsx
 import { MotionConfig } from "motion/react";
@@ -100,7 +105,7 @@ import { MotionConfig } from "motion/react";
 <MotionConfig reducedMotion="user">{children}</MotionConfig>
 ```
 
-**The default is `never`, so this does nothing until you set it.** Wrap your whole application and you stop having to remember per-component — a good baseline, with per-component `useReducedMotion` on top wherever the fade-only default loses meaning.
+**The default is `never`, so this does nothing until you set it.** Wrap the application as a baseline, then check every component override, explicit dimension animation, SVG effect, and decorative loop with `useReducedMotion` where needed.
 
 ## Visuals: jump, don't tween
 

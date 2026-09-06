@@ -11,6 +11,8 @@ metadata:
 
 Complete API reference for Prisma Client. This skill provides guidance on model queries, filtering, relations, and client methods for Prisma ORM 7.x.
 
+Match `@prisma/client`, the Prisma CLI, and the selected driver adapter at the same stable 7.x version. The currently verified compatible target is `7.10.0`; avoid an unbounded `latest` install while it selects the Prisma 8 release candidate.
+
 ## When to Apply
 
 Reference this skill when:
@@ -159,10 +161,11 @@ await prisma.user.delete({
 ### Transactions
 
 ```typescript
-const [user, post] = await prisma.$transaction([
+const [alice, bob] = await prisma.$transaction([
   prisma.user.create({ data: { email: 'alice@prisma.io' } }),
-  prisma.post.create({ data: { title: 'Hello', authorId: 1 } })
+  prisma.user.create({ data: { email: 'bob@prisma.io' } })
 ])
+// For a post linked to a newly generated user ID, use a nested write or interactive transaction.
 ```
 
 ## Rule Files

@@ -2,186 +2,90 @@
 
 ## Priority: MEDIUM
 
-## Explanation
+Server errors cross a serialization boundary. Do not depend on a custom
+`Error` subclass, `instanceof`, or arbitrary custom properties surviving RPC
+unless the application explicitly registers and tests serialization adapters.
+Use plain discriminated results for expected failures, and sanitized exceptions
+for unexpected failures. Keep full diagnostics in server logs.
 
-Server function errors cross the network boundary. Handle them gracefully with appropriate error types, status codes, and user-friendly messages. Avoid exposing internal details in production.
-
-## Bad Example
-
-```tsx
-// Throwing raw errors - exposes internals
-export const createUser = createServerFn({ method: 'POST' })
-  .validator(createUserSchema)
-  .handler(async ({ data }) => {
-    const user = await db.users.create({ data })  // May throw DB error
-    return user
-    // Prisma error with stack trace sent to client
-  })
-
-// Generic error handling - no useful info for client
-export const getPost = createServerFn()
-  .handler(async ({ data }) => {
-    try {
-      return await fetchPost(data.id)
-    } catch (e) {
-      throw new Error('Something went wrong')  // Too vague
-    }
-  })
-```
-
-## Good Example: Structured Error Handling
+## Not Found and Redirects
 
 ```tsx
-// lib/errors.ts
-export class AppError extends Error {
-  constructor(
-    message: string,
-    public code: string,
-    public status: number = 400
-  ) {
-    super(message)
-    this.name = 'AppError'
-  }
-}
-
-export class NotFoundError extends AppError {
-  constructor(resource: string) {
-    super(`${resource} not found`, 'NOT_FOUND', 404)
-  }
-}
-
-export class UnauthorizedError extends AppError {
-  constructor(message = 'Unauthorized') {
-    super(message, 'UNAUTHORIZED', 401)
-  }
-}
-
-export class ValidationError extends AppError {
-  constructor(message: string, public fields?: Record<string, string>) {
-    super(message, 'VALIDATION_ERROR', 400)
-  }
-}
-```
-
-## Good Example: Server Function with Error Handling
-
-```tsx
-import { createServerFn, notFound } from '@tanstack/react-start'
-import { setResponseStatus } from '@tanstack/react-start/server'
+import { createServerFn } from '@tanstack/react-start'
+import { notFound, redirect } from '@tanstack/react-router'
+import { z } from 'zod'
 
 export const getPost = createServerFn()
   .validator(z.object({ id: z.string() }))
   .handler(async ({ data }) => {
-    const post = await db.posts.findUnique({
-      where: { id: data.id },
-    })
-
-    if (!post) {
-      // Use built-in notFound for 404s
-      throw notFound()
-    }
-
+    const user = await requireCurrentUser()
+    const post = await findPostVisibleToUser(data.id, user.id)
+    if (!post) throw notFound()
     return post
   })
+```
+
+`requireCurrentUser` and `findPostVisibleToUser` are the application's
+server-only authentication and access-controlled data functions. Import them
+inside this server-function module; do not replace them with a client route guard.
+
+## Expected Failure Results
+
+```tsx
+import { createServerFn } from '@tanstack/react-start'
+import { setResponseStatus } from '@tanstack/react-start/server'
 
 export const createPost = createServerFn({ method: 'POST' })
   .validator(createPostSchema)
   .handler(async ({ data }) => {
+    const user = await requireCurrentUser()
     try {
-      const post = await db.posts.create({ data })
-      return post
+      const post = await insertPostForUser(data, user.id)
+      return { ok: true as const, post }
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        if (error.code === 'P2002') {
-          // Unique constraint violation
-          setResponseStatus(409)
-          throw new AppError('A post with this title already exists', 'DUPLICATE', 409)
+      if (isDuplicateTitle(error)) {
+        return {
+          ok: false as const,
+          code: 'DUPLICATE' as const,
+          message: 'A post with this title already exists',
         }
       }
-
-      // Log full error server-side
-      console.error('Failed to create post:', error)
-
-      // Return sanitized error to client
+      console.error('Failed to create post', error)
       setResponseStatus(500)
-      throw new AppError('Failed to create post', 'INTERNAL_ERROR', 500)
+      throw new Error('Failed to create post')
     }
   })
 ```
 
-## Good Example: Client-Side Error Handling
+Here `createPostSchema`, `insertPostForUser`, and `isDuplicateTitle` come from
+the project's schema/data layer. If using Prisma, recognize its typed `P2002`
+error in that layer. Validate that the constraint is the one you intend to map.
 
 ```tsx
-function CreatePostForm() {
-  const [error, setError] = useState<string | null>(null)
-
-  const createMutation = useMutation({
-    mutationFn: createPost,
-    onError: (error) => {
-      if (error instanceof AppError) {
-        setError(error.message)
-      } else if (error instanceof ValidationError) {
-        // Handle field-specific errors
-        Object.entries(error.fields ?? {}).forEach(([field, message]) => {
-          form.setError(field, { message })
-        })
-      } else {
-        setError('An unexpected error occurred')
-      }
-    },
-    onSuccess: (post) => {
-      navigate({ to: '/posts/$postId', params: { postId: post.id } })
-    },
-  })
-
-  return (
-    <form onSubmit={handleSubmit}>
-      {error && <Alert variant="error">{error}</Alert>}
-      {/* form fields */}
-    </form>
-  )
-}
-```
-
-## Good Example: Using Redirects for Auth Errors
-
-```tsx
-export const updateProfile = createServerFn({ method: 'POST' })
-  .validator(updateProfileSchema)
-  .handler(async ({ data }) => {
-    const session = await getSessionData()
-
-    if (!session) {
-      // Redirect to login for auth errors
-      throw redirect({
-        to: '/login',
-        search: { redirect: '/settings' },
-      })
+const mutation = useMutation({
+  mutationFn: (data: CreatePostInput) => createPost({ data }),
+  onSuccess: (result) => {
+    if (!result.ok) {
+      setError(result.message)
+      return
     }
-
-    return await db.users.update({
-      where: { id: session.userId },
-      data,
-    })
-  })
+    navigate({ to: '/posts/$postId', params: { postId: result.post.id } })
+  },
+  onError: () => setError('Unable to save the post. Please try again.'),
+})
 ```
 
-## Error Response Best Practices
+RPC envelopes represent expected application results. For an external REST
+endpoint, return `Response.json(payload, { status: 409 })` for a conflict.
+Do not assume that setting an HTTP status on an RPC changes its result type.
 
-| Scenario | HTTP Status | Response |
-|----------|-------------|----------|
-| Validation failed | 400 | Field-specific errors |
-| Not authenticated | 401 | Redirect to login |
-| Not authorized | 403 | Generic forbidden message |
-| Resource not found | 404 | Use `notFound()` |
-| Conflict (duplicate) | 409 | Specific conflict message |
-| Server error | 500 | Generic message, log details |
+## Verify in the Application
 
-## Context
+- Test schema failures, unauthenticated calls, forbidden resources, missing
+  records, duplicate constraints, and unexpected server exceptions through HTTP.
+- Keep `redirect()` and `notFound()` out of broad catch blocks, or rethrow
+  them using Router's `isRedirect` / `isNotFound` checks.
+- Assert the actual client result and response status on the installed release.
+- Use Query error reset plus router invalidation when retrying failed loaders.
 
-- Use `notFound()` for 404 errors - integrates with router
-- Use `redirect()` for auth-related errors
-- Set status codes with `setResponseStatus()`
-- Log full errors server-side, sanitize for client
-- Create custom error classes for consistent handling
-- Validation errors from `.validator()` are automatic
+Reference: [TanStack Start server functions](https://tanstack.com/start/latest/docs/framework/react/guide/server-functions)

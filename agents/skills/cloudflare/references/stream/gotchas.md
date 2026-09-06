@@ -31,7 +31,7 @@
 
 ### Video stuck in "inprogress" state
 - **Cause**: Processing large/complex video
-- **Solution**: Wait up to 5 minutes for processing; use webhooks instead of polling
+- **Solution**: Processing time varies; use webhooks and surface prolonged processing without promising a fixed deadline
 
 ### Signed URL returns 403
 - **Cause**: Token expired or invalid signature
@@ -43,31 +43,21 @@
 
 ### Webhook signature verification fails
 - **Cause**: Incorrect secret or timestamp window
-- **Solution**: Use exact secret from webhook setup, allow 5-minute timestamp drift
+- **Solution**: Use exact secret from webhook setup, apply an application-chosen replay window (for example 5 minutes); verify the exact timestamp string and raw body
 
 ### Video uploads but isn't visible
 - **Cause**: `requireSignedURLs` enabled without providing token
 - **Solution**: Generate signed token or set `requireSignedURLs: false` for public videos
 
 ### Player shows infinite loading
-- **Cause**: CORS issue with allowedOrigins
+- **Cause**: Origin restrictions or playback access configuration
 - **Solution**: Add your domain to `allowedOrigins` array
 
 ## Limits
 
-| Resource | Limit |
-|----------|-------|
-| Max file size | 30 GB |
-| Max frame rate | 60 fps (recommended) |
-| Max duration per direct upload | Configurable via `maxDurationSeconds` |
-| Token generation (API endpoint) | 1,000/day recommended (use signing keys for higher) |
-| Live input outputs (simulcast) | 5 per live input |
-| Webhook retry attempts | 5 (exponential backoff) |
-| Webhook timeout | 30 seconds |
-| Caption file size | 5 MB |
-| Watermark image size | 2 MB |
-| Metadata keys per video | Unlimited |
-| Search results per page | Max 1,000 |
+Basic POST direct creator uploads are limited to 200 MB; larger files require TUS (also preferable for unreliable connections). Stream's maximum file size is 30 GB. `maxDurationSeconds` reserves storage until upload completion/expiry, so enforce user quotas before provisioning URLs.
+
+Use the current [upload guide](https://developers.cloudflare.com/stream/uploading-videos/direct-creator-uploads/) and [Stream FAQ](https://developers.cloudflare.com/stream/faq/) for plan/format limits. Do not infer a hard API token quota from guidance to self-sign at higher volume, or invent webhook retry counts, unlimited metadata, and fixed processing times.
 
 ## Performance Issues
 
@@ -83,31 +73,9 @@
 - **Cause**: Complex video codec, high resolution
 - **Solution**: Pre-encode with H.264 (most efficient), reduce resolution
 
-## Type Safety
+## Upload Response Handling
 
-```typescript
-// Error response type
-interface StreamError {
-  success: false;
-  errors: Array<{
-    code: number;
-    message: string;
-  }>;
-}
-
-// Handle errors
-async function uploadWithErrorHandling(url: string, file: File) {
-  const formData = new FormData();
-  formData.append('file', file);
-  const response = await fetch(url, { method: 'POST', body: formData });
-  const result = await response.json();
-  
-  if (!result.success) {
-    throw new Error(result.errors[0]?.message || 'Upload failed');
-  }
-  return result;
-}
-```
+Check HTTP status before considering the upload successful. A successful basic direct upload need not return JSON. For SDK/API responses, validate the actual envelope and check `success`; do not apply that envelope assumption to every upload endpoint. Store the UID issued during provisioning and track processing separately.
 
 ## Security Gotchas
 

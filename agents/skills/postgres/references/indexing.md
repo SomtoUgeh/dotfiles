@@ -8,7 +8,7 @@ tags: postgres, indexes, composite, partial, covering, gin, brin
 
 ## Core Rules
 
-1. **Always index foreign key columns** — PostgreSQL does not auto-create these
+1. **Evaluate indexes on foreign key columns** — PostgreSQL does not auto-create these
 2. **Index columns in WHERE, JOIN, and ORDER BY** clauses
 3. **Don't over-index** — each index slows writes and uses storage
 4. **Verify with EXPLAIN ANALYZE** — confirm indexes are actually used
@@ -19,10 +19,10 @@ Put equality columns first, then range/sort columns:
 
 ```sql
 -- WHERE status = 'active' AND created_at > '2026-01-01'
-CREATE INDEX order_status_created_idx ON order (status, created_at);
+CREATE INDEX order_status_created_idx ON purchase_order (status, created_at);
 ```
 
-A composite index on `(a, b)` supports queries on `a` + `b` and `a` alone, but not `b` alone.
+A composite index on `(a, b)` supports queries on `a` + `b` and `a` alone, and can sometimes serve `b` alone, including PostgreSQL 18 B-tree skip scans when leading-column cardinality makes that economical. Confirm the actual plan.
 
 ## Partial Indexes
 
@@ -30,7 +30,7 @@ Reduce index size by filtering to common query patterns.
 Only use if index size is problematic but the index is needed for performance.
 
 ```sql
-CREATE INDEX order_active_idx ON order (customer_id)
+CREATE INDEX order_active_idx ON purchase_order (customer_id)
   WHERE status = 'active';
 ```
 
@@ -48,7 +48,7 @@ Consider creating covering indexes for commonly executed query patterns that ret
 | BRIN | Large sequential/time-series | Append-only logs, events (requires physical row order correlation) |
 
 ```sql
-CREATE INDEX metadata_idx ON order USING GIN (metadata);       -- JSONB
+CREATE INDEX metadata_idx ON purchase_order USING GIN (metadata);       -- JSONB
 CREATE INDEX event_created_idx ON event USING BRIN (created_at); -- time-series
 ```
 

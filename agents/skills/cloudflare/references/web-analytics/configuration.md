@@ -1,76 +1,30 @@
-# Configuration
+# Web Analytics configuration
 
-## Setup Methods
+Add the site in the Web Analytics dashboard. For a proxied hostname, choose automatic injection, an available regional exclusion, manual installation, or disable collection according to the project's requirements. `Cache-Control: no-transform` prevents automatic modification; use manual installation when that header must remain.
 
-### Proxied Sites (Automatic)
-
-Dashboard → Web Analytics → Add site → Select hostname → Done
-
-| Injection Option | Description |
-|------------------|-------------|
-| Enable | Auto-inject for all visitors (default) |
-| Enable, excluding EU | No injection for EU (GDPR) |
-| Enable with manual snippet | You add beacon manually |
-| Disable | Pause tracking |
-
-**Fails if response has:** `Cache-Control: public, no-transform`
-
-**CSP required:**
-```
-script-src https://static.cloudflareinsights.com https://cloudflareinsights.com;
-```
-
-### Non-Proxied Sites (Manual)
-
-Dashboard → Web Analytics → Add site → Enter hostname → Copy snippet
+For manual installation, use the snippet supplied for the site:
 
 ```html
-<script defer src='https://static.cloudflareinsights.com/beacon.min.js' 
-        data-cf-beacon='{"token": "YOUR_TOKEN", "spa": true}'></script>
+<script type="module"
+  src="https://static.cloudflareinsights.com/beacon.min.js"
+  data-cf-beacon='{"token":"YOUR_SITE_TOKEN"}'></script>
 ```
 
-**Limits:** 10 non-proxied sites per account
+The site token is public identification, not a server API secret. Hostname checks use the service's documented matching behavior; do not treat them as an authentication boundary. Keep staging and production collection separate or disable collection in non-production builds.
 
-## SPA Mode
+## CSP
 
-**Enable `spa: true` for:** React Router, Next.js, Vue Router, Nuxt, SvelteKit, Angular
+Merge into the existing policy:
 
-**Keep `spa: false` for:** Traditional multi-page apps, static sites, WordPress
-
-**Hash routing (`#/path`) NOT supported** - use History API routing.
-
-## Token Management
-
-- Found in: Dashboard → Web Analytics → Manage site
-- **Not secrets** - domain-locked, safe to expose in HTML
-- Each site gets unique token
-
-## Environment Config
-
-```typescript
-// Only load in production
-if (process.env.NODE_ENV === 'production') {
-  // Load beacon
-}
+```text
+script-src 'self' https://static.cloudflareinsights.com;
+connect-src 'self' https://cloudflareinsights.com;
 ```
 
-Or use environment-specific tokens via env vars.
+Automatic injection reports to the site's `/cdn-cgi/rum` endpoint (`connect-src 'self'`); manual installation reports to `cloudflareinsights.com`. Preserve other existing script/connect sources and nonce requirements. Do not hardcode an SRI hash for the unversioned manual beacon.
 
-## Verify Installation
+## Rules and data
 
-1. DevTools Network → filter `cloudflareinsights` → see `beacon.min.js` + data request
-2. No CSP/CORS errors in console
-3. Dashboard shows pageviews after 5-10 min delay
+Rules are available for proxied sites, with current limits Free 0, Pro 5, Business 20, Enterprise 100. Use the dashboard's supported hostname/path collection rules; do not invent a per-rule sample-rate field. Aggregate queries are sampled dynamically; the FAQ documents unsampled storage for seven days and lower-resolution long-term aggregates. These are different from beacon installation rules.
 
-## Rules (Plan-dependent)
-
-Configure in dashboard for:
-- **Sample rate** - reduce collection % for high-traffic
-- **Path-based** - different behavior per route
-- **Host-based** - separate tracking per domain
-
-## Data Retention
-
-- 6 months rolling window
-- 1-hour bucket granularity
-- No raw export, dashboard only
+[Setup and CSP FAQ](https://developers.cloudflare.com/web-analytics/faq/) · [Current limits](https://developers.cloudflare.com/web-analytics/limits/)

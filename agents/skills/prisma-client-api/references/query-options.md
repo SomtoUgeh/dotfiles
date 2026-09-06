@@ -247,13 +247,14 @@ const firstPage = await prisma.user.findMany({
   orderBy: { id: 'asc' }
 })
 
-// Next page using cursor
-const nextPage = await prisma.user.findMany({
+// No next page when the first page is empty
+const last = firstPage.at(-1)
+const nextPage = last ? await prisma.user.findMany({
   take: 10,
   skip: 1,  // Skip the cursor record
-  cursor: { id: firstPage[firstPage.length - 1].id },
+  cursor: { id: last.id },
   orderBy: { id: 'asc' }
-})
+}) : []
 ```
 
 ## distinct

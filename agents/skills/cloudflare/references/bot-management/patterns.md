@@ -11,9 +11,9 @@ Action: Managed Challenge
 ## API Protection
 
 ```txt
-# Protect API with JS detection + score
-(http.request.uri.path matches "^/api/" and (cf.bot_management.score lt 30 or not cf.bot_management.js_detection.passed) and not cf.bot_management.verified_bot)
-Action: Block
+# API clients may not execute JavaScript. Use score plus normal API authentication.
+(starts_with(http.request.uri.path, "/api/") and cf.bot_management.score gt 0 and cf.bot_management.score lt 30 and not cf.bot_management.verified_bot)
+Action: Block (only after evaluating false positives for the supported clients)
 ```
 
 ## SEO-Friendly Bot Handling
@@ -49,34 +49,30 @@ Action: Block
 (cf.bot_management.score lt 50)
 Rate: 10 requests per 10 seconds
 
-(cf.bot_management.score ge 50)
+(cf.bot_management.score geq 50)
 Rate: 100 requests per 10 seconds
 ```
 
-## Mobile App Allowlisting
+## Mobile clients
 
-```txt
-# Identify mobile app by JA3/JA4
-(cf.bot_management.ja4 in {"fingerprint1" "fingerprint2"})
-Action: Skip (all remaining rules)
-```
+Authenticate mobile clients using verified credentials or a trusted attestation design. JA3/JA4 fingerprints are shared and reproducible; never skip all security rules based on a fingerprint. Use them only as one risk signal.
 
 ## Datacenter Detection
 
 ```typescript
 import type { IncomingRequestCfProperties } from '@cloudflare/workers-types';
 
-// Low score + not corporate proxy = likely datacenter bot
+// A low score indicates automated-traffic risk; it does not identify a datacenter.
 export default {
-  async fetch(request: Request): Promise<Response> {
-    const cf = request.cf as IncomingRequestCfProperties | undefined;
+  async fetch(request: Request<unknown, IncomingRequestCfProperties>): Promise<Response> {
+    const cf = request.cf;
     const botMgmt = cf?.botManagement;
-    
-    if (botMgmt?.score && botMgmt.score < 30 && 
+
+    if (botMgmt?.score && botMgmt.score < 30 &&
         !botMgmt.corporateProxy && !botMgmt.verifiedBot) {
-      return new Response('Datacenter traffic blocked', { status: 403 });
+      return new Response('Traffic blocked by bot policy', { status: 403 });
     }
-    
+
     return fetch(request);
   }
 };
@@ -89,16 +85,16 @@ import type { IncomingRequestCfProperties } from '@cloudflare/workers-types';
 
 // Add delay proportional to bot suspicion
 export default {
-  async fetch(request: Request): Promise<Response> {
-    const cf = request.cf as IncomingRequestCfProperties | undefined;
+  async fetch(request: Request<unknown, IncomingRequestCfProperties>): Promise<Response> {
+    const cf = request.cf;
     const botMgmt = cf?.botManagement;
-    
+
     if (botMgmt?.score && botMgmt.score < 50 && !botMgmt.verifiedBot) {
       // Delay: 0-2 seconds for scores 50-0
       const delayMs = Math.max(0, (50 - botMgmt.score) * 40);
       await new Promise(r => setTimeout(r, delayMs));
     }
-    
+
     return fetch(request);
   }
 };
@@ -126,38 +122,14 @@ Sensitive: Low threshold (score < 50) + JSD
 ```txt
 1. Default deny (all scores < 30)
 2. Allowlist verified bots
-3. Allowlist mobile apps (JA3/JA4)
+3. Authenticate mobile apps (fingerprints alone cannot authorize)
 4. Allowlist corporate proxies
 5. Allowlist static resources
 ```
 
-## Workers: Score + JS Detection
+## JavaScript detection scope
 
-```typescript
-import type { IncomingRequestCfProperties } from '@cloudflare/workers-types';
-
-export default {
-  async fetch(request: Request): Promise<Response> {
-    const cf = request.cf as IncomingRequestCfProperties | undefined;
-    const botMgmt = cf?.botManagement;
-    const url = new URL(request.url);
-    
-    if (botMgmt?.staticResource) return fetch(request); // Skip static
-    
-    // API endpoints: require JS detection + good score
-    if (url.pathname.startsWith('/api/')) {
-      const jsDetectionPassed = botMgmt?.jsDetection?.passed ?? false;
-      const score = botMgmt?.score ?? 100;
-      
-      if (!jsDetectionPassed || score < 30) {
-        return new Response('Unauthorized', { status: 401 });
-      }
-    }
-    
-    return fetch(request);
-  }
-};
-```
+Apply JSD only to browser flows after an initial HTML visit. Native clients, API tools, first visits, and missing metadata must not be treated as failed authentication. Use Managed Challenge through WAF for eligible browser flows; use credential validation and rate limits for APIs.
 
 ## Rate Limiting by JWT Claim + Bot Score
 
@@ -180,3 +152,5 @@ Rate limiting > Custom rules
 ## See Also
 
 - [gotchas.md](./gotchas.md) - Common errors, false positives/negatives, limitations
+
+Metadata source: [Bot Management variables](https://developers.cloudflare.com/bots/reference/bot-management-variables/). Bot classification, verified-bot status, and corporate-proxy status do not grant application authorization.

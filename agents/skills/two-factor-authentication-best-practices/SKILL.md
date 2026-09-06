@@ -21,7 +21,16 @@ export const auth = betterAuth({
 });
 ```
 
-**Note**: After adding the plugin, run `npx @better-auth/cli migrate` to add the required database fields and tables.
+After adding the plugin, follow the
+[released schema workflow](../organization-best-practices/references/better-auth-1-7-migration.md).
+For a new database or an already migrated 1.7 database, inspect `auth generate`
+output, then use `auth migrate` with the built-in Kysely adapter or your ORM's
+migration tooling with Prisma/Drizzle. Pin `auth` to the project's Better Auth
+release; the older `@better-auth/cli` package is not the 1.7 CLI.
+
+Published `auth@1.7.2` has no `migrate plan` or `migrate apply` actions, despite
+the live website showing them. A populated 1.6 database requires the separate
+manual data preparation in the linked reference before schema changes.
 
 ### Client-Side Setup
 
@@ -34,7 +43,8 @@ import { twoFactorClient } from "better-auth/client/plugins";
 export const authClient = createAuthClient({
   plugins: [
     twoFactorClient({
-      onTwoFactorRedirect() {
+      onTwoFactorRedirect({ twoFactorMethods }) {
+        sessionStorage.setItem("two-factor-methods", JSON.stringify(twoFactorMethods));
         window.location.href = "/2fa"; // Redirect to your 2FA verification page
       },
     }),
@@ -44,26 +54,34 @@ export const authClient = createAuthClient({
 
 ## Enabling 2FA for Users
 
-When a user enables 2FA, require their password for verification. The enable endpoint returns a TOTP URI for QR code generation and backup codes for account recovery.
+When a user enables 2FA, require their password for credential accounts. Better Auth 1.7 accepts `method: "totp" | "otp"` and returns a discriminated result. TOTP returns a URI and backup codes; OTP does not.
 
 ```ts
 const enable2FA = async (password: string) => {
   const { data, error } = await authClient.twoFactor.enable({
     password,
+    method: "totp",
   });
 
-  if (data) {
-    // data.totpURI - Use this to generate a QR code
-    // data.backupCodes - Display these to the user for safekeeping
+  if (error || !data) {
+    return { data: null, error };
   }
+
+  if (data.method === "totp") {
+    // Narrowed to { method: "totp", totpURI, backupCodes }.
+    return { data, error: null };
+  }
+
+  // { method: "otp" }; OTP is active immediately.
+  return { data, error: null };
 };
 ```
 
-**Important**: The `twoFactorEnabled` flag on the user is not set to `true` until the user successfully verifies their first TOTP code. This ensures users have properly configured their authenticator app before 2FA is fully active.
+For TOTP, `twoFactorEnabled` remains `false` until the user verifies the enrollment code, unless `skipVerificationOnEnable` is enabled. OTP becomes active immediately and requires `otpOptions.sendOTP` on the server. Render the QR code and backup-code step only after narrowing `data.method === "totp"`.
 
 ### Skipping Initial Verification
 
-If you want to enable 2FA immediately without requiring verification, set `skipVerificationOnEnable`:
+If you want TOTP to become active without enrollment-code verification, set `skipVerificationOnEnable`:
 
 ```ts
 twoFactor({
@@ -71,7 +89,7 @@ twoFactor({
 });
 ```
 
-**Note**: This is generally not recommended as it doesn't confirm the user has successfully set up their authenticator app.
+This does not confirm that the user successfully configured an authenticator app. It does not change OTP enrollment, which is already immediate.
 
 ## TOTP (Authenticator App)
 
@@ -188,11 +206,11 @@ twoFactor({
 
 ## Backup Codes
 
-Backup codes provide account recovery when users lose access to their authenticator app or phone. They are generated automatically when 2FA is enabled.
+Backup codes provide account recovery when users lose access to their authenticator app or phone. They are generated automatically during TOTP enrollment. OTP enrollment does not generate or return backup codes.
 
 ### Displaying Backup Codes
 
-Always show backup codes to users when they enable 2FA:
+Show the returned backup codes during TOTP enrollment after narrowing the enable result to `method === "totp"`:
 
 ```tsx
 const BackupCodes = ({ codes }: { codes: string[] }) => {
@@ -334,15 +352,25 @@ twoFactor({
 
 ### Rate Limiting
 
-Better Auth applies built-in rate limiting to all 2FA endpoints (3 requests per 10 seconds). For OTP verification, additional attempt limiting is applied:
+Keep endpoint rate limiting enabled. Add `allowedAttempts` to the existing
+`otpOptions` configuration that already supplies `sendOTP`; it limits guesses
+against one issued OTP code. Better Auth 1.7 also supports account-level
+lockout across TOTP, OTP, and backup-code failures:
 
 ```ts
 twoFactor({
   otpOptions: {
-    allowedAttempts: 5, // Max attempts per OTP code (default: 5)
+    allowedAttempts: 5,
+  },
+  accountLockout: {
+    enabled: true,
+    maxFailedAttempts: 10,
+    durationSeconds: 15 * 60,
   },
 });
 ```
+
+A successful second-factor verification resets the account counter. Locked attempts return `429` with `ACCOUNT_TEMPORARILY_LOCKED`. Endpoint throttling, per-code attempt limits, and account lockout are separate controls.
 
 ### Encryption at Rest
 
@@ -356,7 +384,7 @@ Better Auth uses constant-time comparison for OTP verification to prevent timing
 
 ### Credential Account Requirement
 
-Two-factor authentication can only be enabled for credential (email/password) accounts. For social accounts, it's assumed the provider already handles 2FA.
+By default, enabling and managing 2FA requires a credential account. Set `allowPasswordless: true` only when the product intentionally allows passwordless users to manage 2FA; a password remains required whenever the user has a credential account. This option does not make OAuth or other passwordless sign-in endpoints pass through the 2FA challenge automatically.
 
 ## Disabling 2FA
 
@@ -401,6 +429,11 @@ export const auth = betterAuth({
         period: 5,
         allowedAttempts: 5,
         storeOTP: "encrypted",
+      },
+      accountLockout: {
+        enabled: true,
+        maxFailedAttempts: 10,
+        durationSeconds: 15 * 60,
       },
       // Backup code settings
       backupCodeOptions: {

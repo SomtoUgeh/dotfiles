@@ -1,178 +1,52 @@
-# Terraform Data Sources Reference
+# Terraform data sources and import
 
-Query existing Cloudflare resources to reference in your configurations.
-
-## v5 Data Source Names
-
-| v4 Name | v5 Name | Notes |
-|---------|---------|-------|
-| `cloudflare_record` | `cloudflare_dns_record` | |
-| `cloudflare_worker_script` | `cloudflare_workers_script` | Note: plural |
-| `cloudflare_access_*` | `cloudflare_zero_trust_*` | Access → Zero Trust |
-
-## Zone Data Sources
+Resolve IDs deliberately; do not silently select the first of several accounts or zones. These examples use provider 5.24.0.
 
 ```hcl
-# Get zone by name
 data "cloudflare_zone" "example" {
-  name = "example.com"
+  zone_id = var.zone_id
 }
-
-# Use in resources
-resource "cloudflare_dns_record" "www" {
-  zone_id = data.cloudflare_zone.example.id
-  name = "www"
-  # ...
+data "cloudflare_accounts" "matching" {
+  name = var.account_name
 }
-```
-
-## Account Data Sources
-
-```hcl
-# List all accounts
-data "cloudflare_accounts" "main" {
-  name = "My Account"
-}
-
-# Use account ID
-resource "cloudflare_worker_script" "api" {
-  account_id = data.cloudflare_accounts.main.accounts[0].id
-  # ...
-}
-```
-
-## Worker Data Sources
-
-```hcl
-# Get existing worker script (v5: cloudflare_workers_script)
 data "cloudflare_workers_script" "existing" {
-  account_id = var.account_id
-  name = "existing-worker"
+  account_id  = var.account_id
+  script_name = "existing-worker"
 }
-
-# Reference in service bindings
-resource "cloudflare_workers_script" "consumer" {
-  service_binding {
-    name = "UPSTREAM"
-    service = data.cloudflare_workers_script.existing.name
-  }
-}
-```
-
-## KV Data Sources
-
-```hcl
-# Get KV namespace
 data "cloudflare_workers_kv_namespace" "existing" {
-  account_id = var.account_id
-  namespace_id = "abc123"
+  account_id   = var.account_id
+  namespace_id = var.namespace_id
 }
-
-# Use in worker binding
-resource "cloudflare_workers_script" "api" {
-  kv_namespace_binding {
-    name = "KV"
-    namespace_id = data.cloudflare_workers_kv_namespace.existing.id
-  }
-}
-```
-
-## Lists Data Source
-
-```hcl
-# Get IP lists for WAF rules
 data "cloudflare_list" "blocked_ips" {
   account_id = var.account_id
-  name = "blocked_ips"
+  list_id    = var.list_id
 }
-```
-
-## IP Ranges Data Source
-
-```hcl
-# Get Cloudflare IP ranges (for firewall rules)
 data "cloudflare_ip_ranges" "cloudflare" {}
-
 output "ipv4_cidrs" {
-  value = data.cloudflare_ip_ranges.cloudflare.ipv4_cidr_blocks
+  value = data.cloudflare_ip_ranges.cloudflare.ipv4_cidrs
 }
-
 output "ipv6_cidrs" {
-  value = data.cloudflare_ip_ranges.cloudflare.ipv6_cidr_blocks
-}
-
-# Use in security group rules (AWS example)
-resource "aws_security_group_rule" "allow_cloudflare" {
-  type = "ingress"
-  from_port = 443
-  to_port = 443
-  protocol = "tcp"
-  cidr_blocks = data.cloudflare_ip_ranges.cloudflare.ipv4_cidr_blocks
-  security_group_id = aws_security_group.web.id
+  value = data.cloudflare_ip_ranges.cloudflare.ipv6_cidrs
 }
 ```
 
-## Common Patterns
+`cloudflare_zone` supports an explicit `zone_id` or its documented `filter` object; `name` is not a top-level v5 argument. `cloudflare_accounts` returns `result`, not `accounts`; check the number and identity of matches before selecting one. A list lookup uses `list_id`, not a guessed name argument. Worker service and KV bindings use the list/object shapes in [configuration.md](configuration.md).
 
-### Import ID Formats
+## Import
 
-| Resource | Import ID Format |
-|----------|------------------|
-| `cloudflare_zone` | `<zone-id>` |
-| `cloudflare_dns_record` | `<zone-id>/<record-id>` |
-| `cloudflare_workers_script` | `<account-id>/<script-name>` |
-| `cloudflare_workers_kv_namespace` | `<account-id>/<namespace-id>` |
-| `cloudflare_r2_bucket` | `<account-id>/<bucket-name>` |
-| `cloudflare_d1_database` | `<account-id>/<database-id>` |
-| `cloudflare_pages_project` | `<account-id>/<project-name>` |
+Verify the pinned resource's Import section before touching state. Common v5 formats:
 
-```bash
-# Example: Import DNS record
-terraform import cloudflare_dns_record.example <zone-id>/<record-id>
-```
+| Resource | Format |
+|---|---|
+| `cloudflare_zone` | `zone_id` |
+| `cloudflare_dns_record` | `zone_id/record_id` |
+| `cloudflare_workers_script` | `account_id/script_name` |
+| `cloudflare_workers_kv_namespace` | `account_id/namespace_id` |
+| `cloudflare_d1_database` | `account_id/database_id` |
+| `cloudflare_pages_project` | `account_id/project_name` |
 
-### Reference Across Modules
+Use explicit import blocks or the project's import workflow, then review a plan for unexpected replacements. Resource-type migration is not necessarily supported by `terraform state mv`; follow the provider's migration guide.
 
-```hcl
-# modules/worker/main.tf
-data "cloudflare_zone" "main" {
-  name = var.domain
-}
+Export IDs for dependent modules, and keep secret outputs sensitive. Cloudflare IP-range data identifies published HTTP proxy address ranges; it does not authorize all traffic from those ranges or replace authenticated origin access.
 
-resource "cloudflare_worker_route" "api" {
-  zone_id = data.cloudflare_zone.main.id
-  pattern = "api.${var.domain}/*"
-  script_name = cloudflare_worker_script.api.name
-}
-```
-
-### Output Important Values
-
-```hcl
-output "zone_id" {
-  value = cloudflare_zone.main.id
-  description = "Zone ID for DNS management"
-}
-
-output "worker_url" {
-  value = "https://${cloudflare_worker_domain.api.hostname}"
-  description = "Worker API endpoint"
-}
-
-output "kv_namespace_id" {
-  value = cloudflare_workers_kv_namespace.app.id
-  sensitive = false
-}
-
-output "name_servers" {
-  value = cloudflare_zone.main.name_servers
-  description = "Name servers for domain registration"
-}
-```
-
-## See Also
-
-- [README](./README.md) - Provider setup
-- [Configuration Reference](./configuration.md) - All resource types
-- [Patterns](./patterns.md) - Architecture patterns
-- [Troubleshooting](./gotchas.md) - Common issues
+[Versioned data sources](https://registry.terraform.io/providers/cloudflare/cloudflare/5.24.0/docs) · [Provider upgrade guidance](https://registry.terraform.io/providers/cloudflare/cloudflare/latest/docs/guides/version-5-migration)

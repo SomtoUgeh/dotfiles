@@ -9,8 +9,8 @@ FIFO queue persisted in SQLite. Sequential processing, one item at a time.
 ```typescript
 export class MyAgent extends Agent<Env, State> {
   async onRequest(request: Request) {
-    this.queue("processItem", { id: "abc", data: "..." });
-    this.queue("processItem", { id: "def", data: "..." }, { retry: { maxAttempts: 5 } });
+    await this.queue("processItem", { id: "abc", data: "..." });
+    await this.queue("processItem", { id: "def", data: "..." }, { retry: { maxAttempts: 5 } });
     return new Response("Queued");
   }
 
@@ -23,12 +23,14 @@ export class MyAgent extends Agent<Env, State> {
 ### Queue Management
 
 ```typescript
-const items = this.getQueue();
-const byCallback = this.getQueues("processItem");
+const item = this.getQueue(itemId);
+const byPayloadId = this.getQueues("id", "abc");
 this.dequeue(itemId);
 this.dequeueAll();
 this.dequeueAllByCallback("processItem");
 ```
+
+`getQueues(key, value)` filters fields inside each item's payload, not queue metadata such as the callback name. Await `queue()` to receive its ID and propagate enqueue validation errors.
 
 ## Retries
 
@@ -46,8 +48,8 @@ const result = await this.retry(
     baseDelayMs: 200,
     maxDelayMs: 5000,
     shouldRetry: (err, nextAttempt) => {
-      if (err.message.includes("429")) return true;
-      if (err.message.includes("401")) return false;
+      if (err instanceof Error && err.message.includes("429")) return true;
+      if (err instanceof Error && err.message.includes("401")) return false;
       return nextAttempt <= 3;
     }
   }
@@ -59,7 +61,7 @@ const result = await this.retry(
 ```typescript
 await this.schedule(60, "task", payload, { retry: { maxAttempts: 3 } });
 await this.scheduleEvery(30, "poll", undefined, { retry: { maxAttempts: 2 } });
-this.queue("handler", payload, { retry: { maxAttempts: 5 } });
+await this.queue("handler", payload, { retry: { maxAttempts: 5 } });
 ```
 
 ### Class-level Defaults

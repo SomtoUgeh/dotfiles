@@ -9,16 +9,17 @@ Add a Flagship binding to your Wrangler config to access flags via `env.FLAGS`.
 ```jsonc
 // wrangler.jsonc
 {
-  "flagship": {
+  "flagship": [{
     "binding": "FLAGS",
-    "app_id": "<APP_ID>"
-  }
+    "app_id": "<APP_ID>",
+    "remote": true
+  }]
 }
 ```
 
 ```toml
 # wrangler.toml
-[flagship]
+[[flagship]]
 binding = "FLAGS"
 app_id = "<APP_ID>"
 ```
@@ -96,16 +97,10 @@ npm i @cloudflare/flagship @openfeature/web-sdk
 Recommended approach inside Workers. No HTTP overhead, auth handled automatically.
 
 ```typescript
-import { OpenFeature } from "@openfeature/server-sdk";
-import { FlagshipServerProvider } from "@cloudflare/flagship";
-
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    await OpenFeature.setProviderAndWait(
-      new FlagshipServerProvider({ binding: env.FLAGS }),
-    );
-    const client = OpenFeature.getClient();
-    // ... evaluate flags
+    const enabled = await env.FLAGS.getBooleanValue("new-checkout", false);
+    return new Response(enabled ? "New checkout" : "Standard checkout");
   },
 };
 ```
@@ -116,7 +111,7 @@ For non-Worker runtimes. Requires an API token with Flagship read permissions.
 
 ```typescript
 import { OpenFeature } from "@openfeature/server-sdk";
-import { FlagshipServerProvider } from "@cloudflare/flagship";
+import { FlagshipServerProvider } from "@cloudflare/flagship/server";
 
 await OpenFeature.setProviderAndWait(
   new FlagshipServerProvider({
@@ -134,13 +129,11 @@ Pre-fetches flags on init, then evaluates synchronously. Only `prefetchFlags` ar
 
 ```typescript
 import { OpenFeature } from "@openfeature/web-sdk";
-import { FlagshipClientProvider } from "@cloudflare/flagship";
+import { FlagshipClientProvider } from "@cloudflare/flagship/web";
 
 await OpenFeature.setProviderAndWait(
   new FlagshipClientProvider({
-    appId: "<APP_ID>",
-    accountId: "<ACCOUNT_ID>",
-    authToken: "<API_TOKEN>",
+    endpoint: "/api/flags/evaluate", // Your authenticated, allowlisted server proxy
     prefetchFlags: ["promo-banner", "dark-mode", "max-uploads"],
   }),
 );
@@ -185,7 +178,7 @@ For managing flags via the REST API (create, update, delete), set these environm
 Base URL: `https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/flagship`
 
 ```bash
-curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+curl --fail-with-body -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
   "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/flagship/apps" | jq .
 ```
 
@@ -200,3 +193,5 @@ Flagship bindings work in local dev with `wrangler dev`. Flag evaluation uses th
 ```bash
 npx wrangler dev
 ```
+
+Initialize each OpenFeature provider once per process/Worker isolate, await readiness before evaluation, and pass user context per evaluation. Do not replace the global provider on every request or store user context globally. Inside Workers, direct env.FLAGS evaluation is the simplest option. Browser evaluation requires an application-owned proxy; implement its authentication, allowed keys, context derivation, and response contract before using the proxy URL above. Flag delivery is not an authorization system.

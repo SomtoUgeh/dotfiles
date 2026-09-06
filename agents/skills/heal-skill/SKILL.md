@@ -1,124 +1,30 @@
 ---
 name: heal-skill
-description: Fix incorrect SKILL.md files when a skill has wrong instructions or outdated API references
+description: Correct a skill whose instructions, paths, commands, or external API guidance were shown to be wrong or stale.
 ---
 
-# Heal Skill
+# Heal a Skill
 
-## Runtime Tools
+Repair the invoked skill and its supporting resources from concrete failure evidence or current authoritative documentation.
 
-When this skill needs user questions, todo/progress tracking, subagents, or another skill, use the active runtime equivalents in [RUNTIME_TOOLS.md](../RUNTIME_TOOLS.md).
+## Runtime and Path Resolution
 
+Use the invoked skill path supplied by the active skill catalog or loader. If it is unavailable, search the configured skill roots and the current repository for an exact `name:` match. Never assume the current directory contains `./skills/<name>`. Use the user's current message and conversation context as inputs; do not depend on harness-specific variables.
 
-## Requirements
+For questions, progress tracking, delegation, or related skills, use the active runtime equivalents in [RUNTIME_TOOLS.md](../RUNTIME_TOOLS.md) when available, with a plain-language fallback when a mapped capability is absent.
 
-This skill needs file read/edit access and shell access for `ls` and `git`. Tool permissions are configured by the active agent runtime, not by this shared skill.
+## Workflow
 
-Update a skill's SKILL.md and related files based on corrections discovered during execution.
-
-Analyze the conversation to detect which skill is running, reflect on what went wrong, propose specific fixes, get user approval, then apply changes with optional commit.
-
-## Step 1: Detect Skill
-
-Identify the skill from conversation context:
-
-- Look for skill invocation messages
-- Check which SKILL.md was recently referenced
-- Examine current task context
-
-Set: `SKILL_NAME=[skill-name]` and `SKILL_DIR=./skills/$SKILL_NAME`
-
-If unclear, ask the user.
-
-## Step 2: Reflect and Analyze
-
-Focus on $ARGUMENTS if provided, otherwise analyze broader context.
-
-Determine:
-- **What was wrong**: Quote specific sections from SKILL.md that are incorrect
-- **Discovery method**: Context7, error messages, trial and error, documentation lookup
-- **Root cause**: Outdated API, incorrect parameters, wrong endpoint, missing context
-- **Scope of impact**: Single section or multiple? Related files affected?
-- **Proposed fix**: Which files, which sections, before/after for each
-
-## Step 3: Scan Affected Files
-
-```bash
-ls -la $SKILL_DIR/
-ls -la $SKILL_DIR/references/ 2>/dev/null
-ls -la $SKILL_DIR/scripts/ 2>/dev/null
-```
-
-## Step 4: Present Proposed Changes
-
-Present changes in this format:
-
-```
-**Skill being healed:** [skill-name]
-**Issue discovered:** [1-2 sentence summary]
-**Root cause:** [brief explanation]
-
-**Files to be modified:**
-- [ ] SKILL.md
-- [ ] references/[file].md
-- [ ] scripts/[file].py
-
-**Proposed changes:**
-
-### Change 1: SKILL.md - [Section name]
-**Location:** Line [X] in SKILL.md
-
-**Current (incorrect):**
-[exact text from current file]
-
-**Corrected:**
-[new text]
-
-**Reason:** [why this fixes the issue]
-
-[repeat for each change across all files]
-
-**Impact assessment:**
-- Affects: [authentication/API endpoints/parameters/examples/etc.]
-
-**Verification:**
-These changes will prevent: [specific error that prompted this]
-```
-
-## Step 5: Request Approval
-
-Ask using structured user-question tool:
-
-1. Yes, apply and commit all changes
-2. Apply but don't commit (let me review first)
-3. Revise the changes (I'll provide feedback)
-4. Cancel (don't make changes)
-
-**Wait for user response. Do not proceed without approval.**
-
-## Step 6: Apply Changes
-
-Only after approval (option 1 or 2):
-
-1. Use Edit tool for each correction across all files
-2. Read back modified sections to verify
-3. If option 1, commit with structured message showing what was healed
-4. Confirm completion with file list
+1. Read the target `SKILL.md` fully, then inspect only the related references, scripts, metadata, and callers needed to understand the failure.
+2. State the observed failure, the incorrect instruction, the root cause, affected files, and the proposed correction. Use exact errors and current primary sources where an external contract is involved.
+3. Preserve authorization already given. If the user explicitly asked to fix or heal the skill, proceed with in-scope edits without requesting approval again. Ask only when the target is ambiguous, the proposed change conflicts with the user's direction, or a separate external action such as publishing or pushing lacks authorization.
+4. Make the smallest complete correction. Update all examples and supporting resources that encode the same wrong behavior.
+5. Read back the changed sections, run the skill validator when available, and perform a focused behavioral check for scripts or fragile commands.
+6. Report changed files, verification, and any remaining uncertainty. Commit only when the user has authorized a commit.
 
 ## Success Criteria
 
-- Skill correctly detected from conversation context
-- All incorrect sections identified with before/after
-- User approved changes before application
-- All edits applied across SKILL.md and related files
-- Changes verified by reading back
-- Commit created if user chose option 1
-
-## Verification
-
-Before completing:
-
-- Read back each modified section to confirm changes applied
-- Ensure cross-file consistency (SKILL.md examples match references/)
-- Verify git commit created if option 1 was selected
-- Check no unintended files were modified
+- The exact loaded skill was repaired.
+- The correction is supported by failure evidence, repository behavior, or current primary documentation.
+- Related examples and references agree with the entrypoint.
+- No unrelated files or external systems were changed.

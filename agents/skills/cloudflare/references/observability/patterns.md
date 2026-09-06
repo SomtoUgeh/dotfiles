@@ -28,7 +28,8 @@ env.ANALYTICS.writeDataPoint({
 ```
 
 ```sql
-SELECT blob1 AS url, AVG(double1) AS avg_ms, percentile(double1, 0.95) AS p95_ms
+SELECT blob1 AS url, SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_ms,
+  quantileExactWeighted(0.95)(double1, _sample_interval) AS p95_ms
 FROM fetch_metrics WHERE timestamp >= NOW() - INTERVAL '1' HOUR
 GROUP BY url
 ```
@@ -58,18 +59,17 @@ env.ANALYTICS.writeDataPoint({
 ```typescript
 export default {
   async tail(events, env, ctx) {
-    const critical = events.filter(e => 
-      e.exceptions.length > 0 || e.event.wallTime > 1000000
+    const critical = events.filter(e =>
+      e.exceptions.length > 0 || e.outcome !== 'ok'
     );
     if (critical.length === 0) return;
-    
+
     ctx.waitUntil(
       fetch('https://logging.example.com/ingest', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${env.API_KEY}` },
         body: JSON.stringify(critical.map(e => ({
-          outcome: e.event.outcome,
-          cpu_ms: e.event.cpuTime / 1000,
+          outcome: e.outcome,
           errors: e.exceptions
         })))
       })
@@ -80,26 +80,4 @@ export default {
 
 ## OpenTelemetry Export
 
-```typescript
-export default {
-  async tail(events, env, ctx) {
-    const otelSpans = events.map(e => ({
-      traceId: generateId(32),
-      spanId: generateId(16),
-      name: e.scriptName || 'worker.request',
-      attributes: [
-        { key: 'worker.outcome', value: { stringValue: e.event.outcome } },
-        { key: 'worker.cpu_time_us', value: { intValue: String(e.event.cpuTime) } }
-      ]
-    }));
-    
-    ctx.waitUntil(
-      fetch('https://api.honeycomb.io/v1/traces', {
-        method: 'POST',
-        headers: { 'X-Honeycomb-Team': env.HONEYCOMB_KEY },
-        body: JSON.stringify({ resourceSpans: [{ scopeSpans: [{ spans: otelSpans }] }] })
-      })
-    );
-  }
-};
-```
+Use Cloudflare's built-in [OTel destinations](https://developers.cloudflare.com/workers/observability/exporting-opentelemetry-data/) for supported providers. Configure destination IDs under the producer's observability logs/traces settings and verify actual receipt. Do not fabricate unrelated span IDs from tail events or omit span timestamps: that loses trace relationships and does not form a valid export pipeline. If custom transformation is required, use a maintained OTLP SDK and the provider's current schema, with authentication and response checks.

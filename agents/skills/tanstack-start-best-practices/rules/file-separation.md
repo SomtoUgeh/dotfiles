@@ -135,8 +135,8 @@ export const config = {
 // lib/config.ts - Public config (safe for client)
 export const publicConfig = {
   appName: 'My App',
-  apiUrl: process.env.NEXT_PUBLIC_API_URL,
-  stripePublicKey: process.env.NEXT_PUBLIC_STRIPE_KEY,
+  apiUrl: import.meta.env.VITE_API_URL,
+  stripePublicKey: import.meta.env.VITE_STRIPE_KEY,
 }
 
 // Never import config.server.ts on client

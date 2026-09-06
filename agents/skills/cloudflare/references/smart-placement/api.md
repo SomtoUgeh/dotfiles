@@ -13,7 +13,7 @@ curl -X GET "https://api.cloudflare.com/client/v4/accounts/{ACCOUNT_ID}/workers/
 Response includes `placement_status` field:
 
 ```typescript
-type PlacementStatus = 
+type PlacementStatus =
   | undefined  // Not yet analyzed
   | 'SUCCESS'  // Successfully optimized
   | 'INSUFFICIENT_INVOCATIONS'  // Not enough traffic
@@ -39,17 +39,17 @@ type PlacementStatus =
 - Smart Placement made Worker slower
 - Placement decision reverted
 - Always runs at edge location
-- Won't be re-analyzed until redeployed
+- Inspect current status and traffic; do not assume an undocumented redeploy-only reanalysis rule.
 
 ## cf-placement Header (Beta)
 
-Smart Placement adds response header indicating routing decision:
+Cloudflare adds a request header indicating routing decision:
 
 ```typescript
 // Remote placement (Smart Placement routed request)
 "cf-placement: remote-LHR"  // Routed to London
 
-// Local placement (default edge routing)  
+// Local placement (default edge routing)
 "cf-placement: local-EWR"   // Stayed at Newark edge
 ```
 
@@ -68,7 +68,7 @@ Format: `{placement-type}-{IATA-code}`
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const placementHeader = request.headers.get('cf-placement');
-    
+
     if (placementHeader?.startsWith('remote-')) {
       const location = placementHeader.split('-')[1];
       console.log(`Smart Placement routed to ${location}`);
@@ -76,7 +76,7 @@ export default {
       const location = placementHeader.split('-')[1];
       console.log(`Running at edge location ${location}`);
     }
-    
+
     return new Response('OK');
   }
 } satisfies ExportedHandler<Env>;
@@ -94,7 +94,7 @@ Shows histogram comparing:
 
 **Request Duration vs Execution Duration:**
 - **Request duration:** Total time from request arrival to response delivery (includes network latency)
-- **Execution duration:** Time Worker code actively executing (excludes network waits)
+- **CPU time:** Time executing code; **wall time** also includes waits
 
 Use request duration to measure Smart Placement impact.
 
@@ -110,12 +110,9 @@ Use request duration to measure Smart Placement impact.
 - Worker primarily serves static assets or cached content
 - Backend services are globally distributed (no single optimal location)
 - Worker has minimal backend communication
-- Using Pages with `assets.run_worker_first = true`
+- Serving assets through a remotely placed Worker binding
 
-**Typical improvements when Smart Placement helps:**
-- 20-50% reduction in request duration for database-heavy Workers
-- 30-60% reduction for Workers making multiple backend API calls
-- Larger improvements when backend is geographically concentrated
+Performance improvements are workload-dependent. Compare request-duration distributions and backend call latency before and after enabling placement. CPU time measures active execution; wall time includes I/O waits. Do not label all execution duration as CPU time.
 
 ## Monitoring Commands
 
@@ -125,7 +122,7 @@ wrangler tail your-worker-name
 
 # Tail with filters
 wrangler tail your-worker-name --status error
-wrangler tail your-worker-name --header cf-placement
+# Observe cf-placement inside the Worker, then use wrangler tail.
 
 # Check placement status via API
 curl -H "Authorization: Bearer $TOKEN" \
@@ -137,7 +134,7 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 ```typescript
 // Placement status returned by API (field may be absent)
-type PlacementStatus = 
+type PlacementStatus =
   | 'SUCCESS'
   | 'INSUFFICIENT_INVOCATIONS'
   | 'UNSUPPORTED_APPLICATION'
@@ -181,3 +178,5 @@ export default {
   }
 } satisfies ExportedHandler<Env>;
 ```
+
+The official placement page currently contains an RPC example that conflicts with its explicit fetch-only limitation. Rely on fetch-based calls for this reference; verify hosted RPC placement before changing architecture based on that example.

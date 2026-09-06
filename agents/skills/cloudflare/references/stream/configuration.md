@@ -50,6 +50,16 @@ STREAM_CUSTOMER_CODE=your-customer-code
 }
 ```
 
+## Workers Binding
+
+For supported in-Worker operations, the native binding avoids managing a REST token:
+
+```jsonc
+{ "stream": { "binding": "STREAM" } }
+```
+
+Generate types with current Wrangler and consult the [Stream binding API](https://developers.cloudflare.com/stream/manage-video-library/bindings/). Basic direct-upload URLs are supported; TUS provisioning still uses the REST upload endpoint. Do not assume every REST operation exists on the binding.
+
 ## Signing Keys (High Volume)
 
 Create once for self-signing tokens (thousands of daily users).
@@ -95,7 +105,7 @@ const uploadConfig = {
   maxDurationSeconds: 3600,
   expiry: new Date(Date.now() + 3600000).toISOString(),
   requireSignedURLs: true,
-  allowedOrigins: ['https://yourdomain.com'],
+  allowedOrigins: ['yourdomain.com'],
   meta: { creator: 'user-123' }
 };
 

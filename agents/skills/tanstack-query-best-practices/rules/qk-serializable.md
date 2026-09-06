@@ -56,7 +56,7 @@ const { data: todos } = useQuery({
 })
 
 // For dates, use stable string representations
-const dateKey = date.toISOString().split('T')[0]  // '2024-01-15'
+const dateKey = date.toISOString()  // Preserve every timestamp dependency
 const { data: events } = useQuery({
   queryKey: ['events', dateKey],
   queryFn: () => fetchEvents(date),

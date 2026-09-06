@@ -19,52 +19,38 @@ Access in Worker:
 
 ```typescript
 interface Env {
-  IMAGES: ImageBinding;
+  IMAGES: ImagesBinding;
 }
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    return await env.IMAGES
-      .input(imageBuffer)
+    if (!request.body) return new Response("Image body required", { status: 400 });
+    const result = await env.IMAGES.input(request.body)
       .transform({ width: 800 })
-      .output()
-      .response();
+      .output({ format: "image/avif", quality: 85 });
+    return result.response();
   }
 };
 ```
 
 ### Upload via Script
 
-Wrangler doesn't have built-in Images commands, use REST API:
+A Node script can use native fetch/FormData with a Blob, or the current hosted-image binding/API. Do not pass the legacy form-data package directly to native fetch:
 
 ```typescript
 // scripts/upload-image.ts
-import fs from 'fs';
-import FormData from 'form-data';
+import { readFile } from 'node:fs/promises';
 
-async function uploadImage(filePath: string) {
-  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID!;
-  const apiToken = process.env.CLOUDFLARE_API_TOKEN!;
-  
-  const formData = new FormData();
-  formData.append('file', fs.createReadStream(filePath));
-  
+async function uploadImage(filePath: string, accountId: string, apiToken: string) {
+  const form = new FormData();
+  form.append('file', new Blob([await readFile(filePath)]), 'image.jpg');
   const response = await fetch(
     `https://api.cloudflare.com/client/v4/accounts/${accountId}/images/v1`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiToken}`,
-      },
-      body: formData,
-    }
+    { method: 'POST', headers: { Authorization: `Bearer ${apiToken}` }, body: form }
   );
-  
-  const result = await response.json();
-  console.log('Uploaded:', result);
+  if (!response.ok) throw new Error(`Upload failed: ${response.status}`);
+  return response.json(); // Validate success/result from the returned envelope.
 }
-
-uploadImage('./photo.jpg');
 ```
 
 ### Environment Variables
@@ -108,7 +94,7 @@ curl -X POST \
       "height": 200,
       "fit": "cover"
     },
-    "neverRequireSignedURLs": true
+    "neverRequireSignedURLs": false
   }'
 ```
 
@@ -186,20 +172,23 @@ curl -X POST \
 Generate signed URL:
 
 ```typescript
-import { createHmac } from 'crypto';
+import { createHmac } from 'node:crypto';
 
-function signUrl(imageId: string, variant: string, expiry: number, key: string): string {
-  const path = `/${imageId}/${variant}`;
-  const toSign = `${path}${expiry}`;
+function signUrl(accountHash: string, imageId: string, variant: string, expirySeconds: number, key: string): string {
+  if (!Number.isSafeInteger(expirySeconds) || expirySeconds <= Math.floor(Date.now() / 1000)) {
+    throw new RangeError('Expiry must be a future Unix timestamp in seconds');
+  }
+  const path = [accountHash, imageId, variant].map(encodeURIComponent).join('/');
+  const url = new URL(`https://imagedelivery.net/${path}`);
+  url.searchParams.set('exp', String(expirySeconds));
   const signature = createHmac('sha256', key)
-    .update(toSign)
-    .digest('hex');
-  
-  return `https://imagedelivery.net/{hash}${path}?exp=${expiry}&sig=${signature}`;
+    .update(url.pathname + '?' + url.searchParams.toString()).digest('hex');
+  url.searchParams.set('sig', signature);
+  return url.toString();
 }
 
-// Sign URL valid for 1 hour
-const signedUrl = signUrl('image-id', 'public', Date.now() + 3600, env.SIGNING_KEY);
+// Sign only images/variants the authenticated caller is authorized to view.
+const expiry = Math.floor(Date.now() / 1000) + 3600;
 ```
 
 ## Local Development
@@ -208,4 +197,6 @@ const signedUrl = signUrl('image-id', 'public', Date.now() + 3600, env.SIGNING_K
 npx wrangler dev --remote
 ```
 
-Must use `--remote` for Images binding access.
+Check the current binding development support. A local Worker can use a hosted Images binding with `remote: true`; this requires authentication and incurs service usage. Local mocks do not prove hosted transformations or delivery.
+
+Signing source: [private image URLs](https://developers.cloudflare.com/images/optimization/hosted-images/serve-private-images/). The signed message includes the account hash, complete path, question mark, and `exp` query string. A variant with `neverRequireSignedURLs: true` intentionally bypasses private-image signing.

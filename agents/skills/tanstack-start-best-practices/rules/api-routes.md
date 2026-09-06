@@ -13,7 +13,8 @@ While server functions are ideal for internal RPC, server routes provide traditi
 export const stripeWebhook = createServerFn({ method: 'POST' })
   .handler(async ({ request }) => {
     // Server functions aren't designed for raw request handling
-    // No easy access to raw body for signature verification
+    // Start also has server request APIs, but a server route gives this
+    // external consumer an explicit stable endpoint and response contract.
     // Response format is JSON by default
   })
 
@@ -25,29 +26,34 @@ export const getUsers = createServerFn()
 // No versioning, no standard REST semantics
 ```
 
+The application-owned `requireApiPermission` helper below must validate credentials, tenant/resource access and cookie-auth CSRF where applicable, and return/throw appropriate HTTP failures. It is required integration code, not a built-in Start API. Webhook handlers must deduplicate event IDs and make business updates idempotent.
+
 ## Good Example: Basic Server Route
 
 ```tsx
 // routes/api/users.ts
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { requireApiPermission } from '@/lib/api-auth.server'
 
 export const Route = createFileRoute('/api/users')({
   server: {
     handlers: {
       GET: async ({ request }) => {
+        await requireApiPermission(request, 'users:read')
         const users = await db.users.findMany({
           select: { id: true, name: true, email: true },
         })
 
         return json(users, {
           headers: {
-            'Cache-Control': 'public, max-age=60',
+            'Cache-Control': 'private, no-store',
           },
         })
       },
 
       POST: async ({ request }) => {
+        await requireApiPermission(request, 'users:create')
         const body = await request.json()
 
         // Validate input
@@ -122,11 +128,13 @@ export const Route = createFileRoute('/api/webhooks/stripe')({
 // routes/api/posts/$postId.ts
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { requireApiPermission } from '@/lib/api-auth.server'
 
 export const Route = createFileRoute('/api/posts/$postId')({
   server: {
     handlers: {
-      GET: async ({ params }) => {
+      GET: async ({ request, params }) => {
+        await requireApiPermission(request, 'posts:read', params.postId)
         const post = await db.posts.findUnique({
           where: { id: params.postId },
         })
@@ -139,6 +147,7 @@ export const Route = createFileRoute('/api/posts/$postId')({
       },
 
       PUT: async ({ request, params }) => {
+        await requireApiPermission(request, 'posts:update', params.postId)
         const body = await request.json()
         const parsed = updatePostSchema.safeParse(body)
 
@@ -154,7 +163,8 @@ export const Route = createFileRoute('/api/posts/$postId')({
         return json(post)
       },
 
-      DELETE: async ({ params }) => {
+      DELETE: async ({ request, params }) => {
+        await requireApiPermission(request, 'posts:delete', params.postId)
         await db.posts.delete({ where: { id: params.postId } })
         return new Response(null, { status: 204 })
       },

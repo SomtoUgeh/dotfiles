@@ -35,4 +35,4 @@ function MessageList({ messages }: { messages: Message[] }) {
 }
 ```
 
-For 1000 messages, browser skips layout/paint for ~990 off-screen items (10× faster initial render).
+The browser can skip rendering work for sufficiently distant off-screen items. Measure the actual viewport, overscan, and content; a fixed item count does not imply a 10× speedup.

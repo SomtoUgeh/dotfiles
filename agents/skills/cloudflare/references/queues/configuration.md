@@ -4,7 +4,7 @@
 
 ```bash
 wrangler queues create my-queue
-wrangler queues create my-queue --retention-period-hours=336  # 14 days
+wrangler queues create my-queue --message-retention-period-secs=1209600  # 14 days
 wrangler queues create my-queue --delivery-delay-secs=300
 ```
 
@@ -75,7 +75,7 @@ interface Env {
 interface MessageBody {
   id: string;
   action: 'create' | 'update' | 'delete';
-  data: Record<string, any>;
+  data: Record<string, unknown>;
 }
 
 export default {
@@ -110,9 +110,9 @@ Choose content type based on consumer type and data requirements:
 await env.QUEUE.send({ id: 123, name: 'test' }, { contentType: 'json' });
 
 // V8: Good for Date, Map, Set (push consumers only)
-await env.QUEUE.send({ 
-  created: new Date(), 
-  tags: new Set(['a', 'b']) 
+await env.QUEUE.send({
+  created: new Date(),
+  tags: new Set(['a', 'b'])
 }, { contentType: 'v8' });
 
 // Text: Simple strings
@@ -122,7 +122,7 @@ await env.QUEUE.send('process-user-123', { contentType: 'text' });
 await env.QUEUE.send(imageBuffer, { contentType: 'bytes' });
 ```
 
-**Default behavior:** If not specified, Cloudflare auto-selects `json` for JSON-serializable objects and `v8` for complex types.
+**Default behavior:** `json` is the default for compatibility dates after 2024-03-18. It does not automatically switch to `v8` for complex objects; select that encoding explicitly when needed.
 
 **IMPORTANT:** `v8` messages cannot be read by pull consumers or viewed in the dashboard. Use `json` if you need visibility or pull-based consumption.
 
@@ -137,8 +137,8 @@ wrangler queues consumer http remove my-queue
 
 # Queue operations
 wrangler queues list
-wrangler queues pause my-queue
-wrangler queues resume my-queue
+wrangler queues pause-delivery my-queue
+wrangler queues resume-delivery my-queue
 wrangler queues purge my-queue
 wrangler queues delete my-queue
 ```

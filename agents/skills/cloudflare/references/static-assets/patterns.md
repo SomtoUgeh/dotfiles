@@ -21,7 +21,7 @@ const response = await env.ASSETS.fetch("https://assets.local/logo.png");
 ```typescript
 const url = new URL(request.url);
 url.pathname = "/index.html";
-return env.ASSETS.fetch(new Request(url, request));
+return env.ASSETS.fetch(new Request(url, request), { redirect: 'follow' });
 ```
 
 **4. Transform asset response:**
@@ -41,7 +41,7 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname === '/') {
-      return env.ASSETS.fetch('/index.html');
+      return env.ASSETS.fetch(new URL('/index.html', request.url));
     }
     return env.ASSETS.fetch(request);
   }
@@ -78,10 +78,10 @@ async function handleAPI(request: Request, env: Env): Promise<Response> {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname.startsWith('/admin/')) {
+    if (url.pathname === '/admin' || url.pathname.startsWith('/admin/')) {
       const session = await validateSession(request, env);
       if (!session) {
-        return Response.redirect('/login', 302);
+        return Response.redirect(new URL('/login', request.url).href, 302);
       }
     }
     return env.ASSETS.fetch(request);
@@ -89,7 +89,7 @@ export default {
 };
 ```
 
-**Config:** Set `run_worker_first: ["/admin/*"]`
+**Config:** Set `run_worker_first: ["/admin", "/admin/*"]`. Cover every protected asset and its HTML aliases; do not exclude private files from authentication. Test direct asset URLs and navigation requests.
 
 **8. Custom headers for security:**
 
@@ -112,10 +112,13 @@ export default {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const cookies = request.headers.get('Cookie') || '';
-    const variant = cookies.includes('variant=b') ? 'b' : 'a';
+    const variant = cookies.split(';').some(cookie => cookie.trim() === 'variant=b') ? 'b' : 'a';
     const url = new URL(request.url);
     if (url.pathname === '/') {
-      return env.ASSETS.fetch(`/index-${variant}.html`);
+      const response = await env.ASSETS.fetch(new URL(`/index-${variant}.html`, request.url));
+      const varied = new Response(response.body, response);
+      varied.headers.set('Cache-Control', 'private, no-store');
+      return varied;
     }
     return env.ASSETS.fetch(request);
   }
@@ -127,10 +130,11 @@ export default {
 ```typescript
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const locale = request.headers.get('Accept-Language')?.split(',')[0] || 'en';
+    const preferred = request.headers.get('Accept-Language')?.split(',')[0]?.split('-')[0]?.toLowerCase();
+    const locale = preferred === 'fr' || preferred === 'es' ? preferred : 'en';
     const url = new URL(request.url);
     if (url.pathname === '/') {
-      return env.ASSETS.fetch(`/${locale}/index.html`);
+      return env.ASSETS.fetch(new URL(`/${locale}/index.html`, request.url));
     }
     if (!url.pathname.startsWith(`/${locale}/`)) {
       url.pathname = `/${locale}${url.pathname}`;
@@ -142,29 +146,7 @@ export default {
 
 **11. OAuth callback handling:**
 
-```typescript
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
-    if (url.pathname === '/auth/callback') {
-      const code = url.searchParams.get('code');
-      if (code) {
-        const session = await exchangeCode(code, env);
-        return new Response(null, {
-          status: 302,
-          headers: {
-            'Location': '/',
-            'Set-Cookie': `session=${session}; HttpOnly; Secure; SameSite=Lax`
-          }
-        });
-      }
-    }
-    return env.ASSETS.fetch(request);
-  }
-};
-```
-
-**Config:** Set `run_worker_first: ["/auth/*"]`
+Route `/auth/*` to the existing authentication library with `run_worker_first`. The library must validate state against the initiating browser session, enforce PKCE where applicable, validate callback/provider errors, and set the session cookie with `Path=/`, `HttpOnly`, `Secure`, and the chosen SameSite policy. Do not implement a callback that accepts any `code` without verifying the login transaction.
 
 **12. Cache control override:**
 
@@ -174,16 +156,18 @@ export default {
     const response = await env.ASSETS.fetch(request);
     const url = new URL(request.url);
     // Immutable assets (hashed filenames)
-    if (/\.[a-f0-9]{8,}\.(js|css|png|jpg)$/.test(url.pathname)) {
+    if (response.ok && /\.[a-f0-9]{8,}\.(js|css|png|jpg)$/.test(url.pathname)) {
+      const headers = new Headers(response.headers);
+      headers.set('Cache-Control', 'public, max-age=31536000, immutable');
       return new Response(response.body, {
-        ...response,
-        headers: {
-          ...Object.fromEntries(response.headers),
-          'Cache-Control': 'public, max-age=31536000, immutable'
-        }
+        status: response.status,
+        statusText: response.statusText,
+        headers
       });
     }
     return response;
   }
 };
 ```
+
+Worker response transforms only apply when the Worker is invoked. Use `_headers` for static headers without Worker execution; configure `run_worker_first` for cookie/locale routing and test every route variant.

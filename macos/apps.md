@@ -32,11 +32,11 @@ App Store: `mas`
 
 ## Installed via Homebrew — Apps (casks)
 
-Editors/terminals: Cursor, VS Code, Zed, Ghostty, iTerm2
+Editors/terminals: Cursor, VS Code, Zed, cmux
 Dev: OrbStack, TablePlus, Postman, LM Studio, gcloud CLI
-AI: Claude, Granola, superwhisper
+AI: Claude, Granola
 Browsers/comms: Google Chrome, Slack, Discord, Telegram, Notion
-Utilities: Raycast, AltTab, Bartender, Alcove, BetterMouse, Cap, 1Password, 1Password CLI
+Utilities: Raycast, AltTab, Alcove, 1Password, 1Password CLI
 Storage/media: Dropbox, Spotify
 Networking: Tailscale, Surfshark, Termius
 Fonts: JetBrains Mono Nerd Font, Zed Mono Nerd Font
@@ -61,15 +61,13 @@ Keynote, Numbers, Pages, Xcode, TestFlight.
 - **Codex** — Codex CLI desktop component
 - **cmux** — spawned by tooling
 - **Sotto** — dictation helper
-- **Claude Code URL Handler** (~/Applications) — created by Claude Code
-- **Raycast Beta** — beta channel of Raycast (the stable cask is `raycast`)
+- **Raycast** — Raycast (the stable cask is `raycast`)
 
 ---
 
 ## Notes / decisions
 
-- **Node:** `fnm` is the chosen version manager. `mise` was installed but is not
-  carried over to avoid overlap.
+- **Node:** `fnm` is the chosen version manager.
 - **Postgres:** consolidated to `postgresql@17`. `@14` and `@16` are dropped.
 - **Docker:** OrbStack is the chosen runtime; Docker Desktop is not in the Brewfile.
 - Browser extensions and IDE extensions still need to be installed per-app.

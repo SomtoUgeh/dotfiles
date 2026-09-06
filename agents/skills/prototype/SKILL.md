@@ -12,13 +12,13 @@ A divergence skill. It does ONE thing: take a described piece of UI ("a toast", 
 
 You are a senior design engineer running a design exploration. The entire value of this skill is **divergence**: three tints of the same idea waste the picker — the user learns nothing by flipping between them. Each variant must be a direction you could defend shipping on its own, exploring a genuinely different answer to the same brief.
 
-Divergence is not an excuse to drop the craft bar. Every variant individually meets Emil Kowalski's standards — right easing (`ease-out` on entrances, never `ease-in`), sub-300ms UI motion, correct `transform-origin`, `transform`/`opacity` only, reduced-motion handled. A sloppy variant doesn't widen the exploration; it just loses on execution and teaches nothing about the direction it represents.
+Divergence is not an excuse to drop the craft bar. Every variant individually meets Emil Kowalski's standards — right easing (`ease-out` on entrances, never `ease-in`), sub-300ms UI motion, correct `transform-origin`, properties appropriate to the measured rendering cost, reduced-motion handled. Follow the [canonical motion policy](../animate/references/canonical-policy.md); timing values are starting points. A sloppy variant doesn't widen the exploration; it just loses on execution and teaches nothing about the direction it represents.
 
 ## Hard Rules
 
 1. **Never touch production code during exploration.** Everything lives in an isolated prototype surface (see Phase 4). Integration happens only in Phase 6, only for the variant the user picked.
 2. **Variants diverge on a named axis** — layout, density, personality, motion, interaction model. Before building, you must be able to state each variant's axis in a phrase. Sharing the project's tokens is not convergence; variants *should* feel native to the product.
-3. **Every variant fully works.** Real interactions, real motion, realistic content — actual product-shaped copy, plausible names and numbers. No lorem ipsum, no dead buttons, no "imagine this part".
+3. **Every variant fully works.** Real interactions, real motion, realistic, clearly labelled sample content where source data is unavailable — never fabricated production metrics or claims. No lorem ipsum, no dead buttons, no "imagine this part".
 4. **The picker is chrome, not a contestant.** Its exact markup, styles, and behavior are specified in [PICKER.md](PICKER.md) — copy them verbatim. Its look is not a design decision and never adapts to the project.
 5. **Clean up after the choice.** When a winner is promoted, delete the prototype surface unless the user asks to keep it.
 
@@ -26,7 +26,7 @@ Divergence is not an excuse to drop the craft bar. Every variant individually me
 
 ### Phase 1 — Scope
 
-One thing per run. If the description spans multiple components ("the dashboard"), narrow it: pick the single highest-leverage piece, say which and why, and offer the rest as follow-up runs. Restate the brief in one sentence — what the thing is, where it will live, what it must do.
+One thing per run. If the description spans multiple components ("the dashboard"), preserve the requested scope: organize it into coherent variants, or ask only when selecting one part would materially change the deliverable. Restate the brief in one sentence — what the thing is, where it will live, what it must do.
 
 ### Phase 2 — Recon
 

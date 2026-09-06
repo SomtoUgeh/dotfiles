@@ -1,266 +1,67 @@
 # Animations
 
-Based on Emil Kowalski's "Animations on the Web" course.
+Follow the [canonical motion policy](../animate/references/canonical-policy.md). Use `animate` for direction, `css-animations` or `motion-react` for implementation, and the focused accessibility/performance skills for verification. Preserve the project's existing tokens and product intent.
 
-## Quick Decision
+## Choose motion with a purpose
 
-1. **Is this element entering or exiting?** → Use `ease-out`
-2. **Is an on-screen element moving?** → Use `ease-in-out`
-3. **Is this a hover/color transition?** → Use `ease`
-4. **Will users see this 100+ times daily?** → Don't animate it
+Use motion for feedback, continuity, state change, or explanation. Frequent actions must respond immediately; a keyboard trigger alone does not ban animation. Remove delays or movement that obstruct the task. Marketing sequences may run longer when they serve the story and keep content accessible.
 
-## The Easing Blueprint
+Useful starting points:
 
-### ease-out (Most Common)
-
-Use for **user-initiated interactions**: dropdowns, modals, tooltips, any element entering or exiting the screen.
-
-```css
-/* Sorted weak to strong */
---ease-out-quad: cubic-bezier(0.25, 0.46, 0.45, 0.94);
---ease-out-cubic: cubic-bezier(0.215, 0.61, 0.355, 1);
---ease-out-quart: cubic-bezier(0.165, 0.84, 0.44, 1);
---ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
---ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
---ease-out-circ: cubic-bezier(0.075, 0.82, 0.165, 1);
-```
-
-Why it works: Acceleration at the start creates an instant, responsive feeling. The element "jumps" toward its destination then settles in.
-
-### ease-in-out (For Movement)
-
-Use when **elements already on screen need to move or morph**. Mimics natural motion like a car accelerating then braking.
-
-```css
-/* Sorted weak to strong */
---ease-in-out-quad: cubic-bezier(0.455, 0.03, 0.515, 0.955);
---ease-in-out-cubic: cubic-bezier(0.645, 0.045, 0.355, 1);
---ease-in-out-quart: cubic-bezier(0.77, 0, 0.175, 1);
---ease-in-out-quint: cubic-bezier(0.86, 0, 0.07, 1);
---ease-in-out-expo: cubic-bezier(1, 0, 0, 1);
---ease-in-out-circ: cubic-bezier(0.785, 0.135, 0.15, 0.86);
-```
-
-### ease (For Hover Effects)
-
-Use for **hover states and color transitions**. The asymmetrical curve (faster start, slower end) feels elegant for gentle animations.
-
-```css
-transition: background-color 150ms ease;
-```
-
-### linear (Avoid in UI)
-
-Only use for:
-- Constant-speed animations (marquees, tickers)
-- Time visualization (hold-to-delete progress indicators)
-
-Linear feels robotic and unnatural for interactive elements.
-
-### ease-in (Almost Never)
-
-**Avoid for UI animations.** Makes interfaces feel sluggish because the slow start delays visual feedback.
-
-## Paired Elements Rule
-
-Elements that animate together must use the same easing and duration. Modal + overlay, tooltip + arrow, drawer + backdrop—if they move as a unit, they should feel like a unit.
-
-```css
-/* Both use the same timing */
-.modal { transition: transform 200ms ease-out; }
-.overlay { transition: opacity 200ms ease-out; }
-```
-
-## Duration Guidelines
-
-| Element Type | Duration |
+| Interaction | Timing |
 | --- | --- |
-| Micro-interactions | 100-150ms |
-| Standard UI (tooltips, dropdowns) | 150-250ms |
-| Modals, drawers | 200-300ms |
-| Page transitions | 300-400ms |
+| Small feedback | 100–200ms |
+| Dropdown or tooltip | 125–250ms |
+| Modal or drawer | 200–500ms |
 
-**Rules:**
-- UI animations should stay under 300ms
-- Larger elements animate slower than smaller ones
-- Exit animations can be faster than entrances
-- Longer travel distance = longer duration
+Tune timing with distance, size, easing, frequency, and interruption. Named curves are valid: ease-out for responsive entrance/exit, ease-in-out for movement between visible states, ease for small color changes, and linear for constant progress or rotation. Custom curves are optional, not a quality gate.
 
-## The Frequency Principle
+## Physical continuity
 
-Determine how often users will see the animation:
+- Keep press feedback immediate; use a small scale only where it fits and reduced motion permits it.
+- Anchor a triggered popover to its positioning library's computed origin, including collision flips. Centered modals can remain centered.
+- Animate an inner surface if moving the hover target causes flicker.
+- Retarget from the current visible state on reversal. CSS transitions handle changing targets; runtime springs can preserve velocity for gestures. Keyframes follow a timeline and require explicit controls for interruption.
+- Set spring parameters using the installed library's contract. Apple damping ratios and Motion's damping coefficient are different quantities. Extra damping can reduce oscillation but also lengthen settling.
 
-- **100+ times/day** → No animation (or drastically reduced)
-- **Occasional use** → Standard animation
-- **Rare/first-time** → Can be special
+## Presence and layout
 
-**Example:** Raycast never animates its menu toggle because users open it hundreds of times daily.
+Keep the presence boundary mounted while children exit. Use stable keys for swapped/list children; use the installed primitive's lifecycle instead of assuming React will wait for CSS. Radix and Base UI do not share identical attributes. Motion's `wait` mode handles one child; `popLayout` removes exiting items from flow and needs correct ref/containing-block behavior.
 
-## When to Animate
-
-**Do animate:**
-- Enter/exit transitions for spatial consistency
-- State changes that benefit from visual continuity
-- Responses to user actions (feedback)
-- Rarely-used interactions where delight adds value
-
-**Don't animate:**
-- Keyboard-initiated actions
-- Hover effects on frequently-used elements
-- Anything users interact with 100+ times daily
-- When speed matters more than smoothness
-
-**Marketing vs. Product:**
-- Marketing: More elaborate, longer durations allowed
-- Product: Fast, purposeful, never frivolous
-
-## Spring Animations
-
-Springs feel more natural because they don't have fixed durations—they simulate real physics.
-
-### When to Use Springs
-
-- Drag interactions with momentum
-- Elements that should feel "alive" (Dynamic Island)
-- Gestures that can be interrupted mid-animation
-- Organic, playful interfaces
-
-### Configuration
-
-**Apple's approach (recommended):**
-
-```js
-// Duration + bounce (easier to understand)
-{ type: "spring", duration: 0.5, bounce: 0.2 }
-```
-
-**Traditional physics:**
-
-```js
-// Mass, stiffness, damping (more complex)
-{ type: "spring", mass: 1, stiffness: 100, damping: 10 }
-```
-
-### Bounce Guidelines
-
-- **Avoid bounce** in most UI contexts
-- **Use bounce** for drag-to-dismiss, playful interactions
-- Keep bounce subtle (0.1-0.3) when used
-
-### Interruptibility
-
-Springs maintain velocity when interrupted—CSS animations restart from zero. This makes springs ideal for gestures users might change mid-motion.
+For changing intrinsic height, measure an inner element and animate the outer one. Restore `height: "auto"` under reduced motion instead of leaving a stale pixel height. Check initial unmeasured values and meaningful zero-height content separately.
 
 ## Performance
 
-### The Golden Rule
+Transform and opacity usually avoid layout/paint, but no syntax guarantees GPU use or frame rate. Motion is a hybrid engine; the actual driver varies by feature, version, and property. Record the interaction before replacing `x` with a transform string or adding `will-change`.
 
-Only animate `transform` and `opacity`. These skip layout and paint stages, running entirely on the GPU.
-
-**Avoid animating:**
-- `padding`, `margin`, `height`, `width` (trigger layout)
-- `blur` filters above 20px (expensive, especially Safari)
-- CSS variables in deep component trees
-
-### Optimization Techniques
-
-```css
-/* Force GPU acceleration */
-.animated-element {
-  will-change: transform;
-}
-```
-
-**React-specific:**
-- Animate outside React's render cycle when possible
-- Use refs to update styles directly instead of state
-- Re-renders on every frame = dropped frames
-
-**Framer Motion:**
-
-```jsx
-// Hardware accelerated (transform as string)
-<motion.div animate={{ transform: "translateX(100px)" }} />
-
-// NOT hardware accelerated (more readable)
-<motion.div animate={{ x: 100 }} />
-```
-
-### CSS vs. JavaScript
-
-- CSS animations run off main thread (smoother under load)
-- JS animations (Framer Motion, React Spring) use `requestAnimationFrame`
-- CSS better for simple, predetermined animations
-- JS better for dynamic, interruptible animations
+Dimension, clipping, shadow, blur, and inherited-variable changes need measurement in their real context. There is no universal 20px blur cutoff. Layer hints and containment can consume memory or change rendering. Pause decorative loops while off-screen and clean up animation handles/subscriptions on unmount.
 
 ## Accessibility
 
-### prefers-reduced-motion
-
-Whenever you add an animation, also add a media query to disable it:
-
-```css
-.modal {
-  animation: fadeIn 200ms ease-out;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .modal {
-    animation: none;
-  }
-}
-```
-
-### Reduced Motion Guidelines
-
-- Every animated element needs its own `prefers-reduced-motion` media query
-- Set `animation: none` or `transition: none` (no `!important`)
-- No exceptions for opacity or color—disable all animations
-- Show play buttons instead of autoplay videos
-
-### Framer Motion Implementation
+Design both motion preferences from the beginning. Under reduced motion, remove or reduce spatial/decorative movement and preserve meaning with instant or restrained non-spatial feedback.
 
 ```jsx
-import { useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "motion/react";
 
-function Component() {
-  const shouldReduceMotion = useReducedMotion();
-
+function Notice() {
+  const reduce = useReducedMotion();
   return (
     <motion.div
-      initial={shouldReduceMotion ? false : { opacity: 0, y: 20 }}
+      initial={reduce ? false : { opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-    />
+    >Saved</motion.div>
   );
 }
 ```
 
-## Practical Tips
+`MotionConfig reducedMotion="user"` disables transform and layout animation while retaining other animated values. It is a baseline, not proof that explicit height, SVG, autoplay, or custom code respects the preference. Use the accessibility skill for SSR and live preference changes.
 
-| Scenario | Solution |
-| --- | --- |
-| Make buttons feel responsive | Add `transform: scale(0.97)` on `:active` |
-| Element appears from nowhere | Start from `scale(0.95)`, not `scale(0)` |
-| Shaky/jittery animations | Add `will-change: transform` |
-| Hover causes flicker | Animate child element, not parent |
-| Popover scales from wrong point | Set `transform-origin` to trigger location |
-| Sequential tooltips feel slow | Skip delay/animation after first tooltip |
-| Small buttons hard to tap | Use 44px minimum hit area (pseudo-element) |
-| Something still feels off | Add subtle blur (under 20px) to mask it |
-| Hover triggers on mobile | Use `@media (hover: hover) and (pointer: fine)` |
+Keep hover decorative and gate spatial hover by both pointer capability and motion preference. Keyboard focus, touch operation, and readable hidden states must work independently. Do not hide focusable content with opacity alone. Preserve native media controls and handle rejected playback promises.
 
-## Theme Transitions
+## Verify
 
-**Important:** Switching themes should not trigger transitions and animations on elements. Disable transitions during theme changes to prevent flash of animated content.
+Replay enter, exit, rapid reversal, keyboard/touch input, both preferences, live preference changes, and the relevant workload. For gestures, test pointer cancellation and real-device behavior when possible. Choose swipe thresholds from measured velocity units, distance, and product behavior; there is no universal `0.10` threshold.
 
-## AnimatePresence
+Report what was observed and what remains untested. Do not prescribe a next-day pause or claim Safari/device coverage from desktop Chrome.
 
-Use `popLayout` mode on AnimatePresence when an element has an exit animation and is in a group of elements.
-
-## Drag Gestures
-
-When implementing drag-to-dismiss or similar gestures, ensure velocity-based swiping works. Usually velocity (`swipeAmount / timeTaken`) higher than `0.10` should be sufficient to trigger the action.
-
-## Looping Animations
-
-Pause looping animations when off-screen to save resources.
+Sources: [Motion accessibility](https://motion.dev/docs/react-accessibility), [Motion performance](https://motion.dev/docs/performance), [Motion presence](https://motion.dev/docs/react-animate-presence).

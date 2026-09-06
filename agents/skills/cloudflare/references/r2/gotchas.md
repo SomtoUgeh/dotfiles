@@ -7,9 +7,11 @@
 while (listed.objects.length < options.limit) { ... }
 
 // ✅ CORRECT: Always use truncated property
-while (listed.truncated) {
-  const next = await env.MY_BUCKET.list({ cursor: listed.cursor });
-  // ...
+let page = await env.MY_BUCKET.list(options);
+for (;;) {
+  for (const object of page.objects) console.log(object.key);
+  if (!page.truncated) break;
+  page = await env.MY_BUCKET.list({ ...options, cursor: page.cursor });
 }
 ```
 
@@ -49,26 +51,18 @@ await env.MY_BUCKET.put(key, data, { sha256: hash });
 ```typescript
 // Precondition failure returns object WITHOUT body
 const object = await env.MY_BUCKET.get(key, {
-  onlyIf: { etagMatches: '"wrong"' }
+  onlyIf: { etagMatches: 'wrong' }
 });
 
 // Check for body, not just null
 if (!object) return new Response('Not found', { status: 404 });
-if (!object.body) return new Response(null, { status: 304 }); // Precondition failed
+if (!('body' in object)) return new Response(null, { status: 412 }); // If-Match failed
+// A matching If-None-Match on GET/HEAD instead maps to 304.
 ```
 
-## Key Validation
+## Key Authorization
 
-```typescript
-// ❌ DANGEROUS: Path traversal
-const key = url.pathname.slice(1); // Could be ../../../etc/passwd
-await env.MY_BUCKET.get(key);
-
-// ✅ SAFE: Validate keys
-if (!key || key.includes('..') || key.startsWith('/')) {
-  return new Response('Invalid key', { status: 400 });
-}
-```
+R2 keys are object names, not filesystem paths. Rejecting `..` does not authorize a caller. Authenticate first and derive an allowed tenant/user prefix on the server; validate the requested key stays within that prefix. Use server-generated upload IDs when clients must not overwrite existing objects.
 
 ## Storage Class Pitfalls
 
@@ -78,24 +72,9 @@ if (!key || key.includes('..') || key.startsWith('/')) {
 
 ## Stream Length Requirement
 
-```typescript
-// ❌ WRONG: Streaming unknown length fails silently
-const response = await fetch(url);
-await env.MY_BUCKET.put(key, response.body); // May fail without error
+R2 requires a known-length stream. Request/Response bodies with a runtime-known length work directly; arbitrary transformed streams may not. An unsupported stream raises an error; do not describe this as silent truncation. `httpMetadata.contentLength` does not exist and cannot supply the length.
 
-// ✅ CORRECT: Buffer or use Content-Length
-const data = await response.arrayBuffer();
-await env.MY_BUCKET.put(key, data);
-
-// OR: Pass Content-Length if known
-const object = await env.MY_BUCKET.put(key, request.body, {
-  httpMetadata: {
-    contentLength: parseInt(request.headers.get('content-length') || '0')
-  }
-});
-```
-
-**Reason:** R2 requires known length for streams. Unknown length may cause silent truncation.
+Use `FixedLengthStream` when the exact length is known and await both the write and upload promises. Otherwise use bounded buffering for small payloads or multipart uploads for large ones. Do not buffer an unbounded response in the Worker's 128 MiB memory.
 
 ## S3 SDK Region Configuration
 
@@ -116,24 +95,9 @@ const s3 = new S3Client({
 
 **Reason:** S3 SDK requires region. R2 uses 'auto' as placeholder.
 
-## Local Development Limits
+## Local Development
 
-```typescript
-// ❌ Miniflare/wrangler dev: Limited R2 support
-// - No multipart uploads
-// - No presigned URLs (requires S3 SDK + network)
-// - Memory-backed storage (lost on restart)
-
-// ✅ Use remote bindings for full features
-wrangler dev --remote
-
-// OR: Conditional logic
-if (env.ENVIRONMENT === 'development') {
-  // Fallback for local dev
-} else {
-  // Full R2 features
-}
-```
+Wrangler/Miniflare emulate R2 including multipart uploads. Wrangler persists local state under `.wrangler/state`; configure Miniflare persistence explicitly when using its API. Local binding tests do not verify the hosted S3 endpoint, signed URL authorization, CORS, or public-domain delivery. Use a dedicated remote test bucket for those checks.
 
 ## Presigned URL Expiry
 
@@ -164,27 +128,27 @@ return Response.json({
 
 ## Common Errors
 
-### "Stream upload failed" / Silent Truncation
+### "Stream upload failed"
 
-**Cause:** Stream length unknown or Content-Length missing  
-**Solution:** Buffer data or pass explicit Content-Length
+**Cause:** Stream length unknown or Content-Length missing
+**Solution:** Use a runtime-known-length body, FixedLengthStream, bounded buffering, or multipart upload
 
 ### "Invalid credentials" / S3 SDK
 
-**Cause:** Missing `region: 'auto'` in S3Client config  
+**Cause:** Missing `region: 'auto'` in S3Client config
 **Solution:** Always set `region: 'auto'` for R2
 
 ### "Object not found"
 
-**Cause:** Object key doesn't exist or was deleted  
+**Cause:** Object key doesn't exist or was deleted
 **Solution:** Verify object key correct, check if object was deleted, ensure bucket correct
 
 ### "List compatibility error"
 
-**Cause:** Missing or old compatibility_date, or flag not enabled  
+**Cause:** Missing or old compatibility_date, or flag not enabled
 **Solution:** Set `compatibility_date >= 2022-08-04` or enable `r2_list_honor_include` flag
 
 ### "Multipart upload failed"
 
-**Cause:** Part sizes not uniform or incorrect part number  
+**Cause:** Part sizes not uniform or incorrect part number
 **Solution:** Ensure uniform size except final part, verify part numbers start at 1

@@ -1,134 +1,71 @@
-# Gotchas & Limits
+# Workers for Platforms gotchas
 
-## Common Errors
+## Dispatch failures
 
-### "Worker not found"
-
-**Cause:** Attempting to get Worker that doesn't exist in namespace  
-**Solution:** Catch error and return 404:
+Await the delegated fetch inside the try block; otherwise an asynchronous
+rejection bypasses the catch. Narrow unknown errors before reading fields.
 
 ```typescript
-try {
-  const userWorker = env.DISPATCHER.get(workerName);
-  return userWorker.fetch(request);
-} catch (e) {
-  if (e.message.startsWith("Worker not found")) {
-    return new Response("Worker not found", { status: 404 });
-  }
-  throw e;  // Re-throw unexpected errors
-}
-```
-
-### "CPU time limit exceeded"
-
-**Cause:** User Worker exceeded configured CPU time limit  
-**Solution:** Track violations in Analytics Engine and return 429 response; consider adjusting limits per customer tier
-
-### "Hostname Routing Issues"
-
-**Cause:** DNS proxy settings causing routing problems  
-**Solution:** Use `*/*` wildcard route which works regardless of proxy settings for orange-to-orange routing
-
-### "Bindings Lost on Update"
-
-**Cause:** Not using `keep_bindings` flag when updating Worker  
-**Solution:** Use `keep_bindings: true` in API requests to preserve existing bindings during updates
-
-### "Tag Filtering Not Working"
-
-**Cause:** Special characters not URL encoded in tag filters  
-**Solution:** URL encode tags (e.g., `tags=production%3Ayes`) and avoid special chars like `,` and `&`
-
-### "Deploy Failures with ES Modules"
-
-**Cause:** Incorrect upload format for ES modules  
-**Solution:** Use multipart form upload, specify `main_module` in metadata, and set file type to `application/javascript+module`
-
-### "Static Asset Upload Failed"
-
-**Cause:** Invalid hash format, expired token, or incorrect encoding  
-**Solution:** Hash must be first 16 bytes (32 hex chars) of SHA-256, upload within 1 hour of session creation, deploy within 1 hour of upload completion, and Base64 encode file contents
-
-### "Outbound Worker Not Intercepting Calls"
-
-**Cause:** Outbound Workers don't intercept Durable Object or mTLS binding fetch  
-**Solution:** Plan egress control accordingly; not all fetch calls are intercepted
-
-### "TCP Socket Connection Failed"
-
-**Cause:** Outbound Worker enabled blocks `connect()` API for TCP sockets  
-**Solution:** Outbound Workers only intercept `fetch()` calls; TCP socket connections unavailable when outbound configured. Remove outbound if TCP needed, or use proxy pattern.
-
-### "API Rate Limit Exceeded"
-
-**Cause:** Exceeded Cloudflare API rate limits (1200 requests per 5 minutes per account, 200 requests per second per IP)  
-**Solution:** Implement exponential backoff:
-
-```typescript
-async function deployWithBackoff(deploy: () => Promise<void>, maxRetries = 3) {
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      return await deploy();
-    } catch (e) {
-      if (e.status === 429 && i < maxRetries - 1) {
-        await new Promise(r => setTimeout(r, Math.pow(2, i) * 1000));
-        continue;
-      }
-      throw e;
+export async function dispatch(request: Request, dispatcher: DispatchNamespace, name: string): Promise<Response> {
+  try {
+    const worker = dispatcher.get(name);
+    return await worker.fetch(request);
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('Worker not found')) {
+      return new Response('Worker not found', { status: 404 });
     }
+    throw error;
   }
 }
 ```
 
-### "Gradual Deployment Not Supported"
+Determine the name from a trusted platform routing record. Do not expose arbitrary
+Worker names to callers or classify every runtime error as "not found".
 
-**Cause:** Attempted to use gradual deployments with user Workers  
-**Solution:** Gradual deployments not supported for Workers in dispatch namespaces. Use all-at-once deployment with staged rollout via dispatch worker logic (feature flags, percentage-based routing).
+## Uploads and preserved configuration
 
-### "Asset Session Expired"
+- Use a multipart module upload with `metadata.main_module` matching the file name.
+- SDK method signatures do not prove multipart serialization is correct. The
+  current SDK 7.1.0 transport fixture failed that check; [patterns.md](./patterns.md)
+  uses the documented REST multipart format. Verify headers, metadata JSON, and
+  named module parts when changing the upload implementation.
+- `metadata.keep_bindings` is an array of binding **types**, such as
+  `['secret_text']`; it is not a boolean. Explicitly preserve or resend each
+  required binding/configuration and verify the resulting script settings.
+- Use real returned KV/D1/R2 resource identifiers, not names constructed from a
+  tenant ID. Creating a namespace and binding to one are separate operations.
 
-**Cause:** Upload JWT expired (1 hour validity) or completion token expired (1 hour after upload)  
-**Solution:** Complete asset upload within 1 hour of session creation, and deploy Worker within 1 hour of upload completion. For large uploads, batch files or increase upload parallelism.
+## Static assets
 
-## Platform Limits
+Assets are associated with a dispatch namespace and may be reused by hash across
+user Workers. Keep upload/completion JWTs in trusted platform services. Use a
+stable tenant-specific hash input when tenant isolation is required. The manifest
+hash is 32 hex characters; a consistent truncated SHA-256 scheme is documented.
+Upload file contents as required by the assets endpoint; the upload and completion
+tokens each have one-hour lifetimes. A session response alone does not upload files.
 
-| Limit | Value | Notes |
-|-------|-------|-------|
-| Workers per namespace | Unlimited | Unlike regular Workers (500 per account) |
-| Namespaces per account | Unlimited | Best practice: 1 production + 1 staging |
-| Max tags per Worker | 8 | For filtering and organization |
-| Worker mode | Untrusted (default) | No `request.cf` access unless trusted mode |
-| Cache isolation | Per-Worker (untrusted) | Shared in trusted mode with key prefixes |
-| Durable Object namespaces | Unlimited | No per-account limit for WfP |
-| Gradual Deployments | Not supported | All-at-once only |
-| `caches.default` | Disabled (untrusted) | Use Cache API with custom keys |
+## Limits and isolation
 
-## Asset Upload Limits
+| Constraint | Current documented behavior |
+| --- | --- |
+| User Worker scripts | Unlimited for Workers for Platforms customers |
+| Durable Object namespaces | No WfP namespace limit |
+| Tags per script | Eight; avoid comma/ampersand in tags |
+| `request.cf` in user Worker | Unavailable by default; trusted mode requires controlling all code |
+| `caches.default` in namespaced script | Disabled; follow the documented cache model |
+| Gradual deployment of user Workers | Not supported; user-script updates deploy all at once |
+| Client API rate limit | 1200/5min per user/account token, cumulative across dashboard/key/token |
+| Client API per IP | 200/second |
 
-| Limit | Value | Notes |
-|-------|-------|-------|
-| Upload session JWT validity | 1 hour | Must complete upload within this time |
-| Completion token validity | 1 hour | Must deploy within this time after upload |
-| Asset hash format | First 16 bytes SHA-256 | 32 hex characters |
-| Base64 encoding | Required | For binary files |
+Use SDK retry settings/Retry-After handling for control-plane rate limits. A
+concurrency limit does not guarantee rate-limit compliance. Do not wrap retries
+in a helper that silently succeeds when its attempt count is zero.
 
-## API Rate Limits
+Outbound Workers do not intercept every operation. Check the current outbound
+Worker restrictions, including DO/mTLS fetch and TCP socket behavior, before
+claiming complete egress mediation. Monitor CPU/subrequest limit failures and
+return the application's documented failure response.
 
-| Limit Type | Value | Scope |
-|------------|-------|-------|
-| Client API | 1200 requests / 5 min | Per account |
-| Client API | 200 requests / sec | Per IP address |
-| GraphQL | Varies by query cost | Query complexity |
-
-See [Cloudflare API Rate Limits](https://developers.cloudflare.com/fundamentals/api/reference/limits/) for details.
-
-## Operational Limits
-
-| Operation | Limit | Notes |
-|-----------|-------|-------|
-| CPU time (custom limits) | Up to Workers plan limit | Set per-invocation in dispatch worker |
-| Subrequests (custom limits) | Up to Workers plan limit | Set per-invocation in dispatch worker |
-| Outbound Worker subrequests | Not intercepted for DO/mTLS | Only regular fetch() calls |
-| TCP sockets with outbound | Disabled | `connect()` API unavailable |
-
-See [README.md](./README.md), [configuration.md](./configuration.md), [api.md](./api.md), [patterns.md](./patterns.md)
+Sources: [limits](https://developers.cloudflare.com/cloudflare-for-platforms/workers-for-platforms/reference/limits/),
+[static assets](https://developers.cloudflare.com/cloudflare-for-platforms/workers-for-platforms/configuration/static-assets/),
+[upload API](https://developers.cloudflare.com/api/resources/workers_for_platforms/subresources/dispatch/subresources/namespaces/subresources/scripts/methods/update/).

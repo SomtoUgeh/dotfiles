@@ -15,9 +15,9 @@
 
 ```typescript
 // Good - structured logging
-console.log({ 
-  user_id: 123, 
-  action: "login", 
+console.log({
+  user_id: 123,
+  action: "login",
   status: "success",
   duration_ms: 45
 });
@@ -65,7 +65,7 @@ export default {
       doubles: [1, 245.5], // request_count, response_time_ms
       indexes: ['customer_123'] // for efficient filtering
     });
-    
+
     return new Response('OK');
   }
 }
@@ -77,12 +77,12 @@ Tail Workers receive logs/traces from other Workers for filtering, transformatio
 
 **Setup**:
 ```toml
-# wrangler.toml
-name = "log-processor"
-main = "src/tail.ts"
+# Producer Worker wrangler.toml
+name = "my-worker"
+main = "src/index.ts"
 
 [[tail_consumers]]
-service = "my-worker" # Worker to tail
+service = "log-processor" # Separately deployed Worker with a tail() handler
 ```
 
 **Tail Worker Example**:
@@ -90,10 +90,10 @@ service = "my-worker" # Worker to tail
 export default {
   async tail(events: TraceItem[], env: Env, ctx: ExecutionContext) {
     // Filter errors only
-    const errors = events.filter(event => 
+    const errors = events.filter(event =>
       event.outcome === 'exception' || event.outcome === 'exceededCpu'
     );
-    
+
     if (errors.length > 0) {
       // Send to external monitoring
       ctx.waitUntil(
@@ -109,7 +109,7 @@ export default {
 
 ### Configure Logpush
 
-Send logs to external storage (S3, R2, GCS, Azure, Datadog, etc.). Requires Business/Enterprise plan.
+Send logs to external storage (S3, R2, GCS, Azure, Datadog, etc.). Workers Trace Events Logpush requires the Workers Paid plan.
 
 **Via Dashboard**:
 1. Navigate to Analytics → Logs → Logpush
@@ -165,5 +165,5 @@ curl -X POST "https://api.cloudflare.com/client/v4/accounts/{account_id}/logpush
 
 Deploy with env-specific config:
 ```bash
-wrangler deploy --config wrangler.prod.jsonc --env production
+wrangler deploy --config wrangler.prod.jsonc
 ```

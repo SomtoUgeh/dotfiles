@@ -3,12 +3,12 @@
 ## Rate Limits & 429 Errors
 
 **Actual Limits:**
-- **1200 requests / 5 minutes** per user/token (global)
+- **1200 requests / 5 minutes** per user or account token (global)
 - **200 requests / second** per IP address
 - **GraphQL: 320 / 5 minutes** (cost-based)
 
 **SDK Behavior:**
-- Auto-retry with exponential backoff (default 2 retries, Go: 10)
+- Auto-retry with exponential backoff (default 2 retries)
 - Respects `Retry-After` header
 - Throws `RateLimitError` after exhausting retries
 
@@ -31,14 +31,14 @@ const limit = pLimit(10); // Max 10 concurrent requests
 
 ```go
 // ❌ WRONG - Won't compile or send field
-client.Zones.New(ctx, cloudflare.ZoneNewParams{
+client.Zones.New(ctx, zones.ZoneNewParams{
     Name: "example.com",
 })
 
 // ✅ CORRECT
-client.Zones.New(ctx, cloudflare.ZoneNewParams{
+client.Zones.New(ctx, zones.ZoneNewParams{
     Name: cloudflare.F("example.com"),
-    Account: cloudflare.F(cloudflare.ZoneNewParamsAccount{
+    Account: cloudflare.F(zones.ZoneNewParamsAccount{
         ID: cloudflare.F("account-id"),
     }),
 })
@@ -52,6 +52,7 @@ client.Zones.New(ctx, cloudflare.ZoneNewParams{
 
 ```python
 # ❌ WRONG - Can't await sync client
+import os
 from cloudflare import Cloudflare
 client = Cloudflare()
 await client.zones.list()  # TypeError
@@ -100,20 +101,7 @@ for await (const zone of client.zones.list()) {
 
 ## Workers Subrequests
 
-**Problem:** Rate limit hit faster than expected in Workers.
-
-**Cause:** Workers subrequests count as separate API calls.
-
-**Solution:** Use bindings instead of REST API in Workers (see ../bindings/).
-
-```typescript
-// ❌ WRONG - REST API in Workers (counts against rate limit)
-const client = new Cloudflare({ apiToken: env.CLOUDFLARE_API_TOKEN });
-const zones = await client.zones.list();
-
-// ✅ CORRECT - Use bindings (no rate limit)
-// Access via env.MY_BINDING
-```
+Use product bindings for supported data operations. Bindings still have product and Worker quotas. Zone listing, DNS management, and other control-plane operations require the REST API or SDK even inside a Worker; no generic binding replaces them.
 
 ## Authentication Errors (401)
 
@@ -140,7 +128,7 @@ console.log('Token valid:', user.status);
 
 ## Timeout Errors
 
-**Problem:** Request times out (default 60s).
+**Problem:** Request times out (TypeScript/Python default 60s; Go has no default timeout).
 
 **Cause:** Large operations (bulk DNS, zone transfers).
 
@@ -182,7 +170,7 @@ for await (const zone of client.zones.list()) {
 
 | Resource/Limit | Value | Notes |
 |----------------|-------|-------|
-| API rate limit | 1200/5min | Per user/token |
+| API rate limit | 1200/5min | Per user or account token |
 | IP rate limit | 200/sec | Per IP |
 | GraphQL rate limit | 320/5min | Cost-based |
 | Parallel requests (recommended) | < 10 | Avoid overwhelming API |

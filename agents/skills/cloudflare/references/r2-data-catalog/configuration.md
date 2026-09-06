@@ -1,6 +1,6 @@
 # R2 Data Catalog Configuration
 
-Enable the catalog, create tokens, turn on automatic maintenance, connect clients. For exhaustive token/permission options and maintenance settings, pull `https://developers.cloudflare.com/r2/data-catalog/manage-catalogs/` and `.../table-maintenance/`.
+Enable the catalog, create tokens, turn on automatic maintenance, connect clients. For exhaustive token/permission options and maintenance settings, pull `https://developers.cloudflare.com/r2-data-catalog/manage-catalogs/` and `.../table-maintenance/`.
 
 ## Step 1: Create Bucket + Enable Catalog
 
@@ -42,12 +42,12 @@ npx wrangler r2 bucket catalog snapshot-expiration enable my-bucket \
 
 Compaction needs a **stored credential** to access files. `compaction enable` (and the dashboard wizard) stores it automatically; pure-API setups must call `/credential` (see [api.md](api.md)).
 
-> Compaction triggers **hourly** with **no hard throughput cap** (the former 2 GB/hour limit was lifted). Snapshot expiration deletes unreferenced data files automatically (since April 2026) — manual orphan cleanup is rarely needed. For target-size guidance per workload, see the table-maintenance doc.
+> Automatic compaction supports Parquet with a 64–512 MB target size. Do not assume a fixed cadence or guaranteed throughput. Snapshot expiration removes data files no longer referenced by retained snapshots; files never referenced by any snapshot remain orphaned and need separate cleanup.
 
 ## Step 4: Verify
 
 ```bash
-npx wrangler r2 bucket catalog status my-bucket
+npx wrangler r2 bucket catalog get my-bucket
 # or control-plane API:
 curl -s "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/r2-catalog/$BUCKET" \
   -H "Authorization: Bearer $API_TOKEN"
@@ -74,7 +74,7 @@ print(catalog.list_namespaces())            # connection test
 
 ### PySpark / DuckDB / Trino / Snowflake
 
-Full, current engine configs live at `https://developers.cloudflare.com/r2/data-catalog/config-examples/`. A verified PySpark session template is in [patterns.md](patterns.md#pyspark-session) (needs Iceberg 1.6.1 and `X-Iceberg-Access-Delegation: vended-credentials`).
+Full, current engine configs live at `https://developers.cloudflare.com/r2-data-catalog/config-examples/`. A verified PySpark session template is in [patterns.md](patterns.md#pyspark-session) (uses compatible Iceberg/Spark artifacts and `X-Iceberg-Access-Delegation: vended-credentials`).
 
 ## Environment Variables Pattern
 

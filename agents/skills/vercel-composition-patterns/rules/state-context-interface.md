@@ -41,7 +41,7 @@ interface ComposerActions {
 }
 
 interface ComposerMeta {
-  inputRef: React.RefObject<TextInput>
+  inputRef: React.RefObject<TextInput | null>
 }
 
 interface ComposerContextValue {
@@ -51,6 +51,11 @@ interface ComposerContextValue {
 }
 
 const ComposerContext = createContext<ComposerContextValue | null>(null)
+function useComposerContext(): ComposerContextValue {
+  const context = use(ComposerContext)
+  if (context === null) throw new Error('Composer requires a provider')
+  return context
+}
 ```
 
 **UI components consume the interface, not the implementation:**
@@ -61,7 +66,7 @@ function ComposerInput() {
     state,
     actions: { update },
     meta,
-  } = use(ComposerContext)
+  } = useComposerContext()
 
   // This component works with ANY provider that implements the interface
   return (
@@ -80,7 +85,7 @@ function ComposerInput() {
 // Provider A: Local state for ephemeral forms
 function ForwardMessageProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState(initialState)
-  const inputRef = useRef(null)
+  const inputRef = useRef<TextInput>(null)
   const submit = useForwardMessage()
 
   return (
@@ -99,7 +104,7 @@ function ForwardMessageProvider({ children }: { children: React.ReactNode }) {
 // Provider B: Global synced state for channels
 function ChannelProvider({ channelId, children }: Props) {
   const { state, update, submit } = useGlobalChannel(channelId)
-  const inputRef = useRef(null)
+  const inputRef = useRef<TextInput>(null)
 
   return (
     <ComposerContext
@@ -172,13 +177,13 @@ function ForwardMessageDialog() {
 function ForwardButton() {
   const {
     actions: { submit },
-  } = use(ComposerContext)
+  } = useComposerContext()
   return <Button onPress={submit}>Forward</Button>
 }
 
 // This preview lives OUTSIDE Composer.Frame but can read composer's state!
 function MessagePreview() {
-  const { state } = use(ComposerContext)
+  const { state } = useComposerContext()
   return <Preview message={state.input} attachments={state.attachments} />
 }
 ```

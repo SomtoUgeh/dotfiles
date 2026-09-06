@@ -75,24 +75,26 @@ client.with_options(timeout=5, max_retries=0).zones.get(zone_id="zone-id")
 ```go
 client := cloudflare.NewClient(
     option.WithAPIToken(os.Getenv("CLOUDFLARE_API_TOKEN")),
-    option.WithMaxRetries(5),  // default 10 (higher than TS/Python)
-    option.WithRequestTimeout(2 * time.Minute),  // default 60s
+    option.WithMaxRetries(5),  // default 2
+    option.WithRequestTimeout(2 * time.Minute),  // per-attempt timeout; no Go timeout by default
     option.WithBaseURL("https://..."),  // proxy (rare)
 )
 
 // Per-request overrides
-client.Zones.Get(ctx, "zone-id", option.WithMaxRetries(0))
+client.Zones.Get(ctx, zones.ZoneGetParams{
+    ZoneID: cloudflare.F("zone-id"),
+}, option.WithMaxRetries(0))
 ```
 
 ## Configuration Options
 
 | Option | TypeScript | Python | Go | Default |
 |--------|-----------|--------|-----|---------|
-| Timeout | `timeout` (ms) | `timeout` (s) | `WithRequestTimeout` | 60s |
-| Retries | `maxRetries` | `max_retries` | `WithMaxRetries` | 2 (Go: 10) |
+| Timeout | `timeout` (ms) | `timeout` (s) | `WithRequestTimeout` | TS/Python: 60s; Go: none |
+| Retries | `maxRetries` | `max_retries` | `WithMaxRetries` | 2 |
 | Base URL | `baseURL` | `base_url` | `WithBaseURL` | api.cloudflare.com |
 
-**Note:** Go SDK has higher default retries (10) than TypeScript/Python (2).
+The current Go SDK defaults to two retries and no timeout. Use `context.WithTimeout` for the entire request including retries; `WithRequestTimeout` limits each attempt. [Go SDK](https://developers.cloudflare.com/api/go/)
 
 ## Timeout Configuration
 
@@ -131,7 +133,7 @@ export CLOUDFLARE_API_TOKEN='token'
 
 # Common commands that use API
 wrangler deploy              # Uploads worker via API
-wrangler kv:key put          # KV operations
+wrangler kv key put          # KV operations
 wrangler r2 bucket create    # R2 operations
 wrangler d1 execute          # D1 operations
 wrangler pages deploy        # Pages operations

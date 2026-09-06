@@ -1,105 +1,91 @@
 # Miniflare
 
-Local simulator for Cloudflare Workers development/testing. Runs Workers in workerd sandbox implementing runtime APIs - no internet required.
+Miniflare runs Workers locally in workerd. Select the API from the installed version before copying examples. On 2026-09-05, npm `latest` resolves to `5.20260903.0-alpha`; its constructor requires `workers` entries with a `config`. The older top-level `script`, `scriptPath`, and `kvNamespaces` examples do not work unchanged.
 
-## Features
+For applications with Wrangler config, prefer the verified [Wrangler integration test harness](../wrangler/api.md). For tests inside workerd, use the [Vitest integration](../wrangler/patterns.md#testing-with-vitest). Use direct Miniflare when you need low-level runtime configuration.
 
-- Full-featured: KV, Durable Objects, R2, D1, WebSockets, Queues
-- Fully-local: test without internet, instant reload
-- TypeScript-native: detailed logging, source maps
-- Advanced testing: dispatch events without HTTP, simulate Worker connections
+## Quick start: Miniflare 5
 
-## When to Use
-
-**Decision tree for testing Workers:**
-
-```
-Need to test Workers?
-│
-├─ Unit tests for business logic only?
-│  └─ getPlatformProxy (Vitest/Jest) → [patterns.md](./patterns.md#getplatformproxy)
-│     Fast, no HTTP, direct binding access
-│
-├─ Integration tests with full runtime?
-│  ├─ Single Worker?
-│  │  └─ Miniflare API → [Quick Start](#quick-start)
-│  │     Full control, programmatic access
-│  │
-│  ├─ Multiple Workers + service bindings?
-│  │  └─ Miniflare workers array → [configuration.md](./configuration.md#multiple-workers)
-│  │     Shared storage, inter-worker calls
-│  │
-│  └─ Vitest test runner integration?
-│     └─ vitest-pool-workers → [patterns.md](./patterns.md#vitest-pool-workers)
-│        Full Workers env in Vitest
-│
-└─ Local dev server?
-   └─ wrangler dev (not Miniflare)
-      Hot reload, automatic config
-```
-
-**Use Miniflare for:**
-- Integration tests with full Worker runtime
-- Testing bindings/storage locally
-- Multiple Workers with service bindings
-- Programmatic event dispatch (fetch, queue, scheduled)
-
-**Use getPlatformProxy for:**
-- Fast unit tests of business logic
-- Testing without HTTP overhead
-- Vitest/Jest environments
-
-**Use Wrangler for:**
-- Local development workflow
-- Production deployments
-
-## Setup
-
-```bash
-npm i -D miniflare
-```
-
-Requires ES modules in `package.json`:
-```json
-{"type": "module"}
-```
-
-## Quick Start
+The following example was run with `miniflare@5.20260903.0-alpha`:
 
 ```js
 import { Miniflare } from "miniflare";
+import assert from "node:assert/strict";
 
 const mf = new Miniflare({
-  modules: true,
-  script: `
-    export default {
-      async fetch(request, env, ctx) {
-        return new Response("Hello Miniflare!");
-      }
-    }
-  `,
+  port: 0,
+  cf: false,
+  workers: [{
+    config: {
+      name: "test",
+      type: "worker",
+      compatibilityDate: "2026-09-05",
+      manifest: {
+        mainModule: "index.js",
+        modules: {
+          "index.js": {
+            type: "esm",
+            contents: `export default {
+              async fetch(request, env) {
+                await env.KV.put("key", "value");
+                return new Response(await env.KV.get("key"));
+              }
+            }`,
+          },
+        },
+      },
+      env: { KV: { type: "kv", id: "test-kv" } },
+    },
+  }],
 });
-
-const res = await mf.dispatchFetch("http://localhost:8787/");
-console.log(await res.text()); // Hello Miniflare!
-await mf.dispose();
+try {
+  const response = await mf.dispatchFetch("http://test/");
+  assert.equal(await response.text(), "value");
+  const kv = await mf.getKVNamespace("KV");
+  assert.equal(await kv.get("key"), "value");
+} finally {
+  await mf.dispose();
+}
 ```
 
-## Reading Order
+Pin the version used for low-level tooling; an alpha API can change. Do not upgrade an existing project's major version merely to match this example. For a project still using v4, use its installed `MiniflareOptions` types and corresponding [upstream source](https://github.com/cloudflare/workers-sdk/tree/main/packages/miniflare).
 
-**New to Miniflare?** Start here:
-1. [Quick Start](#quick-start) - Running in 2 minutes
-2. [When to Use](#when-to-use) - Choose your testing approach
-3. [patterns.md](./patterns.md) - Testing patterns (getPlatformProxy, Vitest, node:test)
-4. [configuration.md](./configuration.md) - Configure bindings, storage, multiple workers
+For TypeScript host tests, also install a matching `@cloudflare/workers-types` package: Miniflare 5's declarations import its types, but the alpha package does not install it. Missing declarations can produce misleading return types when `skipLibCheck` hides the missing import. Use a Node TypeScript configuration for the test runner; keep generated Worker globals in the separate Worker configuration.
 
-**Troubleshooting:**
-- [gotchas.md](./gotchas.md) - Common errors and debugging
+Local execution is not inherently offline: Worker fetches, `cf: true`, and remote bindings can use the network. Mock outbound requests for isolated tests.
 
-**API reference:**
-- [api.md](./api.md) - Complete method reference
+- [Configuration](./configuration.md)
+- [API](./api.md)
+- [Testing patterns](./patterns.md)
+- [Troubleshooting](./gotchas.md)
 
-## See Also
-- [wrangler](../wrangler/) - CLI tool that embeds Miniflare for `wrangler dev`
-- [workerd](../workerd/) - Runtime that powers Miniflare
-- [workers](../workers/) - Workers runtime API documentation
+## Existing Miniflare 4 projects
+
+This recipe was separately executed against `miniflare@4.20260730.0` (the latest published v4 version at verification). It preserves that version's supported constructor contract:
+
+```js
+import { Miniflare } from "miniflare";
+import assert from "node:assert/strict";
+
+const mf = new Miniflare({
+  port: 0,
+  cf: false,
+  modules: true,
+  compatibilityDate: "2026-07-30",
+  kvNamespaces: ["KV"],
+  script: `export default {
+    async fetch(request, env) {
+      await env.KV.put("key", "value");
+      return new Response(await env.KV.get("key"));
+    }
+  }`,
+});
+try {
+  const response = await mf.dispatchFetch("http://test/");
+  assert.equal(await response.text(), "value");
+} finally {
+  await mf.dispose();
+}
+```
+
+For v4, file-based modules use `modules: true` with compiled `scriptPath`; named storage bindings use `kvNamespaces`, `r2Buckets`, or `d1Databases`, with their matching persistence options. SQL-backed Durable Objects use `{ className: "Counter", useSQLite: true }`. Check the installed v4 types for the full option set. These fields belong to v4 and must not be copied unchanged into v5.

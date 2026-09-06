@@ -1,78 +1,27 @@
-# Workerd Runtime
+# workerd runtime
 
-V8-based JS/Wasm runtime powering Cloudflare Workers. Use as app server, dev tool, or HTTP proxy.
+`workerd` is the JavaScript/Wasm runtime underlying Workers. Use Wrangler for normal Worker development and deployment, Miniflare for programmatic local testing, and raw workerd for self-hosting or runtime integration.
 
-## ⚠️ IMPORTANT SECURITY NOTICE
-**workerd is NOT a hardened sandbox.** Do not run untrusted code. It's designed for deploying YOUR code locally/self-hosted, not multi-tenant SaaS. Cloudflare production adds security layers not present in open-source workerd.
+The standalone runtime is not a hardened sandbox. Running potentially malicious code requires an appropriate additional security boundary, such as a VM; Cloudflare's hosted service supplies additional isolation layers. Capability bindings also require careful policy: public outbound networking is available by default.
 
-## Decision Tree: When to Use What
-
-**95% of users:** Use Wrangler
-- Local development: `wrangler dev` (uses workerd internally)
-- Deployment: `wrangler deploy` (deploys to Cloudflare)
-- Types: `wrangler types` (generates TypeScript types)
-
-**Use raw workerd directly only if:**
-- Self-hosting Workers runtime in production
-- Embedding runtime in C++ application
-- Custom tooling/testing infrastructure
-- Debugging workerd-specific behavior
-
-**Never use workerd for:**
-- Running untrusted/user-submitted code
-- Multi-tenant isolation (not hardened)
-- Production without additional security layers
-
-## Key Features
-- **Standards-based**: Fetch API, Web Crypto, Streams, WebSocket
-- **Nanoservices**: Service bindings with local call performance
-- **Capability security**: Explicit bindings prevent SSRF
-- **Backwards compatible**: Version = max compat date supported
-
-## Architecture
-```
-Config (workerd.capnp)
-├── Services (workers/endpoints)
-├── Sockets (HTTP/HTTPS listeners)
-└── Extensions (global capabilities)
-```
-
-## Quick Start
 ```bash
 workerd serve config.capnp
-workerd compile config.capnp myConfig -o binary
 workerd test config.capnp
+workerd compile config.capnp > app-server
+chmod +x app-server
 ```
 
-## Platform Support & Beta Status
+`compile` writes the binary to stdout; it does not accept `-o`. Test filtering uses service/entrypoint patterns, not `--test-only=test.js`.
 
-| Platform | Status | Notes |
-|----------|--------|-------|
-| Linux (x64) | Stable | Primary platform |
-| macOS (x64/ARM) | Stable | Full support |
-| Windows | Beta | Use WSL2 for best results |
-| Linux (ARM64) | Experimental | Limited testing |
+Use the installed release's Cap'n Proto schema and CLI help. Its release date determines the newest compatibility date it supports; earlier dates remain valid. Pin and test the binary version and compatibility date separately.
 
-workerd is in **active development**. Breaking changes possible. Pin versions in production.
+| Topic | Reference |
+|---|---|
+| Services, sockets, bindings, storage | [configuration.md](configuration.md) |
+| Handlers, RPC, runtime APIs | [api.md](api.md) |
+| Tests, deployment, multi-service use | [patterns.md](patterns.md) |
+| Syntax, networking, storage failures | [gotchas.md](gotchas.md) |
 
-## Core Concepts
-- **Service**: Named endpoint (worker/network/disk/external)
-- **Binding**: Capability-based resource access (KV/DO/R2/services)
-- **Compatibility date**: Feature gate (always set!)
-- **Modules**: ES modules (recommended) or service worker syntax
+Upstream currently tests Linux and macOS on x86-64/arm64 and Windows on x86-64. Verify the specific release's OS dependencies rather than relying on an old beta/stable matrix.
 
-## Reading Order (Progressive Disclosure)
-
-**Start here:**
-1. This README (overview, decision tree)
-2. [patterns.md](./patterns.md) - Common workflows, framework examples
-
-**When you need details:**
-3. [configuration.md](./configuration.md) - Config format, services, bindings
-4. [api.md](./api.md) - Runtime APIs, TypeScript types
-5. [gotchas.md](./gotchas.md) - Common errors, debugging
-
-## Related References
-- [workers](../workers/) - Workers runtime API documentation
-- [miniflare](../miniflare/) - Testing tool built on workerd
-- [wrangler](../wrangler/) - CLI that uses workerd for local dev
+[Upstream README](https://github.com/cloudflare/workerd/blob/main/README.md) · [Configuration schema](https://github.com/cloudflare/workerd/blob/main/src/workerd/server/workerd.capnp) · [Wrangler](../wrangler/) · [Miniflare](../miniflare/)

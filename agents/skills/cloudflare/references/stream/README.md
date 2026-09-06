@@ -37,7 +37,7 @@ Cloudflare Stream provides video upload, storage, encoding, and delivery without
 
 ### Live Streaming
 - RTMPS/SRT ingest from OBS, FFmpeg
-- Automatic recording to on-demand
+- Automatic recording to on-demand for RTMP/SRT; current WHIP/WHEP does not record
 - Simulcast to YouTube, Twitch, etc.
 - WebRTC support for browser streaming
 
@@ -80,8 +80,10 @@ curl -X POST \
 
 ## Pricing
 
-- $5/1000 min stored
-- $1/1000 min delivered
+- $5 per 1,000 minutes of storage capacity
+- $1 per 1,000 minutes delivered
+
+Verified 2026-09-05: WebRTC delivery billing is announced for October 15, 2026. See [current pricing](https://developers.cloudflare.com/stream/pricing/).
 
 ## Resources
 
@@ -111,4 +113,4 @@ curl -X POST \
 
 - [workers](../workers/) - Deploy Stream APIs in Workers
 - [pages](../pages/) - Integrate Stream with Pages
-- [workers-ai](../workers-ai/) - AI-generate captions
+- [Captions](https://developers.cloudflare.com/stream/manage-video-library/adding-captions/) - Stream caption generation API

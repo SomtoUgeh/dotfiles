@@ -6,13 +6,15 @@ Touch devices, mobile considerations, keyboard navigation, and accessibility.
 
 ### Hover Effects
 
-Disable hover effects on touch devices. Touch devices trigger hover on tap, causing false positives:
+Disable hover effects on touch devices. Touch devices trigger hover on tap,
+causing false positives. Keep spatial hover motion small and contextual, and
+omit it when reduced motion is requested:
 
 ```css
-/* Only apply hover on devices that support it */
-@media (hover: hover) and (pointer: fine) {
-  .element:hover {
-    transform: scale(1.05);
+/* Opt in only on precise pointers when spatial motion is acceptable. */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .element--hover-scale:hover {
+    transform: scale(1.02);
   }
 }
 ```
@@ -41,7 +43,11 @@ button, a, input {
 
 ### Tap Targets
 
-Ensure minimal tap target of all buttons on touch devices is at least 44px:
+WCAG 2.2 Level AA requires pointer targets to be at least 24×24 CSS pixels or
+meet a listed spacing or other exception. For touch-heavy controls, aim for a
+comfortable 44×44px hit area; 44×44 is also the WCAG enhanced Level AAA target,
+not the Level AA minimum. See [focused-polish.md](focused-polish.md#pointer-target-sizes)
+for the standards and platform distinction.
 
 ```css
 .icon-button {
@@ -51,7 +57,7 @@ Ensure minimal tap target of all buttons on touch devices is at least 44px:
   position: relative;
 }
 
-/* But hit area should be 44px */
+/* Comfortable touch target */
 .icon-button::before {
   content: '';
   position: absolute;
@@ -115,7 +121,7 @@ Ensure keyboard navigation scrolls elements into view if needed:
 ```jsx
 function handleFocus(e) {
   e.target.scrollIntoView({
-    behavior: 'smooth',
+    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
     block: 'nearest',
   });
 }
@@ -159,42 +165,11 @@ See [animations.md](animations.md) for `prefers-reduced-motion` implementation. 
 
 ### Videos
 
-For users who prefer reduced motion, show play buttons instead of autoplaying videos:
-
-```jsx
-const prefersReducedMotion = window.matchMedia(
-  '(prefers-reduced-motion: reduce)'
-).matches;
-
-<video
-  autoPlay={!prefersReducedMotion}
-  controls={prefersReducedMotion}
-  muted
-  playsinline
-/>
-```
+Use the tested [media recipe](../animation-accessibility/SNIPPETS.md#autoplaying-video): native controls remain available, play() rejection is handled, and enabling reduced motion pauses ongoing playback. In React, use `playsInline`, not the HTML spelling `playsinline`; read browser preferences through an SSR-safe subscription, not `window` during render.
 
 ### Time-Limited Actions
 
-Ensure any time-limited action is frozen when the user switches tabs. Use the `visibilitychange` event:
-
-```js
-let timeoutId;
-let remainingTime;
-let startTime;
-
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
-    // Pause the timer
-    clearTimeout(timeoutId);
-    remainingTime -= Date.now() - startTime;
-  } else {
-    // Resume the timer
-    startTime = Date.now();
-    timeoutId = setTimeout(callback, remainingTime);
-  }
-});
-```
+Distinguish a pausable local presentation timer from a server-authoritative deadline. A session/token expiry, auction, or security timeout must retain its real deadline while the tab is hidden. For pausable UI, initialize the remaining duration and start time, pause on visibilitychange, clamp remaining time to zero, and clean up the timer and listener on unmount. Do not copy an uninitialized countdown or reset an authoritative expiry.
 
 ## Feedback
 
@@ -223,14 +198,4 @@ const [isWarm, setIsWarm] = useState(false);
 
 ### Submenus
 
-Apply a safe-area for submenus using clippath to ensure diagonal movement works. Users should be able to move diagonally from parent menu to submenu without the submenu closing.
-
-```css
-.submenu-trigger::after {
-  content: '';
-  position: absolute;
-  /* Creates a "safe zone" for cursor movement */
-  clip-path: polygon(0 0, 100% 0, 100% 100%);
-  /* Adjust based on submenu position */
-}
-```
+Use the installed menu primitive's pointer-grace behavior when available. A clip-path pseudo-element alone does not implement submenu intent: it needs real hit-area dimensions, correct positioning, and state/lifecycle behavior. Test diagonal movement, keyboard navigation, touch, and collision flips in the real component.

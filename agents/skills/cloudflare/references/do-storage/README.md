@@ -18,7 +18,9 @@ DO Storage provides:
 ## Quick Start
 
 ```typescript
-export class Counter extends DurableObject {
+import { DurableObject } from "cloudflare:workers";
+
+export class Counter extends DurableObject<Env> {
   sql: SqlStorage;
   
   constructor(ctx: DurableObjectState, env: Env) {
@@ -28,11 +30,11 @@ export class Counter extends DurableObject {
   }
   
   async increment(): Promise<number> {
-    const result = this.sql.exec(
+    const result = this.sql.exec<{ value: number }>(
       'INSERT INTO data VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = value + 1 RETURNING value',
       'counter', 1
     ).one();
-    return result?.value || 1;
+    return result.value;
   }
 }
 ```
@@ -41,8 +43,8 @@ export class Counter extends DurableObject {
 
 | Backend | Create Method | APIs | PITR |
 |---------|---------------|------|------|
-| SQLite (recommended) | `new_sqlite_classes` | SQL + sync KV + async KV | ✅ |
-| KV (legacy) | `new_classes` | async KV only | ❌ |
+| SQLite (recommended) | `exports` with `"storage": "sqlite"` | SQL + sync KV + async KV | ✅ |
+| KV (legacy deployments) | `new_classes` migration | async KV only | ❌ |
 
 ## Core APIs
 
@@ -62,11 +64,11 @@ export class Counter extends DurableObject {
 
 ## In This Reference
 
-- [configuration.md](./configuration.md) - wrangler.jsonc migrations, SQLite vs KV setup, RPC binding
+- [configuration.md](./configuration.md) - wrangler.jsonc lifecycle exports, legacy migrations, SQLite vs KV setup, RPC binding
 - [api.md](./api.md) - SQL exec/cursors, KV methods, storage options, transactions, alarms, PITR
 - [patterns.md](./patterns.md) - Schema migrations, caching, rate limiting, batch processing, parent-child coordination
 - [gotchas.md](./gotchas.md) - Concurrency gates, INTEGER precision, transaction rules, SQL limits
-- [testing.md](./testing.md) - vitest-pool-workers setup, testing DOs with SQL/alarms/PITR
+- [testing.md](./testing.md) - vitest-plugin setup, testing DOs with SQL/alarms/PITR
 
 ## See Also
 

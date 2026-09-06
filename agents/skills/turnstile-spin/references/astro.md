@@ -1,6 +1,8 @@
 # Astro
 
-For Astro projects. The widget renders in a page; siteverify lives in an Astro Action, an API route, or a Pages Function. Astro frontmatter reads the sitekey from env at build time; the secret stays server-only.
+Copy [verify-turnstile.ts](../templates/verify-turnstile.ts) to `src/lib/server/verify-turnstile.ts` before using the backend examples. Keep it server-only and preserve the handler's existing inputs and business logic. Configure the exact frontend hostnames for each deployment; production must exclude local-development hosts.
+
+These native-page examples assume full-document navigation. If the project uses ClientRouter, preserve that routing choice and use the component lifecycle pattern below. For Astro projects. The widget renders in a page; siteverify lives in an Astro Action, an API route, or a Pages Function. Astro frontmatter reads the sitekey from env at build time; the secret stays server-only.
 
 ```astro title="src/pages/signup.astro"
 ---
@@ -9,7 +11,7 @@ const SITEKEY = import.meta.env.PUBLIC_TURNSTILE_SITEKEY;
 
 <html>
 	<head>
-		<script
+		<script is:inline
 			src="https://challenges.cloudflare.com/turnstile/v0/api.js"
 			async
 			defer
@@ -40,39 +42,26 @@ The `PUBLIC_` prefix is mandatory for client-exposed variables in Astro. The sec
 
 ## API route (canonical siteverify)
 
+This endpoint needs an installed deployment adapter and on-demand rendering. `prerender = false` prevents the route from becoming a static build artifact. See the [Astro rendering guide](https://docs.astro.build/en/guides/on-demand-rendering/).
+
 ```ts title="src/pages/api/signup.ts"
 import type { APIRoute } from "astro";
+import { verifyTurnstile } from "../../lib/server/verify-turnstile";
+export const prerender = false;
 
-const expectedHostnames = new Set(
-	(import.meta.env.TURNSTILE_HOSTNAMES ?? "")
-		.split(",")
-		.map((h) => h.trim())
-		.filter(Boolean),
-);
 
-export const POST: APIRoute = async ({ request, clientAddress }) => {
-	const form = await request.formData();
+export const POST: APIRoute = async ({ request }) => {
+	let form: FormData;
+	try { form = await request.formData(); } catch { return new Response("invalid form", { status: 400 }); }
 	const token = form.get("cf-turnstile-response");
-	if (typeof token !== "string" || expectedHostnames.size === 0) {
+	if (typeof token !== "string") {
 		return new Response("forbidden", { status: 403 });
 	}
 
-	const verify = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-		method: "POST",
-		headers: { "Content-Type": "application/x-www-form-urlencoded" },
-		body: new URLSearchParams({
-			secret: import.meta.env.TURNSTILE_SECRET,
-			response: token,
-			remoteip: clientAddress,
-		}),
-	});
-	const result = await verify.json();
-	if (
-		verify.ok !== true ||
-		result.success !== true ||
-		result.action !== "signup" ||
-		!expectedHostnames.has(result.hostname)
-	) {
+	if (!await verifyTurnstile({
+		token, secret: import.meta.env.TURNSTILE_SECRET,
+		hostnames: import.meta.env.TURNSTILE_HOSTNAMES, action: "signup",
+	})) {
 		return new Response("forbidden", { status: 403 });
 	}
 
@@ -86,42 +75,24 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
 If the project uses Astro Actions, call siteverify from the action:
 
 ```ts title="src/actions/index.ts"
-import { defineAction } from "astro:actions";
-import { z } from "astro:schema";
+import { ActionError, defineAction } from "astro:actions";
+import { z } from "astro/zod";
+import { verifyTurnstile } from "../lib/server/verify-turnstile";
 
-const expectedHostnames = new Set(
-	(import.meta.env.TURNSTILE_HOSTNAMES ?? "")
-		.split(",")
-		.map((h) => h.trim())
-		.filter(Boolean),
-);
 
 export const server = {
 	signup: defineAction({
 		accept: "form",
 		input: z.object({
-			email: z.string().email(),
-			"cf-turnstile-response": z.string(),
+			email: z.email(),
+			"cf-turnstile-response": z.string().min(1).max(2048),
 		}),
-		handler: async (input, ctx) => {
-			if (expectedHostnames.size === 0) throw new Error("Verification failed");
-			const verify = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-				method: "POST",
-				headers: { "Content-Type": "application/x-www-form-urlencoded" },
-				body: new URLSearchParams({
-					secret: import.meta.env.TURNSTILE_SECRET,
-					response: input["cf-turnstile-response"],
-					remoteip: ctx.clientAddress,
-				}),
-			});
-			const result = await verify.json();
-			if (
-				verify.ok !== true ||
-				result.success !== true ||
-				result.action !== "signup" ||
-				!expectedHostnames.has(result.hostname)
-			) {
-				throw new Error("Verification failed");
+		handler: async (input) => {
+			if (!await verifyTurnstile({
+				token: input["cf-turnstile-response"], secret: import.meta.env.TURNSTILE_SECRET,
+				hostnames: import.meta.env.TURNSTILE_HOSTNAMES, action: "signup",
+			})) {
+				throw new ActionError({ code: "FORBIDDEN", message: "Verification failed" });
 			}
 			// process signup
 		},
@@ -134,60 +105,88 @@ export const server = {
 For a client-side Astro Action, replace the native form and script with an explicit widget. Retain this surface's widget ID and reset it in `finally` after every same-page request completion:
 
 ```astro
-<form id="signup-action-form">
-	<input name="email" type="email" required />
-	<div id="signup-action-turnstile" data-sitekey={SITEKEY}></div>
-	<button type="submit">Sign up</button>
-</form>
+<turnstile-signup>
+  <form>
+    <input name="email" type="email" required />
+    <div data-turnstile data-sitekey={SITEKEY}></div>
+    <p role="alert" data-error></p>
+    <button type="submit" disabled>Sign up</button>
+  </form>
+</turnstile-signup>
 <script>
-	import { actions } from "astro:actions";
+  import { actions } from "astro:actions";
+  type TurnstileApi = {
+    render(container: HTMLElement, options: {
+      sitekey: string; action: string; callback(token: string): void;
+      "expired-callback"(): void; "error-callback"(): void;
+    }): string;
+    reset(id: string): void;
+    remove(id: string): void;
+  };
+  declare global { interface Window { turnstile?: TurnstileApi } }
 
-	type TurnstileApi = {
-		render: (
-			container: HTMLElement,
-			options: { sitekey: string; action: string },
-		) => string;
-		reset: (widgetId: string) => void;
-	};
-
-	const turnstileWindow = window as Window & { turnstile?: TurnstileApi };
-	const form = document.getElementById("signup-action-form") as HTMLFormElement;
-	const container = document.getElementById("signup-action-turnstile") as HTMLElement;
-	let signupActionWidgetId: string | undefined;
-
-	const renderWidget = () => {
-		if (!turnstileWindow.turnstile) return;
-		signupActionWidgetId = turnstileWindow.turnstile.render(container, {
-			sitekey: container.dataset.sitekey!,
-			action: "signup",
-		});
-	};
-
-	if (turnstileWindow.turnstile) {
-		renderWidget();
-	} else {
-		const script = document.createElement("script");
-		script.src =
-			"https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
-		script.async = true;
-		script.addEventListener("load", renderWidget, { once: true });
-		document.head.appendChild(script);
-	}
-
-	form.addEventListener("submit", async (event) => {
-		event.preventDefault();
-		try {
-			const { error } = await actions.signup(new FormData(form));
-			if (error) throw error;
-			// proceed
-		} catch {
-			// surface the error
-		} finally {
-			if (signupActionWidgetId !== undefined) {
-				turnstileWindow.turnstile?.reset(signupActionWidgetId);
-			}
-		}
-	});
+  class TurnstileSignup extends HTMLElement {
+    cleanup?: () => void;
+    connectedCallback() {
+      this.cleanup?.();
+      const form = this.querySelector("form");
+      const container = this.querySelector<HTMLElement>("[data-turnstile]");
+      const button = this.querySelector("button");
+      const error = this.querySelector<HTMLElement>("[data-error]");
+      if (!form || !container?.dataset.sitekey || !button || !error) return;
+      const sitekey = container.dataset.sitekey;
+      let id: string | undefined;
+      let token = "";
+      let pending = false;
+      const setToken = (value: string) => { token = value; button.disabled = pending || !token; };
+      const renderWidget = () => {
+        if (!this.isConnected || !window.turnstile || id !== undefined) return;
+        id = window.turnstile.render(container, {
+          sitekey, action: "signup", callback: setToken,
+          "expired-callback": () => setToken(""), "error-callback": () => setToken(""),
+        });
+      };
+      let script = document.querySelector<HTMLScriptElement>('script[src^="https://challenges.cloudflare.com/turnstile/v0/api.js"]');
+      if (window.turnstile) renderWidget();
+      else {
+        const needsScript = !script;
+        script ??= document.createElement("script");
+        script.addEventListener("load", renderWidget);
+        if (needsScript) {
+          script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+          script.async = true;
+          document.head.appendChild(script);
+        }
+      }
+      const submit = async (event: SubmitEvent) => {
+        event.preventDefault();
+        if (pending || !token) return;
+        pending = true;
+        button.disabled = true;
+        error.textContent = "";
+        try {
+          const result = await actions.signup(new FormData(form));
+          if (result.error) throw result.error;
+          // Continue the existing successful submission flow.
+        } catch {
+          error.textContent = "Submission failed. Please retry.";
+        } finally {
+          pending = false;
+          setToken("");
+          if (id !== undefined && this.isConnected) window.turnstile?.reset(id);
+        }
+      };
+      form.addEventListener("submit", submit);
+      this.cleanup = () => {
+        script?.removeEventListener("load", renderWidget);
+        form.removeEventListener("submit", submit);
+        if (id !== undefined) window.turnstile?.remove(id);
+        id = undefined;
+      };
+    }
+    disconnectedCallback() { this.cleanup?.(); this.cleanup = undefined; }
+  }
+  if (!customElements.get("turnstile-signup")) customElements.define("turnstile-signup", TurnstileSignup);
 </script>
 ```
 

@@ -26,7 +26,7 @@ export class MyAgent extends Agent<Env, State> {
 const count = this.state.count;
 
 // Write (sync, persists, broadcasts)
-this.setState({ count: this.state.count + 1 });
+this.setState({ ...this.state, count: this.state.count + 1 });
 ```
 
 ### Validation Hook
@@ -46,15 +46,16 @@ validateStateChange(nextState: State, source: Connection | "server") {
 1. `validateStateChange(nextState, source)` - sync, gating
 2. State persisted to SQLite
 3. State broadcast to connected clients
-4. `onStateUpdate(nextState, source)` - async via `ctx.waitUntil`, non-gating
+4. `onStateChanged(nextState, source)` - async via `ctx.waitUntil`, non-gating
 
 ### Client-Side Sync (React)
 
 ```tsx
+import { useState } from "react";
 import { useAgent } from "agents/react";
 
 function App() {
-  const [state, setLocalState] = useState<State>({ count: 0 });
+  const [state, setLocalState] = useState<State>({ count: 0, items: [] });
   
   const agent = useAgent<State>({
     agent: "MyAgent",
@@ -62,7 +63,7 @@ function App() {
     onStateUpdate: (newState) => setLocalState(newState)
   });
 
-  return <button onClick={() => agent.setState({ count: state.count + 1 })}>
+  return <button onClick={() => agent.setState({ ...state, count: state.count + 1 })}>
     Count: {state.count}
   </button>;
 }
@@ -159,7 +160,7 @@ export class MyAgent extends Agent<Env, State> {
     // WebSocket message (non-RPC)
   }
 
-  onStateUpdate(state: State, source: Connection | "server") {
+  onStateChanged(state: State, source: Connection | "server") {
     // State changed (async, non-blocking)
   }
 

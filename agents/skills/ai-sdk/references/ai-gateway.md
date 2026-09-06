@@ -22,8 +22,11 @@ The AI Gateway is the default global provider, so you can access models using a 
 ```ts
 import { generateText } from 'ai';
 
+const modelId = process.env.AI_GATEWAY_MODEL;
+if (!modelId) throw new Error('AI_GATEWAY_MODEL is required');
+
 const { text } = await generateText({
-  model: 'anthropic/claude-sonnet-4.5',
+  model: modelId,
   prompt: 'What is love?',
 });
 ```
@@ -31,13 +34,16 @@ const { text } = await generateText({
 You can also explicitly import and use the gateway provider:
 
 ```ts
+const modelId = process.env.AI_GATEWAY_MODEL;
+if (!modelId) throw new Error('AI_GATEWAY_MODEL is required');
+
 // Option 1: Import from 'ai' package (included by default)
 import { gateway } from 'ai';
-model: gateway('anthropic/claude-sonnet-4.5');
+model: gateway(modelId);
 
 // Option 2: Install and import from '@ai-sdk/gateway' package
 import { gateway } from '@ai-sdk/gateway';
-model: gateway('anthropic/claude-sonnet-4.5');
+model: gateway(modelId);
 ```
 
 ## Find Available Models
@@ -63,4 +69,6 @@ curl -s https://ai-gateway.vercel.sh/v1/models | jq -r '[.data[] | select(.id | 
 curl -s https://ai-gateway.vercel.sh/v1/models | jq -r '[.data[] | select(.id | startswith("google/")) | .id] | reverse | .[]'
 ```
 
-When multiple versions of a model exist, use the one with the highest version number (e.g., prefer `anthropic/claude-sonnet-4.6` over `anthropic/claude-sonnet-4.5` over `claude-sonnet-4`).
+Choose a model that supports the task's required capabilities and is available to
+the project. Preserve the user's provider and model choice when one is already
+configured; do not replace it merely because another identifier sorts later.

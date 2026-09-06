@@ -1,9 +1,11 @@
 ---
 name: minimalist-ui
-description: Clean editorial-style interfaces. Warm monochrome palette, typographic contrast, flat bento grids, muted pastels. No gradients, no heavy shadows.
+description: Apply a clean editorial minimalist web style with warm monochrome color, flat grids, and restrained surfaces when the user explicitly requests that aesthetic.
 ---
 
 # Protocol: Premium Utilitarian Minimalism UI Architect
+
+Preserve the user's brand, real content, existing components, and licensed assets. These are style defaults. Follow the [canonical motion policy](../animate/references/canonical-policy.md), including static states and reduced motion.
 
 ## 1. Protocol Overview
 Name: Premium Utilitarian Minimalism & Editorial UI
@@ -63,16 +65,16 @@ Color is a scarce resource, utilized only for semantic meaning or subtle accents
 ## 6. Iconography & Imagery Directives
 - System Icons: Use "Phosphor Icons (Bold or Fill weights)" or "Radix UI Icons" for a technical, slightly thicker-stroke aesthetic. Standardize stroke width across all icons.
 - Illustrations: Monochromatic, rough continuous-line ink sketches on a white background, featuring a single offset geometric shape filled with a muted pastel color.
-- Photography: Use high-quality, desaturated images with a warm tone. Apply subtle overlays (`opacity: 0.04` warm grain) to blend photos into the monochrome palette. Never use oversaturated stock photos. Use reliable placeholders like `https://picsum.photos/seed/{context}/1200/800` when real assets are unavailable.
+- Photography: Use high-quality, desaturated images with a warm tone. Apply subtle overlays (`opacity: 0.04` warm grain) to blend photos into the monochrome palette. Never use oversaturated stock photos. Use project assets or clearly labelled placeholders; introduce remote image dependencies only when they fit the task and its privacy/loading constraints.
 - Hero & Section Backgrounds: Sections should not feel empty and flat. Use subtle full-width background imagery at very low opacity, soft radial light spots (`radial-gradient` with warm tones at `opacity: 0.03`), or minimal geometric line patterns to add depth without breaking the clean aesthetic.
 
 ## 7. Subtle Motion & Micro-Animations
 Motion should feel invisible — present but never distracting. The goal is quiet sophistication, not spectacle.
 - Scroll Entry: Elements fade in gently as they enter the viewport. Use `translateY(12px)` + `opacity: 0` resolving over `600ms` with `cubic-bezier(0.16, 1, 0.3, 1)`. Use `IntersectionObserver`, never `window.addEventListener('scroll')`.
 - Hover States: Cards lift with an ultra-subtle shadow shift (`box-shadow` transitioning from `0 0 0` to `0 2px 8px rgba(0,0,0,0.04)` over `200ms`). Buttons respond with `scale(0.98)` on `:active`.
-- Staggered Reveals: Lists and grid items enter with a cascade delay (`animation-delay: calc(var(--index) * 80ms)`). Never mount everything at once.
+- Staggered Reveals: Lists and grid items enter with a cascade delay (`animation-delay: calc(var(--index) * 80ms)`). Keep content available immediately; omit decorative staggering under reduced motion.
 - Background Ambient Motion: Optional. A single, very slow-moving radial gradient blob (`animation-duration: 20s+`, `opacity: 0.02-0.04`) drifting behind hero sections. Must be applied to a `position: fixed; pointer-events: none` layer. Never on scrolling containers.
-- Performance: Animate exclusively via `transform` and `opacity`. No layout-triggering properties (`top`, `left`, `width`, `height`). Use `will-change: transform` sparingly and only on actively animating elements.
+- Performance: Prefer transform/opacity when they preserve geometry; profile other properties and add will-change only after demonstrating a benefit.
 
 ## 8. Execution Protocol
 When tasked with writing frontend code (HTML, React, Tailwind, Vue) or designing a layout:
@@ -80,6 +82,6 @@ When tasked with writing frontend code (HTML, React, Tailwind, Vue) or designing
 2. Constrain the main typography content width to `max-w-4xl` or `max-w-5xl`.
 3. Apply the custom typographic hierarchy and monochromatic color variables immediately.
 4. Ensure every card, divider, and border adheres strictly to the `1px solid #EAEAEA` rule.
-5. Add scroll-entry animations to all major content blocks.
+5. Add only purposeful motion; verify reduced-motion, keyboard/touch, and no-JavaScript states.
 6. Ensure sections have visual depth through imagery, ambient gradients, or subtle textures — no empty flat backgrounds.
 7. Provide code that reflects this high-end, uncluttered, editorial aesthetic natively without requiring manual adjustments.

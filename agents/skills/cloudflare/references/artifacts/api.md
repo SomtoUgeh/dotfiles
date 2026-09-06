@@ -14,6 +14,7 @@ Artifacts exposes a Worker binding on `env.ARTIFACTS`.
 |--------|---------|
 | `create(name, opts?)` | Create a repo and receive its initial remote and token |
 | `get(name)` | Resolve a repo handle for repo-scoped operations |
+| `import(params)` | Import a public HTTPS remote using source/target options |
 | `list(opts?)` | List repos in a namespace |
 | `delete(name)` | Delete a repo |
 
@@ -26,27 +27,34 @@ const repo = await env.ARTIFACTS.get("starter-repo");
 const page = await env.ARTIFACTS.list({ limit: 10 });
 ```
 
-Use the REST API when you need to import a repo from another HTTPS remote.
+The binding also supports imports:
+
+```typescript
+const imported = await env.ARTIFACTS.import({
+  source: { url: "https://github.com/cloudflare/workers-sdk", branch: "main", depth: 1 },
+  target: { name: "workers-sdk-copy", opts: { readOnly: true } }
+});
+```
+
+Only import an intended, authorized source. The service import does not authorize local checkout or dependency execution.
 
 ### Repo Handle Methods
 
-Use a repo handle returned by `get()` or `create()`.
+`get()` returns the repo handle and throws for missing or still-importing/forking repos. `create()`, `import()`, and `fork()` return metadata plus the initial token, not a handle.
 
 | Method | Use For |
 |--------|---------|
-| `info()` | Read repo metadata, including the remote URL |
+| `remote`, `name`, `defaultBranch` | Metadata properties on the handle |
 | `createToken(scope?, ttl?)` | Mint a repo-scoped read or write token |
 | `listTokens()` | Inspect active tokens |
-| `validateToken(token)` | Check whether a token is still valid |
 | `revokeToken(tokenOrId)` | Revoke a token by ID or value |
 | `fork(name, opts?)` | Fork one repo into another |
 
 ```typescript
 const repo = await env.ARTIFACTS.get("starter-repo");
-if (!repo) throw new Error("Repo not found");
-
-const info = await repo.info();
+const remote = repo.remote;
 const token = await repo.createToken("read", 3600);
+// token.plaintext is the Git credential; token.expiresAt is its expiry.
 const forked = await repo.fork("starter-repo-copy", {
   defaultBranchOnly: true
 });
@@ -54,27 +62,23 @@ const forked = await repo.fork("starter-repo-copy", {
 
 ### Binding Notes
 
-- Current docs describe the runtime binding surface as `create`, `get`, `list`, `delete`, and repo-handle methods like `info`, `createToken`, and `fork`.
-- Use `npx wrangler types` in the target project and treat the generated `worker-configuration.d.ts` as the source of truth for that environment.
-- If generated types appear to expose `import()` or a different `get()` shape, verify the live docs before depending on those methods.
+The examples are checked against `@cloudflare/workers-types` 5.20260905.1. Regenerate types with `wrangler types` for the target project. `info()` and `validateToken()` are not methods in these types. The live binding docs also describe commit/tree methods absent from this type release; verify the generated runtime surface before using those additions.
 
-Verify current runtime behavior in the live docs before depending on methods that are not shown in the Workers binding reference.
+Catch binding errors at the route boundary, distinguish `NOT_FOUND` from in-progress and service failures, and authorize callers before creating repos or returning tokens. Never log plaintext credentials.
 
 ## REST API
 
 Artifacts currently documents a namespace-scoped control plane:
 
 ```txt
-https://artifacts.cloudflare.net/v1/api/namespaces/$ARTIFACTS_NAMESPACE
+https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/artifacts/namespaces/$ARTIFACTS_NAMESPACE
 ```
 
-Some deployments also expose an `/edge/v1/api/...` base path. Verify the correct base URL for your environment in the live docs.
-
-Requests to the standard `/v1/api/...` routes use a **gateway JWT** with Bearer authentication.
+Requests use a Cloudflare API token with Bearer authentication. The gateway JWT and `/edge/v1` routes in older drafts are not the current public API.
 
 Returned repo tokens authenticate **Git operations** against the repo `remote`. They do not authenticate REST control-plane requests.
 
-Current docs show the standard Cloudflare v4 response envelope around REST results.
+JSON results use the standard Cloudflare v4 envelope. Check HTTP status and `success`; file/blob/raw endpoints return bytes on success.
 
 ### Repo Routes
 
@@ -89,12 +93,12 @@ Current docs show the standard Cloudflare v4 response envelope around REST resul
 
 ```bash
 curl --request POST "$ARTIFACTS_BASE_URL/repos" \
-  --header "Authorization: Bearer $ARTIFACTS_JWT" \
+  --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
   --header "Content-Type: application/json" \
   --data '{"name":"starter-repo"}'
 ```
 
-Important current details from the docs draft:
+Current REST details:
 - `POST /repos/:name/import` accepts a full HTTPS remote URL such as GitHub or GitLab.
 - Import supports options such as `branch`, `depth`, and `read_only`.
 - Repo metadata includes fields such as description, default branch, timestamps, and the Git `remote`.
@@ -121,8 +125,10 @@ Recommended current auth pattern for local workflows:
 git -c http.extraHeader="Authorization: Bearer $ARTIFACTS_TOKEN" clone "$ARTIFACTS_REMOTE" artifacts-clone
 ```
 
-Use a self-contained Basic-auth remote only for short-lived commands that need credentials embedded in the URL.
+Keep credentials out of persisted remote URLs. Header-based command arguments can still be visible in process listings; use an appropriate credential helper for long-running shared environments.
 
 `read` tokens support `clone`, `fetch`, and `pull`. `git push` requires a `write` token.
 
 For large repos where startup time matters more than a full clone, Artifacts also documents **ArtifactFS**. Retrieve current details from `https://developers.cloudflare.com/artifacts/` when you need mount-style access.
+
+[Current binding API](https://developers.cloudflare.com/artifacts/api/workers-binding/) · [Current REST API](https://developers.cloudflare.com/artifacts/api/rest-api/) · [Authentication](https://developers.cloudflare.com/artifacts/guides/authentication/)

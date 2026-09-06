@@ -12,11 +12,12 @@ await step.sleep('description', '1 hour');
 await step.sleep('description', 5000); // ms
 
 // step.sleepUntil()
-await step.sleepUntil('description', Date.parse('2024-12-31'));
+await step.sleepUntil('description', Date.parse(event.payload.deadline));
 
 // step.waitForEvent()
-const data = await step.waitForEvent<PayloadType>('wait', {type: 'webhook-type', timeout: '24h'});
-try { const event = await step.waitForEvent('wait', { type: 'approval', timeout: '1h' }); } catch (e) { /* Timeout */ }
+const received = await step.waitForEvent<PayloadType>('wait', {type: 'webhook-type', timeout: '24 hours'});
+const data = received.payload;
+try { const event = await step.waitForEvent('wait', { type: 'approval', timeout: '1 hours' }); } catch (e) { /* Timeout */ }
 ```
 
 ## WorkflowStepContext
@@ -41,7 +42,7 @@ await step.do('call api', { retries: { limit: 3, delay: '5 seconds', backoff: 'e
   if (ctx.attempt > 1) console.log(`Retry attempt ${ctx.attempt} for step "${ctx.step.name}"`);
   const res = await fetch('https://api.example.com/data');
   if (!res.ok) throw new Error(`API failed (attempt ${ctx.attempt})`);
-  return res.json();
+  return res.text(); // Validate against your schema when decoding JSON.
 });
 
 ```
@@ -56,7 +57,7 @@ const instance = await env.MY_WORKFLOW.create({id: crypto.randomUUID(), params: 
 const instance = await env.MY_WORKFLOW.create({
   id: crypto.randomUUID(),
   params: { userId: 'user123' },
-  retention: '30 days'  // Override default retention period
+  retention: { successRetention: '30 days', errorRetention: '30 days' }
 });
 
 // Batch (max 100, idempotent: skips existing IDs)
@@ -80,15 +81,19 @@ await instance.sendEvent({type: 'approval', payload: { approved: true }}); // Mu
 export default { async fetch(req, env) { const instance = await env.MY_WORKFLOW.create({id: crypto.randomUUID(), params: { userId: 'user123' }}); return Response.json({ id: instance.id }); }};
 
 // From Queue
-export default { async queue(batch, env) { for (const msg of batch.messages) { await env.MY_WORKFLOW.create({id: `job-${msg.id}`, params: msg.body}); } }};
+export default { async queue(batch, env) { for (const msg of batch.messages) { await env.MY_WORKFLOW.createBatch([{id: `job-${msg.id}`, params: msg.body}]); msg.ack(); } }};
 
 // From Cron
-export default { async scheduled(event, env) { await env.CLEANUP_WORKFLOW.create({id: `cleanup-${Date.now()}`, params: { timestamp: event.scheduledTime }}); }};
+export default { async scheduled(event, env) { await env.CLEANUP_WORKFLOW.create({id: `cleanup-${event.scheduledTime}`, params: { timestamp: event.scheduledTime }}); }};
 
 // From Another Workflow (non-blocking)
 export class ParentWorkflow extends WorkflowEntrypoint<Env, Params> {
   async run(event, step) {
-    const child = await step.do('start child', async () => await this.env.CHILD_WORKFLOW.create({id: `child-${event.instanceId}`, params: {}}));
+    const childId = await step.do('start child', async () => {
+      const id = `child-${event.instanceId}`;
+      await this.env.CHILD_WORKFLOW.createBatch([{ id, params: {} }]);
+      return id; // Persist an ID, not a WorkflowInstance handle
+    });
   }
 }
 ```
@@ -104,17 +109,21 @@ await step.do('validate', async () => {
   const res = await fetch('https://api.example.com/charge', { method: 'POST' });
   if (res.status === 401) throw new NonRetryableError('Invalid credentials'); // Don't retry
   if (!res.ok) throw new Error('Retryable failure'); // Will retry
-  return res.json();
+  return res.text(); // Validate against your schema when decoding JSON.
 });
 
 // Catching Errors
 try { await step.do('risky op', async () => { throw new NonRetryableError('Failed'); }); } catch (e) { await step.do('cleanup', async () => {}); }
 
-// Idempotency
+// Idempotency: requires downstream support for the Idempotency-Key contract.
 await step.do('charge', async () => {
-  const sub = await fetch(`https://api/subscriptions/${id}`).then(r => r.json());
-  if (sub.charged) return sub; // Already done
-  return await fetch(`https://api/subscriptions/${id}`, {method: 'POST', body: JSON.stringify({ amount: 10.0 })}).then(r => r.json());
+  const response = await fetch(`https://api.example.com/subscriptions/${id}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Idempotency-Key': `charge-${event.instanceId}` },
+    body: JSON.stringify({ amount: 10.0 }),
+  });
+  if (!response.ok) throw new Error(`Charge failed: ${response.status}`);
+  return response.text(); // Validate against your schema when decoding JSON.
 });
 ```
 
@@ -146,6 +155,7 @@ const result = await step.do('fetch', async () => {
 // ✅ ReadableStream<Uint8Array> for large binary output (bypasses non-stream step result size limit)
 const stream = await step.do('read from R2', async () => {
   const obj = await this.env.BUCKET.get('large-file.csv');
+  if (!obj) throw new Error("Object not found");
   return obj.body; // Return the ReadableStream directly
 });
 ```
@@ -158,13 +168,16 @@ await step.sleep('wait 1 hour', '1 hour');
 await step.sleep('wait 30 days', '30 days');
 await step.sleep('wait 5s', 5000); // ms
 
-// Absolute
-await step.sleepUntil('launch date', Date.parse('24 Oct 2024 13:00:00 UTC'));
-await step.sleepUntil('deadline', new Date('2024-12-31T23:59:59Z'));
+// Absolute: caller supplies validated future ISO timestamps.
+await step.sleepUntil('launch date', Date.parse(event.payload.launchAt));
+await step.sleepUntil('deadline', new Date(event.payload.deadline));
 ```
 
 Units: second, minute, hour, day, week, month, year.
 Sleeping instances don't count toward concurrency.
+`sleepUntil()` rejects a target in the past. Choose targets that remain in the
+future when the step is first reached, including any preceding sleeps; do not
+copy a fixed historical date or recompute a deadline on every replay.
 
 ## Parameters
 
@@ -199,20 +212,20 @@ npx wrangler workflows list
 npx wrangler workflows trigger my-workflow '{"userId":"user123"}'
 npx wrangler workflows instances list my-workflow
 npx wrangler workflows instances describe my-workflow instance-id
-npx wrangler workflows instances pause/resume/terminate my-workflow instance-id
+npx wrangler workflows instances pause my-workflow instance-id
+npx wrangler workflows instances resume my-workflow instance-id
+npx wrangler workflows instances terminate my-workflow instance-id
 ```
 
 ## REST API
 
-```bash
-# Create
-curl -X POST "https://api.cloudflare.com/client/v4/accounts/{account_id}/workflows/{workflow_name}/instances" -H "Authorization: Bearer {token}" -d '{"id":"custom-id","params":{"userId":"user123"}}'
+Use the [current REST reference](https://developers.cloudflare.com/api/resources/workflows/subresources/instances/) and check the HTTP result:
 
-# Status
-curl "https://api.cloudflare.com/client/v4/accounts/{account_id}/workflows/{workflow_name}/instances/{instance_id}/status" -H "Authorization: Bearer {token}"
+- Create: `POST /accounts/{account_id}/workflows/{workflow_name}/instances`
+- Inspect: `GET /accounts/{account_id}/workflows/{workflow_name}/instances/{instance_id}`
+- Change status: `PATCH /accounts/{account_id}/workflows/{workflow_name}/instances/{instance_id}/status`
+- Send event: `POST /accounts/{account_id}/workflows/{workflow_name}/instances/{instance_id}/events/{event_type}` with the event payload as the JSON body.
 
-# Send Event
-curl -X POST "https://api.cloudflare.com/client/v4/accounts/{account_id}/workflows/{workflow_name}/instances/{instance_id}/events" -H "Authorization: Bearer {token}" -d '{"type":"approval","payload":{"approved":true}}'
-```
+The event type belongs in the REST URL; the binding's `sendEvent({ type, payload })` shape is a different API.
 
 See: [configuration.md](./configuration.md), [patterns.md](./patterns.md)

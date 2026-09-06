@@ -9,7 +9,7 @@ When integrating TanStack Router with TanStack Query, use `queryClient.ensureQue
 ## Bad Example
 
 ```tsx
-// Using prefetchQuery - doesn't return data, can't await stale check
+// Unawaited prefetchQuery does not block navigation or propagate fetch errors
 export const Route = createFileRoute('/posts/$postId')({
   loader: async ({ params, context: { queryClient } }) => {
     // prefetchQuery never throws, swallows errors
@@ -45,8 +45,8 @@ const postQueryOptions = (postId: string) =>
 export const Route = createFileRoute('/posts/$postId')({
   loader: async ({ params, context: { queryClient } }) => {
     // ensureQueryData:
-    // - Returns cached data if fresh
-    // - Fetches and caches if missing or stale
+    // - Returns existing cached data, even when stale
+    // - Fetches and caches only when data is missing
     // - Awaits completion
     // - Throws on error (caught by error boundary)
     await queryClient.ensureQueryData(postQueryOptions(params.postId))
@@ -100,39 +100,21 @@ export const Route = createFileRoute('/users/$userId/posts')({
 ## Router Configuration for TanStack Query
 
 ```tsx
-// router.tsx
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 60 * 1000,  // 1 minute default
-    },
-  },
-})
+// router.tsx — create one client/router per SSR request
+import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query'
 
-export const router = createRouter({
-  routeTree,
-  context: { queryClient },
-
-  // Let TanStack Query manage caching
-  defaultPreloadStaleTime: 0,
-
-  // SSR: Dehydrate query cache
-  dehydrate: () => ({
-    queryClientState: dehydrate(queryClient),
-  }),
-
-  // SSR: Hydrate on client
-  hydrate: (dehydrated) => {
-    hydrate(queryClient, dehydrated.queryClientState)
-  },
-
-  // Wrap with QueryClientProvider
-  Wrap: ({ children }) => (
-    <QueryClientProvider client={queryClient}>
-      {children}
-    </QueryClientProvider>
-  ),
-})
+export function getRouter() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { staleTime: 60 * 1000 } },
+  })
+  const router = createRouter({
+    routeTree,
+    context: { queryClient },
+    defaultPreloadStaleTime: 0,
+  })
+  setupRouterSsrQueryIntegration({ router, queryClient })
+  return router
+}
 ```
 
 ## ensureQueryData vs prefetchQuery vs fetchQuery
@@ -146,7 +128,7 @@ export const router = createRouter({
 ## Context
 
 - `ensureQueryData` is the recommended method for route loaders
-- Respects `staleTime` - won't refetch fresh cached data
+- Returns stale cached data by default. Set `revalidateIfStale: true` for background refresh, or use `fetchQuery` to await freshness.
 - Errors propagate to route error boundaries
 - Use `queryOptions()` factory for type-safe, reusable query definitions
 - Set `defaultPreloadStaleTime: 0` to let TanStack Query manage cache

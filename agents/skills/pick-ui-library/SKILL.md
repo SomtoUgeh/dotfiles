@@ -9,7 +9,7 @@ metadata:
 
 **Know your tools.** Don't blindly jump into code — look around first and see what already exists. Most of the time you shouldn't invent a new pattern; the existing one is battle-tested and proven to work.
 
-Everything below is what Emil actually reaches for in the *Animations on the Web* course ([animations.dev](https://animations.dev/)). It is a deliberately short list, not a survey.
+This course-derived shortlist is a starting point, not a current maintenance or compatibility guarantee. Check the project lockfile, supported React/browser versions, and current primary documentation before recommending a dependency. Follow the [canonical motion policy](../animate/references/canonical-policy.md).
 
 ## Before recommending anything
 
@@ -28,7 +28,7 @@ Everything below is what Emil actually reaches for in the *Animations on the Web
 | Runs automatically once — page intro, text reveal, staggered entrance | **CSS `@keyframes`** (+ `animation-fill-mode: backwards`/`forwards`) | Delay via `calc(var(--delay) * var(--stagger))`; no JS |
 | A few discrete steps — blink, pulse | **CSS `@keyframes`** | Past a handful of steps it gets unwieldy — reach for Motion |
 | Simple enter/exit that won't be interrupted — dialog, popup | **CSS keyframes** or **`@starting-style`** | `@starting-style` gives an enter transition with no `mounted` state and no `useEffect` |
-| Must stay smooth while the main thread is busy | **CSS** or **WAAPI** | Both are hardware-accelerated and run off the main thread. Vercel's tab highlight dropped frames on Framer Motion shared layout during page loads and was fixed by moving it to CSS |
+| Must stay smooth while the main thread is busy | **CSS** or **WAAPI** | Eligible effects can run on the compositor; verify the property, browser, and recording. Motion also has a hybrid engine |
 | Programmatic, but you want it hardware-accelerated and colocated with the JS logic | **WAAPI** | What the course uses for the `clip-path` scroll reveal, to keep all animation logic in one place |
 | Real springs, momentum, interruptions that keep velocity | **Motion for React** | Real springs are impossible in CSS — `linear()` is only an approximation |
 | Animating a component **out** after React removes it | **Motion for React** — `AnimatePresence` | The element is gone from the DOM; CSS has nothing left to animate |
@@ -39,11 +39,11 @@ Everything below is what Emil actually reaches for in the *Animations on the Web
 
 Rule of thumb: **CSS for simple and hardware-accelerated motion, Motion for complex and sophisticated motion.** Combining both in one project is normal and is what the course does.
 
-**Your users don't care whether you used CSS.** They care about what they see. If beautiful requires a library, use the library — bundle size is usually not the thing that ruins the experience, and frame drops won't happen if you animate the right properties.
+**Your users don't care whether you used CSS.** They care about what they see. If beautiful requires a library, use the library — bundle size is usually not the thing that ruins the experience, and property choice alone does not guarantee a frame rate; measure the actual interaction.
 
 ### Motion for React (formerly Framer Motion)
 
-Import from `motion/react` — the rename changed nothing but the import path. Not using React? Vanilla **Motion** is the alternative; with React, stay on Motion for React, it's tailored to the framework.
+Import from `motion/react` — the current package is `motion`; check the [upgrade guide](https://motion.dev/docs/react-upgrade-guide) because major versions can change behavior beyond the import path. Not using React? Vanilla **Motion** is the alternative; with React, stay on Motion for React, it's tailored to the framework.
 
 - **For:** springs, layout and shared-layout animations, complex motion in very little code, an API that fits React.
 - **Against:** bundle size, and a lot of magic — when something doesn't work it's hard to see why, and the docs follow the happy path.
@@ -52,7 +52,7 @@ Prefer the declarative API (`initial`/`animate`/`exit`). Imperative `useAnimate`
 
 ### React Spring
 
-Spring-based, smaller than Motion, highly configurable, and pairs well with the rest of the Poimandres set (`use-gesture` for a macOS-dock-style interaction). Against it: steep learning curve, more code for the same animation, and documentation that's hard to parse. Recommend it when spring control matters more than developer speed.
+Spring-based and highly configurable (compare actual bundled imports before claiming a size advantage), and pairs well with the rest of the Poimandres set (`use-gesture` for a macOS-dock-style interaction). Against it: steep learning curve, more code for the same animation, and documentation that's hard to parse. Recommend it when spring control matters more than developer speed.
 
 ### GSAP
 
@@ -72,18 +72,18 @@ Making a dropdown accessible is genuinely hard, and so is a select, a toast, or 
 
 Radix is the course's default: mature, battle-tested, used by shadcn and by many respected teams — it's the base of Vercel's design system and of Linear's navigation — and it makes animation easy — origin-aware `transform-origin` variables, `data-state` for exit animations, and `data-motion` for direction-aware navigation-menu transitions.
 
-**Base UI** is the newer alternative with a near-identical shape — swapping a component over is a few CSS variables and data attributes, under five minutes of work. It also exposes `data-instant`, which lets you kill the animation on subsequent tooltips. **React Aria** is the other credible option.
+**Base UI** is another primitive library, with different component composition, state attributes, and lifecycle contracts. It uses `render` where Radix uses `asChild`; migration needs component-specific behavior, focus, and animation tests. Its tooltip exposes `data-instant`. **React Aria** is another option when it matches the project. See [Base UI useRender](https://base-ui.com/react/utils/use-render).
 
-Radix is less actively maintained than it was. That is not a reason to switch: **code doesn't stop working just because it's not maintained**, and you can always patch or fork. Recommend Base UI when the user wants the newer primitive set with eyes open, not because it's newer.
+Check current releases, open compatibility issues, accessibility behavior, and project support requirements. Do not assert maintenance status from course-era notes or assume patching/forking is free.
 
 ## Utilities the course reaches for
 
 | Need | Use |
 | --- | --- |
-| Measure an element to animate its height (height can't animate to `auto`) | `react-use-measure` |
+| Measure dynamic intrinsic height when CSS cannot cover the required browsers/transition | `react-use-measure` |
 | Dismiss on outside click | `useOnClickOutside` from `usehooks-ts` |
 | Conditional class names | `clsx` |
-| Hover gating, hit-area utilities, arbitrary transforms | Tailwind — v4 already applies hover only where the pointer supports it |
+| Hover gating, hit-area utilities, arbitrary transforms | Tailwind — v4 gates `hover:` with `(hover: hover)`; add `(pointer: fine)` separately when required |
 
 From the guest lesson: **torph** for morphing characters inside a changing string, and **DialKit** for tweaking animation parameters live in any web app.
 

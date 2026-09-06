@@ -11,8 +11,8 @@ Configuration reference for wrangler.jsonc (recommended).
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "my-worker",
   "main": "src/index.ts",
-  "compatibility_date": "2025-01-01",  // Use current date
-  "vars": { "API_KEY": "dev-key" },
+  "compatibility_date": "2025-01-01",  // Example: preserve an existing tested date; choose today for a new project
+  "vars": { "ENVIRONMENT": "development" },
   "kv_namespaces": [{ "binding": "MY_KV", "id": "abc123" }]
 }
 ```
@@ -72,11 +72,18 @@ Deploy: `wrangler deploy --env production`
 { "durable_objects": { 
   "bindings": [{ 
     "name": "COUNTER", 
-    "class_name": "Counter",
-    "script_name": "my-worker"  // Required for external DOs
+    "class_name": "Counter"
   }] 
+}, "exports": {
+  "Counter": { "type": "durable-object", "storage": "sqlite" }
 } }
-{ "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Counter"] }] }
+
+// Durable Object exported by another Worker (no local lifecycle entry)
+{ "durable_objects": { "bindings": [{
+  "name": "EXTERNAL_COUNTER",
+  "class_name": "Counter",
+  "script_name": "counter-worker"
+}] } }
 
 // Service Bindings
 { "services": [{ "binding": "AUTH", "service": "auth-worker" }] }
@@ -101,10 +108,13 @@ Deploy: `wrangler deploy --env production`
 { "workflows": [{ "binding": "WORKFLOW", "name": "my-workflow", "class_name": "MyWorkflow" }] }
 
 // Secrets Store (centralized secrets)
-{ "secrets_store": [{ "binding": "SECRETS", "id": "store-id" }] }
+{ "secrets_store_secrets": [{
+  "binding": "API_KEY",
+  "store_id": "store-id",
+  "secret_name": "api-key"
+}] }
 
-// Constellation (AI inference)
-{ "constellation": [{ "binding": "MODEL", "project_id": "proj-id" }] }
+// AI inference uses the Workers AI binding shown above.
 ```
 
 ## Workers Assets (Static Files)
@@ -148,7 +158,7 @@ Control where Workers run geographically.
 }
 ```
 
-- `"smart"`: Run Worker near data sources (D1, Durable Objects) to reduce latency
+- `"smart"`: Run Worker near backend services and data sources to reduce latency
 - `"off"`: Default distribution (run everywhere)
 
 ## Auto-Provisioning (Beta)

@@ -24,12 +24,12 @@ No implicit conversions. Timestamps must be RFC3339 with timezone; dates ISO 860
 - **File count dominates latency** — enable automatic compaction.
 - **Partition-filter + narrow time windows + always `LIMIT`.**
 - **Multi-way JOINs on large tables** can exceed resource limits — filter heavily, join through dimension tables.
-- Per-query `metrics` (`files_scanned`, `bytes_scanned`, `cache_hits`) are the primary observability signal; `bytes_scanned` ≈ billable data. For LIMIT bounds, pagination, and other guidance, see the limitations-best-practices doc.
+- Per-query `metrics` (`files_scanned`, `bytes_scanned`, `cache_hits`) are the primary observability signal; use the pricing documentation to interpret billed usage; `bytes_scanned` is a query metric. For LIMIT bounds, pagination, and other guidance, see the limitations-best-practices doc.
 
 ## Debug Checklist
 
-1. `wrangler r2 bucket catalog enable <bucket>` — catalog on?
-2. `echo $WRANGLER_R2_SQL_AUTH_TOKEN` — token set?
+1. `wrangler r2 bucket catalog get <bucket>` — catalog on?
+2. `test -n "$WRANGLER_R2_SQL_AUTH_TOKEN" && echo "Token is set"` — token set?
 3. `SHOW DATABASES` → `SHOW TABLES IN ns` → `DESCRIBE ns.table`
 4. `SELECT COUNT(*) FROM ns.table` — data present?
 5. Add filters incrementally; read `metrics` to tune.

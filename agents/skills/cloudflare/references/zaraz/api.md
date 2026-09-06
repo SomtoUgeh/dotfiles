@@ -1,112 +1,89 @@
 # Zaraz Web API
 
-Client-side JavaScript API for tracking events, setting properties, and managing consent.
-
-## zaraz.track()
+## Tracking and data scope
 
 ```javascript
-zaraz.track('button_click');
-zaraz.track('purchase', { value: 99.99, currency: 'USD', item_id: '12345' });
-zaraz.track('pageview', { page_path: '/products', page_title: 'Products' }); // SPA
+await zaraz.track('button_click', { button_id: 'cta', value: 1 });
+zaraz.set('plan', 'premium', { scope: 'page' });
+zaraz.set('plan', undefined); // Removes this key from all scopes.
 ```
 
-**Params:** `eventName` (string), `properties` (object, optional). Fire-and-forget.
+`track(eventName, properties?)` is asynchronous and can be awaited. Use a flat
+properties object and configure a matching trigger/action. Completion of the
+call is not evidence that a third-party provider accepted the event.
 
-## zaraz.set()
+`set(key, value, options?)` takes a key/value pair, not an object of pairs.
+Scope is `page`, `session`, or `persist`; `persist` is the default and uses
+localStorage. Set every identity field to `undefined` when it must be cleared.
+
+Sources: [track](https://developers.cloudflare.com/zaraz/web-api/track/),
+[set](https://developers.cloudflare.com/zaraz/web-api/set/).
+
+## E-commerce
 
 ```javascript
-zaraz.set('userId', 'user_12345');
-zaraz.set({ email: '[email protected]', plan: 'premium', country: 'US' });
-```
-
-Properties persist for page session. Use for user identification and segmentation.
-
-## zaraz.ecommerce()
-
-```javascript
-zaraz.ecommerce('Product Viewed', { product_id: 'SKU123', name: 'Widget', price: 49.99 });
-zaraz.ecommerce('Product Added', { product_id: 'SKU123', quantity: 2, price: 49.99 });
 zaraz.ecommerce('Order Completed', {
-  order_id: 'ORD-789', total: 149.98, currency: 'USD',
-  products: [{ product_id: 'SKU123', quantity: 2, price: 49.99 }]
+  order_id: 'ORD-789', total: 99.98, currency: 'USD',
+  products: [{ product_id: 'SKU123', name: 'Widget', quantity: 2, price: 49.99 }],
 });
 ```
 
-**Events:** `Product Viewed`, `Product Added`, `Product Removed`, `Cart Viewed`, `Checkout Started`, `Order Completed`
+Enable e-commerce in Zaraz settings and each supported tool. Follow that tool's
+payload limits and required fields. This maps supported commerce events; it does
+not make arbitrary events compatible with every tool.
+See [commerce event definitions](https://developers.cloudflare.com/zaraz/web-api/ecommerce/).
 
-Tools auto-map to GA4, Facebook CAPI, etc.
+## Consent
 
-## System Properties (Triggers)
-
-```
-{{system.page.url}}   {{system.page.title}}   {{system.page.referrer}}
-{{system.device.ip}}  {{system.device.userAgent}}  {{system.device.language}}
-{{system.cookies.name}}  {{client.__zarazTrack.userId}}
-```
-
-## zaraz.consent
+Use the configured purpose IDs, not assumed names such as `marketing`. Apply
+choices only in response to the actual user's consent selection.
 
 ```javascript
-// Check
-const purposes = zaraz.consent.getAll(); // { analytics: true, marketing: false }
-
-// Set
-zaraz.consent.modal = true; // Show modal
-zaraz.consent.setAll({ analytics: true, marketing: false });
-zaraz.consent.set('marketing', true);
-
-// Listen
-zaraz.consent.addEventListener('consentChanged', () => {
-  if (zaraz.consent.getAll().marketing) zaraz.track('marketing_consent_granted');
-});
-```
-
-**Flow:** Configure purposes in dashboard → Map tools to purposes → Show modal/set programmatically → Tools fire when allowed
-
-## zaraz.debug
-
-```javascript
-zaraz.debug = true;
-zaraz.track('test_event');
-console.log(zaraz.tools); // View loaded tools
-```
-
-## Cookie Methods
-
-```javascript
-zaraz.getCookie('session_id');  // Zaraz namespace
-zaraz.readCookie('_ga');        // Any cookie
-```
-
-## Async Behavior
-
-All methods fire-and-forget. Events batched and sent asynchronously:
-
-```javascript
-zaraz.track('event1');
-zaraz.set('prop', 'value');
-zaraz.track('event2'); // All batched
-```
-
-## TypeScript Types
-
-```typescript
-interface Zaraz {
-  track(event: string, properties?: Record<string, unknown>): void;
-  set(key: string, value: unknown): void;
-  set(properties: Record<string, unknown>): void;
-  ecommerce(event: string, properties: Record<string, unknown>): void;
-  consent: {
-    getAll(): Record<string, boolean>;
-    setAll(purposes: Record<string, boolean>): void;
-    set(purpose: string, value: boolean): void;
-    addEventListener(event: 'consentChanged', callback: () => void): void;
-    modal: boolean;
-  };
-  debug: boolean;
-  tools?: string[];
-  getCookie(name: string): string | undefined;
-  readCookie(name: string): string | undefined;
+// Call from the application's consent UI after the API is ready.
+function applyPurposeChoice(purposeId, allowed) {
+  if (!zaraz.consent?.APIReady) return false;
+  zaraz.consent.set({ [purposeId]: allowed });
+  return true;
 }
-declare global { interface Window { zaraz: Zaraz; } }
+
+function showConsentModal() {
+  if (zaraz.consent?.APIReady) zaraz.consent.modal = true;
+  else document.addEventListener('zarazConsentAPIReady', () => {
+    zaraz.consent.modal = true;
+  }, { once: true });
+}
+
+document.addEventListener('zarazConsentChoicesUpdated', () => {
+  const choices = zaraz.consent.getAll();
+  // Synchronize the application's consent UI from choices.
+});
 ```
+
+| Method/property | Contract |
+| --- | --- |
+| `get(id)` | Boolean choice, or undefined for an unknown purpose |
+| `getAll()` | Object keyed by configured purpose ID |
+| `set({ [id]: boolean })` | Set selected purposes |
+| `setAll(boolean)` | Set every purpose to the same choice |
+| `purposes` | Read-only configured purpose metadata |
+| `APIReady` | Readiness flag |
+| `modal` | Read/write visibility |
+
+Events are dispatched on `document`; there is no consent object's
+`addEventListener('consentChanged', ...)` API. For checkbox and queued pageview
+methods, follow the [Consent API](https://developers.cloudflare.com/zaraz/consent-management/api/).
+
+## Debug and context
+
+```javascript
+zaraz.debug('YOUR_DEBUG_KEY'); // Dashboard debug key; developer console only.
+zaraz.debug(); // Disable debug mode.
+```
+
+`debug` is a function, not a boolean. Do not rely on undocumented `zaraz.tools`,
+`getCookie`, or `readCookie` methods. Read configured context variables through
+the dashboard: event properties use `{{ client.value }}`, cookies use
+`system.cookies`, and user agent fields live under `system.device.user-agent`.
+
+Sources: [debug](https://developers.cloudflare.com/zaraz/web-api/debug-mode/),
+[context](https://developers.cloudflare.com/zaraz/reference/context/).

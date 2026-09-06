@@ -22,7 +22,7 @@ If several terms could fit, list the best match first, then 1–2 alternates wit
 ## Instructions
 
 1. **Read for intent, not keywords.** Users describe what they *see* or *feel* ("springy", "slides off", "draws itself in", "grows out of the button"), not the technical name. Map the sensation to the glossary below.
-2. **Quote the glossary verbatim.** Its descriptions are authoritative — use them as-is, don't paraphrase.
+2. **Use the glossary as a naming guide.** Paraphrase clearly; course preferences are not API contracts. Correct version-sensitive technical claims against current docs and follow the [canonical motion policy](../animate/references/canonical-policy.md).
 3. **Disambiguate close terms.** When two compete (*Crossfade* vs *Shared element transition*, *Pop in* vs *Bounce*, *Layout animation* vs *Shared layout animation*, *`useMotionValue`* vs *`useSpring`*), contrast them so the user can pick.
 4. **When nothing matches exactly,** name the closest term and say plainly it's an approximation, or describe the effect in the glossary's vocabulary (e.g. "that's a *stagger* of *pop-in* entrances").
 5. **Stay within this glossary.** If a term genuinely isn't here, say so rather than inventing one — though you may explain the concept using these words.
@@ -77,8 +77,8 @@ Output:
 - **Spring animation** — Motion modeled on a physical spring (mass, tension/stiffness, damping), with no fixed duration, so it feels organic and alive.
 - **Bounce** — A springy overshoot at the end of motion; playful in small doses, best defaulted to zero, and needs to be larger on smaller elements to read.
 - **Perceptual duration** — For a spring, the time it *feels* finished even while subtle residual movement continues.
-- **Stiffness / damping / mass** — The physical parameters that shape a spring; higher damping settles faster and less springy.
-- **Interruptibility / momentum** — An in-flight animation redirected mid-motion carries its current velocity into the new target instead of jumping; a property of springs and CSS transitions, not keyframes.
+- **Stiffness / damping / mass** — The physical parameters that shape a spring; higher damping reduces oscillation; excessive damping can lengthen settling.
+- **Interruptibility / momentum** — An in-flight animation redirected mid-motion carries its current velocity into the new target instead of jumping; runtime springs can preserve velocity; CSS transitions retarget from current values but do not promise velocity continuity. Keyframes require explicit playback/retarget control.
 - **`linear()`** — A CSS function used to *approximate* a spring curve (only an approximation — real springs need JS).
 
 ### Entrances, exits & physicality
@@ -111,7 +111,7 @@ Output:
 - **`popLayout` mode** — An `AnimatePresence` mode that pops the exiting element out of layout flow so siblings reflow in parallel with the exit (crossfade-like).
 - **`wait` mode** — An `AnimatePresence` mode that fully animates the old element out before the new one animates in (icon swaps, rich state morphs).
 - **Variants** — Named, reusable sets of animation targets referenced by string; can be functions of a `custom` value for direction-aware motion.
-- **Motion value** — A value that updates outside React's render cycle for re-render-free 60fps animation (`useMotionValue`, `useSpring`, `useTransform`).
+- **Motion value** — A value that updates outside React's render cycle for animation updates without per-frame React renders; frame rate still depends on the workload (`useMotionValue`, `useSpring`, `useTransform`).
 - **Auto-height animation** — Smoothly growing/shrinking a container by measuring its content and animating to that height (since `auto` → `auto` can't animate).
 
 ### SVG
@@ -133,10 +133,10 @@ Output:
 
 ### Performance & accessibility
 
-- **Hardware acceleration / GPU offload** — Animating `transform`, `opacity`, or `clip-path` so the work runs on the GPU and stays smooth regardless of main-thread load.
+- **Hardware acceleration / GPU offload** — Eligible animation work sampled by the browser compositor; support depends on the property, browser, and driver and must be measured.
 - **Layout / Paint / Composite** — The three browser rendering steps; cheap animations touch only Composite (which is why you animate `transform`/`opacity`).
-- **`will-change`** — A hint that promotes an element to its own GPU layer (fixing 1px transform shift and jank) — added only once dropped frames appear.
-- **Reduced motion** — Honoring the user's `prefers-reduced-motion` preference by making animations gentler (opacity/color, no movement) — not deleting them outright.
+- **`will-change`** — A rendering hint that can prepare resources or layers; it costs memory and does not guarantee promotion or fix jank.
+- **Reduced motion** — Honoring the user's `prefers-reduced-motion` preference by reducing or removing spatial/decorative motion, preserving meaning through instant or restrained non-spatial changes.
 
 ### Craft & process
 

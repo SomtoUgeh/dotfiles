@@ -11,7 +11,7 @@ description: Test-driven development with red-green-refactor loop. Use when user
 
 **Good tests** are integration-style: they exercise real code paths through public APIs. They describe _what_ the system does, not _how_ it does it. A good test reads like a specification - "user can checkout with valid cart" tells you exactly what capability exists. These tests survive refactors because they don't care about internal structure.
 
-**Bad tests** are coupled to implementation. They mock internal collaborators, test private methods, or verify through external means (like querying a database directly instead of using the interface). The warning sign: your test breaks when you refactor, but behavior hasn't changed. If you rename an internal function and tests fail, those tests were testing implementation, not behavior.
+**Bad tests** assert incidental implementation rather than the contract. Prefer public behavior; direct database or filesystem checks are appropriate when persistence, constraints, migrations, or external effects are the contract. The warning sign is a test changing solely because a private function was renamed while observable behavior stayed the same.
 
 See [tests.md](tests.md) for examples and [mocking.md](mocking.md) for mocking guidelines.
 
@@ -46,16 +46,13 @@ RIGHT (vertical):
 
 Before writing any code:
 
-- [ ] Confirm with user what interface changes are needed
-- [ ] Confirm with user which behaviors to test (prioritize)
+- [ ] Infer the requested interface and priority behaviors from the user's specification and existing code
 - [ ] Identify opportunities for [deep modules](deep-modules.md) (small interface, deep implementation)
 - [ ] Design interfaces for [testability](interface-design.md)
 - [ ] List the behaviors to test (not implementation steps)
-- [ ] Get user approval on the plan
+- [ ] Ask only when a missing choice materially changes the public interface or behavior
 
-Ask: "What should the public interface look like? Which behaviors are most important to test?"
-
-**You can't test everything.** Confirm with the user exactly which behaviors matter most. Focus testing effort on critical paths and complex logic, not every possible edge case.
+If the request already specifies the interface and behavior, start the first red-green cycle without re-asking. Focus testing effort on critical paths and complex logic rather than mirroring every implementation detail.
 
 ### 2. Tracer Bullet
 
@@ -66,7 +63,7 @@ RED:   Write test for first behavior → test fails
 GREEN: Write minimal code to pass → test passes
 ```
 
-This is your tracer bullet - proves the path works end-to-end.
+This is the first verified path through the selected test boundary. Call it end-to-end only if the test actually exercises the complete runtime flow. Confirm RED fails for the intended missing behavior, not a syntax, import, environment, or setup error.
 
 ### 3. Incremental Loop
 
@@ -88,7 +85,7 @@ Rules:
 
 After all tests pass, look for [refactor candidates](refactoring.md):
 
-- [ ] Extract duplicati
+- [ ] Extract duplication where it represents the same responsibility
 - [ ] Deepen modules (move complexity behind simple interfaces)
 - [ ] Apply SOLID principles where natural
 - [ ] Consider what new code reveals about existing code

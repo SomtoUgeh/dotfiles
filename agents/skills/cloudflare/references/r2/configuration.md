@@ -22,7 +22,8 @@ interface Env { MY_BUCKET: R2Bucket; }
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const object = await env.MY_BUCKET.get('file.txt');
-    return new Response(object?.body);
+    if (!object) return new Response('Not found', { status: 404 });
+    return new Response(object.body);
   }
 }
 ```
@@ -60,7 +61,7 @@ wrangler r2 bucket create my-bucket --location=enam
 
 ## CORS Configuration
 
-CORS must be configured via S3 SDK or dashboard (not available in Workers API):
+CORS can be configured via Wrangler (`r2 bucket cors set`), S3 SDK, REST API, or dashboard (not available in Workers API):
 
 ```typescript
 import { S3Client, PutBucketCorsCommand } from '@aws-sdk/client-s3';
@@ -121,35 +122,27 @@ When creating R2 tokens, set minimal permissions:
 | Permission | Use Case |
 |------------|----------|
 | Object Read | Public serving, downloads |
-| Object Write | Uploads only |
 | Object Read & Write | Full object operations |
 | Admin Read & Write | Bucket management, CORS, lifecycles |
 
-**Best practice:** Separate tokens for Workers (read/write) vs admin tasks (CORS, lifecycles).
+**Best practice:** Worker bindings need no S3 token. Scope external S3 credentials to the required buckets and separate object access from bucket administration.
 
 ## Event Notifications
 
-```jsonc
-// wrangler.jsonc
-{
-  "r2_buckets": [
-    {
-      "binding": "MY_BUCKET",
-      "bucket_name": "my-bucket",
-      "event_notifications": [
-        {
-          "queue": "r2-events",
-          "actions": ["PutObject", "DeleteObject", "CompleteMultipartUpload"]
-        }
-      ]
-    }
-  ],
-  "queues": {
-    "producers": [{ "binding": "R2_EVENTS", "queue": "r2-events" }],
-    "consumers": [{ "queue": "r2-events", "max_batch_size": 10 }]
-  }
-}
+Configure bucket notification rules through Wrangler or the R2 API; `event_notifications` is not a Worker configuration field.
+
+```bash
+wrangler queues create r2-events
+wrangler r2 bucket notification create my-bucket --queue r2-events --event-types object-create object-delete
 ```
+
+Configure the consuming Worker separately:
+
+```jsonc
+{ "queues": { "consumers": [{ "queue": "r2-events", "max_batch_size": 10 }] } }
+```
+
+R2 publishes events directly; no producer binding is required. Validate each message against the [event notification schema](https://developers.cloudflare.com/r2/buckets/event-notifications/) and make processing idempotent. Object creation includes `PutObject`, `CopyObject`, and `CompleteMultipartUpload`; do not handle only `PutObject` when all uploads matter.
 
 ## Bucket Management
 
@@ -161,5 +154,5 @@ wrangler r2 bucket delete my-bucket  # Must be empty
 wrangler r2 bucket update-storage-class my-bucket --storage-class=InfrequentAccess
 
 # Public bucket via dashboard
-wrangler r2 bucket domain add my-bucket --domain=files.example.com
+wrangler r2 bucket domain add my-bucket --domain=files.example.com --zone-id=<ZONE_ID>
 ```

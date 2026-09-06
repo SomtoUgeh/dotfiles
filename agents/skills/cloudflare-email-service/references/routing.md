@@ -23,7 +23,7 @@ Set up routing rules in **Dashboard** > **Compute & AI** > **Email Service** > *
 
 The `message` parameter is a `ForwardableEmailMessage`. Run `npx wrangler types` to get the full type definition. Key properties and methods:
 
-- `message.from` / `message.to` — envelope addresses (SMTP MAIL FROM / RCPT TO). `message.from` is trustworthy; header addresses can be spoofed.
+- `message.from` / `message.to` — envelope addresses (SMTP MAIL FROM / RCPT TO). Neither envelope nor header addresses alone authenticate a person; validate authentication results and application authorization before sensitive actions.
 - `message.headers` — `Headers` object (use `.get("subject")`, `.get("message-id")`, etc.)
 - `message.raw` — `ReadableStream<Uint8Array>` of raw MIME content. **Single use** — buffer before accessing.
 - `message.rawSize` — size in bytes
@@ -70,7 +70,7 @@ async email(message, env, ctx) {
 }
 ```
 
-Using `message.reply()` with MIME (more control, requires `mimetext` + `nodejs_compat`):
+Using `message.reply()` with MIME (requires `mimetext` + `nodejs_compat`): the incoming message must pass DMARC, only one reply is allowed per event, the recipient must match the incoming sender, and the sender domain must match the receiving domain. Handle rejection; do not fall back to unrestricted sending to bypass these checks.
 
 ```typescript
 import { EmailMessage } from "cloudflare:email";
@@ -120,10 +120,20 @@ The `email()` handler stores the email and returns immediately. Replies happen l
 
 ### Receive and Store
 
+Configure `MAILBOX` as a SQLite Durable Object binding, export `MailboxDO`, and generate `Env` with Wrangler before using this example.
+
 ```typescript
+import { DurableObject } from "cloudflare:workers";
 import PostalMime from "postal-mime";
 
-export class MailboxDO extends DurableObject {
+export class MailboxDO extends DurableObject<Env> {
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS emails (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, sender TEXT, recipient TEXT,
+      subject TEXT, body TEXT, message_id TEXT, in_reply_to TEXT, date TEXT, read INTEGER
+    )`);
+  }
   async storeEmail(from: string, to: string, subject: string, body: string,
                    messageId: string, inReplyTo: string | null) {
     this.ctx.storage.sql.exec(
@@ -176,7 +186,7 @@ async function replyToStoredEmail(env: Env, original: StoredEmail, replyBody: st
     from: original.recipient,
     subject: `Re: ${original.subject}`,
     text: replyBody,
-    html: `<p>${replyBody}</p>`,
+    // Render HTML only through an escaping template; text is safe for arbitrary replyBody.
     headers,
   });
 }
@@ -194,6 +204,6 @@ async function replyToStoredEmail(env: Env, original: StoredEmail, replyBody: st
 ## Gotchas
 
 - **`message.raw` is single-use.** Buffer first: `const raw = await new Response(message.raw).arrayBuffer()`
-- **Destinations must be verified.** Forwarding to unverified addresses fails silently.
+- **Destinations must be verified.** Forwarding requires verified addresses; await the promise and handle failures rather than assuming silent success.
 - **Handler must act.** If your handler returns without consuming raw, forwarding, or rejecting, the email is dropped.
 - **DMARC/SPF for replies.** If sending replies, ensure your domain has proper SPF/DKIM records (auto-configured on domain onboarding).

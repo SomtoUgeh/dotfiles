@@ -5,48 +5,44 @@ description: Debug AI SDK calls by inspecting captured runs and steps.
 
 # AI SDK DevTools
 
-## Why Use DevTools
+DevTools is experimental and intended for local development. It captures AI SDK calls in a local JSON file and exposes a browser viewer for requests, responses, tool calls, token use, and multi-step runs.
 
-DevTools captures all AI SDK calls (`generateText`, `streamText`, `ToolLoopAgent`) to a local JSON file. This lets you inspect LLM requests, responses, tool calls, and multi-step interactions without manually logging.
+## Compatibility
 
-## Setup
+Inspect the installed `ai` and `@ai-sdk/devtools` packages before configuring it. The current DevTools line uses the AI SDK 7 telemetry integration and requires Node.js 22 or newer. Some published DevTools documentation may target an AI SDK 7 canary; confirm `registerTelemetry`, `DevToolsTelemetry`, and the runtime engine in the installed package instead of assuming compatibility from the major number alone.
 
-Requires AI SDK 6. Install `@ai-sdk/devtools` using your project's package manager.
+Add the package with the project's package manager only when the user authorized dependency changes. Keep it in development tooling and do not initialize it in production code.
 
-Wrap your model with the middleware:
+## Register telemetry
+
+Register the integration once in the development process before AI SDK calls run:
 
 ```ts
-import { wrapLanguageModel, gateway } from 'ai';
-import { devToolsMiddleware } from '@ai-sdk/devtools';
+import { DevToolsTelemetry } from '@ai-sdk/devtools';
+import { registerTelemetry } from 'ai';
 
-const model = wrapLanguageModel({
-  model: gateway('anthropic/claude-sonnet-4.5'),
-  middleware: devToolsMiddleware(),
-});
+if (process.env.NODE_ENV === 'development') {
+  registerTelemetry(DevToolsTelemetry());
+}
 ```
 
-## Viewing Captured Data
+For a single call, pass the integration through that call's `telemetry.integrations` option when the installed AI SDK types expose it. Do not wrap every model with the legacy `devToolsMiddleware()` setup when the telemetry integration is available.
 
-All runs and steps are saved to:
+## View captured data
 
-```
+Run the installed DevTools executable from the same workspace as the application. If it is not installed, add or execute a pinned compatible version only with dependency authorization.
+
+The viewer listens on `http://localhost:4983` by default. Captured runs are stored locally in:
+
+```text
 .devtools/generations.json
 ```
 
-Read this file directly to inspect captured data:
+Treat that file as sensitive development data: prompts, outputs, tool inputs, and provider metadata may contain secrets or personal information. Keep it out of version control and remove it according to the project's retention policy.
 
-```bash
-cat .devtools/generations.json | jq
-```
+## Verify
 
-Or launch the web UI:
-
-```bash
-npx @ai-sdk/devtools
-# Open http://localhost:4983
-```
-
-## Data Structure
-
-- **Run**: A complete multi-step interaction grouped by initial prompt
-- **Step**: A single LLM call within a run (includes input, output, tool calls, token usage)
+1. Start the application in its Node.js development runtime.
+2. Make one known AI SDK request.
+3. Confirm the viewer records one run with its steps and tool calls.
+4. Confirm production builds do not register DevTools or package captured data.

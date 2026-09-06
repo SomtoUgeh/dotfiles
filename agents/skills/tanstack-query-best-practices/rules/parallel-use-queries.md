@@ -56,7 +56,7 @@ function UserProfiles({ userIds }: { userIds: string[] }) {
 
   const isLoading = userQueries.some(q => q.isLoading)
   const isError = userQueries.some(q => q.isError)
-  const users = userQueries.map(q => q.data).filter(Boolean)
+  const users = userQueries.map(q => q.data).filter(value => value !== undefined)
 
   if (isLoading) return <Loading />
   if (isError) return <Error />
@@ -82,7 +82,7 @@ function UserProfiles({ userIds }: { userIds: string[] }) {
     })),
     // Combine results into single value
     combine: (results) => ({
-      data: results.map(r => r.data).filter(Boolean),
+      data: results.map(r => r.data).filter(value => value !== undefined),
       isPending: results.some(r => r.isPending),
       isError: results.some(r => r.isError),
     }),
@@ -106,7 +106,7 @@ function PostsWithAuthors({ postIds }: { postIds: string[] }) {
     })),
   })
 
-  const posts = postQueries.map(q => q.data).filter(Boolean)
+  const posts = postQueries.map(q => q.data).filter(value => value !== undefined)
   const authorIds = [...new Set(posts.map(p => p.authorId))]
 
   // Then: fetch all unique authors in parallel

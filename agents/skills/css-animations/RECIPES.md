@@ -2,7 +2,14 @@
 
 Worked patterns from the CSS Animations module. Each one exists because of a detail that isn't obvious until it bites you — the detail is the point, not the effect.
 
-Load from [SKILL.md](SKILL.md).
+Load from [SKILL.md](SKILL.md). These are focused mechanics, not complete accessible controls. Add reduced-motion behavior and keyboard/touch access before shipping. In TSX recipes, use this typed custom-property helper:
+
+```tsx
+import type { CSSProperties } from "react";
+function indexStyle(index: number): CSSProperties & { "--index": number } {
+  return { "--index": index };
+}
+```
 
 ## Hover lift without the flicker
 
@@ -56,12 +63,12 @@ The arrow slides out the bottom while a second arrow arrives from the top.
   overflow: hidden;
 }
 
-svg {
+.download-button svg {
   grid-area: 1 / 1;                     /* both arrows in the same grid cell */
   transition: transform 200ms cubic-bezier(0.785, 0.135, 0.15, 0.86);
 }
 
-svg:first-of-type { transform: translateY(-150%); }  /* parked above */
+.download-button svg:first-of-type { transform: translateY(-150%); }  /* parked above */
 
 .download-button:hover svg:first-of-type { transform: translateY(0); }
 .download-button:hover svg:last-of-type  { transform: translateY(150%); }
@@ -78,7 +85,7 @@ Sonner's expanded mode. New toasts push the stack up; if one arrives while the p
   <Toast key={i} index={toasts - (i + 1)} />   /* invert: newest gets index 0 */
 ))}
 
-<div className="toast" style={{ "--index": index }} data-mounted={mounted} />
+<div className="toast" style={indexStyle(index)} data-mounted={mounted} />
 ```
 
 ```css
@@ -105,7 +112,7 @@ The mount flip (`useState(false)` + `useEffect(() => setMounted(true), [])`) is 
 ```css
 .toast {
   opacity: 1;
-  transform: translateY(...);
+  transform: translateY(calc(var(--index) * (100% + var(--gap, 8px)) * -1));
   @starting-style {
     opacity: 0;
     transform: translateY(100%);
@@ -121,7 +128,7 @@ Cards fanned behind each other: each one further back is scaled down and pushed 
 
 ```tsx
 {new Array(LENGTH).fill(0).map((_, i) => (
-  <div className="card" key={i} style={{ "--index": LENGTH - 1 - i }} />
+  <div className="card" key={i} style={indexStyle(LENGTH - 1 - i)} />
 ))}
 ```
 
@@ -142,17 +149,17 @@ The `nth-child` version works but hardcodes every card. The variable version tak
 Each letter rises into place a beat after the last.
 
 ```tsx
-<h1>
-  {WORD.split("").map((char, index) => (
-    <span key={index} style={{ "--index": index }}>{char}</span>
+<h1 className="text-reveal" aria-label={WORD}>
+  {Array.from(WORD).map((char, index) => (
+    <span aria-hidden="true" key={index} style={indexStyle(index)}>{char === " " ? "\u00a0" : char}</span>
   ))}
 </h1>
 ```
 
 ```css
-.h1 { overflow: hidden; }              /* hides the letters' parked position */
+.text-reveal { overflow: hidden; }              /* hides the letters' parked position */
 
-.h1 span {
+.text-reveal span {
   display: inline-block;               /* inline elements have no box to transform */
   animation: reveal 1.3s cubic-bezier(0.19, 1, 0.22, 1) backwards;
   animation-delay: calc(0.03s * var(--index));
@@ -232,19 +239,19 @@ Overlay two images and clip the top one from the right, driven by the drag posit
 .top-image { clip-path: inset(0 50% 0 0); }
 ```
 
-More performant than the two-divs-with-`overflow: hidden` approach, and it needs no extra DOM. The same trick with two versions of the same text (outlined and solid, split horizontally) gives a text mask that doesn't read as a slider at all.
+This can remove a wrapper and preserve layout; compare actual rendering cost before claiming it is faster. The same trick with two versions of the same text (outlined and solid, split horizontally) gives a text mask that doesn't read as a slider at all.
 
 ## clip-path: image reveal on scroll
 
-Animate `inset(100%)` → `inset(0)`. Better than a height animation: hardware-accelerated, and no layout shift because the image is already laid out, just clipped.
+Animate `inset(100%)` → `inset(0)`. The image is already laid out, so clipping does not change its flow size. Acceleration and paint cost depend on the browser; verify performance.
 
-It has to fire when the image enters the viewport or nobody sees it. Use the [Intersection Observer API](https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API) unless the project already ships Motion — in that case `useInView` with `once: true` and `margin: "100px"` (fire when 100px of the image is in view).
+It has to fire when the image enters the viewport or nobody sees it. Use the [Intersection Observer API](https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API) unless the project already ships Motion — in that case `useInView` with `once: true` and `margin: "100px"` (a positive margin expands the detection area and fires before the image enters the viewport).
 
 ## clip-path: seamless tab highlight
 
 The usual approach transitions the text color and hopes the timing lines up with the moving pill. It never quite does.
 
-Instead: **duplicate the whole tab list**, style the copy as if every tab were active (filled background, white text), then clip that copy to just the active tab. Moving the highlight is one animated `clip-path` — the colors are always already correct, so there's no color transition to time.
+Instead: **duplicate the whole tab list**, style the copy as if every tab were active (filled background, white text), then clip that copy to just the active tab. Make the visual copy `aria-hidden`, inert, and non-interactive; keep one real tablist with keyboard and ARIA state. Moving the highlight is one animated `clip-path` — the colors are always already correct, so there's no color transition to time.
 
 Nobody consciously notices the difference, and that's fine; details like this add up. (Technique originally from [Paco](https://x.com/pacocoursey/status/1522639642155266048); Stripe's blog ships it.)
 
@@ -279,4 +286,4 @@ A red overlay wipes across the button while held, and snaps back on release.
 
 **Two different transitions, and that's the whole recipe.** A deliberate action (holding) reveals slowly and `linear`, because the fill is a progress indicator and must advance evenly. Releasing is a system response: `0.2s ease-out`. One shared transition would make the cancel feel broken.
 
-Duplicate the button's content inside the overlay so the wipe reveals a red copy of the same label and icon.
+Duplicate only decorative content inside the overlay, with `aria-hidden="true"` and `pointer-events: none`; keep one real labelled button. This CSS is a progress visual, not deletion logic. Implement keyboard/pointer cancellation, reduced motion, and an accessible alternative for users who cannot hold a control.

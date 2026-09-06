@@ -63,7 +63,7 @@ Run after adding bindings:
 npm run cf-typegen
 ```
 
-Generates `.wrangler/types/runtime.d.ts`:
+Generates `worker-configuration.d.ts` by default:
 ```typescript
 interface Env {
   MY_KV: KVNamespace;
@@ -77,5 +77,7 @@ interface Env {
 2. Replace placeholder binding IDs with real resource IDs
 3. Run `npm run cf-typegen`
 4. Test: `npm run dev`
-5. Deploy: `npm run deploy`
-6. Add secrets: `npx wrangler secret put SECRET_NAME`
+5. Provision required secrets for the target Worker using `npx wrangler secret put SECRET_NAME`
+6. Deploy when configuration and secrets are ready: `npm run deploy`
+
+`--existing-script` downloads a deployed Worker; it does not convert local source or migrate an existing framework app. For an existing app, follow its current Workers framework guide. Workers Static Assets also support static sites, and Workers Builds supports Git workflows; Pages is an explicit framework-dependent choice. Inspect generated package scripts instead of assuming every framework uses the same names.

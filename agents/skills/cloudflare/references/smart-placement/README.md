@@ -21,7 +21,8 @@ Smart Placement automatically analyzes Worker request duration across Cloudflare
 - Pure edge logic (auth checks, redirects, simple transformations)
 - Workers without fetch event handlers
 - Workers with RPC methods or named entrypoints (only `fetch` handlers are affected)
-- Pages/Assets Workers with `run_worker_first = true` (degrades asset serving)
+
+For mixed static/backend routes, measure the cost of assets fetched through the Worker binding.
 
 ### Decision Tree
 
@@ -39,8 +40,8 @@ Does your Worker have a fetch handler?
       └─ Yes or uncertain
          │
          Does it serve static assets with run_worker_first=true?
-         ├─ Yes → Don't enable (will hurt performance)
-         └─ No → Enable Smart Placement
+         ├─ Yes → Measure asset requests and consider assets-first routing
+         └─ No → Evaluate Smart Placement with representative traffic
             │
             After 15min, check placement_status
             ├─ SUCCESS → Monitor metrics
@@ -50,7 +51,7 @@ Does your Worker have a fetch handler?
 
 ### Key Architecture Pattern
 
-**Recommended:** Split full-stack applications into separate Workers:
+**Option for measured mixed-workload latency:** Split frontend and backend into separate Workers:
 ```
 User → Frontend Worker (at edge, close to user)
          ↓ Service Binding
@@ -86,7 +87,7 @@ Deploy and wait 15 minutes for analysis. Check status via API or dashboard metri
 ## Placement Status Values
 
 ```typescript
-type PlacementStatus = 
+type PlacementStatus =
   | undefined  // Not yet analyzed
   | 'SUCCESS'  // Successfully optimized
   | 'INSUFFICIENT_INVOCATIONS'  // Not enough traffic
@@ -105,7 +106,7 @@ curl -H "Authorization: Bearer $TOKEN" \
   | jq .result.placement_status
 
 # Monitor
-wrangler tail your-worker-name --header cf-placement
+# Observe cf-placement inside the Worker, then use wrangler tail.
 ```
 
 ## Reading Order
@@ -136,3 +137,5 @@ wrangler tail your-worker-name --header cf-placement
 - [d1](../d1/) - D1 database that benefits from Smart Placement
 - [durable-objects](../durable-objects/) - Durable Objects with backend logic
 - [bindings](../bindings/) - Service bindings for frontend/backend split
+
+The official placement page currently contains an RPC example that conflicts with its explicit fetch-only limitation. Rely on fetch-based calls for this reference; verify hosted RPC placement before changing architecture based on that example.

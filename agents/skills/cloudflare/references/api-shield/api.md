@@ -1,141 +1,51 @@
-# API Reference
+# API Shield APIs
 
-Base: `/zones/{zone_id}/api_gateway`
+Endpoint inventory and discovery use the [API Gateway API](https://developers.cloudflare.com/api/resources/api_gateway/). Schema Validation uses its current schema validation API. JWT token configuration uses a separate base path, not api_gateway/token_validation.
 
-## Endpoints
+## Token configuration
 
-```bash
-GET /operations                    # List
-GET /operations/{op_id}            # Get single
-POST /operations/item              # Create: {endpoint,host,method}
-POST /operations                   # Bulk: {operations:[{endpoint,host,method}]}
-DELETE /operations/{op_id}         # Delete
-DELETE /operations                 # Bulk delete: {operation_ids:[...]}
-```
+Create at POST /zones/{zone_id}/token_validation/config with this body shape. Load real issuer keys into credentials.keys before submission:
 
-## Discovery
-
-```bash
-GET /discovery/operations                    # List discovered
-PATCH /discovery/operations/{op_id}          # Update: {state:"saved"|"ignored"}
-PATCH /discovery/operations                  # Bulk: {operation_ids:{id:{state}}}
-GET /discovery                               # OpenAPI export
-```
-
-## Config
-
-```bash
-GET /configuration        # Get session ID config
-PUT /configuration        # Update: {auth_id_characteristics:[{name,type:"header"|"cookie"}]}
-```
-
-## Token Validation
-
-```bash
-GET /token_validation                  # List
-POST /token_validation                 # Create: {name,location:{header:"..."},jwks:"..."}
-POST /jwt_validation_rules             # Rule: {name,hostname,token_validation_id,action:"block"}
-```
-
-## Workers Integration
-
-### Access JWT Claims
-```js
-export default {
-  async fetch(req, env) {
-    // Access validated JWT payload
-    const jwt = req.cf?.jwt?.payload?.[env.JWT_CONFIG_ID]?.[0];
-    if (jwt) {
-      const userId = jwt.sub;
-      const role = jwt.role;
-    }
-  }
+```json
+{
+  "title": "Production identity provider",
+  "description": "Validate bearer tokens for this API",
+  "token_sources": ["http.request.headers[\"authorization\"][0]"],
+  "token_type": "jwt",
+  "credentials": { "keys": [] }
 }
 ```
 
-### Access mTLS Info
-```js
-export default {
-  async fetch(req, env) {
-    const tls = req.cf?.tlsClientAuth;
-    if (tls?.certVerified === 'SUCCESS') {
-      const fingerprint = tls.certFingerprintSHA256;
-      // Authenticated client
-    }
-  }
+An empty keys array is a placeholder, not a deployable configuration. Each JWK must use a supported algorithm and matching kid. Credentials rotate through PUT /zones/{zone_id}/token_validation/config/{config_id}/credentials; validate issuer response status and JWKS structure before replacing them. Confirm the returned result and messages.
+
+Token validation rules use POST /zones/{zone_id}/token_validation/rules, with title, expression, selector, action (log or block), and enabled. Use the [current selector schema and examples](https://developers.cloudflare.com/api-shield/security/jwt-validation/api/).
+
+## Rules language
+
+In a token validation rule, the expression below requires a valid token; the configured action applies when the policy is NOT satisfied:
+
+```wirefilter
+is_jwt_valid("<TOKEN_CONFIGURATION_ID>")
+```
+
+is_jwt_valid and is_jwt_present are only supported in token validation rules, not WAF custom rules. Custom rules can access verified claims using:
+
+```wirefilter
+lookup_json_string(http.request.jwt.claims["<TOKEN_CONFIGURATION_ID>"][0], "sub")
+```
+
+These are Rules language fields, not Worker request.cf properties. A Worker must independently verify its JWT (including issuer and audience), or use a deliberately configured trusted Transform Rule and block every bypass of that trust boundary. Do not read a fabricated request.cf.jwt.payload property.
+
+## mTLS in Workers
+
+```typescript
+function hasVerifiedClientCertificate(request: Request<unknown, IncomingRequestCfProperties>): boolean {
+  return request.cf?.tlsClientAuth?.certVerified === "SUCCESS";
 }
 ```
 
-### Dynamic JWKS Update
-```js
-export default {
-  async scheduled(event, env) {
-    const jwks = await (await fetch('https://auth.example.com/.well-known/jwks.json')).json();
-    await fetch(`https://api.cloudflare.com/client/v4/zones/${env.ZONE_ID}/api_gateway/token_validation/${env.CONFIG_ID}`, {
-      method: 'PATCH',
-      headers: {'Authorization': `Bearer ${env.CF_API_TOKEN}`, 'Content-Type': 'application/json'},
-      body: JSON.stringify({jwks: JSON.stringify(jwks)})
-    });
-  }
-}
-```
+A verified chain identifies an accepted certificate; map it to a principal and permissions before returning protected data.
 
-## Firewall Fields
+## Risk labels
 
-### Core Fields
-```js
-cf.api_gateway.auth_id_present           // Session ID present
-cf.api_gateway.request_violates_schema   // Schema violation
-cf.api_gateway.fallthrough_triggered     // No endpoint match
-cf.tls_client_auth.cert_verified         // mTLS cert valid
-cf.tls_client_auth.cert_fingerprint_sha256
-```
-
-### JWT Validation (2026)
-```js
-// Modern validation syntax
-is_jwt_valid(http.request.jwt.payload["{config_id}"][0])
-
-// Legacy (still supported)
-cf.api_gateway.jwt_claims_valid
-
-// Extract claims
-lookup_json_string(http.request.jwt.payload["{config_id}"][0], "claim_name")
-```
-
-### Risk Labels (2026)
-```js
-// BOLA detection
-cf.api_gateway.cf-risk-bola-enumeration  // Sequential resource access detected
-cf.api_gateway.cf-risk-bola-pollution    // Parameter pollution detected
-
-// Authentication posture
-cf.api_gateway.cf-risk-missing-auth      // Endpoint lacks authentication
-cf.api_gateway.cf-risk-mixed-auth        // Inconsistent auth patterns
-```
-
-## BOLA Detection
-
-```bash
-GET /user_schemas/{schema_id}/bola             # Get BOLA config
-PATCH /user_schemas/{schema_id}/bola           # Update: {enabled:true}
-```
-
-## Auth Posture
-
-```bash
-GET /discovery/authentication_posture          # List unprotected endpoints
-```
-
-## GraphQL Protection
-
-```bash
-GET /settings/graphql_protection               # Get limits
-PUT /settings/graphql_protection               # Set: {max_depth,max_size}
-```
-
-## See Also
-
-- [configuration.md](configuration.md) - Setup guides for all features
-- [patterns.md](patterns.md) - Firewall rules and common patterns
-- [API Gateway API Docs](https://developers.cloudflare.com/api/resources/api_gateway/)
+cf-risk-bola-enumeration, cf-risk-bola-pollution, cf-risk-missing-auth, and cf-risk-mixed-auth are endpoint labels. They are not Boolean fields named cf.api_gateway.cf-risk-*. Inspect labeled endpoint traffic and repair authorization at the origin. Filtering by a label includes all traffic to labeled endpoints, not just suspicious requests. See [endpoint labels](https://developers.cloudflare.com/api-shield/management-and-monitoring/endpoint-labels/).

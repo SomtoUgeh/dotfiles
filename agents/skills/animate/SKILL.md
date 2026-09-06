@@ -1,6 +1,6 @@
 ---
 name: animate
-description: Design and build web animations that feel right, grounded in the complete "Animations on the Web" course (animations.dev). Use proactively whenever building or improving motion — deciding whether to animate, choosing easing/duration/springs, implementing entrances, exits, hovers, gestures, drawers, popovers, morphs, layout and shared-element transitions, SVG animation, or fixing motion that feels janky, sluggish, or off. Triggers on — animate, animation, motion, easing, ease-out, ease-in-out, cubic-bezier, duration, spring, bounce, keyframes, transition, transform, opacity, scale, translate, clip-path, stagger, hover, press, drag, gesture, drawer, popover, dropdown, tooltip, modal, toast, morph, crossfade, shared element, layout animation, Framer Motion, motion/react, AnimatePresence, layoutId, WAAPI, SVG animation, stroke-dashoffset, prefers-reduced-motion, will-change, GPU, "feels janky", "make it smooth", "feels off".
+description: Decide whether and how a web interaction should animate, then coordinate its easing, duration, physicality, interruption, and spatial continuity. Use for motion direction across a component or flow, including entrances, exits, gestures, drawers, popovers, morphs, and shared-element transitions. Route CSS or React implementation, measured performance debugging, and reduced-motion design to their focused skills.
 metadata:
   short-description: Design and build web animations that feel right (animations.dev course)
 ---
@@ -9,13 +9,14 @@ metadata:
 
 The complete builder's guide to motion that feels right, distilled from Emil Kowalski's *Animations on the Web* course ([animations.dev](https://animations.dev/)). Use it to make decisions first, then implement.
 
-## Initial Response
+Follow [references/canonical-policy.md](references/canonical-policy.md) for the
+shared accessibility, performance, tool-choice, and verification rules. It wins
+if a stronger statement in this guide conflicts with it.
 
-When this skill is first invoked without a specific question, respond only with:
+## Start from the request
 
-> I'm ready to help you build animations that feel right, based on Emil Kowalski's animations.dev course. Tell me what you're animating.
-
-Do not provide any other information until the user asks a question.
+Use the requested component, interaction, and product context immediately. Ask
+one concise question only when no animation target or goal can be inferred.
 
 ## Core Philosophy
 
@@ -34,9 +35,14 @@ Two consequences run through everything below:
 
 This file is the decision layer. When you move to code, load the companion reference for the exact recipe:
 
-- **[css-techniques.md](css-techniques.md)** — transitions vs keyframes, transforms, `clip-path`, `@starting-style`, stagger, hover patterns, 3D.
-- **[framer-motion.md](framer-motion.md)** — `motion/react`: `initial`/`animate`/`exit`, spring configs, `AnimatePresence` modes, `layout`/`layoutId`, motion values & hooks, animating height, and the component recipes (drawer, crossfade, morph, shared-element, trash).
-- **[svg-animation.md](svg-animation.md)** — `viewBox`, line-drawing (`stroke-dashoffset`), `transform-box`/origin, path morphing, shakes, ambient "life."
+- **[references/css-techniques.md](references/css-techniques.md)** — transitions vs keyframes, transforms, `clip-path`, `@starting-style`, stagger, hover patterns, 3D.
+- **[references/framer-motion.md](references/framer-motion.md)** — `motion/react`: `initial`/`animate`/`exit`, spring configs, `AnimatePresence` modes, `layout`/`layoutId`, motion values and hooks, animating height, and component recipes.
+- **[references/svg-animation.md](references/svg-animation.md)** — `viewBox`, line drawing (`stroke-dashoffset`), `transform-box` and transform origins, path morphing, shakes, and ambient motion.
+- **[references/interaction-patterns.md](references/interaction-patterns.md)** — implementation examples for sequential tooltips, stable hover targets, trigger-relative popovers, and diagnosing one-pixel shifts.
+
+Use `css-animations` for dedicated CSS implementation guidance and
+`motion-react` for Motion for React implementation guidance. The references
+above preserve focused examples that help apply this skill's motion direction.
 
 Err on the side of loading a reference rather than approximating a value.
 
@@ -50,12 +56,15 @@ Match motion to how often the user sees it:
 
 | Frequency | Decision |
 | --- | --- |
-| 100+/day (keyboard shortcuts, command-palette toggle, arrow-key list nav) | **No animation. Ever.** |
+| 100+/day (keyboard shortcuts, command-palette toggle, arrow-key list nav) | Prefer an immediate state change; omit motion that delays feedback |
 | Tens/day (hover effects, list navigation) | Remove or drastically reduce |
 | Occasional (modals, drawers, toasts) | Standard animation |
 | Rare / first-time (onboarding, feedback, celebrations) | Can add delight |
 
-**Never animate keyboard-initiated actions** — they repeat hundreds of times a day; animation makes them feel slow and disconnected. Raycast has no open/close animation — that's correct for something opened hundreds of times a day. A high-frequency selection highlight should be **instant** (track the cursor exactly), not a smooth fade that trails one step behind.
+Avoid delayed spatial motion on rapidly repeated keyboard actions. Preserve an
+immediate focus or selection change, and add motion only when it communicates a
+state transition without making input feel disconnected. A high-frequency
+selection highlight should track the current item instead of trailing it.
 
 ### 2. What's the purpose?
 
@@ -77,9 +86,13 @@ Easing is the single most important part of an animation — it can make a bad a
 | Constant motion (marquee, spinner, timer, hold-to-delete) | **`linear`** |
 | Default | **`ease-out`** |
 
-**Never use `ease-in` on UI.** It starts slow — delaying the exact moment the user is watching — then accelerates into the stop, the opposite of how things settle.
+Avoid `ease-in` when the user is waiting for the first visible response because
+its slow start can feel delayed. Use it only when that acceleration supports the
+specific transition and survives testing in context.
 
-**Built-in named curves are almost never strong enough.** Their acceleration is too weak, so animations feel flat. Every course example uses a **custom** curve. Prefer **asymmetric** curves (steep start, slow settle) — they feel alive and mimic a spring without one. When an animation feels flat, the curve is probably too weak, not the duration.
+Built-in named curves are useful baselines. When they feel flat in context, try
+a stronger custom curve before changing duration. Asymmetric curves with a fast
+start and slow settle often suit responsive entrances.
 
 Curves worth reaching for:
 
@@ -109,7 +122,7 @@ Keep UI animations **under ~300ms** unless justified. A 180ms dropdown feels mor
 
 **Duration and easing are inseparable.** A steep curve can afford a longer duration (Vaul's 500ms doesn't feel slow because the curve front-loads the movement); a weak curve must be shorter. **Choose the easing first, then tune duration to it.** Duration scales with **element size and travel distance** (a bigger element is heavier). **Exits are shorter and simpler than entries** — the user already decided; get out of the way. Too fast is as bad as too slow. Marketing pages can run longer; product must feel fast.
 
-For transitions whose size varies (an auto-height drawer), make duration **proportional to how much changed** so small changes don't over-animate — see the adaptive-duration recipe in [framer-motion.md](framer-motion.md).
+For transitions whose size varies (an auto-height drawer), make duration **proportional to how much changed** so small changes don't over-animate — see the adaptive-duration recipe in [references/framer-motion.md](references/framer-motion.md).
 
 ## Physicality
 
@@ -127,7 +140,11 @@ For transitions whose size varies (an auto-height drawer), make duration **propo
 
 ## Springs
 
-Springs simulate physics (mass, stiffness/tension, damping) with no fixed duration, so they feel organic and alive. Reach for them for: drag with momentum, "alive" elements (Dynamic Island), interruptible gestures, and cursor-following. Simple color/opacity changes don't need a spring. Real springs are impossible in pure CSS (only approximable with `linear()`).
+Springs model velocity and settling through mass, stiffness, and damping; some
+libraries also expose duration-and-bounce controls. Reach for them for drag with
+momentum, interruptible gestures, and cursor-following. Simple color or opacity
+changes rarely need a spring. CSS can approximate a sampled spring with
+`linear()`, while a runtime spring can react continuously to changed input.
 
 ```js
 // Apple / Motion style (easier to reason about) — great for UI text/state swaps
@@ -144,17 +161,20 @@ Springs simulate physics (mass, stiffness/tension, damping) with no fixed durati
 
 ## Interruptibility
 
-Anything triggered rapidly (toasts, toggles, drawers, accordions, drags) must animate **from its current state**, not restart. CSS **transitions** and **springs** are interruptible; `@keyframes` restart from zero and make new items jump. Prefer transitions/springs for dynamic UI, and `@keyframes` only for autonomous, looping, or one-shot motion. Use `@starting-style` to animate an enter without JS — see [css-techniques.md](css-techniques.md).
+Anything triggered rapidly (toasts, toggles, drawers, accordions, drags) must animate **from its current state**, not restart. CSS **transitions** and **springs** are interruptible; `@keyframes` restart from zero and make new items jump. Prefer transitions/springs for dynamic UI, and `@keyframes` only for autonomous, looping, or one-shot motion. Use `@starting-style` to animate an enter without JS — see [references/css-techniques.md](references/css-techniques.md).
 
 ## Performance
 
-**The golden rule: only animate `transform` and `opacity`.** They run on the GPU (Composite step only). `width`/`height`/`margin`/`padding`/`top`/`left` trigger Layout + Paint + Composite and drop frames. Prefer `transform: translate` (percentages — relative to the element's own size) over `margin`/`top`, and `scale` over animating dimensions. Target 60fps (≤16.7ms/frame).
+Prefer `transform` and `opacity`; they usually avoid layout and paint. Layout
+properties such as `width`, `height`, `margin`, and positional offsets are more
+expensive candidates, but their real cost depends on the page. CSS and WAAPI can
+move eligible work away from JavaScript's main-thread workload, but browser
+promotion is not guaranteed. Profile the actual interaction before changing
+library syntax or adding `will-change`, containment, or forced layers.
 
-- **Framer Motion `x`/`y`/`scale` shorthands are not hardware-accelerated** — they run on the main thread via rAF. When motion must stay smooth under load, animate the full `transform` string.
-- **Don't drive child transforms through a CSS variable on a shared parent** — inherited vars recalc styles for all descendants (the Vaul lag past ~20 items). Set `transform` directly on the element.
-- **CSS/WAAPI beat JS under load** — they run off the main thread. Use CSS for predetermined motion, JS for dynamic/interruptible.
-- **`will-change: transform`** fixes 1px GPU/CPU shift and promotes heavy/filtered elements to their own layer — but add it (and `contain: layout style paint`, `translateZ(0)`) **only once you see dropped frames**; too many layers cost memory.
-- **Keep animated `blur()` ≤ ~20px** — blur gets laggy fast, especially in Safari.
+Inherited CSS variables can expand style-recalculation work across descendants,
+and large animated blurs can be costly. Treat both as profiling leads rather
+than universal diagnoses.
 
 For the full frame-budget model (the Layout/Paint/Composite pipeline, main-thread vs GPU, React re-renders, and a diagnosis checklist for dropped frames), use the `animation-performance` skill.
 
@@ -174,33 +194,42 @@ Stagger group entrances 30–80ms apart — longer feels slow, and stagger is de
 
 ## Accessibility
 
-**Reduced motion means gentler, not zero.** Keep transitions that aid comprehension (opacity/color); remove movement and position changes. For purely decorative motion, disable it entirely (a lingering float would falsely imply interactivity).
+Under reduced motion, remove or reduce spatial movement, zooming, parallax, and
+decorative loops. Preserve meaning with an instant change or a restrained
+non-spatial transition such as opacity or color when that helps comprehension.
 
 ```css
 @media (prefers-reduced-motion: reduce) {
-  .element { animation: fade 0.2s ease; } /* replace movement, don't just delete */
+  .element { animation: fade 0.2s ease; }
 }
 @media (hover: hover) and (pointer: fine) {
   .element:hover { transform: scale(1.02); } /* gate hover — touch fires false hovers on tap */
 }
 ```
 
-In Framer Motion, `useReducedMotion()` branches values, and `<MotionConfig reducedMotion="user">` animates only opacity/background app-wide. Make tap targets **≥ 44×44px** (enlarge with an invisible `::before` hitbox). On touch, hover+click fire together — detect `pointer: coarse` and use a two-tap pattern (first tap = hover, second = click).
+In Motion for React, `useReducedMotion()` can branch values, and
+`<MotionConfig reducedMotion="user">` disables transform and layout animation
+while preserving effects such as opacity and background-color changes. Confirm
+target sizing and touch behavior against the product's accessibility
+requirements rather than relying on hover as an interaction step.
 
 For the two-variant workflow and the recipes for autoplaying media, looping animation, and smooth scrolling, use the `animation-accessibility` skill.
 
 ## Process
 
-Great animations take iteration, not one sitting.
+Great animations take iteration.
 
 - **Record and scrub** the reference (and your own work) frame by frame; tune magic transform values live in the console.
-- **Don't code and ship in one sitting** — review with fresh eyes the next day (Sonner's transitions were replayed and tweaked daily for days).
+- When the schedule permits, take a fresh-eye pass after a break; do not pause
+  authorized work or delay delivery solely to wait for another day.
 - **Test gestures on real devices** (hit the dev server by IP; opacity-heavy motion wants high-refresh screens).
 - Steal like an artist: recreate great animations by studying proven products rather than inventing patterns.
 
 ## Review Format (when asked to review)
 
-If asked to review animation code, output a single markdown table — never a "Before:/After:" list.
+Follow the user's requested review format. When no format is specified, use a
+compact Markdown table so each issue keeps the current behavior, proposed
+change, and reason together.
 
 | Before | After | Why |
 | --- | --- | --- |

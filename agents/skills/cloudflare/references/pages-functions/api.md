@@ -3,15 +3,16 @@
 ## EventContext
 
 ```typescript
-interface EventContext<Env = any> {
+// Abridged illustration only; use generated EventContext/PagesFunction in code.
+interface ExampleEventContext<Env = unknown> {
   request: Request;              // Incoming request
   functionPath: string;          // Request path
-  waitUntil(promise: Promise<any>): void;  // Background tasks (non-blocking)
+  waitUntil(promise: Promise<unknown>): void;  // Background tasks (non-blocking)
   passThroughOnException(): void;          // Fallback to static on error
   next(input?: Request | string, init?: RequestInit): Promise<Response>;
   env: Env;                      // Bindings, vars, secrets
   params: Record<string, string | string[]>;  // Route params ([user] or [[catchall]])
-  data: any;                     // Middleware shared state
+  data: Record<string, unknown>;                     // Middleware shared state
 }
 ```
 
@@ -21,16 +22,16 @@ interface EventContext<Env = any> {
 
 ```typescript
 // Generic (fallback for any method)
-export async function onRequest(ctx: EventContext): Promise<Response> {
+export async function onRequest(ctx: EventContext<Env, string, Record<string, unknown>>): Promise<Response> {
   return new Response('Any method');
 }
 
 // Method-specific (takes precedence over generic)
-export async function onRequestGet(ctx: EventContext): Promise<Response> {
+export async function onRequestGet(ctx: EventContext<Env, string, Record<string, unknown>>): Promise<Response> {
   return Response.json({ message: 'GET' });
 }
 
-export async function onRequestPost(ctx: EventContext): Promise<Response> {
+export async function onRequestPost(ctx: EventContext<Env, string, Record<string, unknown>>): Promise<Response> {
   const body = await ctx.request.json();
   return Response.json({ received: body });
 }
@@ -60,7 +61,7 @@ See [configuration.md](./configuration.md) for wrangler.jsonc examples.
 ```typescript
 interface Env { KV: KVNamespace; }
 export const onRequest: PagesFunction<Env> = async (ctx) => {
-  await ctx.env.KV.put('key', 'value', { expirationTtl: 3600 });
+  await ctx.env.KV.put('key', JSON.stringify('value'), { expirationTtl: 3600 });
   const val = await ctx.env.KV.get('key', { type: 'json' });
   const keys = await ctx.env.KV.list({ prefix: 'user:' });
   return Response.json({ val });
@@ -84,7 +85,6 @@ interface Env { BUCKET: R2Bucket; }
 export const onRequest: PagesFunction<Env> = async (ctx) => {
   const obj = await ctx.env.BUCKET.get('file.txt');
   if (!obj) return new Response('Not found', { status: 404 });
-  await ctx.env.BUCKET.put('file.txt', ctx.request.body);
   return new Response(obj.body);
 };
 ```
@@ -104,7 +104,7 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
 ```typescript
 interface Env { AI: Ai; }
 export const onRequest: PagesFunction<Env> = async (ctx) => {
-  const resp = await ctx.env.AI.run('@cf/meta/llama-3.1-8b-instruct', { prompt: 'Hello' });
+  const resp = await ctx.env.AI.run('@cf/meta/llama-3.1-8b-instruct-fp8', { prompt: 'Hello' });
   return Response.json(resp);
 };
 ```
@@ -112,13 +112,11 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
 ### Service Bindings & Env Vars
 
 ```typescript
-interface Env { AUTH: Fetcher; API_KEY: string; }
+interface Env { AUTH: Fetcher; API_URL: string; }
 export const onRequest: PagesFunction<Env> = async (ctx) => {
   // Service binding: forward to another Worker
   return ctx.env.AUTH.fetch(ctx.request);
-  
-  // Environment variable
-  return Response.json({ key: ctx.env.API_KEY });
+
 };
 ```
 

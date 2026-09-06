@@ -4,7 +4,7 @@
 
 ## Explanation
 
-When using TanStack Router with TanStack Query, let Query be the single source of truth for caching. Disable Router's built-in cache with `defaultPreloadStaleTime: 0` to avoid confusion about which cache is authoritative.
+When using TanStack Router with TanStack Query, let Query be the single source of truth for caching. Set `defaultPreloadStaleTime: 0` so preloads invoke the loader and let Query decide whether to fetch. This setting does not disable Router's route-match cache.
 
 ## Bad Example
 
@@ -40,7 +40,7 @@ function PostsPage() {
 ## Good Example
 
 ```tsx
-// router.tsx - Disable router cache when using Query
+// router.tsx - Delegate preload freshness to Query
 import { QueryClient } from '@tanstack/react-query'
 import { createRouter } from '@tanstack/react-router'
 import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query'
@@ -95,7 +95,7 @@ function PostsPage() {
 | Feature | Router Cache | Query Cache |
 |---------|-------------|-------------|
 | Invalidation | Manual/time-based | Query keys, patterns |
-| Background refetch | No | Yes |
+| Background refetch | Stale-while-revalidate loaders | Yes |
 | Optimistic updates | No | Yes |
 | Mutations | No built-in | Full support |
 | DevTools | Limited | Rich debugging |
@@ -157,7 +157,9 @@ export function getRouter() {
 // When user hovers a Link:
 // 1. Router triggers preload
 // 2. Loader runs ensureQueryData
-// 3. Query checks its cache - fresh? skip fetch. stale? refetch.
+// 3. ensureQueryData returns any cached data; only missing data blocks on fetch.
+//    Set revalidateIfStale: true for background stale refresh, or use fetchQuery
+//    when the loader must await fresh data.
 // 4. User clicks - data already in Query cache
 ```
 

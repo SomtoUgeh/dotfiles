@@ -9,7 +9,7 @@ Queues provide:
 - Push-based (Worker) and pull-based (HTTP) consumers
 - Configurable batching and retries
 - Dead Letter Queues (DLQ)
-- Delays up to 12 hours
+- Delays up to 24 hours
 
 **Use cases:** Async processing, API buffering, rate limiting, event workflows, deferred jobs
 
@@ -43,8 +43,8 @@ export default {
 
 **Before using Queues, understand these production mistakes:**
 
-1. **Uncaught errors retry ENTIRE batch** (not just failed message). Always use per-message try/catch.
-2. **Messages not ack'd/retry'd will auto-retry forever** until max_retries. Always explicitly handle each message.
+1. **A successful handler automatically acknowledges messages** unless explicitly marked for retry. Catching an error and merely logging it can therefore lose the failed work.
+2. **Failure retries messages that were not already acknowledged.** Explicit per-message acknowledgements survive a later batch failure. Use `msg.retry()` for caught failures.
 
 See [gotchas.md](./gotchas.md) for detailed solutions.
 
@@ -66,7 +66,7 @@ See [gotchas.md](./gotchas.md) for detailed solutions.
 
 - Max 10,000 queues per account
 - 5,000 msgs/second per queue
-- 4-14 day retention (configurable)
+- Paid retention configurable up to 14 days; Free retention is 24 hours
 
 ## Reading Order
 

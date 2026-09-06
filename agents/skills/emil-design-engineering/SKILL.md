@@ -1,16 +1,32 @@
 ---
 name: emil-design-engineering
-description: "Design engineering principles and patterns for building polished, accessible web interfaces. Use this skill when building UI components, reviewing frontend code, implementing forms, handling touch interactions, optimizing performance, or creating marketing pages. Triggers on: design engineering, UI polish, input fields, form validation, button states, touch devices, mobile UX, accessibility, a11y, keyboard navigation, aria labels, font rendering, typography, layout shift, z-index, animations, transitions, easing, hover effects, tap targets, iOS Safari, prefers-reduced-motion, marketing pages, landing pages, dark mode, theme switching, scrollbars, gradients, shadows, virtualization, preloading."
+description: "Apply Emil Kowalski's design-engineering craft to polished, accessible web interfaces. Use for broad UI review and implementation across forms, controls, touch behavior, typography, layout stability, component APIs, marketing pages, and performance, or for a focused local polish pass when an interface feels off. Route deep motion work to the focused motion skills."
 ---
 
 # Emil's Design Engineering Principles
 
 A comprehensive guide for building polished, accessible web interfaces based on Emil Kowalski's design engineering practices.
 
+## Choose the scope
+
+- **Broad design-engineering pass:** read the references that match the surface
+  being built or reviewed. Check structure, interaction, accessibility, visual
+  craft, and performance together.
+- **Focused polish pass:** when a component or small region "feels off," read
+  [focused-polish.md](focused-polish.md). Keep the pass local unless the cause is
+  a shared token, primitive, or layout rule.
+
+For motion work, follow
+[../animate/references/canonical-policy.md](../animate/references/canonical-policy.md)
+as the canonical policy. It wins when this skill or a companion reference makes
+a stronger or conflicting claim. Route to `animate`, `css-animations`,
+`animation-performance`, or `animation-accessibility` as appropriate.
+
 ## Quick Reference
 
 | Category                                        | When to Use                                          |
 | ----------------------------------------------- | ---------------------------------------------------- |
+| [Focused Polish](focused-polish.md)             | Local spacing, type, surfaces, states, optical fixes |
 | [Animations](animations.md)                     | Enter/exit transitions, easing, springs, performance |
 | [UI Polish](ui-polish.md)                       | Typography, visual design, layout, colors            |
 | [Forms & Controls](forms-controls.md)           | Inputs, buttons, form submission                     |
@@ -28,7 +44,7 @@ Dynamic elements should cause no layout shift. Use hardcoded dimensions, `font-v
 
 ### 2. Touch-First, Hover-Enhanced
 
-Design for touch first, then add hover enhancements. Disable hover effects on touch devices. Ensure 44px minimum tap targets. Never rely on hover for core functionality.
+Design for touch first, then add hover enhancements. Disable hover effects on touch devices. Meet the WCAG target-size baseline and aim for a comfortable 44px touch target. Never rely on hover for core functionality.
 
 ### 3. Keyboard Navigation
 
@@ -76,7 +92,7 @@ Is the element entering or exiting?
 | `transition: all`           | Specify exact properties                    |
 | Hover effects on touch      | Use `@media (hover: hover)`                 |
 | Font weight change on hover | Use consistent weights                      |
-| Animating `height`/`width`  | Use `transform` and `opacity` only          |
+| Costly layout animation     | Prefer transform/opacity; profile the flow |
 | No reduced motion support   | Add `prefers-reduced-motion` query          |
 | z-index: 9999               | Use fixed scale or `isolation: isolate`     |
 | Custom page scrollbars      | Only customize scrollbars in small elements |
@@ -87,7 +103,7 @@ When reviewing UI code, check:
 
 - [ ] No layout shift on dynamic content
 - [ ] Animations have reduced motion support
-- [ ] Touch targets are 44px minimum
+- [ ] Pointer targets meet WCAG 2.2 AA; touch-heavy controls aim for 44px
 - [ ] Hover effects disabled on touch devices
 - [ ] Keyboard navigation works properly
 - [ ] Icon buttons have aria labels
@@ -101,6 +117,7 @@ When reviewing UI code, check:
 For detailed guidance on specific topics:
 
 - [animations.md](animations.md) - Easing, timing, springs, performance
+- [focused-polish.md](focused-polish.md) - Local visual diagnosis and high-value detail work
 - [ui-polish.md](ui-polish.md) - Typography, shadows, gradients, scrollbars
 - [forms-controls.md](forms-controls.md) - Inputs, buttons, form patterns
 - [touch-accessibility.md](touch-accessibility.md) - Touch devices, keyboard nav, a11y

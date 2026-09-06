@@ -5,8 +5,8 @@ Expert guidance for building, deploying, and optimizing Cloudflare Workers appli
 ## Overview
 
 Cloudflare Workers run on V8 isolates (NOT containers/VMs):
-- Extremely fast cold starts (< 1ms)
-- Global deployment across 300+ locations
+- Low startup overhead; measure the actual bundle and workload
+- Global deployment across Cloudflare's network
 - Web standards compliant (fetch, URL, Headers, Request, Response)
 - Support JS/TS, Python, Rust, and WebAssembly
 
@@ -64,7 +64,7 @@ npx wrangler dev
 async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response>
 
 // Cron triggers
-async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void>
+async scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void>
 
 // Queue consumer
 async queue(batch: MessageBatch, env: Env, ctx: ExecutionContext): Promise<void>

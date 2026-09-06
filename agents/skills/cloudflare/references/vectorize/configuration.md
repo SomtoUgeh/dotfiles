@@ -1,88 +1,32 @@
-# Vectorize Configuration
-
-## Create Index
+# Vectorize configuration
 
 ```bash
-npx wrangler vectorize create my-index --dimensions=768 --metric=cosine
+wrangler vectorize create documents --dimensions=768 --metric=cosine
+wrangler vectorize create-metadata-index documents --property-name=category --type=string
+wrangler vectorize create-metadata-index documents --property-name=updated --type=number
 ```
 
-**⚠️ Dimensions and metric are immutable** - cannot change after creation.
-
-## Worker Binding
-
 ```jsonc
-// wrangler.jsonc
 {
+  "name": "document-search",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-05",
+  "ai": { "binding": "AI", "remote": true },
   "vectorize": [
-    { "binding": "VECTORIZE", "index_name": "my-index" }
+    { "binding": "VECTORIZE", "index_name": "documents", "remote": true }
   ]
 }
 ```
 
-```typescript
-interface Env {
-  VECTORIZE: Vectorize;
-}
-```
-
-## Metadata Indexes
-
-**Must create BEFORE inserting vectors** - existing vectors not retroactively indexed.
-
 ```bash
-wrangler vectorize create-metadata-index my-index --property-name=category --type=string
-wrangler vectorize create-metadata-index my-index --property-name=price --type=number
+wrangler types
+wrangler dev
 ```
 
-| Type | Use For |
-|------|---------|
-| `string` | Categories, tags (first 64 bytes indexed) |
-| `number` | Prices, timestamps |
-| `boolean` | Flags |
+Local Worker execution can connect to remote AI/Vectorize bindings; those calls use real account resources. Use mocks for offline tests. Declare bindings again for named environments instead of assuming inheritance.
 
-## CLI Commands
+For HTTP/CLI ingestion use valid NDJSON: one complete vector object per line, with exactly the index's number of numeric values. Ellipses are explanatory notation, never valid vectors. Keep generated files within the HTTP payload and vector-count limits. Inspect `wrangler vectorize --help` and the relevant subcommand help for the installed CLI before using ID-list or mutation options.
 
-```bash
-# Index management
-wrangler vectorize list
-wrangler vectorize info <index-name>
-wrangler vectorize delete <index-name>
+Index dimensions and metric are design choices, not query-time options. Build a new index and migrate/re-embed if they need to change. Create metadata indexes before ingestion and plan re-insertion of existing records when adding indexes.
 
-# Vector operations
-wrangler vectorize insert <index-name> --file=embeddings.ndjson
-wrangler vectorize get <index-name> --ids=id1,id2
-wrangler vectorize delete-by-ids <index-name> --ids=id1,id2
-
-# Metadata indexes
-wrangler vectorize list-metadata-index <index-name>
-wrangler vectorize delete-metadata-index <index-name> --property-name=field
-```
-
-## Bulk Upload (NDJSON)
-
-```json
-{"id": "1", "values": [0.1, 0.2, ...], "metadata": {"category": "docs"}}
-{"id": "2", "values": [0.4, 0.5, ...], "namespace": "tenant-abc"}
-```
-
-**Limits:** 5000 vectors per file, 100 MB max
-
-## Cardinality Best Practice
-
-Bucket high-cardinality data:
-```typescript
-// ❌ Millisecond timestamps
-metadata: { timestamp: Date.now() }
-
-// ✅ 5-minute buckets
-metadata: { timestamp_bucket: Math.floor(Date.now() / 300000) * 300000 }
-```
-
-## Production Checklist
-
-1. Create index with correct dimensions
-2. Create metadata indexes FIRST
-3. Test bulk upload
-4. Configure bindings
-5. Deploy Worker
-6. Verify queries
+[Wrangler commands](https://developers.cloudflare.com/vectorize/reference/wrangler-commands/) · [Bindings](https://developers.cloudflare.com/workers/local-development/bindings-per-env/)

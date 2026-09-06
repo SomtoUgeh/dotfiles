@@ -1,191 +1,68 @@
-# Architecture Patterns
+# Pulumi Architecture Patterns
 
-## Component Resources
+## Component resources
+
+Use components for actual shared ownership. Declare outputs, parent child resources, and register outputs:
 
 ```typescript
+interface WorkerAppArgs {
+  accountId: pulumi.Input<string>;
+  code: pulumi.Input<string>;
+}
 class WorkerApp extends pulumi.ComponentResource {
-    constructor(name: string, args: WorkerAppArgs, opts?) {
-        super("custom:cloudflare:WorkerApp", name, {}, opts);
-        const defaultOpts = {parent: this};
+  readonly worker: cloudflare.WorkerScript;
+  readonly kv: cloudflare.WorkersKvNamespace;
 
-        this.kv = new cloudflare.WorkersKvNamespace(`${name}-kv`, {accountId: args.accountId, title: `${name}-kv`}, defaultOpts);
-        this.worker = new cloudflare.WorkerScript(`${name}-worker`, {
-            accountId: args.accountId, name: `${name}-worker`, content: args.workerCode,
-            module: true, kvNamespaceBindings: [{name: "KV", namespaceId: this.kv.id}],
-        }, defaultOpts);
-        this.domain = new cloudflare.WorkersDomain(`${name}-domain`, {
-            accountId: args.accountId, hostname: args.domain, service: this.worker.name,
-        }, defaultOpts);
-    }
+  constructor(name: string, args: WorkerAppArgs, opts?: pulumi.ComponentResourceOptions) {
+    super('example:cloudflare:WorkerApp', name, {}, opts);
+    this.kv = new cloudflare.WorkersKvNamespace(`${name}-kv`, {
+      accountId: args.accountId, title: `${name}-kv`,
+    }, { parent: this });
+    this.worker = new cloudflare.WorkerScript(`${name}-worker`, {
+      accountId: args.accountId, scriptName: `${name}-worker`,
+      mainModule: 'index.js', content: args.code, compatibilityDate: '2026-09-05',
+      bindings: [{ type: 'kv_namespace', name: 'KV', namespaceId: this.kv.id }],
+    }, { parent: this });
+    this.registerOutputs({ scriptName: this.worker.scriptName, namespaceId: this.kv.id });
+  }
 }
 ```
 
-## Full-Stack Worker App
+## Full-stack and service-bound applications
+
+Create storage once and pass its outputs to the Worker's `bindings` array; see [configuration.md](configuration.md). For microservices, use `{ type: 'service', name: 'AUTH', service: authWorker.scriptName }`. Keep credentials in secret Outputs and choose resource names per stack, such as `app-${pulumi.getStack()}`.
+
+For event processing, create `Queue` and `QueueConsumer` separately. The producer binding uses `queueName`; the consumer uses `queueId` and the consumer Worker's `scriptName`. Runtime retries and idempotency remain application responsibilities, not infrastructure guarantees.
+
+## Build before infrastructure evaluation
+
+Build in CI before `pulumi preview`/`pulumi up`, then load the resulting artifact. Reading the file during evaluation requires it to exist at preview time too.
+
+If a Pulumi command owns the build, include both `create` and `update` commands and a deterministic source hash trigger. `dependsOn` only orders execution; it does not rerun an unchanged command when source files change. Avoid using stdout as a fake build-content hash.
+
+For file-backed script content:
 
 ```typescript
-const kv = new cloudflare.WorkersKvNamespace("cache", {accountId, title: "api-cache"});
-const db = new cloudflare.D1Database("db", {accountId, name: "app-database"});
-const bucket = new cloudflare.R2Bucket("assets", {accountId, name: "app-assets"});
-
-const apiWorker = new cloudflare.WorkerScript("api", {
-    accountId, name: "api-worker", content: fs.readFileSync("./dist/api.js", "utf8"),
-    module: true, kvNamespaceBindings: [{name: "CACHE", namespaceId: kv.id}],
-    d1DatabaseBindings: [{name: "DB", databaseId: db.id}],
-    r2BucketBindings: [{name: "ASSETS", bucketName: bucket.name}],
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+const contentFile = './dist/index.js';
+const contentSha256 = createHash('sha256').update(readFileSync(contentFile)).digest('hex');
+const worker = new cloudflare.WorkerScript('worker', {
+  accountId, scriptName: 'app-worker', mainModule: 'index.js',
+  contentFile, contentSha256, compatibilityDate: '2026-09-05',
 });
 ```
 
-## Multi-Environment Setup
+Do not add `Date.now()` bindings to force every run to redeploy. Changes in actual content or its hash should drive updates.
 
-```typescript
-const stack = pulumi.getStack();
-const worker = new cloudflare.WorkerScript(`worker-${stack}`, {
-    accountId, name: `my-worker-${stack}`, content: code,
-    plainTextBindings: [{name: "ENVIRONMENT", text: stack}],
-});
-```
+## D1 migration sequencing
 
-## Queue-Based Processing
+Create/resolve the database, apply versioned migrations against the intended remote database, and deploy code that needs that schema. Make the migration step depend on the database and the deployment depend on successful migration. Include migration-content changes in update triggers; do not use an untracked `CREATE TABLE` side effect in `apply()`.
 
-```typescript
-const queue = new cloudflare.Queue("processing-queue", {accountId, name: "image-processing"});
+## Local Wrangler configuration
 
-// Producer: API receives requests
-const apiWorker = new cloudflare.WorkerScript("api", {
-    accountId, name: "api-worker", content: apiCode,
-    queueBindings: [{name: "PROCESSING_QUEUE", queue: queue.id}],
-});
+Decide which system owns bindings and deployment. Export a plain JSON configuration artifact from resolved non-secret stack outputs using a dedicated build/CI step, rather than interpolating arbitrary values into shell heredocs. Preserve a tested compatibility date and local-versus-remote resource semantics. Secrets belong in local secret files or environment configuration, never generated committed config.
 
-// Consumer: Process async
-const processorWorker = new cloudflare.WorkerScript("processor", {
-    accountId, name: "processor-worker", content: processorCode,
-    queueConsumers: [{queue: queue.name, maxBatchSize: 10, maxRetries: 3, maxWaitTimeMs: 5000}],
-    r2BucketBindings: [{name: "OUTPUT_BUCKET", bucketName: outputBucket.name}],
-});
-```
+## Gradual rollouts
 
-## Microservices with Service Bindings
-
-```typescript
-const authWorker = new cloudflare.WorkerScript("auth", {accountId, name: "auth-service", content: authCode});
-const apiWorker = new cloudflare.WorkerScript("api", {
-    accountId, name: "api-service", content: apiCode,
-    serviceBindings: [{name: "AUTH", service: authWorker.name}],
-});
-```
-
-## Event-Driven Architecture
-
-```typescript
-const eventQueue = new cloudflare.Queue("events", {accountId, name: "event-bus"});
-const producer = new cloudflare.WorkerScript("producer", {
-    accountId, name: "api-producer", content: producerCode,
-    queueBindings: [{name: "EVENTS", queue: eventQueue.id}],
-});
-const consumer = new cloudflare.WorkerScript("consumer", {
-    accountId, name: "email-consumer", content: consumerCode,
-    queueConsumers: [{queue: eventQueue.name, maxBatchSize: 10}],
-});
-```
-
-## v6.x Versioned Deployments (Blue-Green/Canary)
-
-```typescript
-const worker = new cloudflare.Worker("api", {accountId, name: "api-worker"});
-const v1 = new cloudflare.WorkerVersion("v1", {accountId, workerId: worker.id, content: fs.readFileSync("./dist/v1.js", "utf8"), compatibilityDate: "2025-01-01"});
-const v2 = new cloudflare.WorkerVersion("v2", {accountId, workerId: worker.id, content: fs.readFileSync("./dist/v2.js", "utf8"), compatibilityDate: "2025-01-01"});
-
-// Gradual rollout: 10% v2, 90% v1
-const deployment = new cloudflare.WorkersDeployment("canary", {
-    accountId, workerId: worker.id,
-    versions: [{versionId: v2.id, percentage: 10}, {versionId: v1.id, percentage: 90}],
-    kvNamespaceBindings: [{name: "MY_KV", namespaceId: kv.id}],
-});
-```
-
-**Use:** Canary releases, A/B testing, blue-green. Most apps use `WorkerScript` (auto-versioning).
-
-## Wrangler.toml Generation (Bridge IaC with Local Dev)
-
-Generate wrangler.toml from Pulumi config to keep local dev in sync:
-
-```typescript
-import * as command from "@pulumi/command";
-
-const workerConfig = {
-    name: "my-worker",
-    compatibilityDate: "2025-01-01",
-    compatibilityFlags: ["nodejs_compat"],
-};
-
-// Create resources
-const kv = new cloudflare.WorkersKvNamespace("kv", {accountId, title: "my-kv"});
-const db = new cloudflare.D1Database("db", {accountId, name: "my-db"});
-const bucket = new cloudflare.R2Bucket("bucket", {accountId, name: "my-bucket"});
-
-// Generate wrangler.toml after resources created
-const wranglerGen = new command.local.Command("gen-wrangler", {
-    create: pulumi.interpolate`cat > wrangler.toml <<EOF
-name = "${workerConfig.name}"
-main = "src/index.ts"
-compatibility_date = "${workerConfig.compatibilityDate}"
-compatibility_flags = ${JSON.stringify(workerConfig.compatibilityFlags)}
-
-[[kv_namespaces]]
-binding = "MY_KV"
-id = "${kv.id}"
-
-[[d1_databases]]
-binding = "DB"
-database_id = "${db.id}"
-database_name = "${db.name}"
-
-[[r2_buckets]]
-binding = "MY_BUCKET"
-bucket_name = "${bucket.name}"
-EOF`,
-}, {dependsOn: [kv, db, bucket]});
-
-// Deploy worker after wrangler.toml generated
-const worker = new cloudflare.WorkerScript("worker", {
-    accountId, name: workerConfig.name, content: code,
-    compatibilityDate: workerConfig.compatibilityDate,
-    compatibilityFlags: workerConfig.compatibilityFlags,
-    kvNamespaceBindings: [{name: "MY_KV", namespaceId: kv.id}],
-    d1DatabaseBindings: [{name: "DB", databaseId: db.id}],
-    r2BucketBindings: [{name: "MY_BUCKET", bucketName: bucket.name}],
-}, {dependsOn: [wranglerGen]});
-```
-
-**Benefits:**
-- `wrangler dev` uses same bindings as production
-- No config drift between Pulumi and local dev
-- Single source of truth (Pulumi config)
-
-**Alternative:** Read wrangler.toml in Pulumi (reverse direction) if wrangler is source of truth
-
-## Build + Deploy Pattern
-
-```typescript
-import * as command from "@pulumi/command";
-const build = new command.local.Command("build", {create: "npm run build", dir: "./worker"});
-const worker = new cloudflare.WorkerScript("worker", {
-    accountId, name: "my-worker",
-    content: build.stdout.apply(() => fs.readFileSync("./worker/dist/index.js", "utf8")),
-}, {dependsOn: [build]});
-```
-
-## Content SHA Pattern (Force Updates)
-
-Prevent false "no changes" detections:
-
-```typescript
-const version = Date.now().toString();
-const worker = new cloudflare.WorkerScript("worker", {
-    accountId, name: "my-worker", content: code,
-    plainTextBindings: [{name: "VERSION", text: version}], // Forces deployment
-});
-```
-
----
-See: [README.md](./README.md), [configuration.md](./configuration.md), [api.md](./api.md), [gotchas.md](./gotchas.md)
+Use the versioning pattern in [api.md](api.md). Bindings travel with versions; a deployment only selects percentages. Ensure schema changes and Durable Object migrations are compatible with all simultaneously active versions, then validate the real route before increasing traffic.

@@ -73,7 +73,7 @@ Workers datasets also support `datetimeSixHours`.
 
 ### HTTP Request Dimensions (httpRequestsAdaptiveGroups)
 
-83 dimensions available. Key ones:
+Available dimensions depend on the current schema. Examples to verify:
 
 | Dimension | Description |
 |-----------|-------------|
@@ -131,7 +131,7 @@ httpRequestsAdaptiveGroups(
 | `_like` / `_notlike` | SQL LIKE with `%` | `clientRequestPath_like: "/api/%"` |
 | `_has` / `_hasall` / `_hasany` | array contains | `botDetectionIds_has: "abc"` |
 
-> `_notin` and `_notlike` are in the schema but not in official docs. Confirmed via introspection.
+> Filter operators vary by dataset. Inspect the active input type before using `_notin` or `_notlike`; no account-specific introspection has been performed by this reference.
 
 ### Boolean Operators (AND / OR)
 
@@ -145,17 +145,7 @@ filter: { datetime_gt: "...", OR: [{ edgeResponseStatus: 403 }, { edgeResponseSt
 
 ## Pagination & Sorting
 
-No cursor-based pagination. Use `limit`, `orderBy`, and filter-based offsets:
-
-```graphql
-# First page
-httpRequestsAdaptiveGroups(filter: { datetime_gt: "..." }, limit: 100, orderBy: [datetime_ASC])
-
-# Next page: filter by last seen value from previous page
-httpRequestsAdaptiveGroups(filter: { datetime_gt: "2025-01-01T01:35:00Z" }, limit: 100, orderBy: [datetime_ASC])
-```
-
-Sort with `orderBy: [field_ASC]` or `[field_DESC]`. Multiple sort fields supported.
+Use the dataset's documented limit, ordering, and filters. A datetime-only next-page filter using datetime_gt skips other rows tied at the last timestamp. Use a supported stable compound ordering and matching continuation predicate, or partition time into non-overlapping windows and reconcile each against the result limit. If one time bucket alone exceeds the limit, split another supported dimension or report truncation; never claim completeness from a full page.
 
 ## Settings Node
 

@@ -21,12 +21,15 @@ const uploadData = await client.stream.directUpload.create({
 // Returns: { uploadURL: string, uid: string }
 ```
 
-**Frontend: Upload file**
+**Frontend: Upload file (basic POST, under 200 MB)**
 ```typescript
 async function uploadVideo(file: File, uploadURL: string) {
   const formData = new FormData();
   formData.append('file', file);
-  return fetch(uploadURL, { method: 'POST', body: formData }).then(r => r.json());
+  const response = await fetch(uploadURL, { method: 'POST', body: formData });
+  if (!response.ok) throw new Error(`Upload failed: ${response.status}`);
+  // Success is HTTP 200; do not assume a JSON response body.
+  return response;
 }
 ```
 
@@ -89,11 +92,16 @@ async function getSignedToken(accountId: string, videoId: string, apiToken: stri
       headers: { 'Authorization': `Bearer ${apiToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         exp: Math.floor(Date.now() / 1000) + 3600,
-        accessRules: [{ type: 'ip.geoip.country', action: 'allow', country: ['US'] }]
+        accessRules: [{ type: 'ip.geoip.country', action: 'allow', country: ['US'] }, { type: 'any', action: 'block' }]
       })
     }
   );
-  return (await response.json()).result.token;
+  if (!response.ok) throw new Error(`Token request failed: ${response.status}`);
+  const data: unknown = await response.json();
+  if (typeof data !== 'object' || data === null || !('success' in data) || data.success !== true ||
+      !('result' in data) || typeof data.result !== 'object' || data.result === null ||
+      !('token' in data.result) || typeof data.result.token !== 'string') throw new Error('Invalid token response');
+  return data.result.token;
 }
 
 // High volume: Self-sign with RS256 JWT (see "Self-Sign JWT" in patterns.md)
@@ -123,19 +131,16 @@ async function uploadCaption(
 
 ### Generate AI Captions
 
+Stream has its own caption generation endpoint; a Workers AI binding is not required.
+
 ```typescript
-// TODO: Requires Workers AI integration - see workers-ai reference
-async function generateAICaptions(accountId: string, videoId: string, apiToken: string) {
-  return fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}/stream/${videoId}/captions/generate`,
-    {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ language: 'en' })
-    }
-  ).then(r => r.json());
-}
+await client.stream.captions.language.create('en', {
+  account_id: env.CF_ACCOUNT_ID,
+  identifier: videoId,
+});
 ```
+
+The REST path is `/stream/{video_id}/captions/{language}/generate`. Check current supported languages and processing status before displaying captions.
 
 ### Clip Video
 
@@ -163,25 +168,25 @@ async function clipVideo(
 
 ```typescript
 // List videos
-const videos = await client.stream.videos.list({
+const videos = await client.stream.list({
   account_id: env.CF_ACCOUNT_ID,
   search: 'keyword' // optional
 });
 
 // Get video details
-const video = await client.stream.videos.get(videoId, {
+const video = await client.stream.get(videoId, {
   account_id: env.CF_ACCOUNT_ID
 });
 
 // Update video
-await client.stream.videos.update(videoId, {
+await client.stream.edit(videoId, {
   account_id: env.CF_ACCOUNT_ID,
   meta: { title: 'New Title' },
   requireSignedURLs: true
 });
 
 // Delete video
-await client.stream.videos.delete(videoId, {
+await client.stream.delete(videoId, {
   account_id: env.CF_ACCOUNT_ID
 });
 ```

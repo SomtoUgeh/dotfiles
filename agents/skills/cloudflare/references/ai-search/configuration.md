@@ -1,88 +1,46 @@
 # AI Search Configuration
 
-## Worker Setup
+Create or choose an AI Search instance and configure its data source and indexing settings before querying. Supported ingestion formats, source requirements, and capacity must be checked against the current instance documentation.
+
+## Instance binding
 
 ```jsonc
-// wrangler.jsonc
 {
-  "ai": { "binding": "AI" }
+  "ai_search": [{ "binding": "DOCS", "instance_name": "prod-docs" }],
+  "env": {
+    "staging": {
+      "ai_search": [{ "binding": "DOCS", "instance_name": "staging-docs" }]
+    }
+  }
+}
+```
+
+Bindings are environment-specific; configure each environment explicitly.
+
+## Namespace binding
+
+Use a namespace when the application must select among authorized instances:
+
+```jsonc
+{
+  "ai_search_namespaces": [{ "binding": "AI_SEARCH", "namespace": "default" }]
 }
 ```
 
 ```typescript
-interface Env {
-  AI: Ai;
+interface Env { AI_SEARCH: AiSearchNamespace }
+
+async function inspect(env: Env) {
+  const instance = env.AI_SEARCH.get("docs");
+  const info = await instance.info();
+  const stats = await instance.stats();
+  const page = await env.AI_SEARCH.list({ page: 1, per_page: 20 });
+  return { info, stats, page };
 }
-
-const answer = await env.AI.autorag("my-instance").aiSearch({
-  query: "How do I configure caching?",
-  model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
-});
 ```
 
-## Data Sources
+Regenerate `wrangler types` after binding changes. The initial migration requires Wrangler 4.68.1 or later; use the current project-supported release. Prefer generated types over copied handwritten interfaces.
 
-### R2 Bucket
+Store REST credentials in secrets, never in browser code or Wrangler vars. A Workers binding supplies its own service access; application authentication and tenant authorization are still your responsibility.
 
-Dashboard: AI Search → Create Instance → Select R2 bucket
-
-**Supported formats:** `.md`, `.txt`, `.html`, `.pdf`, `.doc`, `.docx`, `.csv`, `.json`
-
-**Auto-indexed metadata:** `filename`, `folder`, `timestamp`
-
-### Website Crawler
-
-Requirements:
-- Domain on Cloudflare
-- `sitemap.xml` at root
-- Bot protection must allow `CloudflareAISearch` user agent
-
-## Path Filtering (R2)
-
-```
-docs/**/*.md          # All .md in docs/ recursively
-**/*.draft.md         # Exclude (use in exclude patterns)
-```
-
-## Indexing
-
-- **Automatic:** Every 6 hours
-- **Force Sync:** Dashboard button (30s rate limit between syncs)
-- **Pause:** Settings → Pause Indexing (existing index remains searchable)
-
-## Service API Token
-
-Dashboard: AI Search → Instance → Use AI Search → API → Create Token
-
-Permissions:
-- **Read** - search operations
-- **Edit** - instance management
-
-Store securely:
-```bash
-wrangler secret put AI_SEARCH_TOKEN
-```
-
-## Multi-Environment
-
-```toml
-# wrangler.toml
-[env.production.vars]
-AI_SEARCH_INSTANCE = "prod-docs"
-
-[env.staging.vars]
-AI_SEARCH_INSTANCE = "staging-docs"
-```
-
-```typescript
-const answer = await env.AI.autorag(env.AI_SEARCH_INSTANCE).aiSearch({ query });
-```
-
-## Monitoring
-
-```typescript
-const instances = await env.AI.autorag("_").listInstances();
-console.log(instances.find(i => i.name === "docs"));
-```
-
-Dashboard shows: files indexed, status, last index time, storage usage.
+Sources: [Workers binding migration](https://developers.cloudflare.com/ai-search/api/migration/workers-binding/), [AI Search docs](https://developers.cloudflare.com/ai-search/).

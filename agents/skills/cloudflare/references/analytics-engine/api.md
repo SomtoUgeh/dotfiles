@@ -8,7 +8,7 @@ Fire-and-forget (returns `void`, not Promise). Writes happen asynchronously.
 
 ```typescript
 interface AnalyticsEngineDataPoint {
-  blobs?: string[];      // Up to 20 strings (dimensions), 16KB each
+  blobs?: string[];      // Up to 20 strings (dimensions), 16 KB total across blobs
   doubles?: number[];    // Up to 20 numbers (metrics)
   indexes?: string[];    // 1 indexed string for high-cardinality filtering
 }
@@ -20,9 +20,9 @@ env.ANALYTICS.writeDataPoint({
 });
 ```
 
-**Behaviors:** No await needed, no error thrown (check tail logs), auto-sampled at high volumes, auto-timestamped.
+**Behaviors:** Returns void and automatically timestamps points. Invalid inputs can throw synchronously; a return is not proof of durable ingestion. Queries must account for sampling using `_sample_interval`.
 
-**Blob vs Index:** Blob for GROUP BY (<100k unique), Index for filter-only (millions unique).
+**Blob vs Index:** Blobs hold dimensions; the index defines the sampling group and supports filtering and grouping. Choose a non-secret customer or entity ID.
 
 ### Full Example
 
@@ -36,7 +36,7 @@ export default {
       env.ANALYTICS.writeDataPoint({
         blobs: [url.pathname, request.method, response.status.toString()],
         doubles: [Date.now() - start, 1],
-        indexes: [request.headers.get("x-api-key") || "anonymous"]
+        indexes: ["anonymous" // Replace with a non-secret ID from verified authentication]
       });
       return response;
     } catch (error) {
@@ -50,27 +50,27 @@ export default {
 };
 ```
 
-## SQL API (External Only)
+## SQL API (HTTP)
 
 ```bash
 curl -X POST https://api.cloudflare.com/client/v4/accounts/{account_id}/analytics_engine/sql \
   -H "Authorization: Bearer $TOKEN" \
-  -d "SELECT blob1 AS endpoint, COUNT(*) AS requests FROM dataset WHERE timestamp >= NOW() - INTERVAL '1' HOUR GROUP BY blob1"
+  -d "SELECT blob1 AS endpoint, SUM(_sample_interval) AS requests FROM dataset WHERE timestamp >= NOW() - INTERVAL '1' HOUR GROUP BY blob1"
 ```
 
 ### Column References
 
 ```sql
 -- blob1..blob20, double1..double20, index1, timestamp
-SELECT blob1 AS endpoint, SUM(double1) AS latency, COUNT(*) AS requests
+SELECT blob1 AS endpoint, SUM(double1 * _sample_interval) AS latency, SUM(_sample_interval) AS requests
 FROM my_dataset
 WHERE index1 = 'customer_123' AND timestamp >= NOW() - INTERVAL '7' DAY
 GROUP BY blob1
-HAVING COUNT(*) > 100
+HAVING SUM(_sample_interval) > 100
 ORDER BY requests DESC LIMIT 100
 ```
 
-**Aggregations:** `SUM()`, `AVG()`, `COUNT()`, `MIN()`, `MAX()`, `quantile(0.95)()`
+**Aggregations:** `SUM()`, `AVG()`, `COUNT()`, `MIN()`, `MAX()`, `quantileExactWeighted(0.95)(value, _sample_interval)`
 
 **Time ranges:** `NOW() - INTERVAL '1' HOUR`, `BETWEEN '2026-01-01' AND '2026-01-31'`
 
@@ -78,18 +78,18 @@ ORDER BY requests DESC LIMIT 100
 
 ```sql
 -- Top endpoints
-SELECT blob1, COUNT(*) AS requests, AVG(double1) AS avg_latency
+SELECT blob1, SUM(_sample_interval) AS requests, SUM(double1 * _sample_interval) / SUM(_sample_interval) AS avg_latency
 FROM api_requests WHERE timestamp >= NOW() - INTERVAL '24' HOUR
 GROUP BY blob1 ORDER BY requests DESC LIMIT 20
 
 -- Error rate
-SELECT blob1, COUNT(*) AS total,
-  SUM(CASE WHEN blob3 LIKE '5%' THEN 1 ELSE 0 END) AS errors
+SELECT blob1, SUM(_sample_interval) AS total,
+  SUM(CASE WHEN blob3 LIKE '5%' THEN _sample_interval ELSE 0 END) AS errors
 FROM api_requests WHERE timestamp >= NOW() - INTERVAL '1' HOUR
 GROUP BY blob1 HAVING total > 50
 
 -- P95 latency
-SELECT blob1, quantile(0.95)(double1) AS p95
+SELECT blob1, quantileExactWeighted(0.95)(double1, _sample_interval) AS p95
 FROM api_requests GROUP BY blob1
 ```
 
@@ -105,8 +105,10 @@ FROM api_requests GROUP BY blob1
 |----------|-------|
 | Blobs/Doubles per point | 20 each |
 | Indexes per point | 1 |
-| Blob/Index size | 16KB |
+| Total blobs / index size | 16 KB / 96 bytes |
 | Data retention | 90 days |
 | Query timeout | 30s |
 
-**Critical:** High write volumes (>1M/min) trigger automatic sampling.
+Sampling can occur during ingestion and queries. There is no documented universal one-million-per-minute exemption. Weight aggregates by `_sample_interval`.
+
+Sampling reference: [Analytics Engine sampling](https://developers.cloudflare.com/analytics/analytics-engine/sampling/).

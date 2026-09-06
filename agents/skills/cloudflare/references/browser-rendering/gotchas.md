@@ -4,17 +4,17 @@
 
 | Limit | Free | Paid |
 |-------|------|------|
-| Daily browser time | 10 min | Unlimited* |
-| Concurrent sessions | 3 | 30 |
-| Requests/minute | 6 | 180 |
+| Daily browser time | 10 min | Metered, no fixed hour cap |
+| Concurrent sessions | 3 | 200 |
+| Quick Actions requests | 1 every 10 seconds | 30 per second |
 | Session keep-alive | 10 min max | 10 min max |
 
-*Subject to fair-use policy.
+Account defaults and usage charges: [current limits](https://developers.cloudflare.com/browser-run/limits/) and [pricing](https://developers.cloudflare.com/browser-run/pricing/).
 
 **Check quota:**
 ```typescript
 const limits = await puppeteer.limits(env.MYBROWSER);
-// { remaining: 540000, total: 600000, concurrent: 2 }
+// Acquisition/concurrency state, not a remaining-browser-milliseconds balance.
 ```
 
 ## Always Close Browsers
@@ -85,4 +85,6 @@ page.on("request", (req) => {
 });
 ```
 
-**Session reuse:** Cold start ~1-2s, warm connect ~100-200ms. Store sessionId in KV for reuse.
+**Session reuse:** Measure startup and reconnect latency for your workload. Use a Durable Object to coordinate exclusive session ownership; KV does not provide a lock.
+
+Current product name: **Browser Run**. The REST path remains `/browser-rendering`. [Official documentation](https://developers.cloudflare.com/browser-run/).

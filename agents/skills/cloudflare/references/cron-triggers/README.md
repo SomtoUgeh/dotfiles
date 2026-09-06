@@ -6,10 +6,10 @@ Schedule Workers execution using cron expressions. Runs on Cloudflare's global n
 
 - **UTC-only execution** - All schedules run on UTC time
 - **5-field cron syntax** - Quartz scheduler extensions (L, W, #)
-- **Global propagation** - 15min deployment delay
-- **At-least-once delivery** - Rare duplicate executions possible
+- **Global propagation** - up to 15min propagation delay
+- **Idempotent jobs** - Design repeated invocations and manual reruns to be safe
 - **Workflow integration** - Trigger long-running multi-step tasks
-- **Green Compute** - Optional carbon-aware scheduling during low-carbon periods
+- **Green Compute** - Optional account setting for eligible data-center placement
 
 ## Cron Syntax
 
@@ -59,7 +59,7 @@ export default {
   ): Promise<void> {
     console.log("Cron:", controller.cron);
     console.log("Time:", new Date(controller.scheduledTime));
-    
+
     ctx.waitUntil(asyncTask(env)); // Non-blocking
   },
 };
@@ -68,7 +68,7 @@ export default {
 **Test locally:**
 ```bash
 npx wrangler dev
-curl "http://localhost:8787/__scheduled?cron=*/5+*+*+*+*"
+curl "http://localhost:8787/cdn-cgi/local/scheduled?cron=*/5+*+*+*+*"
 ```
 
 ## Limits
@@ -97,3 +97,5 @@ curl "http://localhost:8787/__scheduled?cron=*/5+*+*+*+*"
 ## See Also
 - [workflows](../workflows/) - Alternative for long-running scheduled tasks
 - [workers](../workers/) - Worker runtime documentation
+
+Current source: [Cron Triggers](https://developers.cloudflare.com/workers/configuration/cron-triggers/). Local handler tests do not verify hosted scheduling, retries, or global propagation.

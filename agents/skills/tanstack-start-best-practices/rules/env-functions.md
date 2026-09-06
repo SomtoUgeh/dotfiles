@@ -47,7 +47,11 @@ const envSchema = z.object({
   STRIPE_WEBHOOK_SECRET: z.string().startsWith('whsec_'),
 
   // Optional with defaults
-  NODE_ENV: z.enum(['development', 'staging', 'production']).default('development'),
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  APP_ENV: z.enum(['development', 'staging', 'production']).default('development'),
+  FEATURE_NEW_CHECKOUT: z.enum(['true', 'false']).default('false'),
+  FEATURE_BETA_DASHBOARD: z.enum(['true', 'false']).default('false'),
+  FEATURE_AI_ASSISTANT: z.enum(['true', 'false']).default('false'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 
   // Optional
@@ -91,7 +95,7 @@ export const serverEnv = {
 
 // lib/env.ts - Public config (safe for client)
 export const publicEnv = {
-  appUrl: process.env.VITE_APP_URL ?? 'http://localhost:3000',
+  appUrl: import.meta.env.VITE_APP_URL ?? 'http://localhost:3000',
   stripePublicKey: process.env.VITE_STRIPE_PUBLIC_KEY!,
   sentryDsn: process.env.VITE_SENTRY_DSN,
 }
@@ -108,7 +112,7 @@ export const env = validateEnv()
 
 export const isDevelopment = env.NODE_ENV === 'development'
 export const isProduction = env.NODE_ENV === 'production'
-export const isStaging = env.NODE_ENV === 'staging'
+export const isStaging = env.APP_ENV === 'staging'
 
 // lib/logger.server.ts
 import { env, isDevelopment } from './env.server'
@@ -160,12 +164,14 @@ export const getCheckoutUrl = createServerFn()
     return '/checkout'
   })
 
-// Usage in loaders
+// Public server function returns only explicitly public flags
+export const getPublicFeatures = createServerFn()
+  .handler(() => ({ showBetaFeatures: features.betaDashboard }))
+
+// Usage in loaders — import getPublicFeatures from a .functions.ts module
 export const Route = createFileRoute('/dashboard')({
   loader: async () => {
-    return {
-      showBetaFeatures: features.betaDashboard,
-    }
+    return getPublicFeatures()
   },
 })
 ```
@@ -181,14 +187,17 @@ declare namespace NodeJS {
     SESSION_SECRET: string
 
     // Optional
-    NODE_ENV?: 'development' | 'staging' | 'production'
+    APP_ENV?: 'development' | 'staging' | 'production'
     SENTRY_DSN?: string
 
-    // Vite public vars
-    VITE_APP_URL?: string
-    VITE_STRIPE_PUBLIC_KEY: string
   }
 }
+
+interface ImportMetaEnv {
+  readonly VITE_APP_URL?: string
+  readonly VITE_STRIPE_PUBLIC_KEY: string
+}
+interface ImportMeta { readonly env: ImportMetaEnv }
 ```
 
 ## Environment Variable Checklist

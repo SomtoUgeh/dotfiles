@@ -4,8 +4,8 @@
 
 ### "Stale Read After Write"
 
-**Cause:** Eventual consistency means writes may not be immediately visible in other regions  
-**Solution:** Don't read immediately after write; return confirmation without reading or use the local value you just wrote. Writes visible immediately in same location, ≤60s globally
+**Cause:** Eventual consistency means writes may not be immediately visible in other regions
+**Solution:** Don't read immediately after write; return confirmation without reading or use the local value you just wrote. Even local visibility is not guaranteed; remote visibility can take 60 seconds or longer
 
 ```typescript
 // ❌ BAD: Read immediately after write
@@ -20,7 +20,7 @@ return new Response(newValue); // Don't re-read
 
 ### "429 Rate Limit on Concurrent Writes"
 
-**Cause:** Multiple concurrent writes to same key exceeding 1 write/second limit  
+**Cause:** Multiple concurrent writes to same key exceeding 1 write/second limit
 **Solution:** Use sequential writes, unique keys for concurrent operations, or implement retry with exponential backoff
 
 ```typescript
@@ -30,6 +30,7 @@ async function putWithRetry(
   value: string,
   maxAttempts = 5
 ): Promise<void> {
+  if (!Number.isInteger(maxAttempts) || maxAttempts < 1) throw new RangeError("maxAttempts must be positive");
   let delay = 1000;
   for (let i = 0; i < maxAttempts; i++) {
     try {
@@ -50,17 +51,17 @@ async function putWithRetry(
 
 ### "Inefficient Multiple Gets"
 
-**Cause:** Making multiple individual get() calls instead of bulk operation  
+**Cause:** Making multiple individual get() calls instead of bulk operation
 **Solution:** Use bulk get with array of keys: `env.USERS.get(["user:1", "user:2", "user:3"])` to reduce to 1 operation
 
 ### "Null Reference Error"
 
-**Cause:** Attempting to use value without checking for null when key doesn't exist  
+**Cause:** Attempting to use value without checking for null when key doesn't exist
 **Solution:** Always handle null returns - KV returns `null` for missing keys, not undefined
 
 ```typescript
 // ❌ BAD: Assumes value exists
-const config = await env.KV.get("config", "json");
+const config = await env.KV.get<{ theme?: string }>("config", "json");
 return config.theme; // TypeError if null!
 
 // ✅ GOOD: Null checks
@@ -75,7 +76,7 @@ return new Response(config.theme);
 
 ### "Negative Lookup Caching"
 
-**Cause:** Keys that don't exist are cached as "not found" for up to 60s  
+**Cause:** Keys that don't exist are cached as "not found" for up to 60s
 **Solution:** Creating a key after checking won't be visible until cache expires
 
 ```typescript
@@ -100,18 +101,9 @@ const value = await env.KV.get("key") ?? "default-value";
 | Cold reads | Increase `cacheTtl` parameter | Reduces latency for frequently-read data |
 | Bulk operations | Use array form of get() | Single operation, better performance |
 
-## Cost Examples
+## Cost
 
-**Free tier:**
-- 100K reads/day = 3M/month ✅
-- 1K writes/day = 30K/month ✅
-- 1GB storage ✅
-
-**Example paid workload:**
-- 10M reads/month = $5.00
-- 100K writes/month = $0.50
-- 1GB storage = $0.50
-- **Total: ~$6/month**
+Calculate billable keys and storage after the current plan allowances. A bulk Worker call does not reduce key-based billing to a single read. Use the [current pricing](https://developers.cloudflare.com/kv/platform/pricing/).
 
 ## Limits
 
@@ -120,9 +112,9 @@ const value = await env.KV.get("key") ?? "default-value";
 | Key size | 512 bytes | Maximum key length |
 | Value size | 25 MiB | Maximum value; 413 error if exceeded |
 | Metadata size | 1024 bytes | Maximum metadata per key |
-| cacheTtl minimum | 60s | Minimum cache TTL |
+| cacheTtl minimum | 30s | Minimum cache TTL |
 | Write rate per key | 1 write/second | All plans; 429 error if exceeded |
-| Propagation time | ≤60s | Global propagation time |
+| Propagation time | 60s or longer | Global propagation time |
 | Bulk get max | 100 keys | Maximum keys per bulk operation |
 | Operations per Worker | 1,000 | Per request (bulk counts as 1) |
 | Reads pricing | $0.50 per 1M | Per million reads |

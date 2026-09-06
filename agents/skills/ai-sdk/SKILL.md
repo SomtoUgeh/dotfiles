@@ -5,11 +5,17 @@ description: 'Answer questions about the AI SDK and help build AI-powered featur
 
 ## Prerequisites
 
-This information is for AI SDK 7. Compare to version in `node_modules/ai/package.json`. If the versions don't match, warn the user.
+This information targets AI SDK 7. If the project has the package installed,
+compare against `node_modules/ai/package.json` and use documentation matching
+that version.
 
-Before searching docs, check if `node_modules/ai/docs/` exists. If not, install **only** the `ai` package using the project's package manager (e.g., `pnpm add ai`).
+Before searching remote docs, check whether `node_modules/ai/docs/` exists. If
+it does not, use the official versioned documentation at `ai-sdk.dev`. Do not
+change project dependencies merely to obtain documentation.
 
-Do not install other packages at this stage. Provider packages (e.g., `@ai-sdk/openai`) and client packages (e.g., `@ai-sdk/react`) should be installed later when needed based on user requirements.
+Install `ai`, provider packages, or client packages only when implementation
+requires them and the user's request authorizes adding that functionality. Use
+the project's existing package manager and version policy.
 
 ## Critical: Do Not Trust Internal Knowledge
 
@@ -17,13 +23,21 @@ Everything you know about the AI SDK is outdated or wrong. Your training data co
 
 **When working with the AI SDK:**
 
-1. Ensure `ai` package is installed (see Prerequisites)
+1. Identify the installed AI SDK version, or the requested target version
 2. Search `node_modules/ai/docs/` and `node_modules/ai/src/` for current APIs
 3. If not found locally, search ai-sdk.dev documentation (instructions below)
 4. Never rely on memory - always verify against source code or docs
 5. **`useChat` has changed significantly** - check [Common Errors](references/common-errors.md) before writing client code
-6. When deciding which model and provider to use (e.g. OpenAI, Anthropic, Gemini), use the Vercel AI Gateway provider unless the user specifies otherwise. See [AI Gateway Reference](references/ai-gateway.md) for usage details.
-7. **Always fetch current model IDs** - Never use model IDs from memory. Before writing code that uses a model, run `curl -s https://ai-gateway.vercel.sh/v1/models | jq -r '[.data[] | select(.id | startswith("provider/")) | .id] | reverse | .[]'` (replacing `provider` with the relevant provider like `anthropic`, `openai`, or `google`) to get the full list with newest models first. Use the model with the highest version number (e.g., `claude-sonnet-4-5` over `claude-sonnet-4` over `claude-3-5-sonnet`).
+6. Preserve the project's existing provider and gateway unless the user asks to
+   change it. If no provider has been chosen, compare the task's capability,
+   data-handling, deployment, latency, and cost requirements before recommending
+   one. Use [AI Gateway Reference](references/ai-gateway.md) only when Gateway is
+   already in use or chosen for a stated reason.
+7. Verify current model IDs against the selected provider's official catalog.
+   When Vercel AI Gateway is selected, its `/v1/models` endpoint is one useful
+   source. Do not infer recency from response order or choose the numerically
+   highest ID automatically; select a stable model that supports the required
+   tools, modalities, context, and structured-output behavior.
 8. Run typecheck after changes to ensure code is correct
 9. **Be minimal** - Only specify options that differ from defaults. When unsure of defaults, check docs or source rather than guessing or over-specifying.
 
@@ -35,8 +49,8 @@ If you cannot find documentation to support your answer, state that explicitly.
 
 Search bundled docs and source in `node_modules/ai/`:
 
-- **Docs**: `grep "query" node_modules/ai/docs/`
-- **Source**: `grep "query" node_modules/ai/src/`
+- **Docs**: `rg "query" node_modules/ai/docs/`
+- **Source**: `rg "query" node_modules/ai/src/`
 
 Provider packages include docs at `node_modules/@ai-sdk/<provider>/docs/`.
 
@@ -58,7 +72,9 @@ If not found in common-errors.md:
 
 ### Creating Agents
 
-Always use the `ToolLoopAgent` pattern. Search `node_modules/ai/docs/` for current agent creation APIs.
+Use `ToolLoopAgent` for iterative tool-using agents when the installed version
+documents it as the appropriate abstraction. Simpler generation or a fixed tool
+sequence may use a smaller API. Verify the current agent APIs before choosing.
 
 **File conventions**: See [type-safe-agents.md](references/type-safe-agents.md) for where to save agents and tools.
 

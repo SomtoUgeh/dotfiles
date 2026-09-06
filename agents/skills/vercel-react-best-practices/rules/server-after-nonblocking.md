@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     const userAgent = (await headers()).get('user-agent') || 'unknown'
     const sessionCookie = (await cookies()).get('session-id')?.value || 'anonymous'
     
-    logUserAction({ sessionCookie, userAgent })
+    await logUserAction({ sessionCookie, userAgent })
   })
   
   return new Response(JSON.stringify({ status: 'success' }), {
@@ -69,5 +69,7 @@ The response is sent immediately while logging happens in the background.
 
 - `after()` runs even if the response fails or redirects
 - Works in Server Actions, Route Handlers, and Server Components
+- Await returned work inside the callback. Execution remains bounded by the host's request duration; use a durable job/outbox for work that must survive process termination.
+- Read request APIs in `after` only where the installed Next.js context supports them; Server Component prerendering has additional restrictions.
 
 Reference: [https://nextjs.org/docs/app/api-reference/functions/after](https://nextjs.org/docs/app/api-reference/functions/after)

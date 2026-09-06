@@ -87,7 +87,11 @@ function TodoList() {
       mutationKey: ['create-todo'],
       status: 'pending',
     },
-    select: (mutation) => mutation.state.variables as NewTodo,
+    select: (mutation) => {
+      // newTodoSchema is the same runtime schema used by the form/API.
+      const parsed = newTodoSchema.safeParse(mutation.state.variables)
+      return parsed.success ? parsed.data : undefined
+    },
   })
 
   return (
@@ -98,7 +102,7 @@ function TodoList() {
       ))}
 
       {/* Optimistic todos (pending creation) */}
-      {pendingTodos.map((todo, index) => (
+      {pendingTodos.filter((todo): todo is NewTodo => todo !== undefined).map((todo, index) => (
         <TodoItem
           key={`pending-${index}`}
           todo={{ ...todo, id: `temp-${index}` }}

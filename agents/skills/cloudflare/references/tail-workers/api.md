@@ -1,200 +1,54 @@
-# Tail Workers API Reference
+# Tail Workers API
 
-## Handler Signature
+Generate the project's runtime types with `wrangler types`. Use the global `TraceItem` and `ExportedHandler` types; do not redeclare a smaller `TraceItem` interface. The installed runtime type is authoritative for additional outcomes and event kinds.
 
-```typescript
-export default {
-  async tail(
-    events: TraceItem[],
-    env: Env,
-    ctx: ExecutionContext
-  ): Promise<void> {
-    // Process events
-  }
-} satisfies ExportedHandler<Env>;
-```
+## Handler and event shape
 
-**Parameters:**
-- `events`: Array of `TraceItem` objects (one per producer invocation)
-- `env`: Bindings (KV, D1, R2, env vars, etc.)
-- `ctx`: Context with `waitUntil()` for async work
+A tail handler returns `void` or `Promise<void>`. Await asynchronous delivery, or register its promise with `ctx.waitUntil()`. An ordinary `await` does not block the producer; the tail invocation occurs after its execution.
 
-**CRITICAL:** Tail handlers don't return values. Use `ctx.waitUntil()` for async operations.
-
-## TraceItem Type
-
-```typescript
-interface TraceItem {
-  scriptName: string;           // Producer Worker name
-  eventTimestamp: number;        // Epoch milliseconds
-  outcome: 'ok' | 'exception' | 'exceededCpu' | 'exceededMemory' 
-         | 'canceled' | 'scriptNotFound' | 'responseStreamDisconnected' | 'unknown';
-  
-  event?: {
-    request?: {
-      url: string;               // Redacted by default
-      method: string;
-      headers: Record<string, string>;  // Sensitive headers redacted
-      cf?: IncomingRequestCfProperties;
-      getUnredacted(): TraceRequest;    // Bypass redaction (use carefully)
-    };
-    response?: {
-      status: number;
-    };
-  };
-  
-  logs: Array<{
-    timestamp: number;           // Epoch milliseconds
-    level: 'debug' | 'info' | 'log' | 'warn' | 'error';
-    message: unknown[];          // Args passed to console function
-  }>;
-  
-  exceptions: Array<{
-    timestamp: number;           // Epoch milliseconds
-    name: string;                // Error type (Error, TypeError, etc.)
-    message: string;             // Error description
-  }>;
-  
-  diagnosticsChannelEvents: Array<{
-    channel: string;
-    message: unknown;
-    timestamp: number;           // Epoch milliseconds
-  }>;
-}
-```
-
-**Note:** Official SDK uses `TraceItem`, not `TailItem`. Use `@cloudflare/workers-types` for accurate types.
-
-## Timestamp Handling
-
-All timestamps are **epoch milliseconds**, not seconds:
-
-```typescript
-// ✅ CORRECT - use directly with Date
-const date = new Date(event.eventTimestamp);
-
-// ❌ WRONG - don't multiply by 1000
-const date = new Date(event.eventTimestamp * 1000);
-```
-
-## Automatic Redaction
-
-By default, sensitive data is redacted from `TraceRequest`:
-
-### Header Redaction
-
-Headers containing these substrings (case-insensitive):
-- `auth`, `key`, `secret`, `token`, `jwt`
-- `cookie`, `set-cookie`
-
-Redacted values show as `"REDACTED"`.
-
-### URL Redaction
-
-- **Hex IDs:** 32+ hex digits → `"REDACTED"`
-- **Base-64 IDs:** 21+ chars with 2+ upper, 2+ lower, 2+ digits → `"REDACTED"`
-
-## Bypassing Redaction
-
-```typescript
-export default {
-  async tail(events, env, ctx) {
-    for (const event of events) {
-      // ⚠️ Use with extreme caution
-      const unredacted = event.event?.request?.getUnredacted();
-      // unredacted.url and unredacted.headers contain raw values
-    }
-  }
-};
-```
-
-**Best practices:**
-- Only call `getUnredacted()` when absolutely necessary
-- Never log unredacted sensitive data
-- Implement additional filtering before external transmission
-- Use environment variables for API keys, never hardcode
-
-## Type-Safe Handler
+`TraceItem.event` is a nullable union: fetch, scheduled, queue, email, RPC, alarm, WebSocket and other invocations do not have the same fields. Narrow before accessing HTTP properties. `scriptName` and `eventTimestamp` can be null; a numeric timestamp is milliseconds. `outcome` is execution status, not HTTP status. A normally returned HTTP 500 can have outcome `ok`.
 
 ```typescript
 interface Env {
-  LOGS_KV: KVNamespace;
-  ANALYTICS: AnalyticsEngineDataset;
   LOG_ENDPOINT: string;
-  API_TOKEN: string;
+  LOG_TOKEN: string;
+}
+
+function summarize(event: TraceItem) {
+  const info = event.event;
+  const request = info && "request" in info ? info.request : undefined;
+  const response = info && "response" in info ? info.response : undefined;
+  return {
+    script: event.scriptName,
+    timestamp: event.eventTimestamp,
+    outcome: event.outcome,
+    method: request?.method,
+    status: response?.status,
+    exceptionCount: event.exceptions.length,
+    truncated: event.truncated,
+  };
 }
 
 export default {
-  async tail(
-    events: TraceItem[],
-    env: Env,
-    ctx: ExecutionContext
-  ): Promise<void> {
-    const payload = events.map(event => ({
-      script: event.scriptName,
-      timestamp: event.eventTimestamp,
-      outcome: event.outcome,
-      url: event.event?.request?.url,
-      status: event.event?.response?.status,
-    }));
-    
-    ctx.waitUntil(
-      fetch(env.LOG_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      })
-    );
-  }
+  async tail(events, env) {
+    const response = await fetch(env.LOG_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.LOG_TOKEN}`,
+      },
+      body: JSON.stringify(events.map(summarize)),
+    });
+    await response.body?.cancel();
+    if (!response.ok) throw new Error(`Log destination rejected batch: ${response.status}`);
+  },
 } satisfies ExportedHandler<Env>;
 ```
 
-## Outcome vs HTTP Status
+## Redaction and serialization
 
-**IMPORTANT:** `outcome` is script execution status, NOT HTTP status.
+Trace requests redact sensitive URL/header values. `request.getUnredacted()` deliberately bypasses that protection; use it only for a justified field and never export raw credentials. Console messages and exception text can themselves contain sensitive data; request redaction does not sanitize those application logs.
 
-- Worker returns 500 → `outcome='ok'` if script completed successfully
-- Uncaught exception → `outcome='exception'` regardless of HTTP status
-- CPU limit exceeded → `outcome='exceededCpu'`
+Prefer an explicit allowlisted projection such as `summarize` rather than spreading the entire trace into an external payload. Check `truncated` when assessing log completeness. If a destination requires console details, validate/normalize their unknown values, limit the payload, and redact application-specific secrets before transmission. Do not assert the runtime's console data is always a particular hand-written array type.
 
-```typescript
-// ✅ Check outcome for script execution status
-if (event.outcome === 'exception') {
-  // Script threw uncaught exception
-}
-
-// ✅ Check HTTP status separately
-if (event.event?.response?.status === 500) {
-  // HTTP 500 returned (script may have handled error)
-}
-```
-
-## Serialization Considerations
-
-`log.message` is `unknown[]` and may contain non-serializable objects:
-
-```typescript
-// ❌ May fail with circular references or BigInt
-JSON.stringify(events);
-
-// ✅ Safe serialization
-const safePayload = events.map(event => ({
-  ...event,
-  logs: event.logs.map(log => ({
-    ...log,
-    message: log.message.map(m => {
-      try {
-        return JSON.parse(JSON.stringify(m));
-      } catch {
-        return String(m);
-      }
-    })
-  }))
-}));
-```
-
-**Common serialization issues:**
-- Circular references in logged objects
-- `BigInt` values (not JSON-serializable)
-- Functions or symbols in console.log arguments
-- Large objects exceeding body size limits
+[Handler contract](https://developers.cloudflare.com/workers/runtime-apis/handlers/tail/) · [Tail Workers guide](https://developers.cloudflare.com/workers/observability/logs/tail-workers/)

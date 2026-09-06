@@ -1,6 +1,6 @@
 ## Configuration Management
 
-**Note on Smart Shield Evolution:** Argo Smart Routing is being integrated into Smart Shield. Configuration methods below remain valid; Terraform and IaC patterns unchanged.
+Argo Smart Routing is now offered as part of Smart Shield. Check the target zone subscription and current API/provider version.
 
 ### Infrastructure as Code (Terraform)
 
@@ -8,10 +8,9 @@
 # terraform/argo.tf
 # Note: Use Cloudflare Terraform provider
 
-resource "cloudflare_argo" "example" {
-  zone_id        = var.zone_id
-  smart_routing  = "on"
-  tiered_caching = "on"
+resource "cloudflare_argo_smart_routing" "example" {
+  zone_id = var.zone_id
+  value = "on"
 }
 
 variable "zone_id" {
@@ -20,7 +19,7 @@ variable "zone_id" {
 }
 
 output "argo_enabled" {
-  value       = cloudflare_argo.example.smart_routing
+  value       = cloudflare_argo_smart_routing.example.value
   description = "Argo Smart Routing status"
 }
 ```
@@ -76,19 +75,11 @@ export function getArgoConfig(env: string): ArgoEnvironmentConfig {
 // pulumi/argo.ts
 import * as cloudflare from '@pulumi/cloudflare';
 
-const zone = new cloudflare.Zone('example-zone', {
-  zone: 'example.com',
-  plan: 'enterprise',
+const config = new cloudflare.ArgoSmartRouting("argo-config", {
+  zoneId: existingZoneId,
+  value: "on",
 });
-
-const argoSettings = new cloudflare.Argo('argo-config', {
-  zoneId: zone.id,
-  smartRouting: 'on',
-  tieredCaching: 'on',
-});
-
-export const argoEnabled = argoSettings.smartRouting;
-export const zoneId = zone.id;
+export const argoEnabled = config.value;
 ```
 
 ## Billing Configuration
@@ -97,7 +88,7 @@ Before enabling Argo Smart Routing, ensure billing is configured for the account
 
 **Prerequisites:**
 1. Valid payment method on file
-2. Enterprise or higher plan
+2. An eligible Argo/Smart Shield subscription
 3. Zone must have billing enabled
 
 **Check Billing Status via Dashboard:**
@@ -160,14 +151,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
-        
+
       - name: Terraform Init
         run: terraform init
         working-directory: ./terraform
-        
+
       - name: Terraform Apply
         run: terraform apply -auto-approve
         working-directory: ./terraform
@@ -176,22 +167,6 @@ jobs:
           TF_VAR_zone_id: ${{ secrets.CLOUDFLARE_ZONE_ID }}
 ```
 
-## Enterprise Preview Program
+## Preview access
 
-For early access to Argo Smart Routing features and Smart Shield integration:
-
-**Eligibility:**
-- Enterprise plan customers
-- Active Cloudflare support contract
-- Production traffic >100GB/month
-
-**How to Join:**
-1. Contact Cloudflare account team or support
-2. Request Argo/Smart Shield preview access
-3. Receive preview zone configuration
-
-**Preview Features:**
-- Enhanced analytics and reporting
-- Smart Shield DDoS integration
-- Advanced routing policies
-- Priority support for routing issues
+Enterprise customers may be eligible for a non-contract preview. Confirm its current terms with the account team; do not assume a traffic minimum or a production SLA.

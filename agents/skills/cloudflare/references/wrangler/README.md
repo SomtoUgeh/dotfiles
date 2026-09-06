@@ -28,7 +28,7 @@ Run commands: `npx wrangler <command>` (or `pnpm`/`yarn wrangler`)
 |-------------------|------------|
 | Create/deploy Worker quickly | Essential Commands below → [patterns.md](./patterns.md) §New Worker |
 | Configure bindings (KV, D1, R2) | [configuration.md](./configuration.md) §Bindings |
-| Write integration tests | [api.md](./api.md) §startWorker |
+| Write integration tests | [api.md](./api.md) §Integration tests |
 | Debug production issues | [gotchas.md](./gotchas.md) + Essential Commands §Monitoring |
 | Set up multi-environment workflow | [configuration.md](./configuration.md) §Environments |
 
@@ -76,10 +76,9 @@ wrangler r2 object get BUCKET/key
 wrangler queues create NAME
 wrangler vectorize create NAME --dimensions N --metric cosine
 wrangler hyperdrive create NAME --connection-string "..."
-wrangler workflows create NAME
-wrangler constellation create NAME
+wrangler workflows list  # Workflow definitions are deployed with their Worker
 wrangler pages project create NAME
-wrangler pages deployment create --project NAME --branch main
+wrangler pages deploy ./dist --project-name NAME --branch main
 ```
 
 ### Secrets
@@ -104,7 +103,7 @@ wrangler tail --status error      # Filter by status
 ## In This Reference
 
 - [configuration.md](./configuration.md) - wrangler.jsonc setup, environments, bindings
-- [api.md](./api.md) - Programmatic API (`startWorker`, `getPlatformProxy`, events)
+- [api.md](./api.md) - Programmatic API (`createTestHarness`, `getPlatformProxy`)
 - [patterns.md](./patterns.md) - Common workflows and development patterns
 - [gotchas.md](./gotchas.md) - Common pitfalls, limits, and troubleshooting
 
@@ -112,7 +111,7 @@ wrangler tail --status error      # Filter by status
 
 ```
 Need to test your Worker?
-├─ Testing full Worker with bindings → api.md §startWorker
+├─ Testing full Worker with bindings → api.md §Integration tests
 ├─ Testing individual functions → api.md §getPlatformProxy
 └─ Testing with Vitest → patterns.md §Testing with Vitest
 

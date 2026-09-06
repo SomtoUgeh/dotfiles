@@ -122,6 +122,8 @@ const result = await prisma.user.createMany({
 // Returns { count: 2 }
 ```
 
+`skipDuplicates` is unavailable for SQLite and SQL Server. Returning bulk methods below support PostgreSQL, CockroachDB and SQLite; check your provider before using them.
+
 ### createManyAndReturn
 
 Create multiple and return them:

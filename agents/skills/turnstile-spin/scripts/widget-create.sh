@@ -63,7 +63,7 @@ ACCOUNT_ENCODED="$(python3 -I -c 'import sys,urllib.parse; print(urllib.parse.qu
 
 if ! API_RESPONSE="$(
   printf 'header = "Authorization: Bearer %s"\n' "$API_TOKEN" |
-    curl --disable --config - --silent --show-error --write-out $'\n%{http_code}' -X POST \
+    curl --disable --connect-timeout 10 --max-time 30 --config - --silent --show-error --write-out $'\n%{http_code}' -X POST \
       "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ENCODED/challenges/widgets" \
       -H "Content-Type: application/json" \
       --data "$BODY_JSON"
@@ -95,7 +95,7 @@ except Exception:
 errors = data.get("errors") if isinstance(data, dict) else []
 first = errors[0] if isinstance(errors, list) and errors and isinstance(errors[0], dict) else {}
 code = first.get("code", 0)
-if not isinstance(data, dict) or data.get("success") is not True:
+if not http_code.isdigit() or not 200 <= int(http_code) < 300 or not isinstance(data, dict) or data.get("success") is not True:
     print(f"widget-create: request failed (HTTP {http_code}, code={code})", file=sys.stderr)
     print(json.dumps({"status":"error","code":code,"message":"Cloudflare API request failed"}))
     raise SystemExit(1)

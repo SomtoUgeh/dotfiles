@@ -40,13 +40,13 @@ npx wrangler queues list
   }],
   "ai": { "binding": "AI" },
   "browser": { "binding": "BROWSER" },
-  "workflows": [{ "binding": "MY_WORKFLOW", "name": "my-workflow" }]
+  "workflows": [{ "binding": "MY_WORKFLOW", "name": "my-workflow", "class_name": "MyWorkflow" }]
 }
 ```
 
 **Create workflows:**
 ```bash
-npx wrangler workflows create my-workflow
+npx wrangler deploy  # Deploy the Worker exporting MyWorkflow
 ```
 
 ## Platform Bindings
@@ -56,9 +56,7 @@ npx wrangler workflows create my-workflow
   "analytics_engine_datasets": [{ "binding": "ANALYTICS" }],
   "mtls_certificates": [{ "binding": "MY_CERT", "certificate_id": "..." }],
   "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "..." }],
-  "unsafe": {
-    "bindings": [{ "name": "RATE_LIMITER", "type": "ratelimit", "namespace_id": "..." }]
-  }
+  "ratelimits": [{ "name": "RATE_LIMITER", "namespace_id": "1001", "simple": { "limit": 100, "period": 60 } }]
 }
 ```
 
@@ -111,14 +109,14 @@ npx wrangler deploy --env staging
   "kv_namespaces": [{
     "binding": "MY_KV",
     "id": "prod-id",
-    "preview_id": "dev-id"  // Used in wrangler dev
+    "preview_id": "dev-id"  // Used by the corresponding remote preview mode
   }]
 }
 ```
 
 **Or use remote:**
 ```bash
-npx wrangler dev --remote  # Uses production bindings
+npx wrangler dev --remote  # Remote execution; inspect preview/resource configuration first
 ```
 
 ## Complete Example
@@ -176,7 +174,7 @@ Queue consumer handler: `export default { async queue(batch, env) { /* process b
 
 ## Key Points
 
-- **64 binding limit** (all types combined)
+- **Limits**: Verify the limits for each selected binding and plan.
 - **Secrets**: Always use `wrangler secret put`, never commit
 - **Types**: Run `npx wrangler types` after config changes
 - **Environments**: Use `env` field for staging/production variants

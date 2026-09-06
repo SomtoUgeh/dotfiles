@@ -22,7 +22,7 @@
 **Cause:** Zone not eligible or billing not set up
 
 **Solution:**
-1. Verify zone has Enterprise or higher plan
+1. Verify zone has An eligible Argo/Smart Shield subscription
 2. Check billing is configured in Account → Billing
 3. Ensure payment method is valid and current
 4. Contact Cloudflare support if eligibility unclear
@@ -38,7 +38,7 @@
 2. Verify `editable: true` in GET response before attempting PATCH
 3. If `editable: false`, check:
    - Billing configured for account
-   - Zone plan includes Argo (Enterprise+)
+   - Zone plan includes Argo (eligible Argo/Smart Shield subscription)
    - No active zone holds or suspensions
    - API token has correct scopes
 
@@ -56,7 +56,7 @@ if (!status.editable) {
   // Don't attempt to modify - will fail
   console.error('Cannot modify Argo settings:');
   console.error('- Check billing is configured');
-  console.error('- Verify zone has Enterprise+ plan');
+  console.error('- Verify zone has eligible Argo/Smart Shield subscription plan');
   console.error('- Confirm API token has Edit permission');
   throw new Error('Argo is not editable for this zone');
 }
@@ -79,11 +79,11 @@ try {
   await client.argo.smartRouting.edit({ zone_id: zoneId, value: 'on' });
 } catch (error) {
   if (error instanceof RateLimitError) {
-    const retryAfter = error.response?.headers.get('retry-after');
+    const retryAfter = error.headers?.get('retry-after');
     console.log(`Rate limited. Retry after ${retryAfter} seconds`);
-    
+
     // Implement exponential backoff
-    await new Promise(resolve => setTimeout(resolve, (retryAfter || 60) * 1000));
+    await new Promise(resolve => setTimeout(resolve, Number(retryAfter || 60) * 1000));
     // Retry request
   }
 }
@@ -94,7 +94,7 @@ try {
 | Resource/Limit | Value | Notes |
 |----------------|-------|-------|
 | Min requests for analytics | 500 in 48h | For detailed metrics via GraphQL |
-| Zones supported | Enterprise+ | Check zone plan in dashboard |
+| Zones supported | eligible Argo/Smart Shield subscription | Check zone plan in dashboard |
 | Billing requirement | Must be configured | Before enabling; verify payment method |
 | API rate limit | 1200 req / 5 min | Per API token across all endpoints |
 | Spectrum apps | No hard limit | Each app can enable Argo independently |

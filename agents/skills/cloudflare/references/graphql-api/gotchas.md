@@ -9,7 +9,7 @@
 | Zone scope per query | Up to **10 zones** |
 | Account scope per query | Exactly **1 account** |
 
-The GraphQL rate limit is separate from the general API limit. Exceeding either results in `HTTP 429` and blocks all API calls for 5 minutes. Enterprise customers can contact support to raise limits.
+The GraphQL rate limit is separate from the general API limit. Handle the returned HTTP/GraphQL error and retry information; do not assume every exhausted query budget blocks every endpoint for exactly five minutes. Enterprise customers can contact support to raise limits.
 
 ### "429 Too Many Requests"
 
@@ -24,19 +24,19 @@ The GraphQL rate limit is separate from the general API limit. Exceeding either 
 Datasets with `Adaptive` in the name use adaptive sampling:
 - Results are **statistically representative**, not exact
 - Same query may return **slightly different numbers** each run
-- Higher traffic = higher sampling rate = more accurate
+- Sampling intensity varies with volume and query dimensions; higher traffic does not guarantee better accuracy.
 - `sampleInterval` dimension shows the ratio (1 = no sampling, 10 = ~1-in-10 sampled)
 
-For high-confidence numbers, use `confidence(level: 0.95)` to get estimate bounds. For exact counts, use rollup nodes (`httpRequests1hGroups`, `httpRequests1dGroups`) which are pre-aggregated without sampling.
+For high-confidence numbers, use `confidence(level: 0.95)` to get estimate bounds. Rollup nodes are pre-aggregated but are not a universal guarantee of exact billing-grade counts. Check each dataset's sampling and metric definition.
 
 ### Rollup vs. Adaptive
 
 | Feature | Rollup (`*1hGroups`, `*1dGroups`) | Adaptive (`*AdaptiveGroups`) |
 |---------|-----------------------------------|-----------------------------|
-| Sampling | No (pre-aggregated) | Yes (ABR) |
+| Sampling | Dataset-specific; pre-aggregation alone is not proof of exactness | Adaptive |
 | Flexibility | Fixed time buckets | Any granularity |
 | Dimensions | Fewer | Many more |
-| Accuracy | Exact | Statistical estimate |
+| Accuracy | Check dataset documentation | Statistical estimate |
 
 ## Common Errors
 
@@ -93,7 +93,7 @@ Not all datasets are available on all plans. Higher plans get more datasets, lon
 - All times are **UTC only** (ISO 8601: `"2025-01-15T10:30:00Z"`)
 - `Date` type: `"2025-01-15"` (used in `date_geq`/`date_leq` for storage datasets)
 - `Time` type: `"2025-01-15T10:30:00Z"` (used in `datetime_gt`/`datetime_lt`)
-- Filters are start-inclusive: events that start within the window are included
+- `_gt` and `_lt` are exclusive; `_geq` and `_leq` are inclusive. Prefer supported start-inclusive/end-exclusive filters for adjacent windows.
 
 ## Performance Tips
 

@@ -58,8 +58,8 @@ request.cf.asOrganization  // "Cloudflare, Inc."
 
 // Bot Management (if enabled)
 request.cf.botManagement.score        // 1-99 (1=bot, 99=human)
-request.cf.botManagement.verified_bot // true/false
-request.cf.botManagement.static_resource // true/false
+request.cf.botManagement.verifiedBot // true/false
+request.cf.botManagement.staticResource // true/false
 
 // TLS/HTTP version
 request.cf.tlsVersion      // "TLSv1.3"
@@ -83,7 +83,7 @@ new Response("Hello", { status: 200 })
 Response.json({ key: "value" }, { status: 200 })
 
 // HTML
-new Response("<h1>Hi</h1>", { 
+new Response("<h1>Hi</h1>", {
   status: 200,
   headers: { "Content-Type": "text/html" }
 })
@@ -148,7 +148,7 @@ DELETE /zones/{zone_id}/snippets/{snippet_name}
 
 ### List Snippet Rules
 ```bash
-GET /zones/{zone_id}/rulesets/phases/http_request_snippets/entrypoint
+GET /zones/{zone_id}/snippets/snippet_rules
 ```
 
 ### Update Snippet Rules
@@ -166,9 +166,13 @@ Content-Type: application/json
 }
 ```
 
+The `PUT snippet_rules` operation replaces the zone rule list. Read it first, preserve unrelated rules/order, then submit the complete intended list.
+
 ## Available APIs in Snippets
 
 ### ✅ Supported
+- `caches` API - See the custom-cache example
+- `HTMLRewriter` - See the rewrite-site-links example
 - `fetch()` - HTTP requests (2-5 subrequests per plan)
 - `Request` / `Response` - Standard Web APIs
 - `URL` / `URLSearchParams` - URL manipulation
@@ -178,12 +182,10 @@ Content-Type: application/json
 - `crypto.randomUUID()` - UUID generation
 
 ### ❌ Not Supported in Snippets
-- `caches` API - Not available (use Workers)
 - `KV`, `D1`, `R2` - Storage APIs (use Workers)
 - `Durable Objects` - Stateful objects (use Workers)
 - `WebSocket` - WebSocket upgrades (use Workers)
-- `HTMLRewriter` - HTML parsing (use Workers)
-- `import` statements - No module imports
+- Node.js imports/runtime APIs - Not a Node.js environment; bundle compatible modules within package limits.
 - `addEventListener` - Use `export default { async fetch() {}` pattern
 
 ## Snippet Structure
@@ -196,3 +198,4 @@ export default {
   }
 }
 ```
+[Current Snippets availability and limits](https://developers.cloudflare.com/rules/snippets/) · [Cache example](https://developers.cloudflare.com/rules/snippets/examples/custom-cache/) · [HTMLRewriter example](https://developers.cloudflare.com/rules/snippets/examples/rewrite-site-links/)

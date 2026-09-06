@@ -1,9 +1,11 @@
 ---
 name: redesign-existing-projects
-description: Upgrades existing websites and apps to premium quality. Audits current design, identifies generic AI patterns, and applies high-end design standards without breaking functionality. Works with any CSS framework or vanilla CSS.
+description: Audit and improve the visual design of an existing website or app in its current stack when the user explicitly requests a redesign.
 ---
 
 # Redesign Skill
+
+Preserve explicit user choices, brand rules, accessibility constraints, and working product behavior. Treat the audit below as diagnostic prompts; apply a change only when the observed interface shows the problem.
 
 ## How This Works
 
@@ -17,7 +19,7 @@ When applied to an existing project, follow this sequence:
 
 ### Typography
 
-Check for these problems and fix them:
+Check for these problems and fix the ones supported by the interface:
 
 - **Browser default fonts or Inter everywhere.** Replace with a font that has character. Good options: `Geist`, `Outfit`, `Cabinet Grotesk`, `Satoshi`. For editorial/creative projects, pair a serif header with a sans-serif body.
 - **Headlines lack presence.** Increase size for display text, tighten letter-spacing, reduce line-height. Headlines should feel heavy and intentional.
@@ -46,7 +48,7 @@ Check for these problems and fix them:
 
 - **Everything centered and symmetrical.** Break symmetry with offset margins, mixed aspect ratios, or left-aligned headers over centered content.
 - **Three equal card columns as feature row.** This is the most generic AI layout. Replace with a 2-column zig-zag, asymmetric grid, horizontal scroll, or masonry layout.
-- **Using `height: 100vh` for full-screen sections.** Replace with `min-height: 100dvh` to prevent layout jumping on mobile browsers (iOS Safari viewport bug).
+- **Full-screen sections clipped by browser chrome.** Choose `min-height: 100svh` for a stable small viewport or `100dvh` to track the changing viewport. `dvh` can resize during scrolling; test browser chrome and keyboard states.
 - **Complex flexbox percentage math.** Replace with CSS Grid for reliable multi-column structures.
 - **No max-width container.** Add a container constraint (around 1200-1440px) with auto margins so content doesn't stretch edge-to-edge on wide screens.
 - **Cards of equal height forced by flexbox.** Allow variable heights or use masonry when content varies in length.
@@ -64,26 +66,26 @@ Check for these problems and fix them:
 
 - **No hover states on buttons.** Add background shift, slight scale, or translate on hover.
 - **No active/pressed feedback.** Add a subtle `scale(0.98)` or `translateY(1px)` on press to simulate a physical click.
-- **Instant transitions with zero duration.** Add smooth transitions (200-300ms) to all interactive elements.
+- **Unclear state changes.** Add the least feedback that clarifies the action. Instant changes are valid for frequent actions and reduced motion; avoid blanket transitions.
 - **Missing focus ring.** Ensure visible focus indicators for keyboard navigation. This is an accessibility requirement, not optional.
 - **No loading states.** Replace generic circular spinners with skeleton loaders that match the layout shape.
 - **No empty states.** An empty dashboard showing nothing is a missed opportunity. Design a composed "getting started" view.
 - **No error states.** Add clear, inline error messages for forms. Do not use `window.alert()`.
 - **Dead links.** Buttons that link to `#`. Either link to real destinations or visually disable them.
 - **No indication of current page in navigation.** Style the active nav link differently so users know where they are.
-- **Scroll jumping.** Anchor clicks jump instantly. Add `scroll-behavior: smooth`.
-- **Animations using `top`, `left`, `width`, `height`.** Switch to `transform` and `opacity` for GPU-accelerated, smooth animation.
+- **Disorienting anchor navigation.** Check sticky-header offsets and focus. Add smooth scrolling only where useful, under `prefers-reduced-motion: no-preference`.
+- **Expensive animations.** Prefer transform/opacity when geometry remains correct; profile layout and paint before replacing dimension or position animation.
 
 ### Content
 
 - **Generic names like "John Doe" or "Jane Smith".** Use diverse, realistic-sounding names.
-- **Fake round numbers like `99.99%`, `50%`, `$100.00`.** Use organic, messy data: `47.2%`, `$99.00`, `+1 (312) 847-1928`.
+- **Unsupported numbers or contact details.** Preserve source data. Use clearly labelled sample data in prototypes; never invent metrics, prices, testimonials, or reachable contact details to make a product look credible.
 - **Placeholder company names like "Acme Corp", "Nexus", "SmartFlow".** Invent contextual, believable brand names.
 - **AI copywriting cliches.** Never use "Elevate", "Seamless", "Unleash", "Next-Gen", "Game-changer", "Delve", "Tapestry", or "In the world of...". Write plain, specific language.
 - **Exclamation marks in success messages.** Remove them. Be confident, not loud.
 - **"Oops!" error messages.** Be direct: "Connection failed. Please try again."
 - **Passive voice.** Use active voice: "We couldn't save your changes" instead of "Mistakes were made."
-- **All blog post dates identical.** Randomize dates to appear real.
+- **Suspicious or missing publication dates.** Verify the content source. Preserve actual dates and mark unknown dates; never randomize them to appear real.
 - **Same avatar image for multiple users.** Use unique assets for every distinct person.
 - **Lorem Ipsum.** Never use placeholder latin text. Write real draft copy.
 - **Title Case On Every Header.** Use sentence case instead.
@@ -145,9 +147,9 @@ When upgrading a project, pull from these high-impact techniques to replace gene
 - **Split-screen scroll.** Two halves of the screen sliding in opposite directions.
 
 ### Motion Upgrades
-- **Smooth scroll with inertia.** Decouple scrolling from browser defaults for a heavier, cinematic feel.
-- **Staggered entry.** Elements cascade in with slight delays, combining Y-axis translation with opacity fade. Never mount everything at once.
-- **Spring physics.** Replace linear easing with spring-based motion for a natural, weighty feel on all interactive elements.
+- **Scroll treatment.** Preserve native scrolling by default. Custom inertia requires explicit brief support, input parity, reduced-motion handling, and real-device tests.
+- **Staggered entry.** Elements cascade in with slight delays, combining Y-axis translation with opacity fade. Keep content available immediately; use stagger only when it helps and remove decorative delay for reduced motion.
+- **Spring physics.** Use springs for gestures and retargeting when they help. Preserve linear timing for constant motion and progress indicators.
 - **Scroll-driven reveals.** Content entering through expanding masks, wipes, or draw-on SVG paths tied to scroll progress.
 
 ### Surface Upgrades
@@ -160,7 +162,7 @@ When upgrading a project, pull from these high-impact techniques to replace gene
 
 Apply changes in this order for maximum visual impact with minimum risk:
 
-1. **Font swap** — biggest instant improvement, lowest risk
+1. **Typography fit** — preserve established fonts; change them only when the brief and rendered evidence support it
 2. **Color palette cleanup** — remove clashing or oversaturated colors
 3. **Hover and active states** — makes the interface feel alive
 4. **Layout and spacing** — proper grid, max-width, consistent padding

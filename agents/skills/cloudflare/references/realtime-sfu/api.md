@@ -3,14 +3,14 @@
 ## Authentication
 
 ```bash
-curl -X POST 'https://rtc.live/v1/apps/${CALLS_APP_ID}/sessions/new' \
+curl -X POST "https://rtc.live/v1/apps/${CALLS_APP_ID}/sessions/new" \
   -H "Authorization: Bearer ${CALLS_APP_SECRET}"
 ```
 
 ## Core Concepts
 
-**Sessions:** PeerConnection to Cloudflare edge  
-**Tracks:** Media/data channels (audio/video/datachannel)  
+**Sessions:** PeerConnection to Cloudflare edge
+**Tracks:** Media/data channels (audio/video/datachannel)
 **No rooms:** Build presence via track sharing
 
 ## Client Libraries
@@ -18,7 +18,7 @@ curl -X POST 'https://rtc.live/v1/apps/${CALLS_APP_ID}/sessions/new' \
 **PartyTracks (Recommended):** Observable-based client library for production use. Handles device changes, network switches, ICE restarts automatically. Push/pull API with React hooks. See patterns.md for full examples.
 
 ```bash
-npm install partytracks @cloudflare/calls
+npm install partytracks rxjs
 ```
 
 **Raw API:** Direct HTTP + WebRTC for custom requirements (documented below).
@@ -28,7 +28,7 @@ npm install partytracks @cloudflare/calls
 ### Create Session
 ```http
 POST /v1/apps/{appId}/sessions/new
-→ {sessionId, sessionDescription}
+→ {sessionId, sessionDescription?}
 ```
 
 ### Add Track (Publish)
@@ -36,7 +36,7 @@ POST /v1/apps/{appId}/sessions/new
 POST /v1/apps/{appId}/sessions/{sessionId}/tracks/new
 Body: {
   sessionDescription: {sdp, type: "offer"},
-  tracks: [{location: "local", trackName: "my-video"}]
+  tracks: [{location: "local", trackName: "my-video", mid: "<transceiver-mid>"}]
 }
 → {sessionDescription, tracks: [{trackName}]}
 ```
@@ -63,7 +63,7 @@ Body: {sessionDescription: {sdp, type: "answer"}}
 ### Close Tracks
 ```http
 PUT /v1/apps/{appId}/sessions/{sessionId}/tracks/close
-Body: {tracks: [{trackName}]}
+Body: {tracks: [{mid: "<transceiver-mid>"}], force: true}
 → {requiresImmediateRenegotiation: boolean}
 ```
 
@@ -86,73 +86,32 @@ interface TrackMetadata {
 
 ## WebRTC Flow
 
-```typescript
-// 1. Create PeerConnection
-const pc = new RTCPeerConnection({
-  iceServers: [{urls: 'stun:stun.cloudflare.com:3478'}]
-});
+Create a session on the backend and return its `sessionId`. Add media transceivers before creating an offer, then publish their `mid` and track names with the offer through `tracks/new`. A session created without an SDP has no answer to apply. Serialize signaling changes; check top-level and per-track API errors before updating local state.
 
-// 2. Add tracks
-const stream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
-stream.getTracks().forEach(track => pc.addTrack(track, stream));
-
-// 3. Create offer
-const offer = await pc.createOffer();
-await pc.setLocalDescription(offer);
-
-// 4. Send to backend → Cloudflare API
-const response = await fetch('/api/new-session', {
-  method: 'POST',
-  body: JSON.stringify({sdp: offer.sdp})
-});
-
-// 5. Set remote answer
-const {sessionDescription} = await response.json();
-await pc.setRemoteDescription(sessionDescription);
-```
+Your authenticated proxy must preserve the official `sessionDescription: { type, sdp }` body shape. Do not forward a bare `{sdp}` object to Cloudflare.
 
 ## Publishing
 
 ```typescript
-const offer = await pc.createOffer();
-await pc.setLocalDescription(offer);
-
+const transceiver = pc.addTransceiver(localTrack, { direction: 'sendonly' });
+await pc.setLocalDescription(await pc.createOffer());
+if (!pc.localDescription || transceiver.mid === null) throw new Error('Missing local SDP/mid');
 const res = await fetch(`/api/sessions/${sessionId}/tracks`, {
   method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    sdp: offer.sdp,
-    tracks: [{location: 'local', trackName: 'my-video'}]
+    sessionDescription: pc.localDescription,
+    tracks: [{ location: 'local', trackName: localTrack.id, mid: transceiver.mid }]
   })
 });
-
-const {sessionDescription, tracks} = await res.json();
-await pc.setRemoteDescription(sessionDescription);
-const publishedTrackId = tracks[0].trackName; // Share with others
+if (!res.ok) throw new Error('Track publication failed');
+// Validate the JSON against the OpenAPI schema and apply its answer.
 ```
+
+[Connection API and OpenAPI schema](https://developers.cloudflare.com/realtime/sfu/https-api/)
 
 ## Subscribing
 
-```typescript
-const res = await fetch(`/api/sessions/${sessionId}/tracks`, {
-  method: 'POST',
-  body: JSON.stringify({
-    tracks: [{location: 'remote', trackName: remoteTrackId, sessionId: remoteSessionId}]
-  })
-});
+Register `pc.ontrack` before applying the remote description. A received track may have no `event.streams`; attach `new MediaStream([event.track])` in that case. Request a remote track using `{location: "remote", sessionId, trackName}`. Check `requiresImmediateRenegotiation` and the returned SDP type before creating/applying an answer. Send the answer as `{sessionDescription: {type: "answer", sdp}}` to `/renegotiate`.
 
-const {sessionDescription} = await res.json();
-await pc.setRemoteDescription(sessionDescription);
-
-const answer = await pc.createAnswer();
-await pc.setLocalDescription(answer);
-
-await fetch(`/api/sessions/${sessionId}/renegotiate`, {
-  method: 'PUT',
-  body: JSON.stringify({sdp: answer.sdp})
-});
-
-pc.ontrack = (event) => {
-  const [remoteStream] = event.streams;
-  videoElement.srcObject = remoteStream;
-};
-```
+DataChannels use `/datachannels/establish` and `/datachannels/new` after establishing their transport; `pc.createDataChannel()` alone does not publish a channel through the SFU. Follow the current OpenAPI for channel negotiation and closure.

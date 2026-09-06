@@ -21,7 +21,7 @@ export const Route = createFileRoute('/dashboard')({
   },
 })
 
-// Or nesting data dependencies incorrectly
+// Independent nested loaders are already parallel (this is not a waterfall)
 // routes/posts.tsx
 export const Route = createFileRoute('/posts')({
   loader: async () => {
@@ -33,7 +33,7 @@ export const Route = createFileRoute('/posts')({
 // routes/posts/$postId.tsx
 export const Route = createFileRoute('/posts/$postId')({
   loader: async ({ params }) => {
-    // Waits for parent to complete first - waterfall!
+    // Runs in parallel with the parent loader
     const post = await fetchPost(params.postId)  // +200ms
     return { post }
   },
@@ -165,19 +165,15 @@ function PostPage() {
 ```
 Navigation to /posts/123
 
-Without parallelization:
+Actual route sequence:
 ├─ beforeLoad (parent)  ████████
-├─ loader (parent)              ████████
-├─ beforeLoad (child)                   ████
-├─ loader (child)                           ████████
-└─ Render                                           █
+├─ beforeLoad (child)           ████
+├─ loader (parent)                 ████████
+├─ loader (child)                  ████████████
+└─ Render                                     █
 
-With parallelization:
-├─ beforeLoad (parent)  ████████
-├─ beforeLoad (child)   ████
-├─ loader (parent)      ████████
-├─ loader (child)       ████████████
-└─ Render                           █
+beforeLoad hooks run serially from parent to child. Once they finish,
+independent matched-route loaders can run in parallel.
 ```
 
 ## Context

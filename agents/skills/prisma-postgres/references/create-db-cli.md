@@ -48,6 +48,10 @@ Top-level commands currently exposed:
 | `--interactive [boolean]` | `-i` | Open region selector |
 | `--json [boolean]` | `-j` | Output machine-readable JSON |
 | `--env [string]` | `-e` | Write `DATABASE_URL` and `CLAIM_URL` into a target `.env` |
+| `--ttl [string]` | `-t` | Auto-delete after 30m or 1h-24h |
+| `--copy` | `-c` | Copy connection string to clipboard |
+| `--quiet` | `-q` | Print only the connection string |
+| `--open` | `-o` | Open claim URL in browser |
 
 ## Lifecycle and claim flow
 

@@ -12,7 +12,7 @@ export default {
         headers: { 'Content-Type': 'application/json' }
       });
     }
-    return fetch(request);  // Subrequest to origin
+    return new Response('Not found', { status: 404 });
   },
 };
 ```
@@ -21,10 +21,10 @@ export default {
 
 ```typescript
 ctx.waitUntil(logAnalytics(request));  // Background work, don't block response
-ctx.passThroughOnException();  // Failover to origin on error
+// Use passThroughOnException only when the route has an origin and fail-open is intended.
 ```
 
-**Never** `await` background operations - use `ctx.waitUntil()`.
+Await operations required for the response. Use `ctx.waitUntil()` for optional completion after returning; it does not increase CPU limits.
 
 ## Bindings
 
@@ -55,15 +55,21 @@ const key = env.API_KEY;
 ## Cache API
 
 ```typescript
+// Only for an explicitly public, identical-for-all-users GET route.
+if (request.method !== 'GET' || request.headers.has('Authorization') || request.headers.has('Cookie')) {
+  return handleRequest(request, env);
+}
 const cache = caches.default;
 let response = await cache.match(request);
-
 if (!response) {
-  response = await fetch(request);
-  response = new Response(response.body, response);
-  response.headers.set('Cache-Control', 'max-age=3600');
-  ctx.waitUntil(cache.put(request, response.clone()));  // Clone before caching
+  response = await handleRequest(request, env);
+  if (response.ok && !response.headers.has('Set-Cookie')) {
+    response = new Response(response.body, response);
+    response.headers.set('Cache-Control', 'public, max-age=3600');
+    ctx.waitUntil(cache.put(request, response.clone()));
+  }
 }
+return response;
 ```
 
 ## HTMLRewriter
@@ -100,68 +106,32 @@ return new Response(null, { status: 101, webSocket: client });
 
 ### WebSocket Hibernation (Recommended for idle connections)
 
-```typescript
-// In Durable Object
-export class WebSocketDO {
-  async webSocketMessage(ws: WebSocket, message: string) {
-    ws.send(`Echo: ${message}`);
-  }
-  
-  async webSocketClose(ws: WebSocket, code: number, reason: string) {
-    // Cleanup on close
-  }
-  
-  async webSocketError(ws: WebSocket, error: Error) {
-    console.error('WebSocket error:', error);
-  }
-}
-```
-
-Hibernation automatically suspends inactive connections (no CPU cost), wakes on events
+Use the complete [Durable Object WebSocket example](../../../durable-objects/SKILL.md). The class must extend `DurableObject` and accept the server socket with `ctx.acceptWebSocket`; declaring event methods alone does not enable hibernation.
 
 ## Durable Objects
 
 ### RPC Pattern (Recommended 2024+)
 
 ```typescript
-export class Counter {
-  private value = 0;
+import { DurableObject } from 'cloudflare:workers';
   
-  constructor(private state: DurableObjectState) {
-    state.blockConcurrencyWhile(async () => {
-      this.value = (await state.storage.get('value')) || 0;
+export class Counter extends DurableObject<Env> {
+  async increment(): Promise<number> {
+    return this.ctx.storage.transaction(async (tx) => {
+      const next = (await tx.get<number>('value') ?? 0) + 1;
+      await tx.put('value', next);
+      return next;
     });
   }
-  
-  // Export methods directly - called via RPC (type-safe, zero serialization)
-  async increment(): Promise<number> {
-    this.value++;
-    await this.state.storage.put('value', this.value);
-    return this.value;
-  }
-  
   async getValue(): Promise<number> {
-    return this.value;
+    return await this.ctx.storage.get<number>('value') ?? 0;
   }
 }
-
-// Worker usage:
-const stub = env.COUNTER.get(env.COUNTER.idFromName('global'));
-const count = await stub.increment(); // Direct method call, full type safety
+const stub = env.COUNTER.getByName('global');
+const count = await stub.increment();
 ```
 
-### Legacy Fetch Pattern (Pre-2024)
-
-```typescript
-async fetch(request: Request): Promise<Response> {
-  const url = new URL(request.url);
-  if (url.pathname === '/increment') {
-    await this.state.storage.put('value', ++this.value);
-  }
-  return new Response(String(this.value));
-}
-// Usage: await stub.fetch('http://x/increment')
-```
+Configure the exported class and generate namespace types before using RPC. HTTP `stub.fetch()` remains supported for HTTP/WebSocket interfaces. RPC serializes arguments and results; it does not provide zero serialization or zero latency.
 
 **When to use DOs**: Real-time collaboration, rate limiting, strongly consistent state
 
@@ -176,11 +146,12 @@ async fetch(request: Request): Promise<Response> {
 ## Service Bindings
 
 ```typescript
-// Worker-to-worker RPC (zero latency, no internet round-trip)
+// Worker-to-worker HTTP through a service binding
 return env.SERVICE_B.fetch(request);
 
 // With RPC (2024+) - same as Durable Objects RPC
-export class ServiceWorker {
+import { WorkerEntrypoint } from 'cloudflare:workers';
+export class ServiceWorker extends WorkerEntrypoint<Env> {
   async getData() { return { data: 'value' }; }
 }
 // Usage: const data = await env.SERVICE_B.getData();

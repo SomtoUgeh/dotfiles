@@ -9,7 +9,9 @@ metadata:
 
 A motion designer settles every movement, its timing, and its relationship to every other movement before a single frame gets made. Do that for the interface: interview the user down the decision tree of one animation until a **motion brief** has no blanks, then stop.
 
-Animations get rebuilt three times not because the code was wrong but because nobody decided what the motion was for. This skill front-loads that decision. **It does not write the animation.** The brief is the deliverable; implementation is a separate act, taken only after the user confirms.
+Animations get rebuilt three times not because the code was wrong but because nobody decided what the motion was for. This skill front-loads that decision. **It does not write the animation.** The brief is the deliverable for interview-only requests. If implementation is already explicitly authorized, use the agreed decisions and continue without asking for the same approval again.
+
+Follow the [canonical motion policy](../animate/references/canonical-policy.md). Values below are starting points, not universal requirements.
 
 ## The three rules
 
@@ -37,7 +39,7 @@ From here on, every question is grounded in what you found: _"The drawer current
 
 Ask these first. Both can end in a **cut**, and a cut is a successful outcome — it's the answer an agent never volunteers on its own.
 
-1. **Frequency.** "How many times a day does one user see this?" A keyboard-initiated action or anything at 100+/day gets **no animation, ever** — motion makes a repeated action feel slow and disconnected. Raycast has no open/close animation, correctly.
+1. **Frequency.** "How many times a day does one user see this?" For a rapidly repeated action, recommend immediate feedback and cut any motion that delays or disconnects input. Keyboard input or a count alone is not an automatic ban; test the actual flow.
 2. **Purpose.** "What does the motion tell the user that the static change doesn't?" Valid answers: feedback, spatial consistency, state indication, explanation, preventing a jarring change, or — for something seen rarely — delight. "It looks cool" on a frequently-seen element is not one.
 
 If either lands on a cut, write the brief as a cut with the reasoning and stop. Do not soften it into "a very subtle version."
@@ -55,7 +57,7 @@ If either lands on a cut, write the brief as a cut with the reasoning and stop. 
 
 ## Step 5 — The edges
 
-8. **Reduced motion.** "With movement removed, what should survive?" Gentler, not zero — keep the opacity or color change that aids comprehension; drop the travel. Purely decorative motion goes away entirely.
+8. **Reduced motion.** "With movement removed, what should survive?" An instant change is valid; retain restrained opacity/color feedback only if it aids comprehension, and drop unnecessary travel. Purely decorative motion goes away entirely.
 9. **Scale and load.** What this does with 200 items instead of 3, on a mid-range phone, while data is still loading. Ask only where the recon showed a list, a drag, a filter, or a blur — otherwise it's a question about nothing.
 
 ## Step 6 — The brief
@@ -81,7 +83,7 @@ The interview ends when the brief has **no blanks** — not when the user seems 
 **Open risk:** <what we're least sure of, and how we'd check it>
 ```
 
-Then stop and ask for confirmation. Do not write code, propose a diff, or start editing until the user confirms the brief — the whole point is that the decision is settled before the implementation exists.
+For interview-only requests, present the brief and wait for the user's implementation choice. When the user already authorized implementation, continue with the settled brief; ask only about unresolved decisions that materially change the result.
 
 ## Defaults you bring to each question
 
@@ -89,17 +91,17 @@ Recommend these unless the interview gives you a reason to depart. Never present
 
 | Decision            | Recommend                                                                                                                                                                                                                |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Should it animate   | Cut it if keyboard-triggered or seen 100+/day; reduce it at tens/day; standard for occasional (modals, drawers, toasts); delight only for rare or first-run                                                              |
-| Which properties    | `transform` and `opacity` only — they're the ones that stay on the GPU                                                                                                                                                   |
-| Entrance            | `scale(0.95)` + `opacity: 0`, never `scale(0)` — nothing appears from nothing                                                                                                                                            |
+| Should it animate   | Prefer immediate feedback for repeated actions; reduce motion that delays input; standard for occasional (modals, drawers, toasts); delight only for rare or first-run                                                              |
+| Which properties    | Prefer `transform` and `opacity` when geometry remains correct; verify rendering cost                                                                                                                                                   |
+| Entrance            | `scale(0.95)` + `opacity: 0` for ordinary surface entrances; stronger scaling needs an intentional visual purpose and a reduced-motion alternative                                                                                                                                            |
 | Press / hover       | `scale(0.97)` on press (felt, not seen); 1–2% on hover, gated behind `(hover: hover) and (pointer: fine)`                                                                                                                |
 | Origin              | Trigger-anchored for popovers, dropdowns, menus (`var(--radix-popover-content-transform-origin)`); centered for modals                                                                                                   |
-| Easing              | `ease-out` entering/exiting, `ease-in-out` moving on screen, `ease` for hover/color, `linear` only for constant motion. Never `ease-in` on UI. A custom curve over a built-in — built-ins are almost never strong enough |
+| Easing              | Start with `ease-out` for responsive entrances, `ease-in-out` for movement, `ease` for hover/color, and `linear` for constant speed. Tune named or custom curves to the interaction; an accelerating exit can be appropriate |
 | Curve to start from | `cubic-bezier(0.19, 1, 0.22, 1)` reveals · `cubic-bezier(0.32, 0.72, 0, 1)` sheets · `cubic-bezier(0.645, 0.045, 0.355, 1)` on-screen moves                                                                              |
 | Duration            | Under 300ms unless the element is large or travels far: press ~150ms, tooltip 125–200ms, dropdown 150–250ms, modal or drawer 200–500ms. Exits shorter than entries                                                       |
-| Interrupt           | CSS transitions or springs, which retarget from the current state — not `@keyframes`, which restart from zero                                                                                                            |
+| Interrupt           | CSS transitions or springs, which retarget from the current state — keyframe timelines need explicit retargeting/playback control                                                                                                            |
 | Spring              | `{ type: "spring", duration: 0.3, bounce: 0 }`. Bounce stays at 0 unless the user asked for personality; smaller elements need more bounce to read the same                                                              |
-| Reduced motion      | Keep opacity and color, drop movement; disable decorative motion outright                                                                                                                                                |
+| Reduced motion      | Instant or restrained opacity/color feedback; reduce spatial and disable decorative motion                                                                                                                                                |
 | Stagger             | 30–80ms, varied by importance — uniform stagger kills hierarchy. One entrance per container                                                                                                                              |
 
 ## When the user stalls

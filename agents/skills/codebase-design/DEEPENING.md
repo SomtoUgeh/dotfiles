@@ -8,7 +8,7 @@ When assessing a candidate for deepening, classify its dependencies. The categor
 
 ### 1. In-process
 
-Pure computation, in-memory state, no I/O. Always deepenable — merge the modules and test through the new interface directly. No adapter needed.
+Pure computation, in-memory state, no I/O. If responsibilities belong together, test the deepened module through its interface directly. No adapter is needed merely for testing.
 
 ### 2. Local-substitutable
 
@@ -31,7 +31,7 @@ Third-party services (Stripe, Twilio, etc.) you don't control. The deepened modu
 
 ## Testing strategy: replace, don't layer
 
-- Old unit tests on shallow modules become waste once tests at the deepened module's interface exist — delete them.
+- Map each old test's behavior and edge cases to coverage at the new interface. Remove only redundant or implementation-coupled tests after replacement coverage passes; retain distinct regression and integration coverage.
 - Write new tests at the deepened module's interface. The **interface is the test surface**.
 - Tests assert on observable outcomes through the interface, not internal state.
 - Tests should survive internal refactors — they describe behaviour, not implementation. If a test has to change when the implementation changes, it's testing past the interface.

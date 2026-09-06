@@ -7,10 +7,11 @@ Execute multiple operations atomically.
 Array of operations executed in order:
 
 ```typescript
-const [user, post] = await prisma.$transaction([
+const [alice, bob] = await prisma.$transaction([
   prisma.user.create({ data: { email: 'alice@prisma.io' } }),
-  prisma.post.create({ data: { title: 'Hello', authorId: 1 } })
+  prisma.user.create({ data: { email: 'bob@prisma.io' } })
 ])
+// For a post linked to a newly generated user ID, use a nested write or interactive transaction.
 ```
 
 ### All or nothing
@@ -34,6 +35,7 @@ For complex logic and dependent operations:
 
 ```typescript
 await prisma.$transaction(async (tx) => {
+  // Validate a positive amount and authorized account ownership before this transaction.
   // Decrement sender balance
   const sender = await tx.account.update({
     where: { id: senderId },
@@ -61,18 +63,20 @@ await prisma.$transaction(
     // operations
   },
   {
-    maxWait: 5000,    // Max wait to acquire lock (ms)
+    maxWait: 5000,    // Max wait to acquire a transaction (ms)
     timeout: 10000,   // Max transaction duration (ms)
     isolationLevel: 'Serializable'  // Isolation level
   }
 )
 ```
 
+Prisma P2034 conflicts/deadlocks at Serializable require bounded retries of the whole transaction. Do not retry external side effects blindly.
+
 ### Isolation levels
 
 | Level | Description |
 |-------|-------------|
-| `ReadUncommitted` | Lowest isolation, can read uncommitted changes |
+| `ReadUncommitted` | Provider-specific; PostgreSQL treats it as ReadCommitted (no dirty reads) |
 | `ReadCommitted` | Only read committed changes |
 | `RepeatableRead` | Consistent reads within transaction |
 | `Serializable` | Highest isolation, serialized execution |
@@ -146,12 +150,13 @@ await prisma.$transaction(async (tx) => {
 ### Handle errors
 
 ```typescript
+import { Prisma } from '../generated/client'
 try {
   await prisma.$transaction(async (tx) => {
     // operations
   })
 } catch (e) {
-  if (e.code === 'P2002') {
+  if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
     // Handle unique constraint violation
   }
   throw e

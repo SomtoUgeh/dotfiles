@@ -23,14 +23,14 @@ Pro/Business users see bot score groupings instead of granular 1-99 scores:
 Enterprise plans get granular 1-99 scores for custom thresholds.
 
 ### Bot Fight Mode (Free)
-- Auto-blocks definite bots (score=1), excludes verified bots by default
+- Challenges traffic identified as bots (score=1), excludes verified bots by default
 - JavaScript Detections always enabled, no configuration options
 
 ### Super Bot Fight Mode (Pro/Business)
 ```txt
 Dashboard: Security > Bots > Configure
 - Definitely automated: Block/Challenge
-- Likely automated: Challenge/Allow  
+- Likely automated: Challenge/Allow
 - Verified bots: Allow (recommended)
 - Static resource protection: ON (may block mail clients)
 - JavaScript Detections: Optional
@@ -45,7 +45,7 @@ Dashboard: Security > Bots > Configure > Auto-updates: ON (recommended)
 Action: Block
 
 # Template 2: Challenge likely bots
-(cf.bot_management.score ge 2 and cf.bot_management.score le 29 and not cf.bot_management.verified_bot and not cf.bot_management.static_resource)
+(cf.bot_management.score geq 2 and cf.bot_management.score leq 29 and not cf.bot_management.verified_bot and not cf.bot_management.static_resource)
 Action: Managed Challenge
 ```
 
@@ -55,7 +55,7 @@ Action: Managed Challenge
 ```txt
 Security > Bots > Configure Bot Management > JS Detections: ON
 
-Update CSP: script-src 'self' /cdn-cgi/challenge-platform/;
+Update CSP: script-src 'self';
 ```
 
 ### Manual JS Injection (API)
@@ -68,7 +68,7 @@ function jsdOnload() {
 <script src="/cdn-cgi/challenge-platform/scripts/jsd/api.js?onload=jsdOnload" async></script>
 ```
 
-**Use API for**: Selective deployment on specific pages  
+**Use API for**: Selective deployment on specific pages
 **Don't combine**: Zone-wide toggle + manual injection
 
 ### WAF Rules for JSD
@@ -92,7 +92,7 @@ Cloudflare sets `__cf_bm` cookie to smooth bot scores across user sessions:
 
 - **Purpose:** Reduces false positives from score volatility
 - **Scope:** Per-domain, HTTP-only
-- **Lifespan:** Session duration
+- **Lifespan:** 30 minutes of continuous inactivity
 - **Privacy:** No PII—only session classification
 - **Automatic:** No configuration required
 
@@ -100,7 +100,7 @@ Bot scores for repeat visitors consider session history via this cookie.
 
 ## Static Resource Protection
 
-**File Extensions**: ico, jpg, png, jpeg, gif, css, js, tif, tiff, bmp, pict, webp, svg, svgz, class, jar, txt, csv, doc, docx, xls, xlsx, pdf, ps, pls, ppt, pptx, ttf, otf, woff, woff2, eot, eps, ejs, swf, torrent, midi, mid, m3u8, m4a, mp3, ogg, ts  
+**File Extensions**: ico, jpg, png, jpeg, gif, css, js, tif, tiff, bmp, pict, webp, svg, svgz, class, jar, txt, csv, doc, docx, xls, xlsx, pdf, ps, pls, ppt, pptx, ttf, otf, woff, woff2, eot, eps, ejs, swf, torrent, midi, mid, m3u8, m4a, mp3, ogg, ts
 **Plus**: `/.well-known/` path (all files)
 
 ```txt
@@ -116,11 +116,10 @@ Bot scores for repeat visitors consider session history via this cookie.
 # Block specific attack fingerprint
 (cf.bot_management.ja3_hash eq "8b8e3d5e3e8b3d5e")
 
-# Allow mobile app by fingerprint
-(cf.bot_management.ja4 eq "your_mobile_app_fingerprint")
+# Investigate a known fingerprint as one signal, never as proof of app identity.
 ```
 
-Only available for HTTPS/TLS traffic. Missing for Worker-routed traffic or HTTP requests.
+Only available for HTTPS/TLS traffic. Availability depends on the request and product. Current O2O flows preserve end-user signals; do not assume all Worker-routed traffic loses them.
 
 ## Verified Bot Categories
 
@@ -158,6 +157,8 @@ Action: Block
 
 - **ML Auto-Updates**: Enable on Enterprise for latest models
 - **Start with Managed Challenge**: Test before blocking
-- **Always exclude verified bots**: Use `not cf.bot_management.verified_bot`
-- **Exempt corporate proxies**: For B2B traffic via `cf.bot_management.corporate_proxy`
+- **Exclude verified bots only where the application policy permits**: Use `not cf.bot_management.verified_bot`
+- **Evaluate corporate-proxy exceptions**: For B2B traffic via `cf.bot_management.corporate_proxy`
 - **Use static resource exception**: Improves performance, reduces overhead
+
+Metadata source: [Bot Management variables](https://developers.cloudflare.com/bots/reference/bot-management-variables/). Bot classification, verified-bot status, and corporate-proxy status do not grant application authorization.

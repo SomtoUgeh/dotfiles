@@ -79,7 +79,7 @@ generator client {
 
 ### Key v7 Changes
 
-- Provider must be `prisma-client`
+- Use `prisma-client` for new projects; legacy `prisma-client-js` remains supported in v7 but has different output/import behavior
 - `output` is now **required** - client no longer generates to `node_modules`
 - Update imports after generating:
 

@@ -114,7 +114,7 @@ await fetch(
 // Check status: GET same endpoint returns { state: "In-progress" | "Completed" }
 ```
 
-**Process**: Disable Cache Reserve → Call clear endpoint → Wait up to 24hr → Re-enable
+**Process**: Disable Cache Reserve → Call clear endpoint → Wait until clear completes (up to 24hr) → Re-enable if intended
 
 ## Monitoring and Analytics
 
@@ -134,50 +134,31 @@ Navigate to **Caching > Cache Reserve** to view:
 // Logpush field: CacheReserveUsed (boolean) - filter for Cache Reserve hits
 // Query Cache Reserve hits in analytics
 const logpushQuery = `
-  SELECT 
-    ClientRequestHost, 
-    COUNT(*) as requests, 
+  SELECT
+    ClientRequestHost,
+    COUNT(*) as requests,
     SUM(EdgeResponseBytes) as bytes_served,
     COUNT(CASE WHEN CacheReserveUsed = true THEN 1 END) as cache_reserve_hits,
     COUNT(CASE WHEN CacheReserveUsed = false THEN 1 END) as cache_reserve_misses
-  FROM http_requests 
+  FROM http_requests
   WHERE Timestamp >= NOW() - INTERVAL '24 hours'
-  GROUP BY ClientRequestHost 
+  GROUP BY ClientRequestHost
   ORDER BY requests DESC
 `;
 
 // Filter only Cache Reserve hits
 const crHitsQuery = `
   SELECT ClientRequestHost, COUNT(*) as requests, SUM(EdgeResponseBytes) as bytes
-  FROM http_requests 
+  FROM http_requests
   WHERE CacheReserveUsed = true AND Timestamp >= NOW() - INTERVAL '7 days'
-  GROUP BY ClientRequestHost 
+  GROUP BY ClientRequestHost
   ORDER BY bytes DESC
 `;
 ```
 
 ### GraphQL Analytics
 
-```graphql
-query CacheReserveAnalytics($zoneTag: string, $since: string, $until: string) {
-  viewer {
-    zones(filter: { zoneTag: $zoneTag }) {
-      httpRequests1dGroups(
-        filter: { datetime_geq: $since, datetime_leq: $until }
-        limit: 1000
-      ) {
-        dimensions { date }
-        sum {
-          cachedBytes
-          cachedRequests
-          bytes
-          requests
-        }
-      }
-    }
-  }
-}
-```
+Ordinary cachedBytes/cachedRequests metrics are not Cache Reserve-specific savings. Use the product analytics dataset available to the zone and verify it with introspection; keep sampling and retention in the report.
 
 ## Pricing
 

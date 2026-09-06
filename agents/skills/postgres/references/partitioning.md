@@ -44,16 +44,16 @@ Useful for partitioning by region, tenant, or category:
 
 ```sql
 -- EXAMPLE
-CREATE TABLE order (
+CREATE TABLE purchase_order (
   id BIGINT GENERATED ALWAYS AS IDENTITY,
   region TEXT NOT NULL,
   total NUMERIC(10,2),
   PRIMARY KEY (id, region) -- Partition key MUST be part of PK
 ) PARTITION BY LIST (region);
 
-CREATE TABLE order_us PARTITION OF order FOR VALUES IN ('us');
-CREATE TABLE order_eu PARTITION OF order FOR VALUES IN ('eu');
-CREATE TABLE order_default PARTITION OF order DEFAULT;  -- catches unmatched values
+CREATE TABLE order_us PARTITION OF purchase_order FOR VALUES IN ('us');
+CREATE TABLE order_eu PARTITION OF purchase_order FOR VALUES IN ('eu');
+CREATE TABLE order_default PARTITION OF purchase_order DEFAULT;  -- catches unmatched values
 ```
 
 ## Partition Management

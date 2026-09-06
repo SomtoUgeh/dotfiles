@@ -43,8 +43,17 @@ const queryClient = new QueryClient({
   },
 })
 
+function browserStorage(): Storage | undefined {
+  if (typeof window === 'undefined') return undefined
+  try {
+    return window.localStorage
+  } catch {
+    return undefined // Browser policy can deny access to the property itself
+  }
+}
+
 const persister = createSyncStoragePersister({
-  storage: window.localStorage,
+  storage: browserStorage(),
   key: 'REACT_QUERY_CACHE',
 })
 
@@ -62,6 +71,46 @@ function App() {
   )
 }
 ```
+
+## Good Example: Browser Persistence with TanStack Start
+
+The basic module-level client above is for a client-rendered app. In Start, create
+the `QueryClient` inside `getRouter()` and keep SSR query integration enabled.
+When supplying `PersistQueryClientProvider` through the router's `Wrap`, set
+`wrapQueryClient: false` on `setupRouterSsrQueryIntegration`.
+
+For a view whose initial data exists only in browser storage, preserve a stable
+server fallback with `ClientOnly`. Restoring the cache can finish before a lazy
+or streamed route hydrates; rendering restored data against server loading text
+causes a hydration mismatch. `useIsRestoring` controls restoration UI but is not
+a hydration boundary. Keep loader-backed SSR data on the normal SSR path.
+
+```tsx
+import { ClientOnly } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
+import { catalogQuery } from './queries'
+
+function PersistedCatalog() {
+  return (
+    <ClientOnly fallback={<p>Loading catalog</p>}>
+      <Catalog />
+    </ClientOnly>
+  )
+}
+
+function Catalog() {
+  const query = useQuery(catalogQuery())
+  if (query.error) return <p>Catalog unavailable</p>
+  return <p>{query.data?.label ?? 'Loading catalog'}</p>
+}
+```
+
+Test a full reload with an existing storage snapshot, not only client navigation.
+Also test expired/busted snapshots, malformed or unavailable storage, and account
+changes. When storage is unavailable, let Query continue with its in-memory cache.
+
+References: [ClientOnly](https://tanstack.com/router/latest/docs/framework/react/api/router/clientOnlyComponent),
+[localStorage exceptions](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage#exceptions).
 
 ## Good Example: Async Persistence with IndexedDB
 
@@ -107,20 +156,14 @@ const queryClient = new QueryClient({
   },
 })
 
-// Only persist certain queries
+// Explicitly opt public queries in with meta: { persist: true }.
+// A denylist of known private keys misses newly added sensitive queries.
 persistQueryClient({
   queryClient,
   persister,
   dehydrateOptions: {
     shouldDehydrateQuery: (query) => {
-      // Don't persist user-specific sensitive data
-      if (query.queryKey[0] === 'user-session') return false
-      // Don't persist real-time data
-      if (query.queryKey[0] === 'notifications') return false
-      // Don't persist failed queries
-      if (query.state.status !== 'success') return false
-      // Persist everything else
-      return true
+      return query.meta?.persist === true && query.state.status === 'success'
     },
   },
 })
@@ -143,7 +186,14 @@ const persister = createAsyncStoragePersister({
 ## Good Example: Handling Restoration Loading
 
 ```tsx
+import { useIsRestoring } from '@tanstack/react-query'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
+
+function PersistedApp() {
+  const isRestoring = useIsRestoring()
+
+  return isRestoring ? <SplashScreen /> : <MainApp />
+}
 
 function App() {
   return (
@@ -155,22 +205,9 @@ function App() {
         console.log('Cache restored')
       }}
     >
-      {/* Show loading while restoring */}
-      <PersistQueryClientProvider.Consumer>
-        {({ isRestoring }) =>
-          isRestoring ? <SplashScreen /> : <MainApp />
-        }
-      </PersistQueryClientProvider.Consumer>
+      <PersistedApp />
     </PersistQueryClientProvider>
   )
-}
-
-// Or use the hook
-function MainApp() {
-  const { isRestoring } = usePersistQueryClientRestore()
-
-  if (isRestoring) return <SplashScreen />
-  return <App />
 }
 ```
 
@@ -181,12 +218,13 @@ function MainApp() {
 | `maxAge` | Maximum cache age before considered invalid |
 | `buster` | String to invalidate cache (use app version) |
 | `dehydrateOptions.shouldDehydrateQuery` | Filter which queries to persist |
-| `hydrateOptions.shouldHydrate` | Filter which queries to restore |
+| `hydrateOptions.defaultOptions` | Defaults for hydrated queries and mutations |
 
 ## Context
 
 - Requires `@tanstack/react-query-persist-client` package
-- Set `gcTime` higher than default (5 min) for persistence to be useful
+- Set `gcTime` at least as large as persistence `maxAge`; otherwise inactive restored data can be collected earlier than intended
+- Create the client per SSR request; keep the browser client stable. Clear both persisted and in-memory private data on logout/account changes.
 - Use `buster` option to invalidate cache on app updates
 - Don't persist sensitive data or real-time data
 - IndexedDB is better than localStorage for large caches

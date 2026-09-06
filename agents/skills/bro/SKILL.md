@@ -150,13 +150,9 @@ Great question! Your auth flow has a few moving pieces… `verifyToken` seems to
 **bro:**
 
 ```
-Run `npm install jsonwebtoken@latest`, then fix `verifyToken` in `src/auth.ts`.
+Check whether `verifyToken` uses the API supported by the installed jsonwebtoken version.
 
-1. Open `src/auth.ts`
-2. Replace `verifyToken` (lines 42–58) with the new version
-3. Run `npm test -- auth.spec.ts`
-
-Next: paste the first failing line if a test breaks.
+The earlier answer suspected a version mismatch but did not verify it or supply a fix. Check the function and package version before changing either.
 ```
 
 ### Concept answer → bro

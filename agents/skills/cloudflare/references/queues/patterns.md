@@ -38,7 +38,8 @@ ctx.waitUntil(env.LOGS_QUEUE.send({
 // Consumer: Batch write to external API
 async queue(batch: MessageBatch, env: Env): Promise<void> {
   const logs = batch.messages.map(m => m.body);
-  await fetch(env.LOG_ENDPOINT, { method: 'POST', body: JSON.stringify({ logs }) });
+  const response = await fetch(env.LOG_ENDPOINT, { method: 'POST', body: JSON.stringify({ logs }) });
+  if (!response.ok) throw new Error(`Log endpoint failed: ${response.status}`);
   batch.ackAll();
 }
 ```
@@ -52,9 +53,11 @@ async queue(batch: MessageBatch, env: Env): Promise<void> {
       await callRateLimitedAPI(msg.body);
       msg.ack();
     } catch (error) {
-      if (error.status === 429) {
-        const retryAfter = parseInt(error.headers.get('Retry-After') || '60');
-        msg.retry({ delaySeconds: retryAfter });
+      if (error instanceof Response && error.status === 429) {
+        const header = error.headers.get('Retry-After') ?? '60';
+        const seconds = /^\d+$/.test(header) ? Number(header) : (Date.parse(header) - Date.now()) / 1000;
+        const delay = Number.isFinite(seconds) ? Math.max(0, Math.min(86400, Math.ceil(seconds))) : 60;
+        msg.retry({ delaySeconds: delay });
       } else throw error;
     }
   }
@@ -92,6 +95,7 @@ export default {
         msg.ack();
       } catch (error) {
         console.error(`Failed after ${msg.attempts} attempts:`, error);
+        msg.retry(); // Required: catching alone would acknowledge on successful return.
       }
     }
   }
@@ -123,47 +127,35 @@ await env.EMAIL_QUEUE.send({ to, template, userId }, { delaySeconds: 3600 });
 ```typescript
 async fetch(request: Request, env: Env): Promise<Response> {
   const event = await request.json();
-  
+
   // Send to multiple queues for parallel processing
   await Promise.all([
     env.ANALYTICS_QUEUE.send(event),
     env.NOTIFICATIONS_QUEUE.send(event),
     env.AUDIT_LOG_QUEUE.send(event)
   ]);
-  
-  return Response.json({ status: 'processed' });
+
+  return Response.json({ status: 'queued' }, { status: 202 });
 }
 ```
 
 ## Idempotency Pattern
 
-```typescript
-async queue(batch: MessageBatch, env: Env): Promise<void> {
-  for (const msg of batch.messages) {
-    // Check if already processed
-    const processed = await env.PROCESSED_KV.get(msg.id);
-    if (processed) {
-      msg.ack();
-      continue;
-    }
-    
-    await processMessage(msg.body);
-    await env.PROCESSED_KV.put(msg.id, '1', { expirationTtl: 86400 });
-    msg.ack();
-  }
-}
-```
+Use a stable business-event ID, not only a delivery attempt ID. For effects wholly in D1, enforce a unique event ID and commit the effect and processing record in the same transaction/batch. For external APIs, pass the provider's supported idempotency key and persist the result. A KV existence check followed by a remote effect and KV write cannot provide atomic deduplication.
+
+Fan-out is also not transactional: some queue sends may succeed before another fails. Retrying requires per-destination idempotency or an outbox that records delivery progress.
 
 ## Integration: D1 Batch Writes
 
 ```typescript
 async queue(batch: MessageBatch, env: Env): Promise<void> {
+  // Requires events.id PRIMARY KEY or UNIQUE; duplicate deliveries are ignored.
   // Collect all inserts for single D1 batch
-  const statements = batch.messages.map(msg => 
-    env.DB.prepare('INSERT INTO events (id, data, created) VALUES (?, ?, ?)')
+  const statements = batch.messages.map(msg =>
+    env.DB.prepare('INSERT INTO events (id, data, created) VALUES (?, ?, ?) ON CONFLICT(id) DO NOTHING')
       .bind(msg.id, JSON.stringify(msg.body), Date.now())
   );
-  
+
   try {
     await env.DB.batch(statements);
     batch.ackAll();
@@ -201,16 +193,17 @@ async queue(batch: MessageBatch, env: Env): Promise<void> {
 async queue(batch: MessageBatch, env: Env): Promise<void> {
   for (const msg of batch.messages) {
     const { userId, action } = msg.body;
-    
+
     // Route to user-specific DO
     const id = env.USER_DO.idFromName(userId);
     const stub = env.USER_DO.get(id);
-    
+
     try {
-      await stub.fetch(new Request('https://do/process', {
+      const response = await stub.fetch(new Request('https://do/process', {
         method: 'POST',
         body: JSON.stringify({ action, messageId: msg.id })
       }));
+      if (!response.ok) throw new Error(`DO processing failed: ${response.status}`);
       msg.ack();
     } catch (error) {
       msg.retry({ delaySeconds: 60 });

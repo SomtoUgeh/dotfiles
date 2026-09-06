@@ -41,18 +41,23 @@ curl -s https://api.cloudflare.com/client/v4/graphql \
 ### TypeScript / JavaScript
 
 ```typescript
+import { z } from "zod";
 const GRAPHQL_ENDPOINT = "https://api.cloudflare.com/client/v4/graphql";
-
-async function queryGraphQL<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
+const envelope = z.object({ data: z.unknown().optional(), errors: z.array(z.object({ message: z.string() })).nullish() });
+async function queryGraphQL<T>(query: string, decode: (value: unknown) => T, variables: Record<string, unknown> = {}): Promise<T> {
+  const token = process.env.CF_API_TOKEN;
+  if (!token) throw new Error("CF_API_TOKEN is missing");
   const response = await fetch(GRAPHQL_ENDPOINT, {
     method: "POST",
-    headers: { Authorization: `Bearer ${process.env.CF_API_TOKEN}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ query, variables }),
+    signal: AbortSignal.timeout(30_000),
   });
-  if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-  const json = await response.json() as { data: T | null; errors?: { message: string }[] };
-  if (json.errors?.length) throw new Error(json.errors.map((e) => e.message).join("; "));
-  return json.data!;
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const json = envelope.parse(await response.json());
+  if (json.errors?.length) throw new Error(json.errors.map(error => error.message).join("; "));
+  if (json.data == null) throw new Error("GraphQL response has no data");
+  return decode(json.data);
 }
 ```
 
@@ -61,14 +66,16 @@ async function queryGraphQL<T>(query: string, variables: Record<string, unknown>
 ```python
 import requests, os
 
-def query_graphql(query: str, variables: dict = None) -> dict:
+def query_graphql(query: str, variables: dict | None = None) -> dict:
     r = requests.post("https://api.cloudflare.com/client/v4/graphql",
         headers={"Authorization": f"Bearer {os.environ['CF_API_TOKEN']}", "Content-Type": "application/json"},
-        json={"query": query, "variables": variables or {}})
+        json={"query": query, "variables": variables or {}}, timeout=30)
     r.raise_for_status()
     result = r.json()
     if result.get("errors"):
         raise Exception("; ".join(e["message"] for e in result["errors"]))
+    if result.get("data") is None:
+        raise ValueError("GraphQL response has no data")
     return result["data"]
 ```
 

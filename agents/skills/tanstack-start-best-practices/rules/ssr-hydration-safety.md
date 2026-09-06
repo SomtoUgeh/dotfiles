@@ -58,6 +58,7 @@ function Dashboard() {
 ```tsx
 // Use lazy loading for client-only features
 import { lazy, Suspense } from 'react'
+import { ClientOnly } from '@tanstack/react-router'
 
 const ClientOnlyMap = lazy(() => import('./Map'))
 
@@ -65,9 +66,11 @@ function LocationPage() {
   return (
     <div>
       <h1>Our Location</h1>
-      <Suspense fallback={<MapPlaceholder />}>
-        <ClientOnlyMap />
-      </Suspense>
+      <ClientOnly fallback={<MapPlaceholder />}>
+        <Suspense fallback={<MapPlaceholder />}>
+          <ClientOnlyMap />
+        </Suspense>
+      </ClientOnly>
     </div>
   )
 }
@@ -104,7 +107,7 @@ export const Route = createFileRoute('/onboarding')({
 
 function Onboarding() {
   const { welcomeVariant } = Route.useLoaderData()
-  const messages = ['Welcome aboard!', 'Let's get started!', 'Great to have you!']
+  const messages = ['Welcome aboard!', "Let's get started!", 'Great to have you!']
 
   return <h1>{messages[welcomeVariant]}</h1>  // Same on server and client
 }
@@ -152,9 +155,9 @@ function RelativeTime({ date }: { date: Date }) {
 |-------|----------|
 | `Date.now()` / `new Date()` | Pass timestamp from loader |
 | `Math.random()` | Generate on server, pass to client |
-| `window` / `document` | Use useEffect or lazy loading |
+| `window` / `document` | Use an effect or `ClientOnly`; lazy/Suspense alone still renders on the server |
 | User timezone differences | Use UTC or client-only formatting |
-| Browser-specific APIs | Check `typeof window !== 'undefined'` |
+| Browser-specific APIs | Preserve the same initial markup; use `ClientOnly` for browser-only rendering |
 | Extension-injected content | Use `suppressHydrationWarning` |
 
 ## Debugging Hydration Errors
@@ -182,6 +185,6 @@ function UserContent({ html }: { html: string }) {
 - Hydration compares server HTML with client render
 - Mismatches force full client re-render (slow, flash)
 - Use loaders to pass dynamic data consistently
-- Defer client-only content with useEffect or Suspense
+- Defer client-only content with effects or `ClientOnly`; Suspense alone is not a server exclusion
 - Test SSR by disabling JavaScript and checking render
 - Development mode shows hydration warnings in console

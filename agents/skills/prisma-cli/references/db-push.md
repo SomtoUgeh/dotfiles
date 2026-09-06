@@ -64,14 +64,14 @@ prisma generate  # Must run explicitly in v7
 
 - **Prototyping** - Rapid schema iteration
 - **Local development** - Quick schema changes
-- **MongoDB** - Primary workflow (migrations not supported)
+- **MongoDB** - Not supported by Prisma 7; use the version-specific MongoDB guide
 - **Testing** - Setting up test databases
 
 ## When NOT to Use
 
 - **Production** - Use `migrate deploy`
 - **Team collaboration** - Use migrations for trackable changes
-- **When you need rollback** - Migrations provide history
+- **When you need an audit trail** - Migrations provide history, but no automatic rollback
 
 ## Comparison with migrate dev
 
@@ -81,18 +81,8 @@ prisma generate  # Must run explicitly in v7
 | Tracks history | No | Yes |
 | Requires shadow database | No | Yes |
 | Speed | Faster | Slower |
-| Rollback capability | No | Yes |
+| Automatic down migrations | No | No (write and review corrective SQL/migration) |
 | Best for | Prototyping | Development |
-
-## MongoDB Workflow
-
-MongoDB doesn't support migrations. Use `db push` exclusively:
-
-```bash
-# Schema changes for MongoDB
-prisma db push
-prisma generate
-```
 
 ## Common Patterns
 
@@ -141,8 +131,11 @@ prisma db push --accept-data-loss
 When ready for production, switch to migrations:
 
 ```bash
-# Create baseline migration from current schema
-prisma migrate dev --name init
+# Existing populated database: first introspect and review schema.
+mkdir -p prisma/migrations/0_init
+prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script > prisma/migrations/0_init/migration.sql
+# Review SQL against actual database before recording the baseline.
+prisma migrate resolve --applied 0_init
 ```
 
 Then use `migrate dev` for future changes.

@@ -10,14 +10,14 @@ const result = await env.DB.prepare(`SELECT * FROM users WHERE id = ${userId}`).
 const result = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).all();
 
 // Multiple parameters
-const result = await env.DB.prepare('SELECT * FROM users WHERE email = ? AND active = ?').bind(email, true).all();
+const result = await env.DB.prepare('SELECT * FROM users WHERE email = ? AND active = ?').bind(email, 1).all();
 ```
 
 ## Query Execution Methods
 
 ```typescript
 // .all() - Returns all rows
-const { results, success, meta } = await env.DB.prepare('SELECT * FROM users WHERE active = ?').bind(true).all();
+const { results, success, meta } = await env.DB.prepare('SELECT * FROM users WHERE active = ?').bind(1).all();
 // results: Array of row objects; success: boolean
 // meta: { duration: number, rows_read: number, rows_written: number }
 
@@ -66,42 +66,22 @@ const results = await env.DB.batch([
 ]);
 ```
 
-## Sessions API (Paid Plans)
+## Sessions and read replication
 
-Long-running sessions for operations exceeding 30s timeout (up to 15 min).
-
-```typescript
-const session = env.DB.withSession({ timeout: 600 }); // 10 min (1-900s)
-try {
-  await session.prepare('CREATE INDEX idx_large ON big_table(column)').run();
-  await session.prepare('ANALYZE').run();
-} finally {
-  session.close(); // CRITICAL: always close to prevent leaks
-}
-```
-
-**Use cases**: Migrations, ANALYZE, large index creation, bulk transformations
-
-## Read Replication (Paid Plans)
-
-Routes queries to nearest replica for lower latency. Writes always go to primary.
+D1 sessions provide sequential consistency across queries; they do not extend query timeouts or reserve a 15-minute connection. A session has no `close()` method.
 
 ```typescript
-interface Env {
-  DB: D1Database;          // Primary (writes)
-  DB_REPLICA: D1Database;  // Replica (reads)
-}
-
-// Reads: use replica
-const user = await env.DB_REPLICA.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
-
-// Writes: use primary
-await env.DB.prepare('UPDATE users SET last_login = ? WHERE id = ?').bind(Date.now(), userId).run();
-
-// Read-after-write: use primary for consistency (replication lag <100ms-2s)
-await env.DB.prepare('INSERT INTO posts (title) VALUES (?)').bind(title).run();
-const post = await env.DB.prepare('SELECT * FROM posts WHERE title = ?').bind(title).first(); // Primary
+const session = env.DB.withSession("first-primary");
+await session.prepare("UPDATE users SET last_login = ? WHERE id = ?")
+  .bind(Date.now(), userId).run();
+const user = await session.prepare("SELECT * FROM users WHERE id = ?")
+  .bind(userId).first();
+const bookmark = session.getBookmark();
 ```
+
+Use `first-unconstrained` (the default) for an initial read from any eligible replica, `first-primary` when the first query must use the primary, or a previous bookmark to resume from at least that database version. Subsequent queries in that session preserve sequential consistency. Enabling read replication and using `withSession` controls replica routing; adding a second binding with the same database ID does not create a replica.
+
+[Read replication documentation](https://developers.cloudflare.com/d1/best-practices/read-replication/).
 
 ## Error Handling
 
@@ -121,7 +101,7 @@ async function getUser(userId: number, env: Env): Promise<Response> {
 try {
   await env.DB.prepare('INSERT INTO users (email, name) VALUES (?, ?)').bind(email, name).run();
 } catch (error) {
-  if (error.message?.includes('UNIQUE constraint failed')) return new Response('Email exists', { status: 409 });
+  if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) return new Response('Email exists', { status: 409 });
   throw error;
 }
 ```
@@ -194,3 +174,5 @@ const plan = await env.DB.prepare('EXPLAIN QUERY PLAN SELECT * FROM users WHERE 
 sqlite3 .wrangler/state/v3/d1/<database-id>.sqlite
 .tables; .schema users; PRAGMA table_info(users);
 ```
+
+Binding source: [D1 database and sessions API](https://developers.cloudflare.com/d1/worker-api/d1-database/). SQL result generics describe expected rows and do not validate them at runtime.

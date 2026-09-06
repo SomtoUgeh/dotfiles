@@ -124,12 +124,13 @@ When a migration would cause data loss:
 ```bash
 prisma migrate dev --name remove_field
 # Warning: You are about to delete data...
-# Accept with: --accept-data-loss
+# Review the migration and respond to the interactive prompt.
+# migrate dev has no --accept-data-loss flag.
 ```
 
 ## Shadow Database
 
-`migrate dev` requires a shadow database for drift detection. Configure in `prisma.config.ts`:
+`migrate dev` requires a shadow database for drift detection. Configure in `prisma7.config.ts`:
 
 ```typescript
 export default defineConfig({

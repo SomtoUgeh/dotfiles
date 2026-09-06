@@ -1,176 +1,33 @@
-# Tail Workers Configuration
+# Tail Workers configuration
 
-## Setup Steps
+## Create and attach a consumer
 
-### 1. Create Tail Worker
-
-Create a Worker with a `tail()` handler:
-
-```typescript
-export default {
-  async tail(events, env, ctx) {
-    // Process events from producer Worker
-    ctx.waitUntil(
-      fetch(env.LOG_ENDPOINT, {
-        method: "POST",
-        body: JSON.stringify(events),
-      })
-    );
-  }
-};
-```
-
-### 2. Configure Producer Worker
-
-In producer's `wrangler.jsonc`:
-
-```jsonc
-{
-  "name": "my-producer-worker",
-  "tail_consumers": [
-    {
-      "service": "my-tail-worker"
-    }
-  ]
-}
-```
-
-### 3. Deploy Both Workers
-
-```bash
-# Deploy Tail Worker first
-cd tail-worker
-wrangler deploy
-
-# Then deploy producer Worker
-cd ../producer-worker
-wrangler deploy
-```
-
-## Wrangler Configuration
-
-### Single Tail Consumer
+Implement the handler from [api.md](api.md). Configure its `LOG_ENDPOINT` as a variable and `LOG_TOKEN` as a secret. Deploy the consumer before adding it to the producer's deployment:
 
 ```jsonc
 {
   "name": "producer-worker",
-  "tail_consumers": [
-    {
-      "service": "logging-tail-worker"
-    }
-  ]
+  "tail_consumers": [{ "service": "logging-tail-worker" }]
 }
 ```
 
-### Multiple Tail Consumers
+This is a fragment of the producer's existing Wrangler configuration. Preserve its entrypoint, date, flags and bindings. An environment-specific producer must attach the intended consumer for that environment; do not accidentally export staging logs into production.
 
-```jsonc
-{
-  "name": "producer-worker",
-  "tail_consumers": [
-    {
-      "service": "logging-tail-worker"
-    },
-    {
-      "service": "metrics-tail-worker"
-    }
-  ]
-}
-```
+Several consumers can be listed; each attached consumer processes its own invocation. Remove an attachment using `"tail_consumers": []` and deploying that producer change. Existing external log retention is unaffected.
 
-**Note:** Each consumer receives ALL events independently.
+## Validation
 
-### Remove Tail Consumer
+1. Type-check the handler with generated Worker types and test its projections against HTTP and non-HTTP trace fixtures.
+2. Test downstream HTTP failures, malformed inputs from test fixtures, large/truncated logs, and rejected delivery.
+3. For authorized integration testing, deploy the consumer first, attach a staging producer, invoke it, and verify the destination receives the expected safe fields.
+4. Verify the tail consumer's own errors and observability. `wrangler tail producer-worker` streams terminal logs; it does not prove a custom consumer delivered data.
 
-```jsonc
-{
-  "tail_consumers": []
-}
-```
+Local handler tests do not establish production attachment, permissions, redaction behavior or delivery guarantees. Do not treat Tail Workers as durable audit storage without an explicit ingestion/retention design.
 
-Then redeploy producer Worker.
+## Limits and billing
 
-## Environment Variables
+Tail Workers are available on Workers Paid and Enterprise and are billed by CPU time, not request count. Sampling in the handler can reduce downstream volume and processing, but it does not prevent the tail invocation. Retrieve current platform limits for the account rather than relying on a copied batch-size, consumer-count or request-size table.
 
-Tail Workers use same binding syntax as regular Workers:
+A trace array can contain events from service bindings and dynamic dispatch. Do not assume exactly two records for every Workers for Platforms request. Identify producer identity using available fields such as `scriptName` and `dispatchNamespace`.
 
-```jsonc
-{
-  "name": "my-tail-worker",
-  "vars": {
-    "LOG_ENDPOINT": "https://logs.example.com/ingest"
-  },
-  "kv_namespaces": [
-    {
-      "binding": "LOGS_KV",
-      "id": "abc123..."
-    }
-  ]
-}
-```
-
-## Testing & Development
-
-### Local Testing
-
-**Tail Workers cannot be fully tested with `wrangler dev`.** Deploy to staging environment for testing.
-
-### Testing Strategy
-
-1. Deploy producer Worker to staging
-2. Deploy Tail Worker to staging
-3. Configure `tail_consumers` in producer
-4. Trigger producer Worker requests
-5. Verify Tail Worker receives events (check destination logs/storage)
-
-### Wrangler Tail Command
-
-```bash
-# Stream logs to terminal (NOT Tail Workers)
-wrangler tail my-producer-worker
-```
-
-**This is different from Tail Workers:**
-- `wrangler tail` streams logs to your terminal
-- Tail Workers are Workers that process events programmatically
-
-## Deployment Checklist
-
-- [ ] Tail Worker has `tail()` handler
-- [ ] Tail Worker deployed before producer
-- [ ] Producer's `wrangler.jsonc` has correct `tail_consumers`
-- [ ] Environment variables configured
-- [ ] Tested with staging environment
-- [ ] Monitoring configured for Tail Worker itself
-
-## Limits
-
-| Limit | Value | Notes |
-|-------|-------|-------|
-| Max tail consumers per producer | 10 | Each receives all events independently |
-| Events batch size | Up to 100 events per invocation | Larger batches split across invocations |
-| Tail Worker CPU time | Same as regular Workers | 10ms (free), 30s default / 5min max (paid) |
-| Pricing tier | Workers Paid or Enterprise | Not available on free plan |
-| Request body size | 100 MB max | When sending to external endpoints |
-| Event retention | None | Events not retried if tail handler fails |
-
-## Workers for Platforms
-
-For dynamic dispatch Workers, both dispatch and user Worker events sent to tail consumer:
-
-```jsonc
-{
-  "name": "dispatch-worker",
-  "tail_consumers": [
-    {
-      "service": "platform-tail-worker"
-    }
-  ]
-}
-```
-
-Tail Worker receives TWO `TraceItem` elements per request:
-1. Dynamic dispatch Worker event
-2. User Worker event
-
-See [patterns.md](patterns.md) for handling.
+[Current guide](https://developers.cloudflare.com/workers/observability/logs/tail-workers/) · [Platform limits](https://developers.cloudflare.com/workers/platform/limits/)

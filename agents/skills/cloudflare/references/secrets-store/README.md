@@ -13,7 +13,7 @@ Account-level encrypted secret management for Workers and AI Gateway.
 - **Secret**: String ≤1024 bytes
 - **Scopes**: Permission boundaries controlling access
   - `workers`: For Workers runtime access
-  - `ai-gateway`: For AI Gateway access
+  - `ai_gateway`: For AI Gateway access
   - Secrets must have correct scope for binding to work
 - **Bindings**: Connect secrets via `env` object
 
@@ -26,7 +26,7 @@ Account-level encrypted secret management for Workers and AI Gateway.
 - **Deployer**: View metadata + bindings
 - **Reporter**: View metadata only
 
-API Token permissions: `Account Secrets Store Edit/Read`
+API Token permissions: `Secrets Store Write/Read`
 
 ### Limits (Beta)
 

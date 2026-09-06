@@ -13,7 +13,7 @@ When you onboard a domain, Cloudflare auto-configures:
 - **Suppression lists** — Hard-bounced addresses automatically blocked
 - **Feedback loops** — ISP complaint signals processed and acted on
 
-Consider adding a **DMARC** record if you don't have one: `v=DMARC1; p=quarantine; rua=mailto:dmarc-reports@yourdomain.com`
+Inventory all legitimate senders and SPF/DKIM alignment before adding or tightening **DMARC**. Start monitoring with `p=none` where appropriate, then move to quarantine/reject after reviewing reports; do not copy an enforcement policy into an existing domain without that check.
 
 ## Bounce Handling
 
@@ -57,7 +57,7 @@ Per-domain and account-wide analytics are available in the Cloudflare dashboard:
 
 ### Send Response
 
-Every send (REST API or Workers binding) returns immediate delivery feedback. Check the response to track per-send outcomes:
+The REST API returns per-recipient immediate delivery feedback. The Workers binding returns `messageId`; use email logs/analytics for its delivery outcomes. Check the REST response:
 
 ```json
 {

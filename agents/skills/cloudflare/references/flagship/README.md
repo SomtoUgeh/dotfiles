@@ -57,3 +57,5 @@ REST API note: management endpoints use Cloudflare v4 envelopes (`result`, `resu
 - **[../workers/](../workers/)** — Workers runtime (Flagship runs inside Workers)
 - **[../kv/](../kv/)** — KV storage (Flagship uses KV infrastructure for flag delivery)
 - **[../wrangler/](../wrangler/)** — Wrangler CLI for deployment and config
+
+Initialize each OpenFeature provider once per process/Worker isolate, await readiness before evaluation, and pass user context per evaluation. Do not replace the global provider on every request or store user context globally. Inside Workers, direct env.FLAGS evaluation is the simplest option. Browser evaluation requires an application-owned proxy; implement its authentication, allowed keys, context derivation, and response contract before using the proxy URL above. Flag delivery is not an authorization system.

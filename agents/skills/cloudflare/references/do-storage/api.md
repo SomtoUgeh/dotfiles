@@ -3,20 +3,26 @@
 ## SQL API
 
 ```typescript
-const cursor = this.sql.exec('SELECT * FROM users WHERE email = ?', email);
-for (let row of cursor) {} // Objects: { id, name, email }
-cursor.toArray(); cursor.one(); // Single row (throws if != 1)
-for (let row of cursor.raw()) {} // Arrays: [1, "Alice", "..."]
+type User = { id: number; name: string; email: string };
+// Cursors are single-use: create a fresh query for each alternative below.
+const query = () => this.sql.exec<User>(
+  'SELECT id, name, email FROM users WHERE email = ?', email
+);
+for (const row of query()) {} // Objects: { id, name, email }
+const rows = query().toArray();
+const user = query().one(); // Throws unless exactly one row is returned.
+for (const row of query().raw()) {} // Arrays: [1, "Alice", "..."]
 
-// Manual iteration
+// Manual iteration and metrics for this cursor.
+const cursor = query();
 const iter = cursor[Symbol.iterator]();
 const first = iter.next(); // { value: {...}, done: false }
-
 cursor.columnNames; // ["id", "name", "email"]
-cursor.rowsRead; cursor.rowsWritten; // Billing
+cursor.rowsRead; cursor.rowsWritten;
 
-type User = { id: number; name: string; email: string };
-const user = this.sql.exec<User>('...', userId).one();
+const byId = this.sql.exec<User>(
+  'SELECT id, name, email FROM users WHERE id = ?', userId
+).one();
 ```
 
 ## Sync KV API (SQLite only)
@@ -55,7 +61,7 @@ await this.ctx.storage.put("key", value, { allowUnconfirmed: true, noCache: true
 |--------|---------|--------|----------|
 | `allowConcurrency` | get, list | Skip input gate; allow concurrent requests during read | Read-heavy metrics that don't need strict consistency |
 | `noCache` | get, put, list | Skip in-memory cache; always read from disk | Rarely-accessed data or testing storage directly |
-| `allowUnconfirmed` | put, delete | Return before write confirms (still protected by output gate) | Non-critical writes where latency matters more than confirmation |
+| `allowUnconfirmed` | put, delete | Allow outgoing messages before write confirmation (opts out of output-gate protection) | Non-critical writes where latency matters more than confirmation |
 
 ## Transactions
 
@@ -68,14 +74,19 @@ this.ctx.storage.transactionSync(() => {
 });
 
 // Async
-await this.ctx.storage.transaction(async () => {
-  const value = await this.ctx.storage.get("counter");
-  await this.ctx.storage.put("counter", value + 1);
-  if (value > 100) this.ctx.storage.rollback(); // Explicit rollback
+await this.ctx.storage.transaction(async (txn) => {
+  const value = (await txn.get<number>("counter")) ?? 0;
+  await txn.put("counter", value + 1);
+  if (value > 100) txn.rollback(); // Explicit rollback
 });
 ```
 
 ## Point-in-Time Recovery
+
+These are separate API operations. Save the returned bookmark before passing it
+to the restore operation. A time lookup requires retained history for that
+timestamp; a newly created object cannot restore to two days before it existed.
+`abort()` interrupts the current call; verify the restored state in a new call.
 
 ```typescript
 await this.ctx.storage.getCurrentBookmark();
@@ -97,6 +108,8 @@ async alarm() { await this.doScheduledWork(); }
 ## Misc
 
 ```typescript
-await this.ctx.storage.deleteAll(); // Atomic for SQLite; alarm NOT included
+await this.ctx.storage.deleteAll(); // Atomic for SQLite; includes alarm since compatibility_date 2026-02-24
 this.ctx.storage.sql.databaseSize; // Bytes
 ```
+
+For an earlier compatibility date, call `deleteAlarm()` before `deleteAll()`, or enable `delete_all_deletes_alarm`. See the [2026-02-24 behavior change](https://developers.cloudflare.com/changelog/post/2026-02-24-deleteall-deletes-alarms/).

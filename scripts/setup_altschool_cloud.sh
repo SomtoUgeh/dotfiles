@@ -15,7 +15,7 @@ Options:
   --host HOST         SSH host alias (default: altschool)
   --auth              Run interactive GitHub, Grok, and OpenCode login
   --update            Update Bun, Grok, and OpenCode after installation
-  --repo OWNER/REPO   Clone a repository under ~/code/TalentQL
+  --repo OWNER/REPO   Shallow clone under ~/code/TalentQL; no dependency install
   -h, --help          Show this help
 EOF
 }
@@ -61,7 +61,12 @@ if [ -n "$REPOSITORY" ] &&
   exit 2
 fi
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SELF="${BASH_SOURCE[0]}"
+while [ -L "$SELF" ]; do
+  link=$(readlink "$SELF")
+  case "$link" in /*) SELF="$link" ;; *) SELF="$(dirname "$SELF")/$link" ;; esac
+done
+SCRIPT_DIR="$(cd "$(dirname "$SELF")" && pwd)"
 SSH=(ssh -o ClearAllForwardings=yes "$HOST")
 
 run_interactive() {
@@ -220,21 +225,18 @@ elif [ -e "$target" ]; then
   echo "Target exists but is not a Git repository: $target" >&2
   exit 1
 else
-  gh repo clone "$repository" "$target"
+  gh repo clone "$repository" "$target" -- --depth=1 --single-branch
 fi
 
-export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"
-if [ -f "$target/bun.lock" ]; then
-  (cd "$target" && bun install --frozen-lockfile)
-fi
-
-if [ -f "$target/apps/degree-admin/prisma/schema.prisma" ]; then
-  (cd "$target/apps/degree-admin" && bunx --bun prisma generate)
-fi
 REMOTE
 fi
 
 verify_args=(--host "$HOST")
+# A fresh bootstrap precedes dotfiles installation; do not require its state.
+if ! "${SSH[@]}" 'test -f "$HOME/.gitconfig-personal" && test -L "$HOME/.gitconfig" && test -d "$HOME/code/personal/dotfiles/.git"'; then
+  verify_args+=(--toolchain-only)
+  echo 'After installing cloud dotfiles, run verify_altschool_cloud.sh for full verification.'
+fi
 if [ "$AUTH" = "1" ]; then
   verify_args+=(--require-auth)
 fi

@@ -1,31 +1,37 @@
 # Interface Design for Testability
 
-Good interfaces make testing natural:
+Prefer a small interface that expresses the caller's task. Inject dependencies
+at a real I/O boundary when that makes failure and timing controllable; pure
+computation usually needs no adapter.
 
-1. **Accept dependencies, don't create them**
+```typescript
+type Order = { total: number };
+type PaymentResult = { receiptId: string };
+type PaymentGateway = {
+  charge: (amount: number) => Promise<PaymentResult>;
+};
 
-   ```typescript
-   // Testable
-   function processOrder(order, paymentGateway) {}
+export function processOrder(order: Order, gateway: PaymentGateway) {
+  return gateway.charge(order.total);
+}
+```
 
-   // Hard to test
-   function processOrder(order) {
-     const gateway = new StripeGateway();
-   }
-   ```
+These are application-owned example types, not a Stripe SDK API. Production
+wiring adapts the selected provider's actual contract; tests supply a deliberate
+boundary fake or use the provider's test environment.
 
-2. **Return results, don't produce side effects**
+Prefer returned values for pure calculations:
 
-   ```typescript
-   // Testable
-   function calculateDiscount(cart): Discount {}
+```typescript
+export function calculateDiscount(total: number, rate: number): number {
+  if (!Number.isFinite(total) || total < 0 || !Number.isFinite(rate) || rate < 0 || rate > 1) {
+    throw new RangeError("Expected a nonnegative total and a rate between 0 and 1");
+  }
+  return total * rate;
+}
+```
 
-   // Hard to test
-   function applyDiscount(cart): void {
-     cart.total -= discount;
-   }
-   ```
-
-3. **Small surface area**
-   - Fewer methods = fewer tests needed
-   - Fewer params = simpler test setup
+This illustrates a pure numeric interface, not a monetary rounding policy.
+Use the domain's money representation and rounding rules for actual pricing.
+Side effects remain necessary at system boundaries; test their observable
+results and failure behavior rather than banning them.

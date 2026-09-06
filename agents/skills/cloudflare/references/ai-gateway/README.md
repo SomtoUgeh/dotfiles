@@ -22,94 +22,21 @@ Expert guidance for implementing Cloudflare AI Gateway - a universal gateway for
 - **Direct HTTP (any language)** → Pattern 4 - see [configuration.md](./configuration.md)
 - **Framework (LangChain, etc.)** → See [sdk-integration.md](./sdk-integration.md)
 
-## Pattern 1: Vercel AI SDK (Recommended)
+## Choose the integration
 
-Most modern pattern using official `ai-gateway-provider` package with automatic fallbacks.
-
-```typescript
-import { createAiGateway } from 'ai-gateway-provider';
-import { createOpenAI } from '@ai-sdk/openai';
-import { generateText } from 'ai';
-
-const gateway = createAiGateway({
-  accountId: process.env.CF_ACCOUNT_ID,
-  gateway: process.env.CF_GATEWAY_ID,
-});
-
-const openai = createOpenAI({ 
-  apiKey: process.env.OPENAI_API_KEY 
-});
-
-// Single model
-const { text } = await generateText({
-  model: gateway(openai('gpt-4o')),
-  prompt: 'Hello'
-});
-
-// Automatic fallback array
-const { text } = await generateText({
-  model: gateway([
-    openai('gpt-4o'),              // Try first
-    anthropic('claude-sonnet-4-5'), // Fallback
-  ]),
-  prompt: 'Hello'
-});
-```
-
-**Install:** `npm install ai-gateway-provider ai @ai-sdk/openai @ai-sdk/anthropic`
-
-## Pattern 2: OpenAI SDK
-
-Drop-in replacement for OpenAI API with multi-provider support.
-
-```typescript
-import OpenAI from 'openai';
-
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  baseURL: `https://gateway.ai.cloudflare.com/v1/${accountId}/${gatewayId}/compat`,
-  defaultHeaders: {
-    'cf-aig-authorization': `Bearer ${cfToken}` // For authenticated gateways
-  }
-});
-
-// Switch providers by changing model format: {provider}/{model}
-const response = await client.chat.completions.create({
-  model: 'openai/gpt-4o', // or 'anthropic/claude-sonnet-4-5'
-  messages: [{ role: 'user', content: 'Hello!' }]
-});
-```
-
-## Pattern 3: Workers AI Binding
-
-For Cloudflare Workers using Workers AI.
-
-```typescript
-export default {
-  async fetch(request, env, ctx) {
-    const response = await env.AI.run(
-      '@cf/meta/llama-3-8b-instruct',
-      { messages: [{ role: 'user', content: 'Hello!' }] },
-      { 
-        gateway: { 
-          id: 'my-gateway',
-          metadata: { userId: '123', team: 'engineering' }
-        } 
-      }
-    );
-    
-    return Response.json(response);
-  }
-};
-```
+- AI SDK 7: use ai-gateway-provider 4 and its own provider adapters, including explicit OpenAI .chat() models. See [working integration shapes](sdk-integration.md).
+- OpenAI SDK single-model calls: use the current Cloudflare REST endpoint `/client/v4/accounts/{account}/ai/v1`, a Cloudflare token, and the cf-aig-gateway-id header.
+- Provider-native calls: use the provider route, its model format and provider credential, plus gateway authentication where enabled.
+- Dynamic routes: use `/compat` with dynamic/route-name; the compat endpoint remains supported for routing.
+- Workers AI: configure an AI binding and select the gateway in AI.run call options.
 
 ## Headers Quick Reference
 
 | Header | Purpose | Example | Notes |
 |--------|---------|---------|-------|
 | `cf-aig-authorization` | Gateway auth | `Bearer {token}` | Required for authenticated gateways |
-| `cf-aig-metadata` | Tracking | `{"userId":"x"}` | Max 5 entries, flat structure |
-| `cf-aig-cache-ttl` | Cache duration | `3600` | Seconds, min 60, max 2592000 (30 days) |
+| `cf-aig-metadata` | Tracking | `{"userId":"x"}` | Use current metadata limits and avoid sensitive values |
+| `cf-aig-cache-ttl` | Cache duration | `3600` | Seconds; verify current limits |
 | `cf-aig-skip-cache` | Bypass cache | `true` | - |
 | `cf-aig-cache-key` | Custom cache key | `my-key` | Must be unique per response |
 | `cf-aig-collect-log` | Skip logging | `false` | Default: true |
@@ -146,7 +73,7 @@ Your App → AI Gateway → AI Provider (OpenAI, Anthropic, etc.)
 ```
 
 **Key URL patterns:**
-- Unified API (OpenAI-compatible): `https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/compat/chat/completions`
+- Dynamic-route API (OpenAI-compatible): `https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/compat/chat/completions`
 - Provider-specific: `https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/{provider}/{endpoint}`
 - Dynamic routes: Use route name instead of model: `dynamic/{route-name}`
 

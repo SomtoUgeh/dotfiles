@@ -36,42 +36,17 @@ Load files in this order based on task:
 
 ## Product Overview
 
-### Workers Logs
-- **What:** Console output from Workers (console.log/warn/error)
-- **Access:** Dashboard (Real-time Logs), Logpush, Tail Workers
-- **Cost:** Free (included with all Workers)
-- **Retention:** Real-time only (no historical storage in dashboard)
+### Workers Logs and Traces
 
-### Workers Traces
-- **What:** Execution traces with timing, CPU usage, outcome
-- **Access:** Dashboard (Workers Analytics → Traces), Logpush
-- **Cost:** $0.10/1M spans (GA pricing starts March 1, 2026), 10M free/month
-- **Retention:** 14 days included
+Workers Logs stores searchable historical logs; it is distinct from a real-time tail session. As checked on 2026-09-05, the Free plan includes 200,000 events/day with 3-day retention; Paid includes 20 million/month with 7-day retention and $0.60/million additional events. Tracing is free during beta; current docs announce shared logs/traces event pricing from October 1, 2026. Recheck [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/) and [Tracing](https://developers.cloudflare.com/workers/observability/traces/) before estimates.
 
 ### Analytics Engine
-- **What:** High-cardinality event storage and SQL queries
-- **Access:** SQL API, Dashboard (Analytics → Analytics Engine)
-- **Cost:** $0.25/1M writes beyond 10M free/month
-- **Retention:** 90 days (configurable up to 1 year)
 
-### Tail Workers
-- **What:** Workers that receive logs/traces from other Workers
-- **Use Cases:** Log filtering, transformation, external export
-- **Cost:** Standard Workers pricing
+High-cardinality sampled events queried through SQL. Retention is three months. Current [pricing](https://developers.cloudflare.com/analytics/analytics-engine/pricing/) lists future write/query rates but says usage is not yet billed; do not present those rates as current charges. Both Free and Paid allowances are documented.
 
-### Logpush
-- **What:** Stream logs to external storage (S3, R2, Datadog, etc.)
-- **Access:** Dashboard, API
-- **Cost:** Requires Business/Enterprise plan
+### Tail Workers, Logpush and OpenTelemetry
 
-## Pricing Summary (2026)
-
-| Feature | Free Tier | Cost Beyond Free Tier | Plan Requirement |
-|---------|-----------|----------------------|------------------|
-| Workers Logs | Unlimited | Free | Any |
-| Workers Traces | 10M spans/month | $0.10/1M spans | Paid Workers (GA: March 1, 2026) |
-| Analytics Engine | 10M writes/month | $0.25/1M writes | Paid Workers |
-| Logpush | N/A | Included in plan | Business/Enterprise |
+Tail Workers process execution events for custom filtering/export. Workers Trace Events Logpush requires Workers Paid, rather than a Business/Enterprise zone plan. Prefer built-in [OpenTelemetry export](https://developers.cloudflare.com/workers/observability/exporting-opentelemetry-data/) when its destination support meets the need; use Tail Workers for custom processing.
 
 ## In This Reference
 

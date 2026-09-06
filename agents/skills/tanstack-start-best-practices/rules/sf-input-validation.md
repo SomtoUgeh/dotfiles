@@ -34,6 +34,8 @@ export const deletePost = createServerFn({ method: 'POST' })
 
 ## Good Example: With Zod Validation
 
+`requireCurrentUser` below is the application's server-side session check; import it from the existing auth module. Schema validity does not establish ownership or permission.
+
 ```tsx
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
@@ -48,6 +50,9 @@ const updateUserSchema = z.object({
 export const updateUser = createServerFn({ method: 'POST' })
   .validator(updateUserSchema)
   .handler(async ({ data }) => {
+    // Validation does not authorize updating another user.
+    const user = await requireCurrentUser()
+    if (data.id !== user.id) throw new Error('Forbidden')
     // data is fully typed: { id: string; name: string; email: string }
     const user = await db.users.update({
       where: { id: data.id },

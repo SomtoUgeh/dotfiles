@@ -1,197 +1,31 @@
-# Common Patterns
+# WAF patterns
 
-## Deploy Managed Rulesets
+## Managed protection
+
+Read available managed rulesets and their rule/category IDs. Add an `execute` rule in the managed phase with the discovered ID. Cloudflare Managed uses `efb7b8c949ac4650a09736fc376e9aee`; OWASP Core uses `4814384a9e5d4991b9815dcfc25d2f1f`. Availability varies by plan.
 
 ```typescript
-// Deploy Cloudflare Managed Ruleset (default)
-await client.rulesets.create({
-  zone_id: 'zone_id',
-  kind: 'zone',
-  phase: 'http_request_firewall_managed',
-  name: 'Cloudflare Managed Ruleset',
-  rules: [{
-    action: 'execute',
-    action_parameters: {
-      id: 'efb7b8c949ac4650a09736fc376e9aee', // Cloudflare Managed
-      // Or: '4814384a9e5d4991b9815dcfc25d2f1f' for OWASP CRS
-      // Or: 'c2e184081120413c86c3ab7e14069605' for Exposed Credentials
-    },
-    expression: 'true', // All requests
-    // Or: 'http.request.uri.path starts_with "/api"' for specific paths
-    enabled: true,
-  }],
+await client.rulesets.rules.create(managedEntrypointId, {
+  zone_id: zoneId, action: "execute", expression: "true",
+  action_parameters: { id: managedRulesetId },
+  description: "Apply managed protection", enabled: true,
 });
 ```
 
-## Override Managed Ruleset
+Tune false positives using a verified rule/category override with the smallest useful scope. Do not disable WordPress, SQLi, or other categories because an example happens to do so. OWASP anomaly scoring and WAF attack score are different systems; do not invert their thresholds.
 
-```typescript
-await client.rulesets.create({
-  zone_id: 'zone_id',
-  phase: 'http_request_firewall_managed',
-  rules: [{
-    action: 'execute',
-    action_parameters: {
-      id: 'efb7b8c949ac4650a09736fc376e9aee',
-      overrides: {
-        // Override specific rules
-        rules: [
-          { id: '5de7edfa648c4d6891dc3e7f84534ffa', action: 'log' },
-          { id: '75a0060762034b9dad4e883afc121b4c', enabled: false },
-        ],
-        // Override categories: wordpress, sqli, xss, rce, etc.
-        categories: [
-          { category: 'wordpress', enabled: false },
-          { category: 'sqli', action: 'log' },
-        ],
-      },
-    },
-    expression: 'true',
-  }],
-});
-```
+## Attack score
 
-## Custom Rules
+Use `cf.waf.score lt 20` as an illustrative threshold only after reviewing account availability and actual false positives. Lower scores indicate attacks. Exclude unscored traffic deliberately when using broader conditions; `100` is not a clean classification.
 
-```typescript
-await client.rulesets.create({
-  zone_id: 'zone_id',
-  kind: 'zone',
-  phase: 'http_request_firewall_custom',
-  name: 'Custom WAF Rules',
-  rules: [
-    // Attack score-based
-    { action: 'block', expression: 'cf.waf.score gt 50', enabled: true },
-    { action: 'challenge', expression: 'cf.waf.score gt 20', enabled: true },
-    
-    // Specific attack types
-    { action: 'block', expression: 'cf.waf.score.sqli gt 30 or cf.waf.score.xss gt 30', enabled: true },
-    
-    // Geographic blocking
-    { action: 'block', expression: 'ip.geoip.country in {"CN" "RU"}', enabled: true },
-  ],
-});
-```
+## Rate limiting
 
-## Rate Limiting
+Use the rule shape in [api.md](api.md). `cf.colo.id` plus `ip.src` counts per data center and source IP, not one globally serialized counter. Shared NATs can group legitimate users. Arbitrary cookies, Authorization values, and User-Agent strings are attacker-controlled and can defeat throttling if used as freely variable identity buckets. Use verified identity/plan-supported characteristics and retain a broader abuse limit where necessary.
 
-```typescript
-await client.rulesets.create({
-  zone_id: 'zone_id',
-  kind: 'zone',
-  phase: 'http_ratelimit',
-  name: 'Rate Limits',
-  rules: [
-    // Per-IP global limit
-    {
-      action: 'block',
-      expression: 'true',
-      action_parameters: {
-        ratelimit: {
-          characteristics: ['cf.colo.id', 'ip.src'],
-          period: 60,
-          requests_per_period: 100,
-          mitigation_timeout: 600,
-        },
-      },
-    },
-    
-    // Login endpoint (stricter)
-    {
-      action: 'block',
-      expression: 'http.request.uri.path eq "/api/login"',
-      action_parameters: {
-        ratelimit: {
-          characteristics: ['ip.src'],
-          period: 60,
-          requests_per_period: 5,
-          mitigation_timeout: 600,
-        },
-      },
-    },
-    
-    // API writes only (using counting_expression)
-    {
-      action: 'block',
-      expression: 'http.request.uri.path starts_with "/api"',
-      action_parameters: {
-        ratelimit: {
-          characteristics: ['cf.colo.id', 'ip.src'],
-          period: 60,
-          requests_per_period: 50,
-          counting_expression: 'http.request.method ne "GET"',
-        },
-      },
-    },
-  ],
-});
-```
+A counting expression can differ from the mitigation expression. Check what counts, what is blocked, the period, and the mitigation duration as separate choices. Challenges require a compatible browser flow; API clients typically need a non-interactive response.
 
-## Skip Rules
+## Narrow exceptions
 
-```typescript
-await client.rulesets.create({
-  zone_id: 'zone_id',
-  kind: 'zone',
-  phase: 'http_request_firewall_custom',
-  name: 'Skip Rules',
-  rules: [
-    // Skip static assets (current ruleset only)
-    {
-      action: 'skip',
-      action_parameters: { ruleset: 'current' },
-      expression: 'http.request.uri.path matches "\\.(jpg|css|js|woff2?)$"',
-    },
-    
-    // Skip all WAF phases for trusted IPs
-    {
-      action: 'skip',
-      action_parameters: {
-        phases: ['http_request_firewall_managed', 'http_ratelimit'],
-      },
-      expression: 'ip.src in {192.0.2.0/24}',
-    },
-  ],
-});
-```
+`action: "skip"` with `action_parameters: { ruleset: "current" }` skips only remaining rules in that ruleset. `phases: [...]` skips named later phases. The scope is not interchangeable. Keep exceptions tied to verified traffic conditions; a static-looking extension or attacker-controlled header is not a reason to bypass WAF.
 
-## Complete Setup Example
-
-Combine all three phases for comprehensive protection:
-
-```typescript
-const client = new Cloudflare({ apiToken: process.env.CF_API_TOKEN });
-const zoneId = process.env.ZONE_ID;
-
-// 1. Custom rules (execute first)
-await client.rulesets.create({
-  zone_id: zoneId,
-  phase: 'http_request_firewall_custom',
-  rules: [
-    { action: 'skip', action_parameters: { phases: ['http_request_firewall_managed', 'http_ratelimit'] }, expression: 'ip.src in {192.0.2.0/24}' },
-    { action: 'block', expression: 'cf.waf.score gt 50' },
-    { action: 'managed_challenge', expression: 'cf.waf.score gt 20' },
-  ],
-});
-
-// 2. Managed ruleset (execute second)
-await client.rulesets.create({
-  zone_id: zoneId,
-  phase: 'http_request_firewall_managed',
-  rules: [{
-    action: 'execute',
-    action_parameters: { id: 'efb7b8c949ac4650a09736fc376e9aee', overrides: { categories: [{ category: 'wordpress', enabled: false }] } },
-    expression: 'true',
-  }],
-});
-
-// 3. Rate limiting (execute third)
-await client.rulesets.create({
-  zone_id: zoneId,
-  phase: 'http_ratelimit',
-  rules: [
-    { action: 'block', expression: 'true', action_parameters: { ratelimit: { characteristics: ['cf.colo.id', 'ip.src'], period: 60, requests_per_period: 100, mitigation_timeout: 600 } } },
-    { action: 'block', expression: 'http.request.uri.path eq "/api/login"', action_parameters: { ratelimit: { characteristics: ['ip.src'], period: 60, requests_per_period: 5, mitigation_timeout: 600 } } },
-  ],
-});
-```
+[Skip options](https://developers.cloudflare.com/waf/custom-rules/skip/options/) · [Rate-limit parameters](https://developers.cloudflare.com/waf/rate-limiting-rules/parameters/)

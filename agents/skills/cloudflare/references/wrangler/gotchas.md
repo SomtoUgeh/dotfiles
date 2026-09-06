@@ -12,24 +12,9 @@
 **Cause:** Non-inheritable keys not redefined per environment
 **Solution:** Non-inheritable keys (bindings, vars) must be redefined per environment. Inheritable keys (routes, compatibility_date) can be overridden
 
-### "Local dev behavior differs from production"
+### "Local development differs from production"
 
-**Cause:** Using local simulation instead of remote execution
-**Solution:** Choose appropriate remote mode:
-- `wrangler dev` (default): Local simulation, fast, limited accuracy
-- `wrangler dev --remote`: Full remote execution, production-accurate, slower
-- Use `remote: "minimal"` in tests for fast tests with real remote bindings
-
-### "startWorker doesn't match production"
-
-**Cause:** Using local mode when remote resources needed
-**Solution:** Use `remote` option:
-```typescript
-const worker = await startWorker({ 
-  config: "wrangler.jsonc",
-  remote: true  // or "minimal" for faster tests
-});
-```
+Local workerd uses the same runtime engine, but local storage and network placement differ. Start with reproducible local tests. If the task needs account resources, check each binding's supported development modes; `wrangler dev --remote` runs remotely and can mutate real data. There is no `remote: "minimal"` Wrangler test option.
 
 ### "Unexpected runtime changes"
 
@@ -92,47 +77,20 @@ For local DOs in same Worker, `script_name` is optional.
 
 ### "Placement not reducing latency"
 
-**Cause:** Misunderstanding of Smart Placement
-**Solution:** Smart Placement only helps when Worker accesses D1 or Durable Objects. It doesn't affect KV, R2, or external API latency.
-```jsonc
-{ "placement": { "mode": "smart" } }  // Only beneficial with D1/DOs
-```
+Smart Placement can reduce latency to backend services, including external APIs. Measure the actual request path; proximity alone does not guarantee improvement.
 
-### "unstable_startWorker not found"
+### "startWorker not found"
 
-**Cause:** Using outdated API
-**Solution:** Use stable `startWorker` instead:
-```typescript
-import { startWorker } from "wrangler";  // Not unstable_startWorker
-```
-
-### "outboundService not mocking fetch"
-
-**Cause:** Mock function not returning Response
-**Solution:** Always return Response, use `fetch(req)` for passthrough:
-```typescript
-const worker = await startWorker({
-  outboundService: (req) => {
-    if (shouldMock(req)) {
-      return new Response("mocked");
-    }
-    return fetch(req);  // Required for non-mocked requests
-  }
-});
-```
+Wrangler 4.129.0 exports `unstable_startWorker`, not `startWorker`. Prefer the [integration test harness](./api.md) for tests. Miniflare and Wrangler options are not interchangeable.
 
 ## Limits
 
 | Resource/Limit | Value | Notes |
 |----------------|-------|-------|
-| Bindings per Worker | 64 | Total across all types |
-| Environments | Unlimited | Named envs in config |
-| Config file size | ~1MB | Keep reasonable |
-| Workers Assets size | 25 MB | Per deployment |
-| Workers Assets files | 20,000 | Max number of files |
-| Script size (compressed) | 1 MB | Free, 10 MB paid |
-| CPU time | 10ms | Free, 30s default (5min max) paid |
-| Subrequest limit | 50 | Free, 10,000 paid |
+| Static asset file size | 25 MiB | Per file |
+| Static asset files | 20,000 free; 100,000 paid | Per Worker version |
+
+Other limits depend on plan and workload. Check the [current platform limits](https://developers.cloudflare.com/workers/platform/limits/) before planning capacity; no universal 64-binding or 1 MB Wrangler config limit is established here.
 
 ## Troubleshooting
 
@@ -163,23 +121,15 @@ wrangler whoami            # Check account limits
 
 ### Local Development Issues
 ```bash
-rm -rf .wrangler/state     # Clear local state
+# Back up or rename .wrangler/state before resetting local data
 wrangler dev --remote      # Use remote bindings
 wrangler dev --persist-to ./local-state  # Custom persist location
 wrangler dev --inspector-port 9229  # Enable debugging
 ```
 
 ### Testing Issues
-```bash
-# If tests hang, ensure dispose() is called
-worker.dispose()  // Always cleanup
 
-# If bindings don't work in tests
-const worker = await startWorker({ 
-  config: "wrangler.jsonc",
-  remote: "minimal"  // Use remote bindings
-});
-```
+Always close the [test harness](./api.md#integration-tests) or dispose the platform proxy in `finally`. Do not switch tests to remote resources merely because a binding was missing; first check the selected config and environment.
 
 ## Resources
 

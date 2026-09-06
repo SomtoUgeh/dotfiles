@@ -6,7 +6,7 @@
 {
   "name": "my-worker",
   "main": "src/index.ts",
-  "compatibility_date": "2025-01-01",  // Minimum 2024-10-22 required for Workflows bindings
+  "compatibility_date": "2025-01-01",  // Preserve the project's tested compatibility date
   "observability": {
     "enabled": true  // Enables Workflows dashboard + structured logs
   },
@@ -42,7 +42,7 @@ await step.do('api call', {
 }, async () => {
   const res = await fetch('https://api.example.com/data');
   if (!res.ok) throw new Error('Failed');
-  return res.json();
+  return res.text(); // Validate against your schema when decoding JSON.
 });
 ```
 
@@ -57,11 +57,11 @@ const [user, settings] = await Promise.all([
 ### Conditional Steps
 ```typescript
 const config = await step.do('fetch config', async () => 
-  this.env.KV.get('flags', { type: 'json' })
+  this.env.KV.get<{ enableEmail: boolean }>('flags', { type: 'json' })
 );
 
 // ✅ Deterministic (based on step output)
-if (config.enableEmail) {
+if (config?.enableEmail) {
   await step.do('send email', async () => sendEmail());
 }
 
@@ -70,14 +70,22 @@ if (Date.now() > deadline) { /* BAD */ }
 ```
 
 ### Dynamic Steps (Loops)
+
+This processes one page. Continue listing with the cursor while `truncated` is true, and give each page step a distinct deterministic name.
 ```typescript
-const files = await step.do('list files', async () => 
-  this.env.BUCKET.list()
-);
+const files = await step.do('list files', async () => {
+  const page = await this.env.BUCKET.list();
+  return {
+    objects: page.objects.map(file => ({ key: file.key })),
+    truncated: page.truncated,
+    cursor: page.truncated ? page.cursor : null,
+  };
+});
 
 for (const file of files.objects) {
   await step.do(`process ${file.key}`, async () => {
     const obj = await this.env.BUCKET.get(file.key);
+    if (!obj) throw new Error(`Object not found: ${file.key}`);
     return processData(await obj.arrayBuffer());
   });
 }
@@ -106,7 +114,8 @@ Worker A defines workflow. Worker B calls it by adding `script_name`:
   "workflows": [{
     "name": "billing-workflow",
     "binding": "BILLING",
-    "script_name": "billing-worker"  // Points to Worker A
+    "script_name": "billing-worker",  // Points to Worker A
+    "class_name": "BillingWorkflow"
   }]
 }
 ```
@@ -129,24 +138,20 @@ await step.do('use bindings', async () => {
   const kv = await this.env.KV.get('key');
   const db = await this.env.DB.prepare('SELECT * FROM users').first();
   const file = await this.env.BUCKET.get('file.txt');
-  const ai = await this.env.AI.run('@cf/meta/llama-2-7b-chat-int8', { prompt: 'Hi' });
+  const ai = await this.env.AI.run('@cf/meta/llama-3.1-8b-instruct-fp8', { prompt: 'Hi' });
 });
 ```
 
 ## Pages Functions Binding
 
-Pages Functions can trigger Workflows via service bindings:
+Deploy the Workflow in a Worker first. Pages calls that Worker's HTTP handler through a service binding; a Fetcher does not expose `Workflow.create()`.
 
 ```typescript
-// functions/_middleware.ts
-export const onRequest: PagesFunction<Env> = async ({ env, request }) => {
-  const instance = await env.MY_WORKFLOW.create({
-    params: { url: request.url }
-  });
-  return new Response(`Started ${instance.id}`);
+export const onRequest: PagesFunction<{ WORKFLOW_WORKER: Fetcher }> = async ({ env, request }) => {
+  return env.WORKFLOW_WORKER.fetch(request);
 };
 ```
 
-Configure in wrangler.jsonc under `service_bindings`.
+Configure `services: [{ binding: "WORKFLOW_WORKER", service: "workflow-worker" }]` in the Pages config. The target Worker validates/authenticates the request and invokes its own Workflow binding. See [Pages-to-Workflows guide](https://developers.cloudflare.com/workflows/build/call-workflows-from-pages/).
 
 See: [api.md](./api.md), [patterns.md](./patterns.md)

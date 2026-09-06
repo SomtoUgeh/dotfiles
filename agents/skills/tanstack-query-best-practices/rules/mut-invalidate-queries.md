@@ -97,13 +97,13 @@ onSuccess: () => {
 
 // Option 2: Update cache directly (no network request)
 onSuccess: (newTodo) => {
-  queryClient.setQueryData(['todos'], (old: Todo[]) => [...old, newTodo])
+  queryClient.setQueryData(['todos'], (old: Todo[] = []) => [...old, newTodo])
 }
 
 // Option 3: Hybrid - update one, invalidate others
 onSuccess: (newTodo) => {
   // Immediately add to list
-  queryClient.setQueryData(['todos', 'list'], (old: Todo[]) => [...old, newTodo])
+  queryClient.setQueryData(['todos', 'list'], (old: Todo[] = []) => [...old, newTodo])
   // Invalidate counts/summaries for eventual consistency
   queryClient.invalidateQueries({ queryKey: ['todos', 'count'] })
 }

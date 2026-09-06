@@ -4,7 +4,7 @@ Streaming ingest: receive events over HTTP/Workers/Logpush, transform with SQL, 
 
 ## Documentation
 
-This reference is a fast-start with verified code and gotchas. For limits, settings, full SQL syntax, and pricing, **retrieve the live docs** — use the `cloudflare-docs` MCP/search tool if available, otherwise `webfetch` the URL. Docs are source of truth over this file.
+This reference is a fast-start; verify the selected API and runtime path before claiming it works. For limits, settings, full SQL syntax, and pricing, **retrieve the live docs** — use the `cloudflare-docs` MCP/search tool if available, otherwise `webfetch` the URL. Docs are source of truth over this file.
 
 | Topic | URL |
 |-------|-----|
@@ -45,12 +45,14 @@ npx wrangler pipelines setup
 
 Minimal Worker producer:
 ```typescript
+import type { Pipeline } from "cloudflare:pipelines";
+
 interface Env { MY_STREAM: Pipeline; }
 
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    ctx.waitUntil(env.MY_STREAM.send([{ event_id: crypto.randomUUID(), amount: 29.99 }]));
-    return new Response("OK");
+    await env.MY_STREAM.send([{ event_id: crypto.randomUUID(), amount: 29.99 }]);
+    return new Response("Accepted for processing", { status: 202 });
   }
 } satisfies ExportedHandler<Env>;
 ```
@@ -69,10 +71,10 @@ Just archival / external tools (Spark, Athena)?
 
 These are non-obvious and prevent most failures — see [gotchas.md](gotchas.md) for detail.
 
-- **Everything is immutable after creation** — stream schema, pipeline SQL, sink config. To change, delete and recreate.
+- **Schemas/SQL and some sink settings are immutable** — check the field and resource. Stream HTTP authentication/CORS can be updated; schema changes require versioned streams. Never delete buffered events as routine configuration repair.
 - **Sinks create their own table** — they cannot target an existing Iceberg table.
 - **`__ingest_ts` is added automatically** (TIMESTAMP, partitioned by day). Don't define it in your schema.
-- **Data isn't queryable immediately** — first flush takes **3–7 minutes** (warm-up + table creation) even with a short roll interval.
+- **Data isn't queryable immediately** — first flush takes **several minutes (measure the actual pipeline)** (warm-up + table creation) even with a short roll interval.
 - **Schema validation is deferred** — invalid events are accepted then silently dropped. Monitor via GraphQL error metrics.
 - **Binding field renamed `pipeline` → `stream`** (June 2026); old field still accepted.
 

@@ -4,7 +4,7 @@
 
 ### Placeholder IDs
 
-**Error:** "Invalid namespace ID"  
+**Error:** "Invalid namespace ID"
 **Fix:** Replace placeholders in wrangler.jsonc with real IDs:
 ```bash
 npx wrangler kv namespace create MY_KV  # Get real ID
@@ -12,12 +12,12 @@ npx wrangler kv namespace create MY_KV  # Get real ID
 
 ### Authentication
 
-**Error:** "Not authenticated"  
+**Error:** "Not authenticated"
 **Fix:** `npx wrangler login` or set `CLOUDFLARE_API_TOKEN`
 
 ### Name Conflict
 
-**Error:** "Worker already exists"  
+**Error:** "Worker already exists"
 **Fix:** Change `name` in wrangler.jsonc
 
 ## Platform Selection
@@ -72,13 +72,13 @@ env:
 
 ## Compatibility Date
 
-**"Feature X requires compatibility_date >= ..."**  
+**"Feature X requires compatibility_date >= ..."**
 **Fix:** Update `compatibility_date` in wrangler.jsonc to today's date
 
 ## Node.js Version
 
-**"Node.js version not supported"**  
-**Fix:** Install Node.js 18+ (`nvm install 20`)
+**"Node.js version not supported"**
+**Fix:** Use a currently supported Node.js LTS release that satisfies both C3 and Wrangler engines (Node.js 22 or newer for current Wrangler).
 
 ## Quick Reference
 
@@ -90,3 +90,5 @@ env:
 | Worker already exists | Name conflict | Change `name` |
 | CI hangs | Missing flags | Add --type, --lang, --no-deploy |
 | Template not found | Bad name | Check cloudflare/templates |
+
+`--existing-script` downloads a deployed Worker; it does not convert local source or migrate an existing framework app. For an existing app, follow its current Workers framework guide. Workers Static Assets also support static sites, and Workers Builds supports Git workflows; Pages is an explicit framework-dependent choice. Inspect generated package scripts instead of assuming every framework uses the same names.

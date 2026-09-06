@@ -1,6 +1,6 @@
 # R2 Data Catalog API Reference
 
-Two APIs: the **control-plane REST API** (Cloudflare-specific) and the **Iceberg REST catalog API** (standard, used via PyIceberg/PySpark). For PyIceberg method details pull `https://py.iceberg.apache.org/`; for engine configs see `https://developers.cloudflare.com/r2/data-catalog/config-examples/`.
+Two APIs: the **control-plane REST API** (Cloudflare-specific) and the **Iceberg REST catalog API** (standard, used via PyIceberg/PySpark). For PyIceberg method details pull `https://py.iceberg.apache.org/`; for engine configs see `https://developers.cloudflare.com/r2-data-catalog/config-examples/`.
 
 ## Control-Plane REST API
 
@@ -9,12 +9,11 @@ Auth: `Authorization: Bearer $API_TOKEN`
 
 | Operation | Method | Path |
 |-----------|--------|------|
-| Get catalog details | GET | `/r2-catalog/{bucket}` |
-| Enable / disable | POST | `/r2-catalog/{bucket}/enable` · `/disable` |
-| Store compaction credential | POST | `/r2-catalog/{bucket}/credential` |
+| Get catalog details | GET | base URL |
+| Enable / disable | POST | `/enable` · `/disable` |
+| Store compaction credential | POST | `/credential` |
 | List namespaces | GET | `/namespaces` |
 | List tables | GET | `/namespaces/{ns}/tables` |
-| **Get table metadata** | GET | `/namespaces/{ns}/tables/{table}` |
 | Get/update maintenance config | GET/POST | `/maintenance-configs` and `/namespaces/{ns}/tables/{table}/maintenance-configs` |
 
 List endpoints accept `?return_uuids=true`, `?return_details=true`, `?parent={ns}`, and pagination. **Nested namespaces use `%1F` (Unit Separator)**, not `/` or `.`: `/namespaces/parent%1Fchild/tables`.
@@ -38,33 +37,7 @@ curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/r2-ca
 
 ### Get Table (metadata introspection)
 
-`GET /namespaces/{ns}/tables/{table}` returns schema, partition spec, sort order, and snapshot info — like Iceberg "load table" but on the control plane, with snapshots pruned to the most recent 10. (Newer than the published API docs.)
-
-```bash
-curl -s "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/r2-catalog/$BUCKET/namespaces/live/tables/earthquakes" \
-  -H "Authorization: Bearer $API_TOKEN"
-```
-
-```json
-{"result": {
-  "identifier": {"namespace": ["live"], "name": "earthquakes"},
-  "table_uuid": "019edccf-3ac8-73e3-...",
-  "metadata_location": "s3://live-data/__r2_data_catalog/.../metadata/01225-....metadata.json",
-  "total_snapshots": 1225,
-  "returned_snapshots": 10,
-  "metadata": { /* standard Iceberg TableMetadata: schemas, partition-specs, sort-orders,
-                   properties, current-snapshot-id, snapshots (≤10), snapshot-log, refs */ }
-}, "success": true}
-```
-
-| Field | Description |
-|-------|-------------|
-| `identifier` | `{namespace: [...], name}` |
-| `table_uuid` | Iceberg table UUID |
-| `metadata_location` | R2 path to current metadata file |
-| `total_snapshots` | Total before pruning |
-| `returned_snapshots` | Count in `metadata.snapshots` (max 10) |
-| `metadata` | Standard [Iceberg TableMetadata](https://iceberg.apache.org/spec/#table-metadata-fields), arrays pruned to 10 |
+Load table metadata through the standard Iceberg catalog client: `table = catalog.load_table(("namespace", "table"))`. Inspect `table.schema()`, `table.spec()`, and `table.snapshots()`. Do not assume a control-plane response is a complete Iceberg snapshot history; use the current API schema before relying on undocumented fields.
 
 ### Error Format
 
@@ -94,7 +67,7 @@ table.append(pyarrow_table)          # also .overwrite(...)
 table.scan(row_filter="id > 100").to_pandas()
 ```
 
-Schema evolution (add nullable columns; widen types only):
+Schema evolution example (import LongType from pyiceberg.types):
 ```python
 with table.update_schema() as u:
     u.add_column("user_id", LongType(), doc="User ID")
@@ -103,13 +76,18 @@ with table.update_schema() as u:
 
 Time-travel:
 ```python
-table.scan(snapshot_id=table.snapshots()[-2].snapshot_id)
-table.scan(as_of_timestamp=ms_epoch)
+snapshots = table.snapshots()
+if len(snapshots) < 2:
+    raise ValueError("No previous retained snapshot")
+previous = snapshots[-2]
+result = table.scan(snapshot_id=previous.snapshot_id).to_arrow()
+# For a timestamp, resolve an applicable retained snapshot first;
+# Table.scan does not accept as_of_timestamp.
 ```
 
 ## Manual Maintenance (PySpark)
 
-Prefer automatic maintenance (control-plane API/wrangler). For manual control or very large tables, use Spark procedures (`rewrite_data_files`, `rewrite_manifests`, `expire_snapshots`, `remove_orphan_files`). See `https://developers.cloudflare.com/r2/data-catalog/table-maintenance/`.
+Prefer automatic maintenance (control-plane API/wrangler). For manual control or very large tables, use Spark procedures (`rewrite_data_files`, `rewrite_manifests`, `expire_snapshots`, `remove_orphan_files`). See `https://developers.cloudflare.com/r2-data-catalog/table-maintenance/`.
 
 ```python
 spark.sql("CALL r2dc.system.rewrite_data_files(table => 'ns.tbl')")

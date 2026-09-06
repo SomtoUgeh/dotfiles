@@ -71,7 +71,7 @@ Individual Rule > Category > Global sensitivity/action
 
 ## Adaptive DDoS Profiles
 
-**Availability**: Enterprise, Enterprise Advanced  
+**Availability**: Enterprise, Enterprise Advanced
 **Learning period**: 7 days of traffic history required
 
 | Profile Type | Description | Detects |
@@ -91,3 +91,5 @@ Configure via Notifications:
 - Mechanisms: email, webhooks, PagerDuty
 
 See [api.md](./api.md#alert-configuration) for API examples.
+
+Ruleset phase PUT operations replace the entrypoint rules. Fetch the existing configuration, preserve unrelated rules using the current writable request schema, and review the complete resulting payload before applying it. Prefer a targeted rule update where available. Do not submit these fragments as a replacement for an existing production ruleset.

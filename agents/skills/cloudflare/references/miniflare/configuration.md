@@ -1,173 +1,25 @@
-# Configuration
+# Miniflare configuration
 
-## Script Loading
+Start with the complete [Miniflare 5 example](./README.md#quick-start-miniflare-5). Validate options against the project's installed `MiniflareOptions`, not snippets from another major version.
 
-```js
-// Inline
-new Miniflare({ modules: true, script: `export default { ... }` });
+## Runtime and modules
 
-// File-based
-new Miniflare({ scriptPath: "worker.js" });
+- Server options (`port`, `host`, `cf`, `inspectorPort`) belong at the top level. Use `port: 0` for an available port and `cf: false` for deterministic tests.
+- Each `workers` entry has `config.name`, `config.type: "worker"`, and `config.compatibilityDate`.
+- Compiled modules belong in `config.manifest`; the `mainModule` must name an entry in `modules`. Use `type: "esm"` for an ES module.
+- Miniflare does not transpile TypeScript or automatically read Wrangler config. Build JavaScript first or use [Wrangler's harness](../wrangler/api.md).
+- Match production's tested compatibility date and flags. Updating the date changes behavior; it is not a generic fix for a failed test.
 
-// Multi-module
-new Miniflare({
-  scriptPath: "src/index.js",
-  modules: true,
-  modulesRules: [
-    { type: "ESModule", include: ["**/*.js"] },
-    { type: "Text", include: ["**/*.txt"] },
-  ],
-});
-```
+## Bindings and multiple Workers
 
-## Compatibility
+In v5, `config.env` maps binding names to typed binding descriptors. The quick start demonstrates a KV descriptor. Other storage, service, Queue, and Durable Object descriptors have different required fields: check the installed schema before constructing them. Prefer Wrangler config through the harness when configuring an application's full binding graph; this avoids manually translating storage and migration rules.
 
-```js
-new Miniflare({
-  compatibilityDate: "2026-01-01", // Use recent date for latest features
-  compatibilityFlags: [
-    "nodejs_compat",        // Node.js APIs (process, Buffer, etc)
-    "streams_enable_constructors", // Stream constructors
-  ],
-  upstream: "https://example.com", // Fallback for unhandled requests
-});
-```
+List each Worker as another `workers` entry. Worker names and service binding targets must agree. Use a fake Worker service for API mocks and isolate storage per test. For SQL-backed Durable Objects, configure the exported class with SQLite enabled using the selected API; a plain class name does not establish SQL storage in older APIs.
 
-**Critical:** Use `compatibilityDate: "2026-01-01"` or latest to match production runtime. Old dates limit available APIs.
+## Persistence, logging, and inspection
 
-## HTTP Server & Request.cf
+Use the installed version's persistence configuration (`resourcePersistencePath` in v5); older per-product `kvPersist`/`r2Persist` examples use the v4 shape. Give parallel tests separate storage paths and dispose every instance. Do not reset a development database as routine test cleanup.
 
-```js
-new Miniflare({
-  port: 8787,              // Default: 8787
-  host: "127.0.0.1",
-  https: true,             // Self-signed cert
-  liveReload: true,        // Auto-reload HTML
+`log` accepts a Miniflare `Log` instance. Enable the inspector with `inspectorPort`, then use `getInspectorURL()`. Avoid logging binding values or secrets. `scriptTimeout` and `workersConcurrencyLimit` are not supported Miniflare options.
   
-  cf: true,                // Fetch live Request.cf data (cached)
-  // cf: "./cf.json",      // Or load from file
-  // cf: { colo: "DFW" },  // Or inline mock
-});
-```
-
-**Note:** For tests, use `dispatchFetch()` (no port conflicts).
-
-## Storage Bindings
-
-```js
-new Miniflare({
-  // KV
-  kvNamespaces: ["TEST_NAMESPACE", "CACHE"],
-  kvPersist: "./kv-data", // Optional: persist to disk
-  
-  // R2
-  r2Buckets: ["BUCKET", "IMAGES"],
-  r2Persist: "./r2-data",
-  
-  // Durable Objects
-  modules: true,
-  durableObjects: {
-    COUNTER: "Counter", // className
-    API_OBJECT: { className: "ApiObject", scriptName: "api-worker" },
-  },
-  durableObjectsPersist: "./do-data",
-  
-  // D1
-  d1Databases: ["DB"],
-  d1Persist: "./d1-data",
-  
-  // Cache
-  cache: true, // Default
-  cachePersist: "./cache-data",
-});
-```
-
-## Bindings
-
-```js
-new Miniflare({
-  // Environment variables
-  bindings: {
-    SECRET_KEY: "my-secret-value",
-    API_URL: "https://api.example.com",
-    DEBUG: true,
-  },
-  
-  // Other bindings
-  wasmBindings: { ADD_MODULE: "./add.wasm" },
-  textBlobBindings: { TEXT: "./data.txt" },
-  queueProducers: ["QUEUE"],
-});
-```
-
-## Multiple Workers
-
-```js
-new Miniflare({
-  workers: [
-    {
-      name: "main",
-      kvNamespaces: { DATA: "shared" },
-      serviceBindings: { API: "api-worker" },
-      script: `export default { ... }`,
-    },
-    {
-      name: "api-worker",
-      kvNamespaces: { DATA: "shared" }, // Shared storage
-      script: `export default { ... }`,
-    },
-  ],
-});
-```
-
-**With routing:**
-```js
-workers: [
-  { name: "api", scriptPath: "./api.js", routes: ["api.example.com/*"] },
-  { name: "web", scriptPath: "./web.js", routes: ["example.com/*"] },
-],
-```
-
-## Logging & Performance
-
-```js
-import { Log, LogLevel } from "miniflare";
-
-new Miniflare({
-  log: new Log(LogLevel.DEBUG), // DEBUG | INFO | WARN | ERROR | NONE
-  scriptTimeout: 30000,         // CPU limit (ms)
-  workersConcurrencyLimit: 10,  // Max concurrent workers
-});
-```
-
-## Workers Sites
-
-```js
-new Miniflare({
-  sitePath: "./public",
-  siteInclude: ["**/*.html", "**/*.css"],
-  siteExclude: ["**/*.map"],
-});
-```
-
-## From wrangler.toml
-
-Miniflare doesn't auto-read `wrangler.toml`:
-
-```toml
-# wrangler.toml
-name = "my-worker"
-main = "src/index.ts"
-compatibility_date = "2026-01-01"
-[[kv_namespaces]]
-binding = "KV"
-```
-
-```js
-// Miniflare equivalent
-new Miniflare({
-  scriptPath: "src/index.ts",
-  compatibilityDate: "2026-01-01",
-  kvNamespaces: ["KV"],
-});
-```
+Wrangler and Miniflare expose different configuration schemas. Do not copy `wrangler.jsonc` directly into `new Miniflare()` or treat an upstream URL as a complete request fallback policy.

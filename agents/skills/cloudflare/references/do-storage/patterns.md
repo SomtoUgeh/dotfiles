@@ -5,7 +5,10 @@
 **Note:** `PRAGMA user_version` is **not supported** in Durable Objects SQLite storage. Use a `_sql_schema_migrations` table instead:
 
 ```typescript
-export class MyDurableObject extends DurableObject {
+import { DurableObject } from "cloudflare:workers";
+
+export class MyDurableObject extends DurableObject<Env> {
+  sql: SqlStorage;
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.sql = ctx.storage.sql;
@@ -38,7 +41,11 @@ For production apps, consider [`durable-utils`](https://github.com/lambrospetrou
 ## In-Memory Caching
 
 ```typescript
-export class UserCache extends DurableObject {
+import { DurableObject } from "cloudflare:workers";
+
+interface User { name: string; email: string }
+
+export class UserCache extends DurableObject<Env> {
   cache = new Map<string, User>();
   async getUser(id: string): Promise<User | undefined> {
     if (this.cache.has(id)) {
@@ -50,9 +57,11 @@ export class UserCache extends DurableObject {
     return user;
   }
   async updateUser(id: string, data: Partial<User>) {
-    const updated = { ...await this.getUser(id), ...data };
-    this.cache.set(id, updated);
+    const user = await this.getUser(id);
+    if (!user) throw new Error("User not found");
+    const updated = { ...user, ...data };
     await this.ctx.storage.put(`user:${id}`, updated);
+    this.cache.set(id, updated);
     return updated;
   }
 }
@@ -61,11 +70,23 @@ export class UserCache extends DurableObject {
 ## Rate Limiting
 
 ```typescript
-export class RateLimiter extends DurableObject {
+import { DurableObject } from "cloudflare:workers";
+
+export class RateLimiter extends DurableObject<Env> {
+  sql: SqlStorage;
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    this.sql = ctx.storage.sql;
+    this.sql.exec("CREATE TABLE IF NOT EXISTS requests (key TEXT NOT NULL, timestamp INTEGER NOT NULL)");
+    this.sql.exec("CREATE INDEX IF NOT EXISTS requests_key_time ON requests(key, timestamp)");
+  }
   async checkLimit(key: string, limit: number, window: number): Promise<boolean> {
+    if (!Number.isSafeInteger(limit) || limit < 1 || !Number.isSafeInteger(window) || window < 1) {
+      throw new RangeError("limit and window must be positive safe integers");
+    }
     const now = Date.now();
-    this.sql.exec('DELETE FROM requests WHERE key = ? AND timestamp < ?', key, now - window);
-    const count = this.sql.exec('SELECT COUNT(*) as count FROM requests WHERE key = ?', key).one().count;
+    this.sql.exec('DELETE FROM requests WHERE key = ? AND timestamp <= ?', key, now - window);
+    const count = this.sql.exec<{ count: number }>('SELECT COUNT(*) as count FROM requests WHERE key = ?', key).one().count;
     if (count >= limit) return false;
     this.sql.exec('INSERT INTO requests (key, timestamp) VALUES (?, ?)', key, now);
     return true;
@@ -76,16 +97,25 @@ export class RateLimiter extends DurableObject {
 ## Batch Processing with Alarms
 
 ```typescript
-export class BatchProcessor extends DurableObject {
-  pending: string[] = [];
+import { DurableObject } from "cloudflare:workers";
+
+export class BatchProcessor extends DurableObject<Env> {
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS pending_items (id INTEGER PRIMARY KEY AUTOINCREMENT, item TEXT);
+      CREATE TABLE IF NOT EXISTS processed_items (item TEXT, timestamp INTEGER);`);
+  }
   async addItem(item: string) {
-    this.pending.push(item);
-    if (!await this.ctx.storage.getAlarm()) await this.ctx.storage.setAlarm(Date.now() + 5000);
+    this.ctx.storage.sql.exec("INSERT INTO pending_items(item) VALUES (?)", item);
+    if (await this.ctx.storage.getAlarm() === null) {
+      await this.ctx.storage.setAlarm(Date.now() + 5000);
+    }
   }
   async alarm() {
-    const items = [...this.pending];
-    this.pending = [];
-    this.sql.exec(`INSERT INTO processed_items (item, timestamp) VALUES ${items.map(() => "(?, ?)").join(", ")}`, ...items.flatMap(item => [item, Date.now()]));
+    this.ctx.storage.transactionSync(() => {
+      this.ctx.storage.sql.exec("INSERT INTO processed_items SELECT item, ? FROM pending_items", Date.now());
+      this.ctx.storage.sql.exec("DELETE FROM pending_items");
+    });
   }
 }
 ```
@@ -93,11 +123,13 @@ export class BatchProcessor extends DurableObject {
 ## Initialization Pattern
 
 ```typescript
-export class Counter extends DurableObject {
-  value: number;
+import { DurableObject } from "cloudflare:workers";
+
+export class Counter extends DurableObject<Env> {
+  value = 0;
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    ctx.blockConcurrencyWhile(async () => { this.value = (await ctx.storage.get("value")) || 0; });
+    ctx.blockConcurrencyWhile(async () => { this.value = (await ctx.storage.get<number>("value")) ?? 0; });
   }
   async increment() {
     this.value++;
@@ -112,14 +144,14 @@ export class Counter extends DurableObject {
 ```typescript
 // Input gate blocks other requests
 async getUniqueNumber(): Promise<number> {
-  let val = await this.ctx.storage.get("counter");
+  const val = (await this.ctx.storage.get<number>("counter")) ?? 0;
   await this.ctx.storage.put("counter", val + 1);
   return val;
 }
 
 // No await on write - output gate delays response until write confirms
 async increment(): Promise<Response> {
-  let val = await this.ctx.storage.get("counter");
+  const val = (await this.ctx.storage.get<number>("counter")) ?? 0;
   this.ctx.storage.put("counter", val + 1);
   return new Response(String(val));
 }
@@ -130,8 +162,18 @@ async increment(): Promise<Response> {
 Hierarchical DO pattern where parent manages child DOs:
 
 ```typescript
+import { DurableObject } from "cloudflare:workers";
+
+interface Env { DOCUMENT: DurableObjectNamespace<Document> }
+
 // Parent DO coordinates children
-export class Workspace extends DurableObject {
+export class Workspace extends DurableObject<Env> {
+  sql: SqlStorage;
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    this.sql = ctx.storage.sql;
+    this.sql.exec("CREATE TABLE IF NOT EXISTS documents (id TEXT PRIMARY KEY, name TEXT NOT NULL, created INTEGER NOT NULL)");
+  }
   async createDocument(name: string): Promise<string> {
     const docId = crypto.randomUUID();
     const childId = this.env.DOCUMENT.idFromName(`${this.ctx.id.toString()}:${docId}`);
@@ -145,15 +187,15 @@ export class Workspace extends DurableObject {
   }
   
   async listDocuments(): Promise<string[]> {
-    return this.sql.exec('SELECT id FROM documents').toArray().map(r => r.id);
+    return this.sql.exec<{ id: string }>('SELECT id FROM documents').toArray().map(r => r.id);
   }
 }
 
 // Child DO
-export class Document extends DurableObject {
+export class Document extends DurableObject<Env> {
   async initialize(name: string) {
-    this.sql.exec('CREATE TABLE IF NOT EXISTS content(key TEXT PRIMARY KEY, value TEXT)');
-    this.sql.exec('INSERT INTO content VALUES (?, ?)', 'name', name);
+    this.ctx.storage.sql.exec('CREATE TABLE IF NOT EXISTS content(key TEXT PRIMARY KEY, value TEXT)');
+    this.ctx.storage.sql.exec('INSERT INTO content VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value', 'name', name);
   }
 }
 ```
@@ -168,7 +210,7 @@ async updateMetrics(userId: string, actions: Action[]) {
   for (const action of actions) {
     this.ctx.storage.put(`user:${userId}:lastAction`, action.type);
     this.ctx.storage.put(`user:${userId}:count`, 
-      await this.ctx.storage.get(`user:${userId}:count`) + 1);
+      ((await this.ctx.storage.get<number>(`user:${userId}:count`)) ?? 0) + 1);
   }
   // Output gate ensures all writes confirm before response
   return new Response("OK");
@@ -176,11 +218,11 @@ async updateMetrics(userId: string, actions: Action[]) {
 
 // Atomic batch with SQL
 async batchUpdate(items: Item[]) {
-  this.sql.exec('BEGIN');
-  for (const item of items) {
-    this.sql.exec('INSERT OR REPLACE INTO items VALUES (?, ?)', item.id, item.value);
-  }
-  this.sql.exec('COMMIT');
+  this.ctx.storage.transactionSync(() => {
+    for (const item of items) {
+      this.sql.exec('INSERT OR REPLACE INTO items VALUES (?, ?)', item.id, item.value);
+    }
+  });
 }
 ```
 
@@ -188,7 +230,6 @@ async batchUpdate(items: Item[]) {
 
 ```typescript
 async cleanup() {
-  await this.ctx.storage.deleteAlarm(); // Separate from deleteAll
-  await this.ctx.storage.deleteAll();
+  await this.ctx.storage.deleteAll(); // Also removes alarms with compatibility_date >= 2026-02-24
 }
 ```

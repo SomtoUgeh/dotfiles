@@ -15,7 +15,7 @@ export class MyDO extends DurableObject<Env> {
   async myMethod(arg: string): Promise<string> { return arg; }
   
   // fetch handler (legacy/HTTP semantics)
-  async fetch(req: Request): Promise<Response> { /* ... */ }
+  async fetch(req: Request): Promise<Response> { return new Response("Not found", { status: 404 }); }
   
   // Lifecycle handlers
   async alarm() { /* alarm fired */ }
@@ -31,7 +31,7 @@ export class MyDO extends DurableObject<Env> {
 
 ```typescript
 // Complete work after response sent (e.g., cleanup, logging)
-this.ctx.waitUntil(promise: Promise<any>): void
+this.ctx.waitUntil(promise: Promise<unknown>): void
 
 // Critical section - blocks all other requests until complete
 await this.ctx.blockConcurrencyWhile(async () => {
@@ -161,7 +161,7 @@ async webSocketError(ws: WebSocket, error: unknown) {
 
 **Key concepts:**
 - **Auto-hibernation:** DO hibernates when no active requests/alarms
-- **Zero cost:** Hibernated DOs incur no charges while preserving connections
+- **Zero cost:** Hibernated DOs avoid active compute duration charges while preserving connections; storage and other usage can still be billed
 - **Memory cleared:** All in-memory state lost on hibernation
 - **Attachment persistence:** Use `serializeAttachment()` for per-connection metadata that survives hibernation
 - **Tags for filtering:** Group connections by room/channel/user for targeted broadcasts

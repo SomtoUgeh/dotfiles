@@ -1,199 +1,73 @@
 # CNI API Reference
 
-See [README.md](README.md) for overview.
+Use `cloudflare` SDK declarations for the installed version. The examples below match 7.1.0. All account operations require an authorized API token; creating an interconnect can initiate provisioning.
 
-## Base
+## Endpoints
 
-```
-https://api.cloudflare.com/client/v4
-Auth: Authorization: Bearer <token>
-```
+Base: `https://api.cloudflare.com/client/v4` with `Authorization: Bearer <token>`.
 
-## SDK Namespaces
+- `/accounts/{account_id}/cni/interconnects`: GET lists and POST creates.
+- `/accounts/{account_id}/cni/interconnects/{icon}`: GET details and DELETE.
+- Append `/status` for status or `/loa` for the Letter of Authorization PDF.
+- `/accounts/{account_id}/cni/cnis`: GET and POST; append `/{cni}` for GET, PUT, DELETE.
+- `/accounts/{account_id}/cni/slots`: GET slots; append `/{slot}` for one slot.
+- `/accounts/{account_id}/cni/settings`: account settings.
 
-**Primary (recommended):**
-```typescript
-client.networkInterconnects.interconnects.*
-client.networkInterconnects.cnis.*
-client.networkInterconnects.slots.*
-```
+List responses contain `items` and an optional `next` cursor. Interconnect queries use `cursor`, `limit`, `site`, and `type`, not `page`/`per_page`. Slot queries additionally support `occupied`, `speed`, and `address_contains`.
 
-**Alternate (deprecated):**
-```typescript
-client.magicTransit.cfInterconnects.*
-```
-
-Use `networkInterconnects` namespace for all new code.
-
-## Interconnects
-
-```http
-GET    /accounts/{account_id}/cni/interconnects              # Query: page, per_page
-POST   /accounts/{account_id}/cni/interconnects              # Query: validate_only=true (optional)
-GET    /accounts/{account_id}/cni/interconnects/{icon}
-GET    /accounts/{account_id}/cni/interconnects/{icon}/status
-GET    /accounts/{account_id}/cni/interconnects/{icon}/loa   # Returns PDF
-DELETE /accounts/{account_id}/cni/interconnects/{icon}
-```
-
-**Create Body:** `account`, `slot_id`, `type`, `facility`, `speed`, `name`, `description`  
-**Status Values:** `active` | `healthy` | `unhealthy` | `pending` | `down`
-
-**Response Example:**
-```json
-{"result": [{"id": "icon_abc", "name": "prod", "type": "direct", "facility": "EWR1", "speed": "10G", "status": "active"}]}
-```
-
-## CNI Objects (BGP config)
-
-```http
-GET    /accounts/{account_id}/cni/cnis
-POST   /accounts/{account_id}/cni/cnis
-GET    /accounts/{account_id}/cni/cnis/{cni}
-PUT    /accounts/{account_id}/cni/cnis/{cni}
-DELETE /accounts/{account_id}/cni/cnis/{cni}
-```
-
-Body: `account`, `cust_ip`, `cf_ip`, `bgp_asn`, `bgp_password`, `vlan`
-
-## Slots
-
-```http
-GET /accounts/{account_id}/cni/slots
-GET /accounts/{account_id}/cni/slots/{slot}
-```
-
-Query: `facility`, `occupied`, `speed`
-
-## Health Checks
-
-Configure via Magic Transit/WAN tunnel endpoints (CNI v2).
-
-```typescript
-await client.magicTransit.tunnels.update(accountId, tunnelId, {
-  health_check: { enabled: true, target: '192.0.2.1', rate: 'high', type: 'request' },
-});
-```
-
-Rates: `high` | `medium` | `low`. Types: `request` | `reply`. See [Magic Transit docs](https://developers.cloudflare.com/magic-transit/how-to/configure-tunnel-endpoints/#add-tunnels).
-
-## Settings
-
-```http
-GET /accounts/{account_id}/cni/settings
-PUT /accounts/{account_id}/cni/settings
-```
-
-Body: `default_asn`
-
-## TypeScript SDK
+## TypeScript
 
 ```typescript
 import Cloudflare from 'cloudflare';
-
 const client = new Cloudflare({ apiToken: process.env.CF_TOKEN });
+const account_id = process.env.CF_ACCOUNT_ID;
+if (!account_id) throw new Error('CF_ACCOUNT_ID is required');
 
-// List
-await client.networkInterconnects.interconnects.list({ account_id: id });
+const slots = await client.networkInterconnects.slots.list({
+  account_id, occupied: false, site: 'EWR', speed: '10G',
+});
+const page = await client.networkInterconnects.interconnects.list({ account_id, limit: 20 });
 
-// Create with validation
+// Use the selected slot ID and connection type provided by Cloudflare.
+const created = await client.networkInterconnects.interconnects.create({
+  account_id, account: account_id, slot_id: selectedSlotId,
+  type: approvedConnectionType, speed: '10G',
+});
+// Do not assume created.id exists: the API returns a typed connection object.
+const connection = await client.networkInterconnects.interconnects.get(icon, { account_id });
+const status = await client.networkInterconnects.interconnects.status(icon, { account_id });
+
+// GCP partner interconnect is also supported by the current API.
 await client.networkInterconnects.interconnects.create({
-  account_id: id,
-  account: id,
-  slot_id: 'slot_abc',
-  type: 'direct',
-  facility: 'EWR1',
-  speed: '10G',
-  name: 'prod-interconnect',
-}, {
-  query: { validate_only: true }, // Dry-run validation
+  account_id, account: account_id, type: approvedGcpConnectionType,
+  bandwidth: '1G', pairing_key: gcpPairingKey,
 });
 
-// Create without validation
-await client.networkInterconnects.interconnects.create({
-  account_id: id,
-  account: id,
-  slot_id: 'slot_abc',
-  type: 'direct',
-  facility: 'EWR1',
-  speed: '10G',
-  name: 'prod-interconnect',
-});
-
-// Status
-await client.networkInterconnects.interconnects.get(accountId, iconId);
-
-// LOA (use fetch)
-const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${id}/cni/interconnects/${iconId}/loa`, {
-  headers: { Authorization: `Bearer ${token}` },
-});
-await fs.writeFile('loa.pdf', Buffer.from(await res.arrayBuffer()));
-
-// CNI object
 await client.networkInterconnects.cnis.create({
-  account_id: id,
-  account: id,
-  cust_ip: '192.0.2.1/31',
-  cf_ip: '192.0.2.0/31',
-  bgp_asn: 65000,
-  vlan: 100,
-});
-
-// Slots (filter by facility and speed)
-await client.networkInterconnects.slots.list({
-  account_id: id,
-  occupied: false,
-  facility: 'EWR1',
-  speed: '10G',
+  account_id, account: account_id, interconnect: icon,
+  magic: { conduit_name: conduitName, description: 'Private connectivity', mtu: 1500 },
+  bgp: { customer_asn: 65000, extra_prefixes: [] },
 });
 ```
 
-## Python SDK
+`selectedSlotId`, `icon`, conduit names, pairing keys, and connection type values come from the approved provisioning flow. The current SDK does not declare a `validate_only` creation parameter; do not present a real creation as a dry run. Physical create bodies do not accept arbitrary `name` or `facility` properties.
 
-```python
-from cloudflare import Cloudflare
+For LOA downloads, check the response before saving:
 
-client = Cloudflare(api_token=os.environ["CF_TOKEN"])
-
-# List, create, status (same pattern as TypeScript)
-client.network_interconnects.interconnects.list(account_id=id)
-client.network_interconnects.interconnects.create(account_id=id, account=id, slot_id="slot_abc", type="direct", facility="EWR1", speed="10G")
-client.network_interconnects.interconnects.get(account_id=id, icon=icon_id)
-
-# CNI objects and slots
-client.network_interconnects.cnis.create(account_id=id, cust_ip="192.0.2.1/31", cf_ip="192.0.2.0/31", bgp_asn=65000)
-client.network_interconnects.slots.list(account_id=id, occupied=False)
+```typescript
+import { writeFile } from 'node:fs/promises';
+const response = await fetch(
+  `https://api.cloudflare.com/client/v4/accounts/${account_id}/cni/interconnects/${icon}/loa`,
+  { headers: { Authorization: `Bearer ${token}` } },
+);
+if (!response.ok) throw new Error(`LOA request failed: ${response.status}`);
+await writeFile('loa.pdf', Buffer.from(await response.arrayBuffer()));
 ```
 
-## cURL
+## Other clients and operational limits
 
-```bash
-# List interconnects
-curl "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/cni/interconnects" \
-  -H "Authorization: Bearer ${CF_TOKEN}"
+The Python SDK uses `client.network_interconnects` and keyword arguments (`account_id=...`, `icon=...`); derive request fields from its installed types rather than translating an obsolete example. REST callers use the same documented schemas.
 
-# Create interconnect
-curl -X POST "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/cni/interconnects?validate_only=true" \
-  -H "Authorization: Bearer ${CF_TOKEN}" -H "Content-Type: application/json" \
-  -d '{"account": "id", "slot_id": "slot_abc", "type": "direct", "facility": "EWR1", "speed": "10G"}'
+Physical cross-connect installation and account-team activation remain separate from API creation. Check the current status endpoint/dashboard for available telemetry; do not assume BGP state or optical readings are part of every response. BGP MD5 keys are treated by this API as a misconfiguration guard, not a secret authentication mechanism.
 
-# LOA PDF
-curl "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/cni/interconnects/${ICON_ID}/loa" \
-  -H "Authorization: Bearer ${CF_TOKEN}" --output loa.pdf
-```
-
-## Not Available via API
-
-**Missing Capabilities:**
-- BGP session state query (use Dashboard or BGP logs)
-- Bandwidth utilization metrics (use external monitoring)
-- Traffic statistics per interconnect
-- Historical uptime/downtime data
-- Light level readings (contact account team)
-- Maintenance window scheduling (notifications only)
-
-## Resources
-
-- [API Docs](https://developers.cloudflare.com/api/resources/network_interconnects/)
-- [TypeScript SDK](https://github.com/cloudflare/cloudflare-typescript)
-- [Python SDK](https://github.com/cloudflare/cloudflare-python)
+Sources: [Network Interconnect API](https://developers.cloudflare.com/api/resources/network_interconnects/), [TypeScript SDK](https://github.com/cloudflare/cloudflare-typescript), [Get started](https://developers.cloudflare.com/network-interconnect/get-started/).

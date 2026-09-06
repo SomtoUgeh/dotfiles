@@ -1,111 +1,39 @@
-# Configuration & Setup
+# AI Gateway Configuration
 
-## Creating a Gateway
+Create or select a gateway, then configure authentication, model credentials or billing, caching, rate limits, and logging for its intended environment. Management changes and model requests affect the account and may incur charges.
 
-### Dashboard
-AI > AI Gateway > Create Gateway > Configure (auth, caching, rate limiting, logging)
-
-### API
-```bash
-curl -X POST https://api.cloudflare.com/client/v4/accounts/{account_id}/ai-gateway/gateways \
-  -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
-  -d '{"id":"my-gateway","cache_ttl":3600,"rate_limiting_interval":60,"rate_limiting_limit":100,"collect_logs":true}'
-```
-
-**Naming:** lowercase alphanumeric + hyphens (e.g., `prod-api`, `dev-chat`)
-
-## Wrangler Integration
+## Workers configuration
 
 ```toml
 [ai]
 binding = "AI"
-
-[[ai.gateway]]
-id = "my-gateway"
 ```
+
+Pass `{ gateway: { id: "my-gateway" } }` in `env.AI.run` options, or use `env.AI.gateway("my-gateway")`. There is no `[[ai.gateway]]` Wrangler config section.
+
+## Endpoint and authentication selection
+
+| Path | Authentication and model format |
+|------|---------------------------------|
+| Cloudflare `/accounts/{account}/ai/v1` | Cloudflare token; provider-prefixed model; optional `cf-aig-gateway-id` (required for Workers AI models) |
+| Gateway provider-native `/.../{gateway}/openai` | Provider key; unprefixed OpenAI model; gateway token in `cf-aig-authorization` if enabled |
+| Gateway `/.../{gateway}/compat` | Cloudflare token for stored-key dynamic routing; `dynamic/{route}` |
+
+For new single-model OpenAI-compatible calls, use the Cloudflare REST endpoint. `/compat` remains required for dynamic routes. See [SDK examples](sdk-integration.md).
+
+Unified Billing and stored provider keys have provider/model-specific support. Check the current configuration rather than assuming every listed provider is keyless. An OpenAI SDK constructor still requires `apiKey`; leaving it out only works if its expected environment variable exists.
+
+## Secrets
 
 ```bash
 wrangler secret put CF_API_TOKEN
-wrangler secret put OPENAI_API_KEY  # If not using BYOK
+wrangler secret put OPENAI_API_KEY
 ```
 
-## Authentication
+Only add secrets required by the chosen transport. Do not expose provider or gateway tokens in browser code. Select API-token permissions from the current endpoint's accepted permissions; management access and inference access are different.
 
-### Gateway Auth (protects gateway access)
-```typescript
-const client = new OpenAI({
-  baseURL: `https://gateway.ai.cloudflare.com/v1/${accountId}/${gatewayId}/openai`,
-  defaultHeaders: { 'cf-aig-authorization': `Bearer ${cfToken}` }
-});
-```
+## Management
 
-### Provider Auth Options
+Use the dashboard or the [current management API](https://developers.cloudflare.com/api/resources/ai_gateway/). Read existing configuration before updates and preserve unrelated fields. Verify the resulting gateway settings; a local configuration validation does not exercise hosted routing.
 
-**1. Unified Billing (keyless)** - pay through Cloudflare, no provider key:
-```typescript
-const client = new OpenAI({
-  baseURL: `https://gateway.ai.cloudflare.com/v1/${accountId}/${gatewayId}/openai`,
-  defaultHeaders: { 'cf-aig-authorization': `Bearer ${cfToken}` }
-});
-```
-Supports: OpenAI, Anthropic, Google AI Studio
-
-**2. BYOK** - store keys in dashboard (Provider Keys > Add), no key in code
-
-**3. Request Headers** - pass provider key per request:
-```typescript
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  baseURL: `https://gateway.ai.cloudflare.com/v1/${accountId}/${gatewayId}/openai`,
-  defaultHeaders: { 'cf-aig-authorization': `Bearer ${cfToken}` }
-});
-```
-
-## API Token Permissions
-
-- **Gateway management:** AI Gateway - Read + Edit
-- **Gateway access:** AI Gateway - Read (minimum)
-
-## Gateway Management API
-
-```bash
-# List
-curl https://api.cloudflare.com/client/v4/accounts/{account_id}/ai-gateway/gateways \
-  -H "Authorization: Bearer $CF_API_TOKEN"
-
-# Get
-curl .../gateways/{gateway_id}
-
-# Update
-curl -X PUT .../gateways/{gateway_id} \
-  -d '{"cache_ttl":7200,"rate_limiting_limit":200}'
-
-# Delete
-curl -X DELETE .../gateways/{gateway_id}
-```
-
-## Getting IDs
-
-- **Account ID:** Dashboard > Overview > Copy
-- **Gateway ID:** AI Gateway > Gateway name column
-
-## Python Example
-
-```python
-from openai import OpenAI
-import os
-
-client = OpenAI(
-    api_key=os.environ.get("OPENAI_API_KEY"),
-    base_url=f"https://gateway.ai.cloudflare.com/v1/{os.environ['CF_ACCOUNT_ID']}/{os.environ['GATEWAY_ID']}/openai",
-    default_headers={"cf-aig-authorization": f"Bearer {os.environ['CF_API_TOKEN']}"}
-)
-```
-
-## Best Practices
-
-1. **Always authenticate gateways in production**
-2. **Use BYOK or unified billing** - secrets out of code
-3. **Environment-specific gateways** - separate dev/staging/prod
-4. **Set rate limits** - prevent runaway costs
-5. **Enable logging** - track usage, debug issues
+Sources: [REST API](https://developers.cloudflare.com/ai-gateway/usage/rest-api/), [gateway authentication](https://developers.cloudflare.com/ai-gateway/configuration/authentication/).

@@ -18,8 +18,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${HOME}/code/personal/dotfiles/agents/shared/hooks/git_guard.py\"",
-            "timeout": 5
+            "command": "uv run --script \"${HOME}/.claude/hooks/git_guard.py\"",
+            "timeout": 15
           }
         ]
       }
@@ -30,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${HOME}/.agents/skills/shaping/shaping-ripple.sh",
+            "command": "\"${HOME}/.agents/skills/shaping/shaping-ripple.sh\"",
             "timeout": 5
           }
         ]
@@ -47,35 +47,14 @@
     "claude-code-setup@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true,
     "context7@claude-plugins-official": true,
-    "frontend-design@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": false,
     "hookify@claude-plugins-official": true,
     "playground@claude-plugins-official": true,
     "pr-review-toolkit@claude-plugins-official": true,
     "typescript-lsp@claude-plugins-official": true,
-    "last30days@last30days-skill": true,
-    "plannotator@plannotator": true,
-    "paper-desktop@paper": true,
-    "cloudflare@cloudflare": true
+    "paper-desktop@paper": true
   },
   "extraKnownMarketplaces": {
-    "last30days-skill": {
-      "source": {
-        "source": "github",
-        "repo": "mvanhorn/last30days-skill"
-      }
-    },
-    "shopify-ai-toolkit": {
-      "source": {
-        "source": "github",
-        "repo": "Shopify/shopify-ai-toolkit"
-      }
-    },
-    "plannotator": {
-      "source": {
-        "source": "github",
-        "repo": "backnotprop/plannotator"
-      }
-    },
     "paper": {
       "source": {
         "source": "github",

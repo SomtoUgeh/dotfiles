@@ -13,6 +13,10 @@ Use the local `stack` CLI for squash-safe stacked PR repair. It is designed for
 repos where PRs are squash-merged and merged branches are deleted, so Git ancestry
 alone cannot preserve stack intent.
 
+First verify `command -v stack` and read its `--help`/`guide`; this is a custom tool and a different executable named `stack` may be unrelated. If unavailable, say so and inspect Git/PR metadata read-only with `git` and `gh`; do not execute guessed repair commands or install an unverified namesake. The behavior below must match the discovered implementation before it is relied upon.
+
+Inspection requests do not authorize sync, merge, remote pushes, PR edits, or undo. A correct dry-run alone is not permission to apply it. Use the session's existing authorization for each concrete action; never run a workflow that pushes unless pushing was requested. Undo restores only the effects documented by the actual journal; it cannot unmerge a PR or reverse unrelated external effects.
+
 Keep ordinary editing and commits on plain `git`. Use `stack` only for stack
 intent, stack inspection, sync, merge, and undo workflows.
 

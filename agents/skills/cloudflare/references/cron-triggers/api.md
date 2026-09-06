@@ -10,7 +10,7 @@ export default {
 };
 ```
 
-**JavaScript:** Same signature without types  
+**JavaScript:** Same signature without types
 **Python:** `class Default(WorkerEntrypoint): async def scheduled(self, controller, env, ctx)`
 
 ## ScheduledController
@@ -79,7 +79,7 @@ export default {
 export default {
   async scheduled(controller, env, ctx) {
     const data = await fetchCriticalData(); // Critical path
-    
+
     // Non-blocking background tasks
     ctx.waitUntil(Promise.all([
       logToAnalytics(data),
@@ -115,53 +115,29 @@ export default {
 
 ## Testing Handler
 
-**Local development (/__scheduled endpoint):**
+**Local development (/cdn-cgi/local/scheduled endpoint):**
 ```bash
 # Start dev server
 npx wrangler dev
 
 # Trigger any cron
-curl "http://localhost:8787/__scheduled?cron=*/5+*+*+*+*"
+curl "http://localhost:8787/cdn-cgi/local/scheduled?cron=*/5+*+*+*+*"
 
 # Trigger specific cron with custom time
-curl "http://localhost:8787/__scheduled?cron=0+2+*+*+*&scheduledTime=1704067200000"
+curl "http://localhost:8787/cdn-cgi/local/scheduled?cron=0+2+*+*+*&time=1704067200000"
 ```
 
 **Query parameters:**
-- `cron` - Required. URL-encoded cron expression (use `+` for spaces)
-- `scheduledTime` - Optional. Unix timestamp in milliseconds (defaults to current time)
+- `cron` - Optional. URL-encoded cron expression (use `+` for spaces)
+- `time` - Optional. Unix timestamp in milliseconds (defaults to current time)
 
-**Production security:** The `/__scheduled` endpoint is available in production and can be triggered by anyone. Block it or implement authentication - see [gotchas.md](./gotchas.md#security-concerns)
+The `/cdn-cgi/local/scheduled` route is a local development route. It is not automatically a deployed Worker endpoint. Any custom HTTP job trigger you implement must authenticate callers.
 
-**Unit testing (Vitest):**
-```typescript
-// test/scheduled.test.ts
-import { describe, it, expect } from "vitest";
-import { env } from "cloudflare:test";
-import worker from "../src/index";
-
-describe("Scheduled Handler", () => {
-  it("processes scheduled event", async () => {
-    const controller = { scheduledTime: Date.now(), cron: "*/5 * * * *", type: "scheduled" as const, noRetry: () => {} };
-    const ctx = { waitUntil: (p: Promise<any>) => p, passThroughOnException: () => {} };
-    await worker.scheduled(controller, env, ctx);
-    expect(await env.MY_KV.get("last_run")).toBeDefined();
-  });
-  
-  it("handles multiple crons", async () => {
-    const ctx = { waitUntil: () => {}, passThroughOnException: () => {} };
-    await worker.scheduled({ scheduledTime: Date.now(), cron: "*/5 * * * *", type: "scheduled", noRetry: () => {} }, env, ctx);
-    expect(await env.MY_KV.get("last_type")).toBe("frequent");
-  });
-});
-```
+**Unit testing:** Use `createScheduledController`, `createExecutionContext`, and `waitOnExecutionContext` from `cloudflare:test`. Await both the handler and its registered background work; a stubbed `waitUntil` does not prove completion.
 
 ## Error Handling
 
-**Automatic retries:**
-- Failed cron executions are retried automatically unless `noRetry()` is called
-- Retry happens after a delay (typically minutes)
-- Only first `waitUntil()` failure is recorded in Cron Events
+**Failures:** A `noRetry()` method exists, but do not infer a retry schedule or exactly-once guarantee from it. For required retries, use a documented Workflows/Queues policy and durable state. Monitor cron failures explicitly.
 
 **Best practices:**
 ```typescript
@@ -174,12 +150,12 @@ export default {
       console.error("Cron failed:", {
         cron: controller.cron,
         scheduledTime: controller.scheduledTime,
-        error: error.message,
-        stack: error.stack,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
       });
-      
+
       // Decide: retry or skip
-      if (error.message.includes("rate limit")) {
+      if (error instanceof Error && error.message.includes("rate limit")) {
         controller.noRetry(); // Skip retry for rate limits
       }
       // Otherwise allow automatic retry
@@ -194,3 +170,5 @@ export default {
 - [README.md](./README.md) - Overview
 - [patterns.md](./patterns.md) - Use cases, examples
 - [gotchas.md](./gotchas.md) - Common errors, testing issues
+
+Current source: [Cron Triggers](https://developers.cloudflare.com/workers/configuration/cron-triggers/). Local handler tests do not verify hosted scheduling, retries, or global propagation.

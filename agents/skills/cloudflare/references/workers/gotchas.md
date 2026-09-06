@@ -5,7 +5,7 @@
 ### "Too much CPU time used"
 
 **Cause:** Worker exceeded CPU time limit (10ms on Free plan, 30s default / 5min max on Paid)  
-**Solution:** Use `ctx.waitUntil()` for background work, offload heavy compute to Durable Objects, or consider Workers AI for ML workloads
+**Solution:** Profile and reduce active computation, or move suitable work to a service with the required budget. `waitUntil()` does not grant more CPU.
 
 ### "Module-Level State Lost"
 
@@ -34,7 +34,7 @@
 
 ### "D1 read-after-write inconsistency"
 
-**Cause:** D1 is eventually consistent; reads may not reflect recent writes  
+**Cause:** D1 read replicas can lag; read replication is opt-in through Sessions.
 **Solution:** Use D1 Sessions (2024+) to guarantee read-after-write consistency within a session:
 
 ```typescript
@@ -43,63 +43,19 @@ await session.prepare('INSERT INTO users (name) VALUES (?)').bind('Alice').run()
 const user = await session.prepare('SELECT * FROM users WHERE name = ?').bind('Alice').first(); // Guaranteed to see Alice
 ```
 
-**When to use sessions:** Write → Read patterns, transactions requiring consistency
+**When to use sessions:** Write → Read patterns, sequentially consistent reads; Sessions do not make separate statements an atomic transaction
 
 ### "wrangler types not generating TypeScript definitions"
 
-**Cause:** Type generation not configured or outdated  
-**Solution:** Run `npx wrangler types` after changing bindings in wrangler.jsonc:
+Use the [generated type setup](./configuration.md#automatic-type-generation-recommended). Wrangler 4 defaults to `worker-configuration.d.ts`.
 
-```bash
-npx wrangler types  # Generates .wrangler/types/runtime.d.ts
-```
+### "Durable Object RPC method not available"
 
-Add to `tsconfig.json`: `"include": [".wrangler/types/**/*.ts"]`
-
-Then import: `import type { Env } from './.wrangler/types/runtime';`
-
-### "Durable Object RPC errors with deprecated fetch pattern"
-
-**Cause:** Using old `stub.fetch()` pattern instead of RPC (2024+)  
-**Solution:** Export methods directly, call via RPC:
-
-```typescript
-// ❌ Old fetch pattern
-export class MyDO {
-  async fetch(request: Request) {
-    const { method } = await request.json();
-    if (method === 'increment') return new Response(String(await this.increment()));
-  }
-  async increment() { return ++this.value; }
-}
-const stub = env.DO.get(id);
-const res = await stub.fetch('http://x', { method: 'POST', body: JSON.stringify({ method: 'increment' }) });
-
-// ✅ RPC pattern (type-safe, no serialization overhead)
-export class MyDO {
-  async increment() { return ++this.value; }
-}
-const stub = env.DO.get(id);
-const count = await stub.increment(); // Direct method call
-```
+Extend `DurableObject`, export the class, configure its namespace, and regenerate types. See the [complete RPC pattern](./api.md#durable-objects). HTTP `stub.fetch()` is supported; changing to RPC does not fix missing configuration.
 
 ### "WebSocket connection closes unexpectedly"
 
-**Cause:** Worker reaches CPU limit while maintaining WebSocket connection  
-**Solution:** Use WebSocket hibernation (2024+) to offload idle connections:
-
-```typescript
-export class WebSocketDO {
-  async webSocketMessage(ws: WebSocket, message: string) {
-    // Handle message
-  }
-  async webSocketClose(ws: WebSocket, code: number) {
-    // Cleanup
-  }
-}
-```
-
-Hibernation automatically suspends inactive connections, wakes on events
+Inspect close codes, runtime errors, authentication expiry, and network behavior. Hibernation requires `ctx.acceptWebSocket` in a Durable Object; it is not a blanket fix for CPU limits or disconnects. Use the [complete example](../../../durable-objects/SKILL.md).
 
 ### "Framework middleware not working with Workers"
 
@@ -119,15 +75,11 @@ See [frameworks.md](./frameworks.md) for full patterns
 
 | Limit | Value | Notes |
 |-------|-------|-------|
-| Request size | 100 MB | Maximum incoming request size |
-| Response size | Unlimited | Supports streaming |
-| CPU time (Free) | 10ms | Free plan |
-| CPU time (Paid) | 30s default / 5min max | Configurable via `limits.cpu_ms` |
-| Subrequests (Free) | 50 | Per invocation |
-| Subrequests (Paid) | 10,000 | Per invocation |
-| Subrequest operations (KV, R2, Cache API) | 1,000 | Shared across KV reads, R2 ops, Cache API calls per request |
-| KV value size | 25 MiB | Maximum per key |
-| Environment variable size | 5 KB | Per variable |
+| CPU time | Plan and workload dependent | Check active-compute and wall-time limits separately |
+| Request body | Account plan dependent | Do not assume a universal 100 MB cap |
+| Storage/binding operations | Product dependent | Check quotas and per-invocation restrictions |
+
+Use the [current platform limits](https://developers.cloudflare.com/workers/platform/limits/) before stating numeric limits.
 
 ## See Also
 

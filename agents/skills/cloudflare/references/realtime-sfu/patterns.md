@@ -10,9 +10,9 @@ Client (WebRTC) <---> CF Edge <---> Backend (HTTP)
                     Other Edges <---> Other Clients
 ```
 
-Anycast: Last-mile <50ms (95%), no region select, NACK shield, distributed consensus
+Anycast routing selects Cloudflare edges; measure actual network and media latency.
 
-Cascading trees auto-scale to millions:
+Illustrative distribution topology:
 ```
 Publisher -> Edge A -> Edge B -> Sub1
                     \-> Edge C -> Sub2,3
@@ -22,65 +22,48 @@ Publisher -> Edge A -> Edge B -> Sub1
 
 **1:1:** A creates session+publishes, B creates+subscribes to A+publishes, A subscribes to B
 **N:N:** All create session+publish, backend broadcasts track IDs, all subscribe to others
-**1:N:** Publisher creates+publishes, viewers each create+subscribe (no fan-out limit)
+**1:N:** Publisher creates+publishes, viewers each create+subscribe (subject to transport/client/service constraints)
 **Breakout:** Same PeerConnection! Backend closes/adds tracks, no recreation
 
-## PartyTracks (Recommended)
+## PartyTracks
 
-Observable-based client with automatic device/network handling:
+Verified with `partytracks` 0.0.56. Its entrypoints are `partytracks/client`, `partytracks/react`, and `partytracks/server`; it has no root export.
 
 ```typescript
-import {PartyTracks} from 'partytracks';
+import { PartyTracks, getCamera } from 'partytracks/client';
+import { of } from 'rxjs';
 
-// Create client
-const pt = new PartyTracks({
-  apiUrl: '/api/calls',
-  sessionId: 'my-session',
-  onTrack: (track, peer) => {
-    const video = document.getElementById(`video-${peer.id}`) as HTMLVideoElement;
-    video.srcObject = new MediaStream([track]);
-  }
+const pt = new PartyTracks({ prefix: '/api/partytracks' });
+const camera = getCamera({ broadcasting: true });
+const publishing = pt.push(camera.broadcastTrack$).subscribe({
+  next: metadata => { /* Share authorized metadata through your room service. */ },
+  error: error => console.error('Publication failed', error),
 });
-
-// Publish camera (push API)
-const camera = await pt.getCamera(); // Auto-requests permissions, handles device changes
-await pt.publishTrack(camera, {trackName: 'my-camera'});
-
-// Subscribe to remote track (pull API)
-await pt.subscribeToTrack({trackName: 'remote-camera', sessionId: 'other-session'});
-
-// React hook example
-import {useObservableAsValue} from 'observable-hooks';
-
-function VideoCall() {
-  const localTracks = useObservableAsValue(pt.localTracks$);
-  const remoteTracks = useObservableAsValue(pt.remoteTracks$);
-  
-  return <div>{/* Render tracks */}</div>;
-}
-
-// Screenshare
-const screen = await pt.getScreenshare();
-await pt.publishTrack(screen, {trackName: 'my-screen'});
-
-// Handle device changes (automatic)
-// PartyTracks detects device changes (e.g., Bluetooth headset) and renegotiates
+const receiving = pt.pull(of({ trackName: remoteTrackName, sessionId: remoteSessionId })).subscribe({
+  next: track => { videoElement.srcObject = new MediaStream([track]); },
+  error: error => console.error('Subscription failed', error),
+});
+// On leave:
+receiving.unsubscribe();
+publishing.unsubscribe();
+camera.disableSource();
+videoElement.srcObject = null;
 ```
+
+React observable hooks are exported from `partytracks/react`. Use stable observables and clean up subscriptions; camera/screen helpers are functions, not methods on PartyTracks.
 
 ## Backend
 
-Express:
-```js
-app.post('/api/new-session', async (req, res) => {
-  const r = await fetch(`${CALLS_API}/apps/${process.env.CALLS_APP_ID}/sessions/new`,
-    {method: 'POST', headers: {'Authorization': `Bearer ${process.env.CALLS_APP_SECRET}`}});
-  res.json(await r.json());
+```typescript
+import { routePartyTracksRequest } from 'partytracks/server';
+// After authenticating the caller and authorizing room/track access:
+const response = await routePartyTracksRequest({
+  request, prefix: '/api/partytracks',
+  appId: env.CALLS_APP_ID, token: env.CALLS_APP_SECRET,
 });
 ```
 
-Workers: Same pattern, use `env.CALLS_APP_ID` and `env.CALLS_APP_SECRET`
-
-DO Presence: See configuration.md for boilerplate
+Keep session locking enabled (the default). The library's session lock does not replace application membership or authorization for subscribing to other users' tracks. Secrets stay on the backend.
 
 ## Audio Level Detection
 
@@ -91,15 +74,17 @@ function attachAudioLevelDetector(track: MediaStreamTrack) {
   const analyzer = ctx.createAnalyser();
   const src = ctx.createMediaStreamSource(new MediaStream([track]));
   src.connect(analyzer);
-  
+
   const data = new Uint8Array(analyzer.frequencyBinCount);
+  let frame = 0;
   const checkLevel = () => {
     analyzer.getByteFrequencyData(data);
     const level = data.reduce((a, b) => a + b) / data.length;
     if (level > 30) console.log('Speaking:', level); // Trigger UI update
-    requestAnimationFrame(checkLevel);
+    frame = requestAnimationFrame(checkLevel);
   };
   checkLevel();
+  return () => { cancelAnimationFrame(frame); src.disconnect(); void ctx.close(); };
 }
 ```
 
@@ -110,9 +95,10 @@ pc.getStats().then(stats => {
   stats.forEach(report => {
     if (report.type === 'inbound-rtp' && report.kind === 'video') {
       const {packetsLost, packetsReceived, jitter} = report;
-      const lossRate = packetsLost / (packetsLost + packetsReceived);
+      const total = packetsLost + packetsReceived;
+      const lossRate = total > 0 ? packetsLost / total : 0;
       if (lossRate > 0.05) console.warn('High packet loss:', lossRate);
-      if (jitter > 100) console.warn('High jitter:', jitter);
+      if (jitter > 0.1) console.warn('High jitter:', jitter);
     }
   });
 });
@@ -120,38 +106,21 @@ pc.getStats().then(stats => {
 
 ## Stage Management (Limit Visible Participants)
 
-```typescript
-// Subscribe to top 6 active speakers only
-let activeSubscriptions = new Set<string>();
-
-function updateStage(topSpeakers: string[]) {
-  const toAdd = topSpeakers.filter(id => !activeSubscriptions.has(id)).slice(0, 6);
-  const toRemove = [...activeSubscriptions].filter(id => !topSpeakers.includes(id));
-  
-  toRemove.forEach(id => {
-    pc.getSenders().find(s => s.track?.id === id)?.track?.stop();
-    activeSubscriptions.delete(id);
-  });
-  
-  toAdd.forEach(async id => {
-    await fetch(`/api/subscribe`, {method: 'POST', body: JSON.stringify({trackId: id})});
-    activeSubscriptions.add(id);
-  });
-}
-```
+Choose the top N participants first, then diff against active remote subscriptions. Serialize additions/removals and close remote tracks through the SFU API using their mids (or unsubscribe the PartyTracks pull observable). `pc.getSenders()` contains local senders; stopping those tracks does not unsubscribe a remote participant. Handle failures before updating the active subscription set.
 
 ## Advanced
 
 Bandwidth mgmt:
 ```ts
 const s = pc.getSenders().find(s => s.track?.kind === 'video');
+if (!s) throw new Error("No video sender");
 const p = s.getParameters();
 if (!p.encodings) p.encodings = [{}];
 p.encodings[0].maxBitrate = 1200000; p.encodings[0].maxFramerate = 24;
 await s.setParameters(p);
 ```
 
-Simulcast (CF auto-forwards best layer):
+Simulcast (publish layers; configure subscriber preferredRid/fallback per the API):
 ```ts
 pc.addTransceiver('video', {direction: 'sendonly', sendEncodings: [
   {rid: 'high', maxBitrate: 1200000},
@@ -160,15 +129,6 @@ pc.addTransceiver('video', {direction: 'sendonly', sendEncodings: [
 ]});
 ```
 
-DataChannel:
-```ts
-const dc = pc.createDataChannel('chat', {ordered: true, maxRetransmits: 3});
-dc.onopen = () => dc.send(JSON.stringify({type: 'chat', text: 'Hi'}));
-dc.onmessage = (e) => console.log('RX:', JSON.parse(e.data));
-```
+DataChannels require the SFU establish/new APIs; see [api.md](api.md). Stream WHIP/WHEP is a separate integration, not interchangeable raw SFU signaling.
 
-**WHIP/WHEP:** For streaming interop (OBS → SFU, SFU → video players), use WHIP (ingest) and WHEP (egress) protocols. See Cloudflare Stream integration docs.
-
-Integrations: R2 for recording `env.R2_BUCKET.put(...)`, Queues for analytics
-
-Perf: 100-250ms connect, ~50ms latency (95%), 200-400ms glass-to-glass, no participant limit (client: 10-50 tracks)
+Recording requires capturing/encoding media or a supported recording service before storing bytes in R2. A bare `R2.put()` does not record a live call. Measure join latency, packet loss, and end-to-end media delay in your application rather than treating illustrative figures as guarantees.

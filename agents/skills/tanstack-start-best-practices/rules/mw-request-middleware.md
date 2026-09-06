@@ -12,7 +12,7 @@ Request middleware runs before every server request (routes, SSR, server functio
 // Duplicating auth logic in every server function
 export const getProfile = createServerFn()
   .handler(async () => {
-    const session = await getSession()
+    const session = await getSessionData()
     if (!session) throw new Error('Unauthorized')
     // ... rest of handler
   })
@@ -37,7 +37,8 @@ export const deleteAccount = createServerFn({ method: 'POST' })
 ```tsx
 // lib/middleware/auth.ts
 import { createMiddleware } from '@tanstack/react-start'
-import { getSession } from './session.server'
+import { getSessionData } from '../session.server'
+import { db } from '../db.server'
 
 export const authMiddleware = createMiddleware()
   .server(async ({ next }) => {
@@ -47,7 +48,10 @@ export const authMiddleware = createMiddleware()
     return next({
       context: {
         session,
-        user: session?.user ?? null,
+        user: session ? await db.users.findUnique({
+          where: { id: session.userId },
+          select: { id: true, role: true },
+        }) : null,
       },
     })
   })
@@ -96,30 +100,30 @@ export const loggingMiddleware = createMiddleware()
 ## Good Example: Global Middleware Configuration
 
 ```tsx
-// app/start.ts
-import { createStart } from '@tanstack/react-start/server'
+// src/start.ts
+import { createStart } from '@tanstack/react-start'
 import { loggingMiddleware } from './middleware/logging'
 import { authMiddleware } from './middleware/auth'
 
-export default createStart({
-  // Request middleware runs for all requests
-  requestMiddleware: [
-    loggingMiddleware,
-    authMiddleware,
-  ],
-})
+export const startInstance = createStart(() => ({
+  requestMiddleware: [loggingMiddleware, authMiddleware],
+}))
 ```
 
-## Good Example: Rate Limiting Middleware
+## Development-Only Rate Limiting Example
 
 ```tsx
 // lib/middleware/rateLimit.ts
 import { createMiddleware } from '@tanstack/react-start'
 
+// Single-process demonstration only. In production use the deployed platform
+// or an existing distributed limiter and its trusted client-IP mechanism.
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>()
 
 export const rateLimitMiddleware = createMiddleware()
   .server(async ({ next, request }) => {
+    // Only behind a trusted proxy that overwrites this header. Never trust
+    // arbitrary direct-client x-forwarded-for values as an abuse-control key.
     const ip = request.headers.get('x-forwarded-for') ?? 'unknown'
     const now = Date.now()
     const windowMs = 60 * 1000  // 1 minute
@@ -133,9 +137,12 @@ export const rateLimitMiddleware = createMiddleware()
 
     record.count++
     rateLimitStore.set(ip, record)
+    for (const [key, value] of rateLimitStore) {
+      if (value.resetAt < now) rateLimitStore.delete(key)
+    }
 
     if (record.count > maxRequests) {
-      throw new Response('Too Many Requests', { status: 429 })
+      return new Response('Too Many Requests', { status: 429 })
     }
 
     return next()
@@ -161,6 +168,6 @@ loggingMiddleware.server(async ({ next }) => {
 - Request middleware applies to all server requests
 - Middleware can add to context using `next({ context: {...} })`
 - Order matters - first middleware wraps the entire chain
-- Global middleware defined in `app/start.ts`
-- Route-specific middleware uses `beforeLoad`
-- Server function middleware uses separate pattern (see `mw-function-middleware`)
+- Global middleware is registered in `src/start.ts` with `createStart(() => ({ requestMiddleware }))`
+- Server-route middleware uses `server.middleware`; `beforeLoad` is a router navigation hook, not a server endpoint authorization boundary
+- Server-function middleware uses `createMiddleware({ type: 'function' })` and the server function's `.middleware([...])` chain; consult the installed Start documentation

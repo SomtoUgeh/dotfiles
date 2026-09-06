@@ -1,6 +1,6 @@
 # R2 Data Catalog Patterns
 
-Code templates with PyIceberg (lightweight, no JVM) and PySpark (full Iceberg ecosystem). For per-engine config (DuckDB, Trino, Snowflake, StarRocks) and partitioning/maintenance best practices, pull `https://developers.cloudflare.com/r2/data-catalog/config-examples/` and `.../table-maintenance/`.
+Code templates with PyIceberg (lightweight, no JVM) and PySpark (full Iceberg ecosystem). For per-engine config (DuckDB, Trino, Snowflake, StarRocks) and partitioning/maintenance best practices, pull `https://developers.cloudflare.com/r2-data-catalog/config-examples/` and `.../table-maintenance/`.
 
 | Need | Tool |
 |------|------|
@@ -42,13 +42,15 @@ schema = Schema(
     NestedField(3, "message", StringType(), required=False),
 )
 spec = PartitionSpec(PartitionField(source_id=1, field_id=1000, transform=DayTransform(), name="day"))
+catalog.create_namespace_if_not_exists("logs")
 table = catalog.create_table(("logs", "app_logs"), schema=schema, partition_spec=spec)
-errors = table.scan(row_filter="level = 'ERROR'").to_pandas()   # partition pruning
+errors = table.scan(row_filter="level = 'ERROR' AND timestamp >= '2026-09-01T00:00:00'").to_pandas()
+# The timestamp predicate enables pruning on the day partition.
 ```
 
 ## PySpark Session
 
-Verified template — requires Iceberg **1.6.1** and vended credentials. S3 keys are only needed for orphan-file removal. (If this drifts, cross-check `config-examples/spark-python/`.)
+Version-specific Spark 3.5/Scala 2.12 example using Iceberg 1.6.1. Match artifacts to your installed engine; 1.6.1 is not a service requirement. Cross-check current `config-examples/spark-python/`. This session uses vended credentials; configure a separate maintenance session with S3A credentials if orphan cleanup needs them.
 
 ```python
 from pyspark.sql import SparkSession
@@ -69,10 +71,6 @@ spark = SparkSession.builder \
     .config("spark.sql.catalog.r2dc.header.X-Iceberg-Access-Delegation", "vended-credentials") \
     .config("spark.sql.catalog.r2dc.s3.remote-signing-enabled", "false") \
     .config("spark.sql.defaultCatalog", "r2dc") \
-    .config("spark.hadoop.fs.s3a.access.key", S3_ACCESS_KEY) \
-    .config("spark.hadoop.fs.s3a.secret.key", S3_SECRET_KEY) \
-    .config("spark.hadoop.fs.s3a.endpoint", S3_ENDPOINT) \
-    .config("spark.hadoop.fs.s3a.path.style.access", "true") \
     .getOrCreate()
 spark.sql("USE r2dc")
 ```
@@ -82,13 +80,15 @@ spark.sql("USE r2dc")
 ## PySpark: Batch ETL
 
 ```python
+spark.sql("CREATE NAMESPACE IF NOT EXISTS my_ns")
 spark.sql("""
 CREATE TABLE IF NOT EXISTS my_ns.events (
     __ingest_ts TIMESTAMP, event_id STRING, category STRING, amount DOUBLE
 ) PARTITIONED BY (days(__ingest_ts))
 """)
 
-spark.read.option("header","true").csv("data.csv").writeTo("my_ns.events").append()
+# Parse CSV values using the destination schema instead of appending all strings.
+spark.read.schema(spark.table("my_ns.events").schema).option("header", "true").csv("data.csv").writeTo("my_ns.events").append()
 spark.read.parquet("data.parquet").writeTo("my_ns.events").append()
 spark.sql("INSERT INTO my_ns.target SELECT col1, col2 FROM my_ns.source WHERE col1 > 0")
 spark.sql("DELETE FROM my_ns.events WHERE amount < 0")
@@ -103,15 +103,17 @@ from pyiceberg.exceptions import CommitFailedException
 import time
 
 def append_with_retry(table, data, max_retries=3):
+    if max_retries < 1: raise ValueError("max_retries must be positive")
     for attempt in range(max_retries):
         try:
             table.append(data); return
         except CommitFailedException:
             if attempt == max_retries - 1: raise
             time.sleep(2 ** attempt)
+            table.refresh()
 ```
 
-Optimistic locking: concurrent commits to the same table may conflict; different-partition writes are safe.
+Optimistic locking: concurrent commits to the same table may conflict; different-partition writes still update shared table metadata and may conflict. Retry only known failed commits; an uncertain network result needs reconciliation to avoid duplicate appends.
 
 ## Connecting Any Iceberg Engine
 

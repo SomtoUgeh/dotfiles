@@ -41,7 +41,7 @@ export default {
 };
 ```
 
-**⚠️ Workers connection limit: 6 per Worker invocation** - use connection pooling wisely.
+**⚠️ Workers connection limit: 6 simultaneously opening outbound connections per invocation** - use connection pooling wisely.
 
 ## PostgreSQL (postgres.js)
 
@@ -49,7 +49,7 @@ export default {
 import postgres from "postgres";  // postgres@^3.4.8
 
 const sql = postgres(env.HYPERDRIVE.connectionString, {
-  max: 5,             // Limit per Worker (Workers max: 6)
+  max: 5,             // Bound driver concurrency; account for other outbound operations
   prepare: true,      // Enabled by default, required for caching
   fetch_types: false, // Reduce latency if not using arrays
 });
@@ -112,32 +112,43 @@ const posts = await sqlCached`SELECT * FROM posts ORDER BY views DESC LIMIT 10`;
 
 // Writes/time-sensitive: no cache
 const sqlNoCache = postgres(env.HYPERDRIVE_NO_CACHE.connectionString);
-const orders = await sqlNoCache`SELECT * FROM orders WHERE created_at > NOW() - INTERVAL 5 MINUTE`;
+const orders = await sqlNoCache`SELECT * FROM orders WHERE created_at > NOW() - INTERVAL '5 minutes'`;
 ```
 
 ## ORMs
 
 **Drizzle:**
 ```typescript
+import { eq } from "drizzle-orm";
+import { users } from "./schema";
 import { drizzle } from "drizzle-orm/postgres-js";  // drizzle-orm@^0.45.1
 import postgres from "postgres";
 
 const client = postgres(env.HYPERDRIVE.connectionString, {max: 5, prepare: true});
 const db = drizzle(client);
-const users = await db.select().from(users).where(eq(users.active, true)).limit(10);
+const rows = await db.select().from(users).where(eq(users.active, true)).limit(10);
 ```
 
 **Kysely:**
 ```typescript
-import { Kysely, PostgresDialect } from "kysely";  // kysely@^0.27+
-import postgres from "postgres";
-
-const db = new Kysely({
-  dialect: new PostgresDialect({
-    postgres: postgres(env.HYPERDRIVE.connectionString, {max: 5, prepare: true}),
-  }),
+import { Kysely, PostgresDialect } from "kysely";
+import { Pool } from "pg";
+interface Database { users: { id: number; active: boolean } }
+const db = new Kysely<Database>({
+  dialect: new PostgresDialect({ pool: new Pool({ connectionString: env.HYPERDRIVE.connectionString, max: 5 }) }),
 });
-const users = await db.selectFrom("users").selectAll().where("active", "=", true).execute();
+try {
+  const rows = await db.selectFrom("users").selectAll().where("active", "=", true).execute();
+  console.log(rows);
+} finally {
+  await db.destroy();
+}
 ```
 
 See [patterns.md](./patterns.md) for use cases, [gotchas.md](./gotchas.md) for limits.
+
+## Connection lifetime and freshness
+
+Create clients inside the request. Wrap query work in `try/finally` and close `pg` with `await client.end()`, postgres.js with `await sql.end()`, mysql2 with `await conn.end()`, or Kysely with `await db.destroy()`. Apply this to the abbreviated query fragments above, including error paths. Roll back failed explicit transactions before closing. Never reuse a connection created in another request.
+
+Writes do not invalidate cached SELECT results. Route both writes and freshness-sensitive reads through a cache-disabled Hyperdrive configuration; use the cached binding only where staleness is acceptable. Local driver tests do not verify hosted Hyperdrive caching or pooling.

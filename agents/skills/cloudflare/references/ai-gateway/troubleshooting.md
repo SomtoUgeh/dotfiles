@@ -8,31 +8,11 @@
 | 403 | Invalid provider key / BYOK expired | Check provider key in dashboard |
 | 429 | Rate limit exceeded | Increase limit or implement backoff |
 
-### 401 Fix
+### Authentication and retries
 
-```typescript
-const client = new OpenAI({
-  baseURL: `https://gateway.ai.cloudflare.com/v1/${accountId}/${gatewayId}/openai`,
-  defaultHeaders: { 'cf-aig-authorization': `Bearer ${CF_API_TOKEN}` }
-});
-```
+Match the token and model naming scheme to the endpoint; see [configuration.md](configuration.md). Set the SDK `apiKey` explicitly from the correct server secret.
 
-### 429 Retry Pattern
-
-```typescript
-async function requestWithRetry(fn, maxRetries = 3) {
-  for (let i = 0; i < maxRetries; i++) {
-    try { return await fn(); }
-    catch (e) {
-      if (e.status === 429 && i < maxRetries - 1) {
-        await new Promise(r => setTimeout(r, Math.pow(2, i) * 1000));
-        continue;
-      }
-      throw e;
-    }
-  }
-}
-```
+Prefer the SDK's bounded `maxRetries` or the gateway retry policy. Do not stack multiple retry loops unknowingly; generation retries can repeat billed work. Set an overall request deadline and inspect the final error.
 
 ## Gotchas
 
@@ -43,14 +23,14 @@ async function requestWithRetry(fn, maxRetries = 3) {
 | BYOK + Unified Billing | Mutually exclusive |
 | Rate limit scope | Per-gateway, not per-user (use dynamic routing for per-user) |
 | Log delay | 30-60 seconds normal |
-| Streaming + caching | **Incompatible** |
+| Streaming + caching | Verify for the endpoint and provider; no blanket incompatibility guarantee |
 | Model name (unified API) | Prefix required: `openai/gpt-4o`, not `gpt-4o` |
 
 ## Cache Not Working
 
 **Causes:**
 - Different request params (temperature, etc.)
-- Streaming enabled
+- Response mode or endpoint behavior differs from the tested configuration
 - Caching disabled in settings
 
 **Check:** `response.headers.get('cf-aig-cache-status')` → HIT or MISS
@@ -60,13 +40,13 @@ async function requestWithRetry(fn, maxRetries = 3) {
 1. Check logging enabled: Dashboard → Gateway → Settings
 2. Remove `cf-aig-collect-log: false` header
 3. Wait 30-60 seconds
-4. Check log limit (10M default)
+4. Check the current account log quota and retention
 
 ## Debugging
 
 ```bash
 # Test connectivity
-curl -v https://gateway.ai.cloudflare.com/v1/{account}/{gateway}/openai/models \
+curl --fail-with-body https://gateway.ai.cloudflare.com/v1/{account}/{gateway}/openai/models \
   -H "Authorization: Bearer $OPENAI_KEY" \
   -H "cf-aig-authorization: Bearer $CF_TOKEN"
 ```
@@ -86,3 +66,5 @@ Dashboard → AI Gateway → Select gateway
 **Log filters:** `status: error`, `provider: openai`, `cost > 0.01`, `duration > 1000`
 
 **Export:** Logpush to S3/GCS/Datadog/Splunk
+
+[Current REST and authentication examples](https://developers.cloudflare.com/ai-gateway/usage/rest-api/). HTTP 401/403 can originate from either the gateway or provider; inspect the response without logging credentials.

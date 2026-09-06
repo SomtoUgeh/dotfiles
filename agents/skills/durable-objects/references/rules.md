@@ -38,7 +38,7 @@ async createMatch(name: string): Promise<string> {
 Influence DO creation location for latency-sensitive apps:
 
 ```typescript
-const id = env.GAME.idFromName(gameId, { locationHint: "wnam" });
+const stub = env.GAME.getByName(gameId, { locationHint: "wnam" });
 ```
 
 Available hints: `wnam`, `enam`, `sam`, `weur`, `eeur`, `apac`, `oc`, `afr`, `me`.
@@ -49,7 +49,7 @@ Available hints: `wnam`, `enam`, `sam`, `weur`, `eeur`, `apac`, `oc`, `afr`, `me
 
 Configure in wrangler:
 ```jsonc
-{ "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MyDO"] }] }
+{ "exports": { "MyDO": { "type": "durable-object", "storage": "sqlite" } } }
 ```
 
 SQL API is synchronous:
@@ -138,13 +138,17 @@ async increment(): Promise<number> {
 
 ### Write Coalescing
 
-Multiple writes without `await` between them are batched atomically:
+Multiple writes without `await` between them are coalesced into a commit. That
+does not roll back earlier SQL statements when a later statement throws. Use
+`transactionSync()` for related SQL changes that must also roll back together:
 
 ```typescript
-// ✅ Good: All three writes commit atomically
-this.ctx.storage.sql.exec("UPDATE accounts SET balance = balance - ? WHERE id = ?", amount, fromId);
-this.ctx.storage.sql.exec("UPDATE accounts SET balance = balance + ? WHERE id = ?", amount, toId);
-this.ctx.storage.sql.exec("INSERT INTO transfers (from_id, to_id, amount) VALUES (?, ?, ?)", fromId, toId, amount);
+// ✅ Good: All three writes commit together or roll back on an exception
+this.ctx.storage.transactionSync(() => {
+  this.ctx.storage.sql.exec("UPDATE accounts SET balance = balance - ? WHERE id = ?", amount, fromId);
+  this.ctx.storage.sql.exec("UPDATE accounts SET balance = balance + ? WHERE id = ?", amount, toId);
+  this.ctx.storage.sql.exec("INSERT INTO transfers (from_id, to_id, amount) VALUES (?, ?, ?)", fromId, toId, amount);
+});
 
 // ❌ Bad: await breaks coalescing
 await this.ctx.storage.put("key1", val1);
@@ -166,7 +170,7 @@ async processItem(id: string) {
 }
 ```
 
-**Solution**: Use optimistic locking (version numbers) or `transaction()`.
+**Solution**: Claim work in a storage transaction before external I/O, then persist completion. Use an idempotency key at the external service and handle interrupted claims. A storage transaction cannot roll back an external side effect; do not retry network effects blindly.
 
 ### blockConcurrencyWhile()
 
@@ -212,7 +216,7 @@ const msg = await stub.sendMessage("user-123", "Hello!"); // Typed!
 
 ### Explicit init() Method
 
-DOs don't know their own ID. Pass identity explicitly:
+A DO can read its opaque ID from `this.ctx.id`. Pass and persist application identity explicitly when the original routing name or other metadata is needed:
 
 ```typescript
 async init(entityId: string, metadata: Metadata): Promise<void> {
@@ -259,23 +263,35 @@ await this.ctx.storage.deleteAlarm();
 
 ```typescript
 async fetch(request: Request): Promise<Response> {
+  if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
+    return new Response("Expected WebSocket", { status: 426 });
+  }
   const pair = new WebSocketPair();
   this.ctx.acceptWebSocket(pair[1]);
   return new Response(null, { status: 101, webSocket: pair[0] });
 }
 
 async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
-  const data = JSON.parse(message as string);
+  if (typeof message !== "string") {
+    ws.close(1003, "Text messages required");
+    return;
+  }
+  let data: unknown;
+  try { data = JSON.parse(message); } catch {
+    ws.close(1007, "Invalid JSON");
+    return;
+  }
   // Handle message
   ws.send(JSON.stringify({ type: "ack" }));
 }
 
 async webSocketClose(ws: WebSocket, code: number, reason: string) {
-  // Cleanup
+  // Complete the closing handshake, including on older compatibility dates.
+  ws.close(code, reason);
 }
 
 // Broadcast
-getWebSockets().forEach(ws => ws.send(JSON.stringify(payload)));
+this.ctx.getWebSockets().forEach(ws => ws.send(JSON.stringify(payload)));
 ```
 
 ## Error Handling

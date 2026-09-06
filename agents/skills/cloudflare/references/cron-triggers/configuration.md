@@ -8,7 +8,7 @@
   "name": "my-cron-worker",
   "main": "src/index.ts",
   "compatibility_date": "2025-01-01", // Use current date for new projects
-  
+
   "triggers": {
     "crons": [
       "*/5 * * * *",     // Every 5 minutes
@@ -20,43 +20,9 @@
 }
 ```
 
-## Green Compute (Beta)
+## Green Compute
 
-Schedule crons during low-carbon periods for carbon-aware execution:
-
-```jsonc
-{
-  "name": "eco-cron-worker",
-  "triggers": {
-    "crons": ["0 2 * * *"]
-  },
-  "placement": {
-    "mode": "smart"  // Runs during low-carbon periods
-  }
-}
-```
-
-**Modes:**
-- `"smart"` - Carbon-aware scheduling (may delay up to 24h for optimal window)
-- Default (no placement config) - Standard scheduling (no delay)
-
-**How it works:**
-- Cloudflare delays execution until grid carbon intensity is lower
-- Maximum delay: 24 hours from scheduled time
-- Ideal for batch jobs with flexible timing requirements
-
-**Use cases:** 
-- Nightly data processing and ETL pipelines
-- Weekly/monthly report generation
-- Database backups and maintenance
-- Analytics aggregation
-- ML model training
-
-**Not suitable for:** 
-- Time-sensitive operations (SLA requirements)
-- User-facing features requiring immediate execution
-- Real-time monitoring and alerting
-- Compliance tasks with strict time windows
+Green Compute is an account-level Workers compute setting that selects eligible data centers powered by renewable energy. It is not `placement.mode = "smart"`, and does not add a documented 24-hour delay window. Configure it through the account dashboard.
 
 ## Environment-Specific Schedules
 
@@ -89,7 +55,7 @@ Schedule crons during low-carbon periods for carbon-aware execution:
 
 ## Managing Triggers
 
-**Remove all:** `"triggers": { "crons": [] }`  
+**Remove all:** `"triggers": { "crons": [] }`
 **Preserve existing:** Omit `"triggers"` field entirely
 
 ## Deployment
@@ -120,7 +86,7 @@ curl "https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts
 curl -X PUT "https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/{script_name}/schedules" \
   -H "Authorization: Bearer {api_token}" \
   -H "Content-Type: application/json" \
-  -d '{"crons": ["*/5 * * * *", "0 2 * * *"]}'
+  -d '[{"cron": "*/5 * * * *"}, {"cron": "0 2 * * *"}]'
 ```
 
 **Delete all:**
@@ -128,7 +94,7 @@ curl -X PUT "https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/
 curl -X PUT "https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/{script_name}/schedules" \
   -H "Authorization: Bearer {api_token}" \
   -H "Content-Type: application/json" \
-  -d '{"crons": []}'
+  -d '[]'
 ```
 
 ## Combining Multiple Workers
@@ -146,7 +112,7 @@ For complex schedules, use multiple workers:
 {
   "name": "reports-daily",
   "triggers": { "crons": ["0 2 * * *"] },
-  "placement": { "mode": "smart" }
+  "placement": { "mode": "smart" } // Performance placement, not Green Compute
 }
 
 // worker-weekly.jsonc
@@ -159,7 +125,7 @@ For complex schedules, use multiple workers:
 **Benefits:**
 - Separate CPU limits per worker
 - Independent error isolation
-- Different Green Compute policies
+- Separate schedules and application responsibilities
 - Easier to maintain and debug
 
 ## Validation
@@ -178,3 +144,5 @@ For complex schedules, use multiple workers:
 - [README.md](./README.md) - Overview, quick start
 - [api.md](./api.md) - Handler implementation
 - [patterns.md](./patterns.md) - Multi-cron routing examples
+
+Current source: [Cron Triggers](https://developers.cloudflare.com/workers/configuration/cron-triggers/). Local handler tests do not verify hosted scheduling, retries, or global propagation.

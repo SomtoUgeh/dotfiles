@@ -11,7 +11,8 @@ Expert guidance for deploying and configuring static assets with Cloudflare Work
   "main": "src/index.ts",
   "compatibility_date": "2025-01-01",
   "assets": {
-    "directory": "./dist"
+    "directory": "./dist",
+    "binding": "ASSETS"
   }
 }
 ```
@@ -34,15 +35,10 @@ Deploy: `wrangler deploy`
 | **Use case** | Hybrid apps (static + dynamic API) | Static sites, SSG |
 | **Worker control** | Full control over routing | Limited (Functions) |
 | **Configuration** | Code-first, flexible | Git-based, opinionated |
-| **Dynamic routing** | Worker-first patterns | Functions (_functions/) |
+| **Dynamic routing** | Worker-first patterns | Functions (functions/) |
 | **Best for** | Full-stack apps, SPAs with APIs | Jamstack, static docs |
 
-**Decision tree:**
-
-- Need custom routing logic? → Workers Static Assets
-- Pure static site or SSG? → Pages
-- API routes + SPA? → Workers Static Assets
-- Framework (Next, Nuxt, Remix)? → Pages
+For new projects, check the [current framework guide](https://developers.cloudflare.com/workers/framework-guides/) and adapter support. Workers Static Assets supports pure static sites as well as full-stack apps. Do not send every framework or static site to Pages; preserve the existing platform unless migration is part of the task.
 
 ## Reading Order
 

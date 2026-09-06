@@ -1,28 +1,45 @@
 # Testing Durable Objects
 
-Use `@cloudflare/vitest-pool-workers` to test DOs inside the Workers runtime.
+Use `@cloudflare/vitest-plugin` to test DOs inside the Workers runtime.
 
 ## Setup
 
 ### Install Dependencies
 
 ```bash
-npm i -D vitest@~3.2.0 @cloudflare/vitest-pool-workers
+npm i -D vitest@^4.1.0 @cloudflare/vitest-plugin
 ```
+
+Check the installed plugin peer dependencies before choosing Vitest. The tested
+`@cloudflare/vitest-plugin` 1.1.4 supports Vitest `^4.1.0`, not Vitest 5.
+Use an ESM project (`"type": "module"` in package.json) or name the config
+`vitest.config.mts`; loading this ESM-only plugin through CommonJS fails.
 
 ### vitest.config.ts
 
 ```typescript
-import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
+import { cloudflareTest } from "@cloudflare/vitest-plugin";
+import { defineConfig } from "vitest/config";
 
-export default defineWorkersConfig({
-  test: {
-    poolOptions: {
-      workers: {
-        wrangler: { configPath: "./wrangler.toml" },
-      },
-    },
-  },
+export default defineConfig({
+  plugins: [cloudflareTest({ wrangler: { configPath: "./wrangler.jsonc" } })],
+  test: { setupFiles: ["./test/setup.ts"] },
+});
+```
+
+### Storage Reset (test/setup.ts)
+
+The tested plugin does not reset storage between tests automatically. Register
+the reset hook for tests that require fresh stored data. It does not remove known
+object IDs from namespace listings. Do not run tests concurrently when they share
+this reset hook.
+
+```typescript
+import { reset } from "cloudflare:test";
+import { afterEach } from "vitest";
+
+afterEach(async () => {
+  await reset();
 });
 ```
 
@@ -33,19 +50,27 @@ export default defineWorkersConfig({
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "moduleResolution": "bundler",
-    "types": ["@cloudflare/vitest-pool-workers"]
+    "types": ["@cloudflare/vitest-plugin/types"]
   },
-  "include": ["./**/*.ts", "../src/worker-configuration.d.ts"]
+  "include": ["./**/*.ts", "../worker-configuration.d.ts"]
 }
 ```
 
-### Environment Types (env.d.ts)
+### Environment Types
 
-```typescript
-declare module "cloudflare:test" {
-  interface ProvidedEnv extends Env {}
-}
+Generate types after configuring the bindings and exporting their concrete DO
+classes. Wrangler generates `Cloudflare.Env` and typed namespaces used by the
+tests; augmenting `ProvidedEnv` in `cloudflare:test` no longer supplies these types.
+
+```bash
+npx wrangler types
 ```
+
+The examples assume an exported SQLite-backed `Counter` with
+`increment(name = "default")`, `getCount(name = "default")`, a
+`counters(name, value)` table, and the alarm handler below. The Worker routes
+POST/GET to that counter using the `id` query parameter. Export these classes
+from the configured Worker entry point before running the tests.
 
 ## Unit Tests (Direct DO Access)
 
@@ -149,7 +174,6 @@ describe("DO listing", () => {
     await env.COUNTER.get(id2).increment();
     
     const ids = await listDurableObjectIds(env.COUNTER);
-    expect(ids.length).toBe(2);
     expect(ids.some(id => id.equals(id1))).toBe(true);
     expect(ids.some(id => id.equals(id2))).toBe(true);
   });
@@ -199,9 +223,15 @@ async alarm(): Promise<void> {
 
 ## Test Isolation
 
-Each test gets isolated storage automatically. DOs from one test don't affect others:
+With the `test/setup.ts` reset hook configured above, each test starts with fresh
+storage. Without that hook, the second test below observes the first test's count.
+Known object IDs may still appear in `listDurableObjectIds()` after a reset; test
+stored data rather than asserting that the namespace listing is empty.
 
 ```typescript
+import { env } from "cloudflare:test";
+import { describe, it, expect } from "vitest";
+
 describe("Isolation", () => {
   it("first test creates DO", async () => {
     const stub = env.COUNTER.getByName("isolated");
@@ -210,11 +240,8 @@ describe("Isolation", () => {
   });
 
   it("second test has fresh state", async () => {
-    const ids = await listDurableObjectIds(env.COUNTER);
-    expect(ids.length).toBe(0); // Previous test's DO is gone
-    
     const stub = env.COUNTER.getByName("isolated");
-    expect(await stub.getCount()).toBe(0); // Fresh instance
+    expect(await stub.getCount()).toBe(0); // Stored count was reset
   });
 });
 ```
@@ -222,6 +249,9 @@ describe("Isolation", () => {
 ## SQLite Storage Testing
 
 ```typescript
+import { env, runInDurableObject } from "cloudflare:test";
+import { describe, it, expect } from "vitest";
+
 describe("SQLite", () => {
   it("can verify SQL storage", async () => {
     const stub = env.COUNTER.getByName("sqlite-test");

@@ -17,10 +17,8 @@ Multiple patterns for adding human approval to agent actions.
 
 ```typescript
 // In AgentWorkflow:
-const approved = await step.waitForEvent<{ approved: boolean }>("approval", {
-  timeout: "7d"
-});
-if (!approved.approved) throw new Error("Rejected");
+await this.waitForApproval(step, { timeout: "7 days" });
+// Rejection and timeout throw; handle the workflow failure explicitly.
 
 // From agent:
 await this.approveWorkflow(workflowId);
@@ -33,7 +31,7 @@ await this.rejectWorkflow(workflowId);
 const tools = {
   deleteItem: tool({
     description: "Delete an item",
-    parameters: z.object({ id: z.string() }),
+    inputSchema: z.object({ id: z.string() }),
     execute: async ({ id }) => { /* delete */ },
     needsApproval: true  // or a function: (toolCall) => boolean
   })
@@ -43,25 +41,25 @@ const tools = {
 Client handles approval:
 
 ```tsx
-const { addToolApprovalResponse, addToolOutput } = useAgentChat({
-  agent,
-  onToolCall: async ({ toolCall }) => {
-    if (confirm(`Allow ${toolCall.toolName}?`)) {
-      return { approve: true };
-    }
-    return { approve: false };
-  }
-});
+const { addToolApprovalResponse, addToolOutput } = useAgentChat({ agent });
+// Render approval-requested message parts and call this from the user's choice:
+addToolApprovalResponse({ id: approvalId, approved: true });
+// Use approved: false to deny. approvalId is the tool part's approval.id.
 ```
 
-To deny with a custom message:
+For a client-executed tool, report an execution error using the object API:
 
 ```tsx
-addToolOutput(toolCallId, "output-error", "User rejected this action");
+addToolOutput({
+  toolName,
+  toolCallId,
+  state: "output-error",
+  errorText: "User rejected this action"
+});
 ```
 
 ## Important
 
-- `waitForApproval` may return `undefined` on timeout — handle it
+- `waitForApproval` throws on rejection or timeout — handle those failures
 - `addToolOutput` with `output-error` does NOT auto-continue the LLM — you may need `sendMessage` after
-- For OpenAI Agents SDK, use `needsApproval` on the tool definition (same pattern)
+- OpenAI Agents SDK is a separate SDK; use its own approval documentation.

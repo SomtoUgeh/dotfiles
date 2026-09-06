@@ -1,33 +1,8 @@
 # Binding Gotchas and Troubleshooting
 
-## Critical: Global Scope Mutation
+## Binding lifetime
 
-### ❌ THE #1 GOTCHA: Caching env in Global Scope
-
-```typescript
-// ❌ DANGEROUS - env cached at deploy time
-const apiKey = env.API_KEY;  // ERROR: env not available in global scope
-
-export default {
-  async fetch(request: Request, env: Env) {
-    // Uses undefined or stale value!
-  }
-}
-```
-
-**Why it breaks:**
-- `env` not available in global scope
-- If using workarounds, secrets may not update without redeployment
-- Leads to "Cannot read property 'X' of undefined" errors
-
-**✅ Always access env per-request:**
-```typescript
-export default {
-  async fetch(request: Request, env: Env) {
-    const apiKey = env.API_KEY;  // Fresh every request
-  }
-}
-```
+Handler-injected `env` is convenient for explicit dependencies. Modern Workers also support `import { env } from "cloudflare:workers"`; global access is not inherently an error. Avoid I/O during module initialization, and do not assume a globally cached client will be rebuilt after binding-only changes. Test secret rotation against the actual deployment mechanism.
 
 ## Common Errors
 
@@ -49,11 +24,11 @@ export default {
 ### "Secret updated but Worker still uses old value"
 
 **Cause:** Cached in global scope or not redeployed  
-**Solution:** Avoid global caching, redeploy after secret change
+**Solution:** Check the target environment and active deployment, then inspect derived-client caching. `wrangler secret put` updates the deployed secret; do not assume a second deploy is always required.
 
 ### "KV get() returns null for existing key"
 
-**Cause:** Eventual consistency (60s), wrong namespace, wrong environment  
+**Cause:** Eventual consistency (potentially 60 seconds or more), wrong namespace, wrong environment
 **Solution:**
 ```bash
 # Check key exists
@@ -95,7 +70,7 @@ cd ../target-worker && npx wrangler deploy
 ### Missing @cloudflare/workers-types
 
 **Error:** `Cannot find name 'Request'`  
-**Solution:** `npm install -D @cloudflare/workers-types`, add to tsconfig.json `"types"`
+**Solution:** Generate and include `worker-configuration.d.ts` using the project-local `wrangler types`; avoid duplicate runtime declarations.
 
 ### Binding Type Mismatches
 
@@ -105,7 +80,7 @@ const value: string = await env.MY_KV.get('key');
 
 // ✅ Handle null
 const value = await env.MY_KV.get('key');
-if (!value) return new Response('Not found', { status: 404 });
+if (value === null) return new Response('Not found', { status: 404 });
 ```
 
 ## Environment Gotchas
@@ -124,8 +99,8 @@ if (!value) return new Response('Not found', { status: 404 });
 - dev: Uses `preview_id` or local bindings, secrets not available
 - deploy: Uses production `id`, secrets available
 
-**Access secrets in dev:** `npx wrangler dev --remote`  
-**Persist local data:** `npx wrangler dev --persist`
+**Local secrets:** Put development values in gitignored `.dev.vars`; select remote execution only when the task requires real resources.
+**Persist local data:** `npx wrangler dev --persist-to .wrangler/state`
 
 ## Performance Gotchas
 
@@ -153,25 +128,7 @@ const [user, config] = await Promise.all([
 
 ## Limits Reference
 
-| Resource | Limit | Impact | Plan |
-|----------|-------|--------|------|
-| **Bindings per Worker** | 64 total | All binding types combined | All |
-| **Environment variables** | 64 max, 5KB each | Per Worker | All |
-| **Secret size** | 1KB | Per secret | All |
-| **KV key size** | 512 bytes | UTF-8 encoded | All |
-| **KV value size** | 25 MB | Per value | All |
-| **KV writes per key** | 1/second | Per key; exceeding = 429 error | All |
-| **KV list() results** | 1000 keys | Per call; use cursor for more | All |
-| **KV operations** | 1000 reads/day | Free tier only | Free |
-| **R2 object size** | 5 TB | Per object | All |
-| **R2 operations** | 1M Class A/month free | Writes | All |
-| **D1 database size** | 10 GB | Per database | All |
-| **D1 rows per query** | 100,000 | Result set limit | All |
-| **D1 databases** | 10 | Free tier | Free |
-| **Queue batch size** | 100 messages | Per consumer batch | All |
-| **Queue message size** | 128 KB | Per message | All |
-| **Service binding calls** | Unlimited | Counts toward CPU time | All |
-| **Durable Objects** | 1M requests/month free | First 1M | Free |
+Use the current [Workers limits](https://developers.cloudflare.com/workers/platform/limits/) and each storage product's limit/pricing page. Do not infer one universal binding cap, service-call allowance, D1 row cap, or free request allocation from this catalog. Free allocations and hard limits are different.
 
 ## Debugging Tips
 
@@ -191,11 +148,11 @@ npx wrangler d1 execute my-db --command="SELECT * FROM sqlite_master"
 # Test locally
 npx wrangler dev                  # Local mode
 npx wrangler dev --remote         # Production bindings
-npx wrangler dev --persist        # Persist data across restarts
+npx wrangler dev --persist-to .wrangler/state        # Persist data across restarts
 
 # Verify types
 npx wrangler types
-cat .wrangler/types/runtime.d.ts | grep "interface Env"
+rg "interface Env" worker-configuration.d.ts
 
 # Debug specific binding issues
 npx wrangler tail                 # Stream logs in real-time

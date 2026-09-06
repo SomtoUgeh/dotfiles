@@ -10,11 +10,11 @@ Use when working with Cloudflare Containers: deploying containerized apps on Wor
 
 ## Core Concepts
 
-**Container as Durable Object:** Each container is a Durable Object with persistent identity. Accessed via `getByName(id)` or `getRandom()`.
+**Container as Durable Object:** Each container is a Durable Object with persistent identity. Accessed via `getByName(id)` or the imported `await getRandom(binding, count)` helper.
 
 **Image deployment:** Images pre-fetched globally. Deployments use rolling strategy (not instant like Workers).
 
-**Lifecycle:** cold start (2-3s) → running → `sleepAfter` timeout → stopped. No autoscaling - manual load balancing via `getRandom()`.
+**Lifecycle:** cold start (measure for the image) → running → `sleepAfter` timeout → stopped. No autoscaling - manual load balancing via `getRandom()`.
 
 **Persistent identity, ephemeral disk:** Container ID persists, but disk resets on stop. Use Durable Object storage for persistence.
 
@@ -52,7 +52,7 @@ export default {
 **How should requests reach containers?**
 
 - **Same user/session → same container:** Use `getByName(sessionId)` for session affinity
-- **Stateless, spread load:** Use `getRandom()` for load balancing
+- **Stateless, spread load:** Use the imported `await getRandom(binding, count)` helper for fixed-pool routing
 - **Job per container:** Use `getByName(jobId)` + explicit lifecycle management
 - **Single global instance:** Use `getByName("singleton")`
 
@@ -66,7 +66,7 @@ export default {
 
 **Use Workers when:**
 - Stateless HTTP handlers
-- Sub-millisecond cold starts required
+- Lightweight request processing without a container process
 - Auto-scaling to zero critical
 - Simple request/response patterns
 

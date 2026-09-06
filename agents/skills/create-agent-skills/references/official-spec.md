@@ -1,185 +1,27 @@
-# Anthropic Official Skill Specification
+# Shared Skill Format and Runtime Extensions
 
-Source: [code.claude.com/docs/en/skills](https://code.claude.com/docs/en/skills)
+The [Agent Skills specification](https://agentskills.io/specification) defines the portable format. A skill directory contains `SKILL.md`, with YAML frontmatter and a Markdown body. The specification does not require XML or any particular headings.
 
-## SKILL.md File Structure
+## Portable metadata
 
-Every Skill requires a `SKILL.md` file with YAML frontmatter followed by Markdown instructions.
+- `name`: 1–64 lowercase letters, digits, and hyphens. No leading, trailing, or consecutive hyphens. Match the directory name.
+- `description`: nonempty string, at most 1024 characters; describe the operation and its trigger.
+- Optional standard fields include `license`, `compatibility`, and string-valued `metadata`.
+- `allowed-tools` is an experimental standard field with runtime-dependent support. It is not a portable permission boundary. This shared library leaves tool-specific metadata in native configuration or wrappers.
+- Keep `model`, invocation controls, hooks, and dynamic command substitution out of shared skills. Check the target runtime's current schema when building a native wrapper.
 
-### Basic Format
+## Discovery
 
-```markdown
----
-name: your-skill-name
-description: Brief description of what this Skill does and when to use it
----
+Discovery paths and precedence belong to each runtime, not the file format. This repository exposes its canonical shared library through configured links, including `~/.agents/skills`. Do not infer a runtime's native path from that link.
 
-# Your Skill Name
+Claude Code uses `.claude/skills` and `~/.claude/skills`; it can load relevant skills automatically or through explicit invocation. Loading a skill does not universally require confirmation. Plugin skills have their own namespace. Other harnesses have different discovery rules.
 
-## Instructions
-Provide clear, step-by-step guidance for Claude.
+Consult [RUNTIME_TOOLS.md](../../RUNTIME_TOOLS.md) and the active catalog. Verify the resolved skill path in each supported harness before claiming installation works.
 
-## Examples
-Show concrete examples of using this Skill.
-```
+Sources: [Claude Code](https://code.claude.com/docs/en/skills), [OpenCode](https://opencode.ai/docs/skills/), [Grok](https://docs.x.ai/build/features/skills-plugins-marketplaces).
 
-## Required Frontmatter Fields
+## Body and resources
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `name` | Yes | Skill name using lowercase letters, numbers, and hyphens only (max 64 characters). Should match the directory name. |
-| `description` | Yes | What the Skill does and when to use it (max 1024 characters). Claude uses this to decide when to apply the Skill. |
-| `allowed-tools` | No | Tools Claude can use without asking permission when this Skill is active. Example: `Read, Grep, Glob` |
-| `model` | No | Specific model to use when this Skill is active (e.g., `claude-sonnet-4-20250514`). Defaults to the conversation's model. |
+Use Markdown headings in this shared library. Keep the entrypoint under 500 lines; link directly to relevant workflows, references, scripts, and templates. Examples containing nested fences need a longer outer fence. Quote YAML strings containing placeholders or punctuation that YAML could interpret as collections.
 
-## Skill Locations & Priority
-
-```
-Enterprise (highest priority) → Personal → Project → Plugin (lowest priority)
-```
-
-| Type | Path | Applies to |
-|------|------|-----------|
-| **Enterprise** | See managed settings | All users in organization |
-| **Personal** | `~/.agents/skills/` | You, across all projects |
-| **Project** | `.agents/skills/` | Anyone working in repository |
-| **Plugin** | Bundled with plugins | Anyone with plugin installed |
-
-## How Skills Work
-
-1. **Discovery**: Claude loads only name and description at startup
-2. **Activation**: When your request matches a Skill's description, Claude asks for confirmation
-3. **Execution**: Claude follows the Skill's instructions and loads referenced files
-
-**Key Principle**: Skills are **model-invoked** — Claude automatically decides which Skills to use based on your request.
-
-## Progressive Disclosure Pattern
-
-Keep `SKILL.md` under 500 lines by linking to supporting files:
-
-```
-my-skill/
-├── SKILL.md (required - overview and navigation)
-├── reference.md (detailed API docs - loaded when needed)
-├── examples.md (usage examples - loaded when needed)
-└── scripts/
-    └── helper.py (utility script - executed, not loaded)
-```
-
-### Example SKILL.md with References
-
-```markdown
----
-name: pdf-processing
-description: Extract text, fill forms, merge PDFs. Use when working with PDF files, forms, or document extraction. Requires pypdf and pdfplumber packages.
-allowed-tools: Read, Bash(python:*)
----
-
-# PDF Processing
-
-## Quick start
-
-Extract text:
-```python
-import pdfplumber
-with pdfplumber.open("doc.pdf") as pdf:
-    text = pdf.pages[0].extract_text()
-```
-
-For form filling, see [FORMS.md](FORMS.md).
-For detailed API reference, see [REFERENCE.md](REFERENCE.md).
-
-## Requirements
-
-Packages must be installed:
-```bash
-pip install pypdf pdfplumber
-```
-```
-
-## Restricting Tool Access
-
-```yaml
----
-name: reading-files-safely
-description: Read files without making changes. Use when you need read-only file access.
-allowed-tools: Read, Grep, Glob
----
-```
-
-Benefits:
-- Read-only Skills that shouldn't modify files
-- Limited scope for specific tasks
-- Security-sensitive workflows
-
-## Writing Effective Descriptions
-
-The `description` field enables Skill discovery and should include both what the Skill does and when to use it.
-
-**Always write in third person.** The description is injected into the system prompt.
-
-- **Good:** "Processes Excel files and generates reports"
-- **Avoid:** "I can help you process Excel files"
-- **Avoid:** "You can use this to process Excel files"
-
-**Be specific and include key terms:**
-
-```yaml
-description: Extract text and tables from PDF files, fill forms, merge documents. Use when working with PDF files or when the user mentions PDFs, forms, or document extraction.
-```
-
-**Avoid vague descriptions:**
-
-```yaml
-description: Helps with documents  # Too vague!
-```
-
-## Complete Example: Commit Message Generator
-
-```markdown
----
-name: generating-commit-messages
-description: Generates clear commit messages from git diffs. Use when writing commit messages or reviewing staged changes.
----
-
-# Generating Commit Messages
-
-## Instructions
-
-1. Run `git diff --staged` to see changes
-2. I'll suggest a commit message with:
-   - Summary under 50 characters
-   - Detailed description
-   - Affected components
-
-## Best practices
-
-- Use present tense
-- Explain what and why, not how
-```
-
-## Complete Example: Code Explanation Skill
-
-```markdown
----
-name: explaining-code
-description: Explains code with visual diagrams and analogies. Use when explaining how code works, teaching about a codebase, or when the user asks "how does this work?"
----
-
-# Explaining Code
-
-When explaining code, always include:
-
-1. **Start with an analogy**: Compare the code to something from everyday life
-2. **Draw a diagram**: Use ASCII art to show the flow, structure, or relationships
-3. **Walk through the code**: Explain step-by-step what happens
-4. **Highlight a gotcha**: What's a common misconception?
-
-Keep explanations conversational. For complex concepts, use multiple analogies.
-```
-
-## Distribution
-
-- **Project Skills**: Commit `.agents/skills/` to version control
-- **Plugins**: Add `skills/` directory to plugin with Skill folders
-- **Enterprise**: Deploy organization-wide through managed settings
+The local validator checks entrypoint structure and its inline local links. It does not prove every reference, command, API, or workflow correct. Review and exercise those separately.

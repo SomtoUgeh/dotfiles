@@ -16,7 +16,7 @@ system from scratch, multi-quarter migrations. Boil lakes. Flag oceans.
 **Anti-patterns:**
 - "Choose B; it covers 90% with less code." If A is 70 lines more, choose A.
 - "Let's defer tests to a follow-up PR." Tests are the cheapest lake to boil.
-- "This would take 2 weeks." Say: "2 weeks human / about 1 hour AI-assisted."
+- Unsupported fixed speedup claims. Estimate from the task and state uncertainty.
 
 ---
 
@@ -58,7 +58,8 @@ context you might be missing, and ask. Never act.
 **Anti-patterns:**
 - "The outside voice is right, so I'll incorporate it." Present it. Ask.
 - "Both models agree, so this must be correct." Agreement is signal, not proof.
-- "I'll make the change and tell the user afterward." Ask first. Always.
+- Adopting a change in direction without asking. Verified repairs within the
+  user's existing scope and authorization can proceed without another approval.
 
 ---
 

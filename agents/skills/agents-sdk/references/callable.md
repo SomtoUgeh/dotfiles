@@ -46,7 +46,7 @@ export class MyAgent extends Agent<Env, State> {
     for await (const item of fetchResults(query)) {
       stream.send(JSON.stringify(item));
     }
-    stream.close();
+    stream.end();
   }
 
   @callable({ streaming: true })
@@ -54,10 +54,10 @@ export class MyAgent extends Agent<Env, State> {
     try {
       // ... work
     } catch (error) {
-      stream.error(error.message);  // Signal error to client
+      stream.error(error instanceof Error ? error.message : String(error));  // Signal error to client
       return;
     }
-    stream.close();
+    stream.end();
   }
 }
 ```
@@ -77,9 +77,10 @@ await agent.call("streamResults", ["search term"], {
 ## Introspection
 
 ```typescript
-// Get list of callable methods on an agent
-const methods = await agent.call("getCallableMethods", []);
-// Returns: ["greet", "processData", "streamResults", ...]
+// Inside the agent: returns a Map of method names to callable metadata.
+const methods = this.getCallableMethods();
+const names = [...methods.keys()];
+// Expose your own @callable method if clients need this information.
 ```
 
 ## When to Use

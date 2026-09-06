@@ -1,23 +1,29 @@
 # DO Storage Testing
 
-Testing Durable Objects with storage using `vitest-pool-workers`.
+Testing Durable Objects with storage using `vitest-plugin`.
 
 ## Setup
 
 **vitest.config.ts:**
 ```typescript
-import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
+import { cloudflareTest } from "@cloudflare/vitest-plugin";
+import { defineConfig } from "vitest/config";
 
-export default defineWorkersConfig({
-  test: {
-    poolOptions: {
-      workers: { wrangler: { configPath: "./wrangler.toml" } }
-    }
-  }
+export default defineConfig({
+  plugins: [cloudflareTest({ wrangler: { configPath: "./wrangler.jsonc" } })],
+  test: { setupFiles: ["./test/setup.ts"] }
 });
 ```
 
-**package.json:** Add `@cloudflare/vitest-pool-workers` and `vitest` to devDependencies
+**package.json:** The tested plugin 1.1.4 requires Vitest `^4.1.0`. Check peer dependencies on upgrade. Use ESM (`"type": "module"`) or `vitest.config.mts`. For complete setup and generated Env types see [shared DO testing](../../../durable-objects/references/testing.md).
+
+Create `test/setup.ts` with the shared guide's `afterEach(reset)` hook; storage is
+not reset automatically. These examples need concrete exported classes and
+bindings for `COUNTER`, `USER_MANAGER`, `BATCH_PROCESSOR`, `MY_DO`, and `BANK`.
+`USER_MANAGER` must provide the shown methods and `_meta` schema; the batch
+processor must schedule an alarm and move queued rows into `processed_items`.
+Each snippet below is a test-file fragment; retain the imports from Basic
+Testing, plus any imports shown in the later snippet.
 
 ## Basic Testing
 
@@ -28,7 +34,7 @@ import { describe, it, expect } from "vitest";
 describe("Counter DO", () => {
   it("increments counter", async () => {
     const id = env.COUNTER.idFromName("test");
-    const result = await runInDurableObject(env.COUNTER, id, async (instance, state) => {
+    const result = await runInDurableObject(env.COUNTER.get(id), async (instance, state) => {
       const val1 = await instance.increment();
       const val2 = await instance.increment();
       return { val1, val2 };
@@ -44,7 +50,7 @@ describe("Counter DO", () => {
 ```typescript
 it("creates and queries users", async () => {
   const id = env.USER_MANAGER.idFromName("test");
-  await runInDurableObject(env.USER_MANAGER, id, async (instance, state) => {
+  await runInDurableObject(env.USER_MANAGER.get(id), async (instance, state) => {
     await instance.createUser("alice@example.com", "Alice");
     const user = await instance.getUser("alice@example.com");
     expect(user).toEqual({ email: "alice@example.com", name: "Alice" });
@@ -53,7 +59,7 @@ it("creates and queries users", async () => {
 
 it("handles schema migrations", async () => {
   const id = env.USER_MANAGER.idFromName("migration-test");
-  await runInDurableObject(env.USER_MANAGER, id, async (instance, state) => {
+  await runInDurableObject(env.USER_MANAGER.get(id), async (instance, state) => {
     const version = state.storage.sql.exec(
       "SELECT value FROM _meta WHERE key = 'schema_version'"
     ).one()?.value;
@@ -71,16 +77,16 @@ it("processes batch on alarm", async () => {
   const id = env.BATCH_PROCESSOR.idFromName("test");
   
   // Add items
-  await runInDurableObject(env.BATCH_PROCESSOR, id, async (instance) => {
+  await runInDurableObject(env.BATCH_PROCESSOR.get(id), async (instance) => {
     await instance.addItem("item1");
     await instance.addItem("item2");
   });
   
   // Trigger alarm
-  await runDurableObjectAlarm(env.BATCH_PROCESSOR, id);
+  await runDurableObjectAlarm(env.BATCH_PROCESSOR.get(id));
   
   // Verify processed
-  await runInDurableObject(env.BATCH_PROCESSOR, id, async (instance, state) => {
+  await runInDurableObject(env.BATCH_PROCESSOR.get(id), async (instance, state) => {
     const count = state.storage.sql.exec(
       "SELECT COUNT(*) as count FROM processed_items"
     ).one().count;
@@ -97,9 +103,9 @@ it("handles concurrent increments safely", async () => {
   
   // Parallel increments
   const results = await Promise.all([
-    runInDurableObject(env.COUNTER, id, (i) => i.increment()),
-    runInDurableObject(env.COUNTER, id, (i) => i.increment()),
-    runInDurableObject(env.COUNTER, id, (i) => i.increment())
+    runInDurableObject(env.COUNTER.get(id), (i) => i.increment()),
+    runInDurableObject(env.COUNTER.get(id), (i) => i.increment()),
+    runInDurableObject(env.COUNTER.get(id), (i) => i.increment())
   ]);
   
   // All should get unique values
@@ -111,54 +117,44 @@ it("handles concurrent increments safely", async () => {
 ## Test Isolation
 
 ```typescript
+import { beforeEach } from "vitest";
+
 // Per-test unique IDs
 let testId: string;
 beforeEach(() => { testId = crypto.randomUUID(); });
 
 it("isolated test", async () => {
   const id = env.MY_DO.idFromName(testId);
-  // Uses unique DO instance
+  await runInDurableObject(env.MY_DO.get(id), async (instance, state) => {
+    expect(await state.storage.get("marker")).toBeUndefined();
+    await state.storage.put("marker", testId);
+    expect(await state.storage.get("marker")).toBe(testId);
+  });
 });
 
 // Cleanup pattern
 it("with cleanup", async () => {
   const id = env.MY_DO.idFromName("cleanup-test");
   try {
-    await runInDurableObject(env.MY_DO, id, async (instance) => {});
+    await runInDurableObject(env.MY_DO.get(id), async (instance, state) => {
+      expect(await state.storage.get("marker")).toBeUndefined();
+      await state.storage.put("marker", "temporary");
+      expect(await state.storage.get("marker")).toBe("temporary");
+    });
   } finally {
-    await runInDurableObject(env.MY_DO, id, async (instance, state) => {
+    await runInDurableObject(env.MY_DO.get(id), async (instance, state) => {
       await state.storage.deleteAll();
     });
   }
+  await runInDurableObject(env.MY_DO.get(id), async (instance, state) => {
+    expect(await state.storage.get("marker")).toBeUndefined();
+  });
 });
 ```
 
 ## Testing PITR
 
-```typescript
-it("restores from bookmark", async () => {
-  const id = env.MY_DO.idFromName("pitr-test");
-  
-  // Create checkpoint
-  const bookmark = await runInDurableObject(env.MY_DO, id, async (instance, state) => {
-    await state.storage.put("value", 1);
-    return await state.storage.getCurrentBookmark();
-  });
-  
-  // Modify and restore
-  await runInDurableObject(env.MY_DO, id, async (instance, state) => {
-    await state.storage.put("value", 2);
-    await state.storage.onNextSessionRestoreBookmark(bookmark);
-    state.abort();
-  });
-  
-  // Verify restored
-  await runInDurableObject(env.MY_DO, id, async (instance, state) => {
-    const value = await state.storage.get("value");
-    expect(value).toBe(1);
-  });
-});
-```
+Point-in-time recovery needs a separate authorized integration test against a disposable deployed SQLite DO. Local Miniflare does not establish production bookmark/restore behavior. Do not mark recovery verified from an in-process storage rollback test. See the [PITR API](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/#point-in-time-recovery-api).
 
 ## Testing Transactions
 
@@ -166,7 +162,7 @@ it("restores from bookmark", async () => {
 it("rolls back on error", async () => {
   const id = env.BANK.idFromName("transaction-test");
   
-  await runInDurableObject(env.BANK, id, async (instance, state) => {
+  await runInDurableObject(env.BANK.get(id), async (instance, state) => {
     await state.storage.put("balance", 100);
     
     await expect(

@@ -31,7 +31,7 @@ Cloudflare Realtime SFU: WebRTC infrastructure on global network (310+ cities). 
 - **Tracks:** Audio/video/data channels you publish or subscribe to
 - **No rooms:** Build presence layer yourself via track sharing (see patterns.md)
 
-**Mental model:** Your client establishes one WebRTC session, publishes tracks (audio/video), shares track IDs via your backend, others subscribe to your tracks using track IDs + your session ID.
+**Mental model:** Your client establishes one WebRTC session, publishes tracks (audio/video), shares track IDs via your backend, others subscribe to your tracks using track names + your session ID.
 
 ## Choose Your Approach
 
@@ -46,9 +46,9 @@ Cloudflare Realtime SFU: WebRTC infrastructure on global network (310+ cities). 
 ## SFU vs RealtimeKit
 
 - **Realtime SFU:** WebRTC infrastructure (this reference). Build your own signaling, presence, UI.
-- **RealtimeKit:** SDK layer on top of SFU. Includes React hooks, state management, UI components. Part of Cloudflare AI platform.
+- **RealtimeKit:** SDK layer on top of SFU. Includes React hooks, state management, UI components. See the dedicated RealtimeKit reference.
 
-Use SFU directly when you need custom signaling or non-React framework. Use RealtimeKit for faster development with React.
+Use SFU directly when you need custom signaling or non-React framework. RealtimeKit supports multiple web and mobile platforms.
 
 ## Setup
 
@@ -62,4 +62,4 @@ Get `CALLS_APP_ID` and `CALLS_APP_SECRET` from dashboard, then see configuration
 - [Orange Source](https://github.com/cloudflare/orange)
 - [Calls Examples](https://github.com/cloudflare/calls-examples)
 - [API Reference](https://developers.cloudflare.com/api/resources/calls/)
-- [RealtimeKit Docs](https://developers.cloudflare.com/workers-ai/realtimekit/)
+- [RealtimeKit Docs](https://developers.cloudflare.com/realtime/realtimekit/)

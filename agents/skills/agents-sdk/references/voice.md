@@ -12,26 +12,28 @@ npm install @cloudflare/voice
 
 ```typescript
 import { Agent } from "agents";
-import { withVoice, WorkersAITTS, WorkersAINova3STT } from "@cloudflare/voice";
+import { withVoice, WorkersAITTS, WorkersAINova3STT, type VoiceTurnContext } from "@cloudflare/voice";
+import { streamText } from "ai";
+import { createWorkersAI } from "workers-ai-provider";
+
+interface Env { AI: Ai }
 
 export class VoiceAgent extends withVoice(Agent)<Env> {
-  transcriber = new WorkersAINova3STT(this);
-  tts = new WorkersAITTS(this);
+  transcriber = new WorkersAINova3STT(this.env.AI);
+  tts = new WorkersAITTS(this.env.AI);
 
   async onTurn(transcript: string, context: VoiceTurnContext) {
     const result = streamText({
       model: createWorkersAI({ binding: this.env.AI })("@cf/meta/llama-4-scout-17b-16e-instruct"),
+      abortSignal: context.signal,
+      system: "You are a voice assistant.",
       messages: [
-        { role: "system", content: "You are a voice assistant." },
-        ...context.conversationHistory,
+        ...context.messages,
         { role: "user", content: transcript }
       ]
     });
 
-    for await (const chunk of result.textStream) {
-      if (context.signal.aborted) break;
-      context.speak(chunk);
-    }
+    return result.textStream;
   }
 }
 ```
@@ -52,13 +54,13 @@ export class VoiceAgent extends withVoice(Agent)<Env> {
 import { useVoiceAgent } from "@cloudflare/voice/react";
 
 function VoiceUI() {
-  const { isConnected, isSpeaking, connect, disconnect } = useVoiceAgent({
+  const { status, startCall, endCall } = useVoiceAgent({
     agent: "VoiceAgent",
     name: "session-1"
   });
 
-  return <button onClick={isConnected ? disconnect : connect}>
-    {isConnected ? "End Call" : "Start Call"}
+  return <button onClick={status === "idle" ? startCall : endCall}>
+    {status === "idle" ? "Start Call" : "End Call"}
   </button>;
 }
 ```

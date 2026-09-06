@@ -1,97 +1,32 @@
-# Workers AI Configuration
-
-## wrangler.jsonc
+# Workers AI configuration
 
 ```jsonc
 {
-  "name": "my-ai-worker",
+  "name": "ai-example",
   "main": "src/index.ts",
-  "compatibility_date": "2024-01-01",
-  "ai": {
-    "binding": "AI"
-  }
+  "compatibility_date": "2026-09-05",
+  "ai": { "binding": "AI", "remote": true },
+  "vectorize": [
+    { "binding": "VECTORIZE", "index_name": "documents", "remote": true }
+  ]
 }
 ```
 
-## TypeScript
+Omit Vectorize when retrieval is not required. Its configuration is an array, not `{ bindings: [...] }`. Redeclare bindings for named environments. Generate types with `wrangler types`, then use `env.AI`; the old `@cloudflare/ai` wrapper is unnecessary.
 
 ```bash
-npm install --save-dev @cloudflare/workers-types
+wrangler types
+wrangler dev
 ```
 
-```typescript
-interface Env {
-  AI: Ai;
-}
+AI inference remains remote and billable during local Worker development. Use mocks for offline tests. `remote: false` does not supply a local inference engine.
 
-export default {
-  async fetch(request: Request, env: Env) {
-    const response = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
-      messages: [{ role: 'user', content: 'Hello' }]
-    });
-    return Response.json(response);
-  }
-};
-```
+## External clients
 
-## Local Development
+Use the server-side account endpoint `https://api.cloudflare.com/client/v4/accounts/{accountId}/ai/v1` for OpenAI-compatible chat-completion/embedding clients. Configure the SDK provider once with this base URL and the Cloudflare API token, then select an actual Cloudflare model ID. Do not send `gpt-3.5-turbo` or assume the Responses API is supported merely because the client defaults to it.
 
-```bash
-wrangler dev --remote  # Required for AI - no local inference
-```
+For Vercel AI SDK, use the current [Cloudflare integration](https://developers.cloudflare.com/workers-ai/configuration/ai-sdk/) and installed provider version. If using `@ai-sdk/openai`, configure `createOpenAI({ baseURL, apiKey })` and explicitly select its chat-completions model API where needed; `openai(model, { baseURL })` is not the provider configuration API. The native-binding provider is another supported integration and avoids distributing a REST token.
 
-## REST API
+Keep API credentials on the server with least-privilege permissions listed by the chosen operation. Never place them in public environment variables or browser bundles.
 
-```typescript
-const response = await fetch(
-  `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/ai/run/@cf/meta/llama-3.1-8b-instruct`,
-  {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${API_TOKEN}` },
-    body: JSON.stringify({ messages: [{ role: 'user', content: 'Hello' }] })
-  }
-);
-```
-
-Create API token at: dash.cloudflare.com/profile/api-tokens (Workers AI - Read permission)
-
-## SDK Compatibility
-
-**OpenAI SDK:**
-```typescript
-import OpenAI from 'openai';
-const client = new OpenAI({
-  apiKey: env.CLOUDFLARE_API_TOKEN,
-  baseURL: `https://api.cloudflare.com/client/v4/accounts/${env.ACCOUNT_ID}/ai/v1`
-});
-```
-
-## Multi-Model Setup
-
-```typescript
-const MODELS = {
-  chat: '@cf/meta/llama-3.1-8b-instruct',
-  embed: '@cf/baai/bge-base-en-v1.5',
-  image: '@cf/stabilityai/stable-diffusion-xl-base-1.0'
-};
-```
-
-## RAG Setup (with Vectorize)
-
-```jsonc
-{
-  "ai": { "binding": "AI" },
-  "vectorize": {
-    "bindings": [{ "binding": "VECTORIZE", "index_name": "embeddings-index" }]
-  }
-}
-```
-
-## Troubleshooting
-
-| Error | Fix |
-|-------|-----|
-| `env.AI is undefined` | Check `ai` binding in wrangler.jsonc |
-| Local AI doesn't work | Use `wrangler dev --remote` |
-| Type 'Ai' not found | Install `@cloudflare/workers-types` |
-| @cloudflare/ai package error | Don't install - use native binding |
+[Local development](https://developers.cloudflare.com/workers/local-development/) · [OpenAI compatibility](https://developers.cloudflare.com/workers-ai/configuration/open-ai-compatibility/)

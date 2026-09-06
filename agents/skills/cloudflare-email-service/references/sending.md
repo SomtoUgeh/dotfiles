@@ -162,8 +162,8 @@ Agents can receive and reply to emails natively via the Agents SDK.
   "durable_objects": {
     "bindings": [{ "name": "EmailAgent", "class_name": "EmailAgent" }]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["EmailAgent"] }],
-  "send_email": [{ "name": "EMAIL", "destination_address": "reply@yourdomain.com" }]
+  "exports": { "EmailAgent": { "type": "durable-object", "storage": "sqlite" } },
+  "send_email": [{ "name": "EMAIL" }]
 }
 ```
 
@@ -207,8 +207,9 @@ Resolver types: `createAddressBasedEmailResolver` (recipient → instance name),
 try {
   const response = await env.EMAIL.send({ /* ... */ });
 } catch (error) {
-  // error.code is one of the E_* error codes
-  console.error(`Failed: ${error.code} - ${error.message}`);
+  const code = error instanceof Error && "code" in error ? String(error.code) : "UNKNOWN";
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`Failed: ${code} - ${message}`);
 }
 ```
 
@@ -236,7 +237,7 @@ These error codes are for the **Workers binding** (thrown as Error objects with 
 | `E_HEADERS_TOO_LARGE` | Total headers exceed 16 KB | Reduce number or size of custom headers |
 | `E_HEADERS_TOO_MANY` | More than 20 non-X headers | Reduce to 20 or fewer whitelisted headers |
 
-For `E_RATE_LIMIT_EXCEEDED` and `E_DELIVERY_FAILED`, retry with exponential backoff. For validation errors (`E_VALIDATION_ERROR`, `E_FIELD_MISSING`, `E_SENDER_NOT_VERIFIED`), fix the request — retrying won't help.
+Retry rate limits with bounded backoff. Retry `E_DELIVERY_FAILED` only when confirmed transient; an uncertain send result may already have delivered, so reconcile delivery before resending. For validation errors (`E_VALIDATION_ERROR`, `E_FIELD_MISSING`, `E_SENDER_NOT_VERIFIED`), fix the request — retrying won't help.
 
 ## Restricted Bindings
 

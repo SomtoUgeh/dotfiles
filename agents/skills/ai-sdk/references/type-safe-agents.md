@@ -41,11 +41,12 @@ export const weatherTool = tool({
 ```ts
 // lib/agents/my-agent.ts
 import { ToolLoopAgent, InferAgentUIMessage } from 'ai';
+import { model } from '../model';
 import { weatherTool } from '../tools/weather-tool';
 import { calculatorTool } from '../tools/calculator-tool';
 
 export const myAgent = new ToolLoopAgent({
-  model: 'anthropic/claude-sonnet-4',
+  model,
   instructions: 'You are a helpful assistant.',
   tools: {
     weather: weatherTool,

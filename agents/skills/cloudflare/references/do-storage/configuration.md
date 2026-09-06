@@ -5,18 +5,19 @@
 **wrangler.jsonc:**
 ```jsonc
 {
-  "migrations": [
-    {
-      "tag": "v1",
-      "new_sqlite_classes": ["Counter", "Session", "RateLimiter"]
-    }
-  ]
+  "exports": {
+    "Counter": { "type": "durable-object", "storage": "sqlite" },
+    "Session": { "type": "durable-object", "storage": "sqlite" },
+    "RateLimiter": { "type": "durable-object", "storage": "sqlite" }
+  }
 }
 ```
 
-**Migration lifecycle:** Migrations run once per deployment. Existing DO instances get new storage backend on next invocation. Renaming/removing classes requires `renamed_classes` or `deleted_classes` entries.
+For a new deployment, `exports` declares the Durable Object lifecycle without migration tags.
 
 ## KV-backed (Legacy)
+
+Existing migration-based deployments remain supported. Keep using migrations for their lifecycle changes; `migrations` and Durable Object `exports` are mutually exclusive in one Wrangler configuration.
 
 **wrangler.jsonc:**
 ```jsonc
@@ -33,7 +34,9 @@
 ## TypeScript Setup
 
 ```typescript
-export class MyDurableObject extends DurableObject {
+import { DurableObject } from "cloudflare:workers";
+
+export class MyDurableObject extends DurableObject<Env> {
   sql: SqlStorage;
   
   constructor(ctx: DurableObjectState, env: Env) {
@@ -49,11 +52,15 @@ export class MyDurableObject extends DurableObject {
       );
     `);
   }
+
+  listUsers() {
+    return this.sql.exec<{ id: number; name: string; email: string | null }>("SELECT id, name, email FROM users").toArray();
+  }
 }
 
 // Binding
 interface Env {
-  MY_DO: DurableObjectNamespace;
+  MY_DO: DurableObjectNamespace<MyDurableObject>;
 }
 
 export default {
@@ -62,7 +69,7 @@ export default {
     const stub = env.MY_DO.get(id);
     
     // Modern RPC: call methods directly (recommended)
-    const result = await stub.someMethod();
+    const result = await stub.listUsers();
     return Response.json(result);
     
     // Legacy: forward request (still works)
@@ -97,15 +104,17 @@ const stub = env.MY_DO.get(id, { locationHint: "enam" });
 ## Initialization
 
 ```typescript
-export class Counter extends DurableObject {
-  value: number;
+import { DurableObject } from "cloudflare:workers";
+
+export class Counter extends DurableObject<Env> {
+  value = 0;
   
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     
     // Block concurrent requests during init
     ctx.blockConcurrencyWhile(async () => {
-      this.value = (await ctx.storage.get("value")) || 0;
+      this.value = (await ctx.storage.get<number>("value")) ?? 0;
     });
   }
 }

@@ -1,74 +1,80 @@
-# Zaraz Patterns
+# Zaraz patterns
 
-## SPA Tracking
+## Identity lifecycle
 
-**History Change Trigger (Recommended):** Configure in dashboard - no code needed, Zaraz auto-detects route changes.
-
-**Manual tracking (React/Vue/Next.js):**
-```javascript
-// On route change
-zaraz.track('pageview', { page_path: pathname, page_title: document.title });
-```
-
-## User Identification
+Only send identity attributes allowed by the product's data policy and tool.
+Use the key/value API with an intentional scope:
 
 ```javascript
-// Login
-zaraz.set({ userId: user.id, email: user.email, plan: user.plan });
-zaraz.track('login', { method: 'oauth' });
+// In the application's login callback; user is already verified by the app.
+zaraz.set('userId', user.id, { scope: 'session' });
+zaraz.set('plan', user.plan, { scope: 'session' });
+await zaraz.track('login', { method: 'oauth' });
 
-// Logout - set to null (cannot clear)
-zaraz.set('userId', null);
+// In logout/account-switch cleanup; clear every identity-related key.
+zaraz.set('userId', undefined);
+zaraz.set('plan', undefined);
 ```
 
-## E-commerce Funnel
+Default `persist` scope survives page reloads and sessions. Setting a key to
+`null` sends null; setting it to `undefined` removes it from all scopes.
 
-| Event | Method |
-|-------|--------|
-| View | `zaraz.ecommerce('Product Viewed', { product_id, name, price })` |
-| Add to cart | `zaraz.ecommerce('Product Added', { product_id, quantity })` |
-| Checkout | `zaraz.ecommerce('Checkout Started', { cart_id, products: [...] })` |
-| Purchase | `zaraz.ecommerce('Order Completed', { order_id, total, products })` |
+## Commerce and experiments
 
-## A/B Testing
+Emit purchases from a confirmed order outcome with a stable order ID and provider-
+appropriate deduplication. Do not emit a second purchase on every receipt-page
+render. Enable Zaraz's commerce setting and the selected tool's commerce support.
 
 ```javascript
-zaraz.set('experiment_checkout', variant);
-zaraz.track('experiment_viewed', { experiment_id: 'checkout', variant });
-// On conversion
-zaraz.track('experiment_conversion', { experiment_id, variant, value });
+zaraz.set('experiment_checkout', variant, { scope: 'page' });
+await zaraz.track('experiment_viewed', { experiment_id: 'checkout', variant });
 ```
 
-## Worker Integration
+`variant` comes from the existing experiment assignment, not a new random value
+on each render. Track conversions using the same assignment.
 
-**Context Enricher** - Modify context before tools execute:
+## Context Enricher
+
+Enrich the supplied `{ system, client }` context. The Worker's own `request.cf`
+metadata does not establish the original visitor's location; read the supplied
+system context when needed. Do not put secrets into fields forwarded to tools.
+
 ```typescript
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+type Env = { PUBLIC_APPLICATION_TAG: string };
+
 export default {
-  async fetch(request, env) {
-    const body = await request.json();
-    body.system.userRegion = request.cf?.region;
-    return Response.json(body);
+  async fetch(request: Request, env: Env): Promise<Response> {
+    let body: unknown;
+    try { body = await request.json(); } catch {
+      return new Response('Invalid JSON', { status: 400 });
+    }
+    if (!isRecord(body) || !isRecord(body.system) || !isRecord(body.client)) {
+      return new Response('Invalid context', { status: 400 });
+    }
+    return Response.json({
+      system: body.system,
+      client: { ...body.client, application: env.PUBLIC_APPLICATION_TAG },
+    });
   }
 };
 ```
-Configure: Zaraz > Settings > Context Enrichers
 
-**Worker Variables** - Compute dynamic values server-side, use as `{{worker.variable_name}}`.
+Configure this Worker as the Context Enricher in Zaraz settings. Validate a
+representative context locally, then test the selected zone and actual tool.
+For computed dashboard values, use the documented
+[Worker Variables](https://developers.cloudflare.com/zaraz/variables/worker-variables/)
+contract rather than inventing a `{{worker.variable_name}}` context path.
 
-## GTM Migration
+## GTM migration
 
-| GTM | Zaraz |
-|-----|-------|
-| `dataLayer.push({event: 'purchase'})` | `zaraz.ecommerce('Order Completed', {...})` |
-| `{{Page URL}}` | `{{system.page.url}}` |
-| `{{Page Title}}` | `{{system.page.title}}` |
-| Page View trigger | Pageview trigger |
-| Click trigger | Click (selector: `*`) |
+Map each actual source event, property, trigger, consent purpose, and destination
+tool. Configure equivalent actions and verify event counts before removing the
+old tag. Zaraz also provides a dataLayer compatibility setting; decide whether
+to use it for the requested migration. Avoid double emission while both systems
+run. SPA tracking choices are covered in [configuration.md](./configuration.md).
 
-## Best Practices
-
-1. Use dashboard triggers over inline code
-2. Enable History Change for SPAs (no manual code)
-3. Debug with `zaraz.debug = true`
-4. Implement consent early (GDPR/CCPA)
-5. Use Context Enrichers for sensitive/server data
+Source: [Context Enricher](https://developers.cloudflare.com/zaraz/advanced/context-enricher/).

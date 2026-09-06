@@ -1,196 +1,77 @@
-# API Operations
+# Workers for Platforms API
 
-## Deploy User Worker
+## Upload a user Worker
 
-```bash
-curl -X PUT \
-  "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/dispatch/namespaces/$NAMESPACE/scripts/$SCRIPT_NAME" \
-  -H "Authorization: Bearer $API_TOKEN" \
-  -F 'metadata={"main_module": "worker.mjs"};type=application/json' \
-  -F 'worker.mjs=@worker.mjs;type=application/javascript+module'
-```
+Use account-scoped authorization and correct multipart part names. The metadata part is JSON and the module part name must match `main_module`.
 
-### TypeScript SDK
 ```typescript
-import Cloudflare from "cloudflare";
-
-const client = new Cloudflare({ apiToken: process.env.API_TOKEN });
-
-const scriptFile = new File([scriptContent], `${scriptName}.mjs`, {
-  type: "application/javascript+module",
-});
-
-await client.workersForPlatforms.dispatch.namespaces.scripts.update(
-  namespace, scriptName,
-  {
-    account_id: accountId,
-    metadata: { main_module: `${scriptName}.mjs` },
-    files: [scriptFile],
+export async function uploadUserWorker(
+  accountId: string, namespace: string, scriptName: string,
+  apiToken: string, source: string,
+): Promise<void> {
+  if (!accountId || !namespace || !scriptName || !apiToken) {
+    throw new Error("Deployment configuration missing");
   }
-);
-```
-
-## TypeScript Types
-
-```typescript
-import type { DispatchNamespace } from '@cloudflare/workers-types';
-
-interface DispatchNamespace {
-  get(name: string, options?: Record<string, unknown>, dispatchOptions?: DynamicDispatchOptions): Fetcher;
+  const body = new FormData();
+  body.set("metadata", new Blob([JSON.stringify({
+    main_module: "index.mjs", compatibility_date: "2026-09-05",
+  })], { type: "application/json" }));
+  body.set("index.mjs", new File([source], "index.mjs", {
+    type: "application/javascript+module",
+  }));
+  const response = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/workers/dispatch/namespaces/${encodeURIComponent(namespace)}/scripts/${encodeURIComponent(scriptName)}`,
+    { method: "PUT", headers: { Authorization: `Bearer ${apiToken}` }, body,
+      signal: AbortSignal.timeout(30000) },
+  );
+  const payload: unknown = await response.json();
+  if (!response.ok || !payload || typeof payload !== "object" ||
+      !("success" in payload) || payload.success !== true) {
+    throw new Error(`Worker upload failed (${response.status})`);
+  }
 }
+```
 
-interface DynamicDispatchOptions {
-  limits?: DynamicDispatchLimits;
-  outbound?: Record<string, unknown>;
+Authorize the target namespace/script and enforce source/upload limits in the platform before calling this helper. Let fetch generate the multipart Content-Type boundary. Add bindings/tags/assets to the JSON metadata from validated platform configuration. Do not put JavaScript comments inside a JSON part.
+
+The SDK's typed signature is `scripts.update(scriptName, { account_id, dispatch_namespace, metadata, files })`. In Cloudflare SDK 7.1.0, a transport fixture found incompatible multipart serialization/content-type for this operation. The REST example avoids that specific SDK path; a passing typecheck alone does not prove upload compatibility. Recheck transport when upgrading.
+
+For existing bindings, `keep_bindings` is an array of binding **types**, such as `["kv_namespace", "d1"]`, not a Boolean or a list of binding names. Supply actual provisioned resource IDs. Coordinate the full intended deployment metadata to avoid deleting or leaking bindings.
+
+## Dispatch
+
+Use generated `DispatchNamespace` types rather than redeclaring them. Resolve the complete normalized hostname through your verified routing registry and reject missing/disabled mappings before obtaining a Worker.
+
+```typescript
+const scriptName = await env.ROUTING_KV.get(new URL(request.url).hostname);
+if (!scriptName) return new Response("Unknown site", { status: 404 });
+try {
+  const worker = env.DISPATCHER.get(scriptName, {}, {
+    limits: { cpuMs: 50, subRequests: 20 },
+  });
+  return await worker.fetch(request);
+} catch (error) {
+  if (error instanceof Error && error.message.startsWith("Worker not found")) {
+    return new Response("Site unavailable", { status: 404 });
+  }
+  throw error;
 }
-
-interface DynamicDispatchLimits {
-  cpuMs?: number;        // Max CPU milliseconds
-  subRequests?: number;  // Max fetch() calls
-}
-
-// Usage
-const userWorker = env.DISPATCHER.get('customer-123', {}, {
-  limits: { cpuMs: 50, subRequests: 20 },
-  outbound: { customerId: '123', url: request.url }
-});
 ```
 
-## Deploy with Bindings
-```bash
-curl -X PUT ".../scripts/$SCRIPT_NAME" \
-  -F 'metadata={
-    "main_module": "worker.mjs",
-    "bindings": [
-      {"type": "kv_namespace", "name": "MY_KV", "namespace_id": "'$KV_ID'"}
-    ],
-    "tags": ["customer-123", "production"],
-    "compatibility_date": "2026-01-01"  // Use current date for new projects
-  };type=application/json' \
-  -F 'worker.mjs=@worker.mjs;type=application/javascript+module'
-```
+`await` inside the try is required to catch asynchronous invocation errors. KV is eventually consistent; use a suitable authoritative check for immediate revocation or private authorization. A hostname mapping is sufficient only for deliberately public sites, not private account access.
 
-## List/Delete Workers
+## Static assets
 
-```bash
-# List
-curl "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/dispatch/namespaces/$NAMESPACE/scripts" \
-  -H "Authorization: Bearer $API_TOKEN"
+Create the script's `assets-upload-session` with a manifest of file paths, byte sizes, and consistently generated 32-hex hashes. The returned `buckets` are groups of missing file hashes, not redundant upload URLs. Upload each group to the account's `/workers/assets/upload?base64=true` endpoint using the short-lived upload JWT and hash-named base64 form fields. Once all groups complete, use the returned completion JWT in deployment `assets.jwt`. An already-complete session may return a usable JWT without buckets.
 
-# Delete by name
-curl -X DELETE ".../scripts/$SCRIPT_NAME" -H "Authorization: Bearer $API_TOKEN"
+Assets are associated with the namespace and can be shared by equal hashes. Keep JWTs in trusted platform services. Where strict tenant separation is required, incorporate an unambiguous tenant identifier or salt into the hash input. Do not expose an upload token to end users or assume the user Worker boundary makes all assets private.
 
-# Delete by tag
-curl -X DELETE ".../scripts?tags=customer-123%3Ayes" -H "Authorization: Bearer $API_TOKEN"
-```
+## Outbound policy
 
-**Pagination:** SDK supports async iteration. Manual: add `?per_page=100&page=1` query params.
+The outbound Worker intercepts user Worker fetches but does not intercept Durable Object or mTLS binding fetches. Enabling it disables user Worker `connect()` access. Bindings can still create other capabilities and require their own policy.
 
-## Static Assets
+Enforce destinations against the actual subrequest URL: parse it, require an allowed scheme/port, and compare exact hostnames (or deliberate dot-boundary suffixes). A substring check is bypassable. Use manual redirects or revalidate each redirect before adding platform credentials; never forward injected authorization to an unchecked host.
 
-**3-step process:** Create session → Upload files → Deploy Worker
+Pass only validated platform context through configured outbound parameters. Confirm the installed/runtime parameter shape before accessing it; the outbound request URL and the original incoming URL are distinct.
 
-### 1. Create Upload Session
-```bash
-curl -X POST ".../scripts/$SCRIPT_NAME/assets-upload-session" \
-  -H "Authorization: Bearer $API_TOKEN" \
-  -d '{
-    "manifest": {
-      "/index.html": {"hash": "08f1dfda4574284ab3c21666d1ee8c7d4", "size": 1234}
-    }
-  }'
-# Returns: jwt, buckets
-```
-
-**Hash:** SHA-256 truncated to first 16 bytes (32 hex characters)
-
-### 2. Upload Files
-```bash
-curl -X POST ".../workers/assets/upload?base64=true" \
-  -H "Authorization: Bearer $UPLOAD_JWT" \
-  -F '08f1dfda4574284ab3c21666d1ee8c7d4=<BASE64_CONTENT>'
-# Returns: completion jwt
-```
-
-**Multiple buckets:** Upload to all returned bucket URLs (typically 2 for redundancy) using same JWT and hash.
-
-### 3. Deploy with Assets
-```bash
-curl -X PUT ".../scripts/$SCRIPT_NAME" \
-  -F 'metadata={
-    "main_module": "index.js",
-    "assets": {"jwt": "<COMPLETION_TOKEN>"},
-    "bindings": [{"type": "assets", "name": "ASSETS"}]
-  };type=application/json' \
-  -F 'index.js=export default {...};type=application/javascript+module'
-```
-
-**Asset Isolation:** Assets shared across namespace by default. For customer isolation, salt hash: `sha256(customerId + fileContents).slice(0, 32)`
-
-## Dispatch Workers
-
-### Subdomain Routing
-```typescript
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    const userWorkerName = new URL(request.url).hostname.split(".")[0];
-    const userWorker = env.DISPATCHER.get(userWorkerName);
-    return await userWorker.fetch(request);
-  },
-};
-```
-
-### Path Routing
-```typescript
-const pathParts = new URL(request.url).pathname.split("/").filter(Boolean);
-const userWorker = env.DISPATCHER.get(pathParts[0]);
-return await userWorker.fetch(request);
-```
-
-### KV Routing
-```typescript
-const hostname = new URL(request.url).hostname;
-const userWorkerName = await env.ROUTING_KV.get(hostname);
-const userWorker = env.DISPATCHER.get(userWorkerName);
-return await userWorker.fetch(request);
-```
-
-## Outbound Workers
-
-Control external fetch from user Workers:
-
-### Configure
-```typescript
-const userWorker = env.DISPATCHER.get(
-  workerName, {},
-  { outbound: { customer_context: { customer_name: workerName, url: request.url } } }
-);
-```
-
-### Implement
-```typescript
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    const customerName = env.customer_name;
-    const url = new URL(request.url);
-    
-    // Block domains
-    if (["malicious.com"].some(d => url.hostname.includes(d))) {
-      return new Response("Blocked", { status: 403 });
-    }
-    
-    // Inject auth
-    if (url.hostname === "api.example.com") {
-      const headers = new Headers(request.headers);
-      headers.set("Authorization", `Bearer ${generateJWT(customerName)}`);
-      return fetch(new Request(request, { headers }));
-    }
-    
-    return fetch(request);
-  },
-};
-```
-
-**Note:** Doesn't intercept DO/mTLS fetch.
-
-See [README.md](./README.md), [configuration.md](./configuration.md), [patterns.md](./patterns.md), [gotchas.md](./gotchas.md)
+[Upload metadata](https://developers.cloudflare.com/workers/configuration/multipart-upload-metadata/) · [Static assets](https://developers.cloudflare.com/cloudflare-for-platforms/workers-for-platforms/configuration/static-assets/) · [Outbound Workers](https://developers.cloudflare.com/cloudflare-for-platforms/workers-for-platforms/configuration/outbound-workers/)

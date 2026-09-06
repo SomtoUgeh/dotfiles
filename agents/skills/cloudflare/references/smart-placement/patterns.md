@@ -43,34 +43,13 @@ interface BackendEnv {
 
 export default {
   async fetch(request: Request, env: BackendEnv): Promise<Response> {
-    const data = await env.DATABASE.prepare('SELECT * FROM table').all();
+    const data = await env.DATABASE.prepare('SELECT * FROM users').all();
     return Response.json(data);
   }
 };
 ```
 
-**CRITICAL:** Use fetch-based Service Bindings (shown above). If using RPC with `WorkerEntrypoint`, Smart Placement will NOT optimize those method calls - only `fetch` handlers are affected.
-
-**RPC vs Fetch - CRITICAL:** Smart Placement ONLY works with fetch-based bindings, NOT RPC.
-
-```typescript
-// ❌ RPC - Smart Placement has NO EFFECT on backend RPC methods
-export class BackendRPC extends WorkerEntrypoint {
-  async getData() {
-    // ALWAYS runs at edge, Smart Placement ignored
-    return await this.env.DATABASE.prepare('SELECT * FROM table').all();
-  }
-}
-
-// ✅ Fetch - Smart Placement WORKS
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    // Runs close to DATABASE when Smart Placement enabled
-    const data = await env.DATABASE.prepare('SELECT * FROM table').all();
-    return Response.json(data);
-  }
-};
-```
+These examples use fetch-based service bindings. Official RPC placement guidance is internally inconsistent; verify hosted behavior before changing an existing RPC interface.
 
 ## External API Integration
 
@@ -79,14 +58,14 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const apiUrl = 'https://api.partner.com';
     const headers = { 'Authorization': `Bearer ${env.API_KEY}` };
-    
+
     const [profile, transactions] = await Promise.all([
       fetch(`${apiUrl}/profile`, { headers }),
       fetch(`${apiUrl}/transactions`, { headers })
     ]);
-    
-    return Response.json({ 
-      profile: await profile.json(), 
+
+    return Response.json({
+      profile: await profile.json(),
       transactions: await transactions.json()
     });
   }
@@ -99,12 +78,14 @@ export default {
 // Frontend (edge) - auth/routing close to user
 export default {
   async fetch(request: Request, env: Env) {
-    if (!request.headers.get('Authorization')) {
+    // validateSession is your application auth verifier, not a header-presence check.
+    const session = await validateSession(request);
+    if (!session) {
       return new Response('Unauthorized', { status: 401 });
     }
     const data = await env.BACKEND.fetch(request);
-    return new Response(renderPage(await data.json()), { 
-      headers: { 'Content-Type': 'text/html' } 
+    return new Response(renderPage(await data.json()), {
+      headers: { 'Content-Type': 'text/html' }
     });
   }
 };
@@ -120,7 +101,7 @@ export default {
 
 ## Durable Objects with Smart Placement
 
-**Key principle:** Smart Placement does NOT control WHERE Durable Objects run. DOs always run in their designated region (based on jurisdiction or smart location hints).
+**Key principle:** Smart Placement does NOT control WHERE Durable Objects run. DO placement is separate. Jurisdictions constrain placement; location hints are best-effort and do not pin an object to a designated region.
 
 **What Smart Placement DOES affect:** The location of the coordinator Worker's `fetch` handler that makes calls to multiple DOs.
 
@@ -131,18 +112,20 @@ export default {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const userId = new URL(request.url).searchParams.get('user');
-    
+    if (!userId) return new Response('Missing user', { status: 400 });
+    // Authorize the caller for this user before accessing the objects.
+
     // Get DO stubs
     const userDO = env.USER_DO.get(env.USER_DO.idFromName(userId));
     const analyticsID = env.ANALYTICS_DO.idFromName(`analytics-${userId}`);
     const analyticsDO = env.ANALYTICS_DO.get(analyticsID);
-    
+
     // Fetch from multiple DOs
     const [userData, analyticsData] = await Promise.all([
       userDO.fetch(new Request('https://do/profile')),
       analyticsDO.fetch(new Request('https://do/stats'))
     ]);
-    
+
     return Response.json({
       user: await userData.json(),
       analytics: await analyticsData.json()
@@ -164,7 +147,7 @@ export default {
 }
 ```
 
-**When this helps:** 
+**When this helps:**
 - Worker's `fetch` handler runs closer to DO regions, reducing network latency for multiple DO calls
 - Most beneficial when DOs are geographically concentrated or in specific jurisdictions
 - Helps when coordinator makes many sequential or parallel DO calls
@@ -176,8 +159,10 @@ export default {
 
 ## Best Practices
 
-- Split full-stack apps: frontend at edge, backend with Smart Placement
+- Split frontend/backend Workers only when measured latency justifies it
 - Use fetch-based Service Bindings (not RPC)
 - Enable for backend logic: APIs, data aggregation, DB operations
-- Don't enable for: static content, edge logic, RPC methods, Pages with `run_worker_first`
+- Pure static or edge-only logic generally gains little; measure mixed asset/backend routes
 - Wait 15+ min for analysis, verify `placement_status = SUCCESS`
+
+The official placement page currently contains an RPC example that conflicts with its explicit fetch-only limitation. Rely on fetch-based calls for this reference; verify hosted RPC placement before changing architecture based on that example.

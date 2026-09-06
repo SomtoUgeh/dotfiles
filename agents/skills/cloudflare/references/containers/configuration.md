@@ -23,12 +23,9 @@
       }
     ]
   },
-  "migrations": [
-    {
-      "tag": "v1",
-      "new_sqlite_classes": ["MyContainer"]  // Must use new_sqlite_classes
-    }
-  ]
+  "exports": {
+    "MyContainer": { "type": "durable-object", "storage": "sqlite" }
+  }
 }
 ```
 
@@ -36,7 +33,7 @@ Key config requirements:
 - `image` - Path to Dockerfile or directory containing Dockerfile
 - `class_name` - Must match Container class export name
 - `max_instances` - Max concurrent container instances
-- Must configure Durable Objects binding AND migrations
+- Must configure a Durable Object binding and a SQLite lifecycle entry in `exports`
 
 ### Instance Types
 
@@ -71,10 +68,10 @@ Key config requirements:
     {
       "class_name": "MyContainer",
       "image": "./Dockerfile",
-      "instance_type_custom": {
+      "instance_type": {
         "vcpu": 2,              // 1-4 vCPU
         "memory_mib": 8192,     // 512-12288 MiB (up to 12 GiB)
-        "disk_mib": 16384       // 2048-20480 MiB (up to 20 GB)
+        "disk_mb": 16000       // Check the current disk allocation limits
       }
     }
   ]
@@ -129,7 +126,7 @@ export class MyContainer extends Container {
 
 - **`defaultPort`**: Port used when calling `container.fetch()` without explicit port. Falls back to port 33 if not set.
 
-- **`requiredPorts`**: Array of ports that must be listening before `startAndWaitForPorts()` returns. First port becomes default if `defaultPort` not set.
+- **`requiredPorts`**: Array of ports that must be listening before `startAndWaitForPorts()` returns. The required-port list controls startup readiness; explicitly set defaultPort for fetch routing.
 
 - **`sleepAfter`**: Duration string (e.g., "5m", "30m", "2h"). Container stops after this period of inactivity. Timer resets on each request.
 
@@ -157,7 +154,7 @@ Custom `envVars` from Container class are merged with these. Custom vars overrid
 
 ### Image Management
 
-**Distribution model:** Images pre-fetched to all global locations before deployment. Ensures fast cold starts (2-3s typical).
+**Distribution model:** Image distribution and placement affect startup time. Measure the selected image; do not assume it is preloaded at every location.
 
 **Rolling deploys:** Unlike Workers (instant), container deployments roll out gradually. Old versions continue running during rollout.
 
@@ -180,9 +177,11 @@ max_instances = 10
 name = "MY_CONTAINER"
 class_name = "MyContainer"
 
-[[migrations]]
-tag = "v1"
-new_sqlite_classes = ["MyContainer"]
+[exports.MyContainer]
+type = "durable-object"
+storage = "sqlite"
 ```
 
-Both `wrangler.jsonc` and `wrangler.toml` are supported. Use `wrangler.jsonc` for comments and better IDE support.
+Both `wrangler.jsonc` and `wrangler.toml` are supported. Use `wrangler.jsonc` for comments and better IDE support. Existing migration-based deployments remain supported; keep their migration tags and do not combine Durable Object `migrations` with `exports`.
+
+Verify current [instance types and limits](https://developers.cloudflare.com/containers/platform/limits/) before capacity changes. Custom types use `instance_type` with `vcpu`, `memory_mib`, and `disk_mb`; memory and disk units differ.

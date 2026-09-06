@@ -2,7 +2,7 @@
 
 ## Secret Rotation
 
-Zero-downtime rotation with versioned naming (`api_key_v1`, `api_key_v2`):
+Rotation with overlapping valid keys and versioned naming (`api_key_v1`, `api_key_v2`):
 
 ```typescript
 interface Env {
@@ -19,7 +19,8 @@ export default {
     let resp = await fetchWithAuth("https://api.example.com", await env.PRIMARY_KEY.get());
     
     // Fallback during rotation
-    if (!resp.ok && env.FALLBACK_KEY) {
+    if (resp.status === 401 && env.FALLBACK_KEY) {
+      await resp.body?.cancel();
       resp = await fetchWithAuth("https://api.example.com", await env.FALLBACK_KEY.get());
     }
     
@@ -40,8 +41,11 @@ interface Env {
 
 async function encryptValue(value: string, key: string): Promise<string> {
   const enc = new TextEncoder();
+  // Store a randomly generated 256-bit key encoded as base64, not a password.
+  const keyBytes = Uint8Array.from(atob(key), character => character.charCodeAt(0));
+  if (keyBytes.length !== 32) throw new Error("Expected a 256-bit AES key");
   const keyMaterial = await crypto.subtle.importKey(
-    "raw", enc.encode(key), { name: "AES-GCM" }, false, ["encrypt"]
+    "raw", keyBytes, { name: "AES-GCM" }, false, ["encrypt"]
   );
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encrypted = await crypto.subtle.encrypt(
@@ -51,7 +55,9 @@ async function encryptValue(value: string, key: string): Promise<string> {
   const combined = new Uint8Array(iv.length + encrypted.byteLength);
   combined.set(iv);
   combined.set(new Uint8Array(encrypted), iv.length);
-  return btoa(String.fromCharCode(...combined));
+  let binary = "";
+  for (const byte of combined) binary += String.fromCharCode(byte);
+  return btoa(binary);
 }
 
 export default {
@@ -154,47 +160,9 @@ Same secret, different binding names:
 
 ## JSON Secret Parsing
 
-Store structured config as JSON secrets:
+Parse into `unknown` and validate the required fields with the project's schema library before building a client. A TypeScript annotation does not validate JSON. Use the database driver's connection options so usernames/passwords are not interpolated into an unescaped URL. Return a connected result only after the connection or health query succeeds.
 
-```typescript
-interface Env {
-  DB_CONFIG: { get(): Promise<string> };
-}
-
-interface DbConfig {
-  host: string;
-  port: number;
-  username: string;
-  password: string;
-}
-
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    try {
-      const configStr = await env.DB_CONFIG.get();
-      const config: DbConfig = JSON.parse(configStr);
-      
-      // Use parsed config
-      const dbUrl = `postgres://${config.username}:${config.password}@${config.host}:${config.port}`;
-      
-      return Response.json({ connected: true });
-    } catch (error) {
-      if (error instanceof SyntaxError) {
-        return new Response("Invalid config JSON", { status: 500 });
-      }
-      throw error;
-    }
-  }
-}
-```
-
-Store JSON secret:
-
-```bash
-echo '{"host":"db.example.com","port":5432,"username":"app","password":"secret"}' | \
-  wrangler secrets-store secret create <store-id> \
-    --name DB_CONFIG --scopes workers --remote
-```
+Keep secret values out of shell history: use Wrangler's prompt or an environment variable piped through `printf '%s' "$VALUE"`. Do not log parsing errors that include secret contents.
 
 ## Integration
 

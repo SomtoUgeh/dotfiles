@@ -1,85 +1,23 @@
 # Analytics Engine Gotchas
 
-## Critical Issues
+## Sampling
 
-### Sampling at High Volumes
+Sampling may occur at ingestion and query time. Each returned row's `_sample_interval` supplies its weight. Estimate event counts with `SUM(_sample_interval)`, metric totals with `SUM(double1 * _sample_interval)`, means with the weighted sum divided by total weight, and quantiles with `quantileExactWeighted(0.95)(double1, _sample_interval)`. A sampled estimate is not an exact accounting ledger.
 
-**Problem:** Queries return fewer points than written at >1M writes/min.
+Do not aggregate in module memory or flush when `Date.now() % 1000 === 0`: isolates can disappear, requests need not arrive on an exact millisecond, and the buffer is not durable. Use direct writes or a durable aggregation design.
 
-**Solution:**
-```typescript
-// Pre-aggregate before writing
-let buffer = { count: 0, total: 0 };
-buffer.count++; buffer.total += value;
+## Writes
 
-// Write once per second instead of per request
-if (Date.now() % 1000 === 0) {
-  env.ANALYTICS.writeDataPoint({ doubles: [buffer.count, buffer.total] });
-}
-```
+`writeDataPoint()` returns void. Input validation can throw synchronously, and successful return does not acknowledge durable ingestion. Validate dimensions and sizes; decide whether analytics failures should affect the user request. There is no general promise that all points below a fixed write rate are retained.
 
-**Detection:** `npx wrangler tail` → look for "sampling enabled"
+The limits are 20 blobs totaling 16 KB, 20 doubles, and one index of up to 96 bytes. Check [current limits](https://developers.cloudflare.com/analytics/analytics-engine/limits/) for other quotas.
 
-### writeDataPoint Returns void
+## Queries and identity
 
-```typescript
-// ❌ Pointless await
-await env.ANALYTICS.writeDataPoint({...});
+A Worker can query the HTTP SQL API with a token stored in a secret. Authenticate the caller and enforce tenant scope server-side; do not accept arbitrary SQL or reveal the token. Use a non-secret customer ID as the sampling index, never a raw API key. The index can be filtered and grouped.
 
-// ✅ Fire-and-forget
-env.ANALYTICS.writeDataPoint({...});
-```
+Always constrain time ranges and use weighted aggregates. Check dataset name, ingestion state, and source timestamps when results are empty. The service timestamp is assigned at write time; store an event timestamp separately if needed.
 
-Writes can fail silently. Check tail logs.
+Sources: [sampling](https://developers.cloudflare.com/analytics/analytics-engine/sampling/), [SQL functions](https://developers.cloudflare.com/analytics/analytics-engine/sql-reference/aggregate-functions/).
 
-### Index vs Blob
-
-| Cardinality | Use | Example |
-|-------------|-----|---------|
-| Millions | **Index** | user_id, api_key |
-| Hundreds | **Blob** | endpoint, status_code, country |
-
-```typescript
-// ✅ Correct
-{ blobs: [method, path, status], indexes: [userId] }
-```
-
-### Can't Query from Workers
-
-Query API requires HTTP auth. Use external service or cache in KV/D1.
-
-### No Custom Timestamps
-
-Auto-generated at write time. Store original in blob if needed.
-
-## Common Errors
-
-| Error | Fix |
-|-------|-----|
-| Binding not found | Check wrangler.jsonc, redeploy |
-| No data in query | Wait 30s; check dataset name; check time range |
-| Query timeout | Add time filter; use index for filtering |
-
-## Limits
-
-| Resource | Limit |
-|----------|-------|
-| Blobs per point | 20 |
-| Doubles per point | 20 |
-| Indexes per point | 1 |
-| Blob/Index size | 16KB |
-| Write rate (no sampling) | ~1M/min |
-| Retention | 90 days |
-| Query timeout | 30s |
-
-## Best Practices
-
-✅ Pre-aggregate at high volumes  
-✅ Use index for high-cardinality (millions)  
-✅ Always include time filter in queries  
-✅ Design schema before coding  
-
-❌ Don't await writeDataPoint  
-❌ Don't use index for low-cardinality  
-❌ Don't query without time range  
-❌ Don't assume all writes succeed
+Sampling reference: [Analytics Engine sampling](https://developers.cloudflare.com/analytics/analytics-engine/sampling/).

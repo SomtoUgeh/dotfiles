@@ -49,7 +49,7 @@ If a `CONTEXT-MAP.md` exists at the root, the repo has multiple contexts. The ma
 │       └── docs/adr/
 ```
 
-Create files lazily — only when you have something to write. If no `CONTEXT.md` exists, create one when the first term is resolved. If no `docs/adr/` exists, create it when the first ADR is needed.
+An explicit invocation of this documentation workflow authorizes recording resolved terms. A conversation-only request overrides that default: show proposed entries without writing files. Create files lazily when there is a resolved term or requested ADR to record; preserve an existing repository documentation layout.
 
 ## During the session
 

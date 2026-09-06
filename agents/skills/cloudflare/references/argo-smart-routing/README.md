@@ -4,7 +4,7 @@
 
 Cloudflare Argo Smart Routing is a performance optimization service that detects real-time network issues and routes web traffic across the most efficient network path. It continuously monitors network conditions and intelligently routes traffic through the fastest, most reliable routes in Cloudflare's network.
 
-**Note on Smart Shield:** Argo Smart Routing is being integrated into Cloudflare's Smart Shield product for enhanced DDoS protection and performance. Existing Argo customers maintain full functionality with gradual migration to Smart Shield features.
+Argo Smart Routing is now offered as part of Smart Shield. Check the target zone subscription and current API/provider version.
 
 ## Quick Start
 
@@ -34,14 +34,14 @@ console.log(`Argo enabled: ${result.value}`);
 
 ### What It Does
 - **Intelligent routing**: Detects congestion, outages, packet loss in real-time
-- **Global optimization**: Routes across 300+ Cloudflare data centers
-- **Automatic failover**: Switches paths when issues detected (typically <1s)
+- **Global optimization**: Routes traffic over the Cloudflare network
+- **Route selection**: Responds to observed network conditions; no fixed failover time is guaranteed.
 - **Works with existing setup**: No origin changes required
 
 ### Billing Model
 - Usage-based: Charged per GB of traffic (excluding DDoS/WAF mitigated traffic)
 - Requires billing configuration before enabling
-- Available on Enterprise+ plans (check zone eligibility)
+- Available on eligible Argo/Smart Shield subscription plans (check zone eligibility)
 
 ### When to Use
 - **High-traffic production sites** with global user base
@@ -49,20 +49,9 @@ console.log(`Argo enabled: ${result.value}`);
 - **Sites behind Cloudflare proxy** (orange-clouded DNS records)
 - **Combined with Tiered Cache** for maximum performance gains
 
-### When NOT to Use
-- Development/staging environments (cost control)
-- Low-traffic sites (<1TB/month) where cost may exceed benefit
-- Sites with primarily single-region traffic
+### Evaluate before enabling
 
-## Should I Enable Argo?
-
-| Your Situation | Recommendation |
-|----------------|----------------|
-| Global production app, >1TB/month traffic | ✅ Enable - likely ROI positive |
-| Enterprise plan, latency-critical APIs | ✅ Enable - performance matters |
-| Regional site, <100GB/month traffic | ⚠️ Evaluate - cost may not justify |
-| Development/staging environment | ❌ Disable - use in production only |
-| Not yet configured billing | ❌ Configure billing first |
+Measure latency by visitor region, current origin load, and actual subscription costs. Traffic volume alone does not establish a break-even point; no universal 1 TB minimum applies.
 
 ## Reading Order by Task
 

@@ -163,7 +163,7 @@ const prisma = new PrismaClient({ adapter }).$extends({
 })
 
 const user = await prisma.user.findFirst()
-console.log(user.fullName) // Computed field
+console.log(user?.fullName) // Computed field
 ```
 
 ### Chain extensions
@@ -201,18 +201,18 @@ type UserWithPosts = Prisma.UserGetPayload<{
 }>
 ```
 
-### Prisma.validator
+### Type-safe query fragments with satisfies
 
-Type-safe query fragments:
+The `prisma-client` generator does not export `Prisma.validator`; use TypeScript `satisfies`:
 
 ```typescript
 import { Prisma } from '../generated/client'
 
-const userSelect = Prisma.validator<Prisma.UserSelect>()({
+const userSelect = {
   id: true,
   email: true,
   name: true
-})
+} satisfies Prisma.UserSelect
 
 const user = await prisma.user.findUnique({
   where: { id: 1 },

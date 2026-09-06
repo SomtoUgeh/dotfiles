@@ -1,102 +1,49 @@
-# Cloudflare Terraform Provider
+# Cloudflare Terraform provider
 
-**Expert guidance for Cloudflare Terraform Provider - infrastructure as code for Cloudflare resources.**
+Use Terraform when the project owns infrastructure through Terraform. Preserve the existing provider constraint and lockfile; inspect the installed schema before changing resources. The examples in this reference use Cloudflare provider **5.24.0**, checked on 2026-09-05. They are not a reason to upgrade an existing project implicitly.
 
-## Core Principles
+## Setup
 
-- **Provider-first**: Use Terraform provider for ALL infrastructure - never mix with wrangler.jsonc for the same resources
-- **State management**: Always use remote state (S3, Terraform Cloud, etc.) for team environments
-- **Modular architecture**: Create reusable modules for common patterns (zones, workers, pages)
-- **Version pinning**: Always pin provider version with `~>` for predictable upgrades
-- **Secret management**: Use variables + environment vars for sensitive data - never hardcode API tokens
-
-## Provider Version
-
-| Version | Status | Notes |
-|---------|--------|-------|
-| 5.x | Current | Auto-generated from OpenAPI, breaking changes from v4 |
-| 4.x | Legacy | Manual maintenance, deprecated |
-
-**Critical:** v5 renamed many resources (`cloudflare_record` → `cloudflare_dns_record`, `cloudflare_worker_*` → `cloudflare_workers_*`). See [gotchas.md](./gotchas.md#v5-breaking-changes) for migration details.
-
-## Provider Setup
-
-### Basic Configuration
+For a new isolated example:
 
 ```hcl
 terraform {
-  required_version = ">= 1.0"
-  
+  required_version = ">= 1.10, < 2.0"
   required_providers {
     cloudflare = {
       source  = "cloudflare/cloudflare"
-      version = "~> 5.15.0"
+      version = "= 5.24.0"
     }
   }
 }
-
-provider "cloudflare" {
-  api_token = var.cloudflare_api_token  # or CLOUDFLARE_API_TOKEN env var
-}
+provider "cloudflare" {}
 ```
 
-### Authentication Methods (priority order)
+Supply a scoped `CLOUDFLARE_API_TOKEN` through the existing secret mechanism. Do not put it in tracked HCL or command arguments. A Terraform `sensitive` value can still be stored in state and plan files; protect those artifacts and their backend.
 
-1. **API Token** (RECOMMENDED): `api_token` or `CLOUDFLARE_API_TOKEN`
-   - Create: Dashboard → My Profile → API Tokens
-   - Scope to specific accounts/zones for security
-   
-2. **Global API Key** (LEGACY): `api_key` + `api_email` or `CLOUDFLARE_API_KEY` + `CLOUDFLARE_EMAIL`
-   - Less secure, use tokens instead
-   
-3. **User Service Key**: `user_service_key` for Origin CA certificates
-
-
-
-## Quick Reference: Common Commands
+## Workflow
 
 ```bash
-terraform init          # Initialize provider
-terraform plan          # Plan changes
-terraform apply         # Apply changes
-terraform destroy       # Destroy resources
-terraform import cloudflare_zone.example <zone-id>  # Import existing
-terraform state list    # List resources in state
-terraform output        # Show outputs
-terraform fmt -recursive  # Format code
-terraform validate      # Validate configuration
+terraform init
+terraform fmt -check -recursive
+terraform validate
+terraform plan -out=tfplan
+terraform show tfplan
+# After the requested change and its plan are approved for application:
+terraform apply tfplan
 ```
 
-## Import Existing Resources
+`init` downloads providers; `validate` checks configuration/schema without applying. A plan reads the account and may contain secrets. Applying, importing into state, destroying, or changing state is a separate mutation from inspecting a plan.
 
-Use cf-terraforming to generate configs from existing Cloudflare resources:
+Assign one owner to each remote resource or attribute set. Terraform can create KV/R2/D1 resources while Wrangler deploys a Worker referring to their IDs. It must not concurrently overwrite the same Worker settings managed by Terraform. Modules are supported; use existing module boundaries rather than imposing or banning them.
 
-```bash
-# Install
-brew install cloudflare/cloudflare/cf-terraforming
+## Existing resources
 
-# Generate HCL from existing resources
-cf-terraforming generate --resource-type cloudflare_dns_record --zone <zone-id>
+Use [cf-terraforming](https://developers.cloudflare.com/terraform/advanced-topics/import-cloudflare-resources/) when its installed version supports the target provider/resource. Generated HCL and import commands must be reviewed before execution. Import ID formats are resource-specific; verify the pinned registry page. Importing does not make the configuration match the remote object automatically.
 
-# Import into Terraform state
-cf-terraforming import --resource-type cloudflare_dns_record --zone <zone-id>
-```
+- [configuration.md](configuration.md): v5 resource shapes and examples.
+- [api.md](api.md): data sources and IDs.
+- [patterns.md](patterns.md): ownership, state and deployment patterns.
+- [gotchas.md](gotchas.md): migration, drift and diagnostics.
 
-## Reading Order
-
-1. Start with [README.md](./README.md) for provider setup and authentication
-2. Review [configuration.md](./configuration.md) for resource configurations
-3. Check [api.md](./api.md) for data sources and existing resource queries
-4. See [patterns.md](./patterns.md) for multi-environment and CI/CD patterns
-5. Read [gotchas.md](./gotchas.md) for state drift, v5 breaking changes, and troubleshooting
-
-## In This Reference
-- [configuration.md](./configuration.md) - Resources for zones, DNS, workers, KV, R2, D1, Pages, rulesets
-- [api.md](./api.md) - Data sources for existing resources
-- [patterns.md](./patterns.md) - Architecture patterns, multi-env setup, CI/CD integration
-- [gotchas.md](./gotchas.md) - Common issues, security, best practices
-
-## See Also
-- [pulumi](../pulumi/) - Alternative IaC tool for Cloudflare
-- [wrangler](../wrangler/) - CLI deployment alternative
-- [workers](../workers/) - Worker runtime documentation
+[Versioned provider reference](https://registry.terraform.io/providers/cloudflare/cloudflare/5.24.0/docs) · [Provider source](https://github.com/cloudflare/terraform-provider-cloudflare/tree/v5.24.0/docs)

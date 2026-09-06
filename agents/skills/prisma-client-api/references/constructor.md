@@ -17,7 +17,7 @@ const prisma = new PrismaClient({ adapter })
 
 ## Constructor Options
 
-### adapter (Required in v7)
+### adapter (Required unless using accelerateUrl)
 
 Driver adapter instance:
 
@@ -177,6 +177,8 @@ prisma.$on('query', (e) => {
 ```
 
 ## Log Events
+
+Configure each level with `emit: 'event'` before subscribing (see `client-methods.md`); the query-only instance above cannot subscribe to these levels.
 
 ```typescript
 prisma.$on('info', (e) => console.log(e.message))

@@ -7,43 +7,17 @@ tags: bundle, third-party, analytics, defer
 
 ## Defer Non-Critical Third-Party Libraries
 
-Analytics, logging, and error tracking don't block user interaction. Load them after hydration.
-
-**Incorrect (blocks initial bundle):**
+Use a Client Component for Next.js dynamic imports with `ssr: false`. This option is not supported in a Server Component. Measure the emitted chunks: it disables server rendering, but does not promise a particular post-hydration load time.
 
 ```tsx
-import { Analytics } from '@vercel/analytics/react'
-
-export default function RootLayout({ children }) {
-  return (
-    <html>
-      <body>
-        {children}
-        <Analytics />
-      </body>
-    </html>
-  )
-}
-```
-
-**Correct (loads after hydration):**
-
-```tsx
+// app/deferred-analytics.tsx
+'use client'
 import dynamic from 'next/dynamic'
-
 const Analytics = dynamic(
   () => import('@vercel/analytics/react').then(m => m.Analytics),
-  { ssr: false }
+  { ssr: false },
 )
-
-export default function RootLayout({ children }) {
-  return (
-    <html>
-      <body>
-        {children}
-        <Analytics />
-      </body>
-    </html>
-  )
-}
+export function DeferredAnalytics() { return <Analytics /> }
 ```
+
+Import and render `DeferredAnalytics` from the existing server root layout. Add idle/consent gating only when the product requires it; preserve essential error reporting.

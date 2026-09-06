@@ -104,7 +104,7 @@ const router = createRouter({
 ## Good Example: With TanStack Query Integration
 
 ```tsx
-// When using TanStack Query, disable router cache
+// When using TanStack Query, let loaders decide preload freshness
 const router = createRouter({
   routeTree,
   defaultPreload: 'intent',
@@ -117,7 +117,7 @@ const router = createRouter({
 // Route loader uses TanStack Query
 export const Route = createFileRoute('/posts/$postId')({
   loader: async ({ params, context: { queryClient } }) => {
-    // ensureQueryData respects TanStack Query's staleTime
+    // ensureQueryData returns existing data, even stale; fetches when missing
     await queryClient.ensureQueryData(postQueries.detail(params.postId))
   },
 })
@@ -127,7 +127,7 @@ export const Route = createFileRoute('/posts/$postId')({
 
 - Preloading loads route code AND executes loaders
 - `preloadDelay` prevents excessive requests on quick mouse movements
-- Preloaded data is garbage collected after `preloadStaleTime`
+- `preloadStaleTime` controls freshness; `preloadGcTime` controls unused preload retention
 - Works with both router caching and external caching (TanStack Query)
 - Mobile: Consider `'viewport'` since hover isn't available
 - Monitor network tab to verify preloading works correctly

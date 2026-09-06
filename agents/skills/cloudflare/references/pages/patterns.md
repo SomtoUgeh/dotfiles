@@ -24,12 +24,13 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
 ```typescript
 // functions/_middleware.ts
 const auth: PagesFunction<Env> = async (context) => {
-  if (context.request.url.includes('/public/')) return context.next();
+  const pathname = new URL(context.request.url).pathname;
+  if (pathname === '/public' || pathname.startsWith('/public/')) return context.next();
   const authHeader = context.request.headers.get('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {
     return new Response('Unauthorized', { status: 401 });
   }
-  
+
   try {
     const payload = await verifyJWT(authHeader.substring(7), context.env.JWT_SECRET);
     context.data.user = payload;
@@ -55,7 +56,8 @@ export const onRequest: PagesFunction = async (context) => {
   if (context.request.method === 'OPTIONS') {
     return new Response(null, {headers: corsHeaders});
   }
-  const response = await context.next();
+  const upstream = await context.next();
+  const response = new Response(upstream.body, upstream);
   Object.entries(corsHeaders).forEach(([k, v]) => response.headers.set(k, v));
   return response;
 };
@@ -63,12 +65,19 @@ export const onRequest: PagesFunction = async (context) => {
 
 ## Form Handling
 
+Validate required fields and await the Queue send before confirming submission. Current Wrangler supports Queue producer bindings on Pages; Queue consumers must be separate Workers.
+
 ```typescript
-// functions/api/contact.ts
-export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
-  const formData = await request.formData();
-  await env.QUEUE.send({name: formData.get('name'), email: formData.get('email')});
-  return new Response('<h1>Thanks!</h1>', { headers: { 'Content-Type': 'text/html' } });
+interface FormEnv { QUEUE: Queue<{ name: string; email: string }>; }
+export const onRequestPost: PagesFunction<FormEnv> = async ({ request, env }) => {
+  const form = await request.formData();
+  const name = form.get('name');
+  const email = form.get('email');
+  if (typeof name !== 'string' || typeof email !== 'string' || !name || !email) {
+    return new Response('Name and email required', { status: 400 });
+  }
+  await env.QUEUE.send({ name, email });
+  return new Response('Thanks!');
 };
 ```
 
@@ -93,11 +102,11 @@ const errorHandler: PagesFunction = async (context) => {
     return await context.next();
   } catch (error) {
     console.error('Error:', error);
-    if (context.request.url.includes('/api/')) {
-      return Response.json({ error: error.message }, { status: 500 });
+    if (new URL(context.request.url).pathname.startsWith('/api/')) {
+      return Response.json({ error: 'Internal server error' }, { status: 500 });
     }
-    return new Response(`<h1>Error</h1><p>${error.message}</p>`, { 
-      status: 500, headers: { 'Content-Type': 'text/html' } 
+    return new Response('<h1>Internal server error</h1>', {
+      status: 500, headers: { 'Content-Type': 'text/html' }
     });
   }
 };
@@ -112,7 +121,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, request }) => {
   const cacheKey = `data:${new URL(request.url).pathname}`;
   const cached = await env.KV.get(cacheKey, 'json');
   if (cached) return Response.json(cached, { headers: { 'X-Cache': 'HIT' } });
-  
+
   const data = await env.DB.prepare('SELECT * FROM data').first();
   await env.KV.put(cacheKey, JSON.stringify(data), {expirationTtl: 3600});
   return Response.json(data, {headers: {'X-Cache': 'MISS'}});
@@ -147,51 +156,12 @@ export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
 };
 ```
 
-**Best for**: Read-heavy apps with D1/Durable Objects in specific regions.  
-**Not needed**: Apps without data locality constraints or with evenly distributed traffic.
+**Best for**: Read-heavy apps with D1/Durable Objects in specific regions.
+**Measure first**: User distribution alone does not predict benefit; backend latency matters.
 
 ## Framework Integration
 
-**Supported** (2026): SvelteKit, Astro, Nuxt, Qwik, Solid Start
-
-```bash
-npm create cloudflare@latest my-app -- --framework=svelte
-```
-
-### SvelteKit
-```typescript
-// src/routes/+page.server.ts
-export const load = async ({ platform }) => {
-  const todos = await platform.env.DB.prepare('SELECT * FROM todos').all();
-  return { todos: todos.results };
-};
-```
-
-### Astro
-```astro
----
-const { DB } = Astro.locals.runtime.env;
-const todos = await DB.prepare('SELECT * FROM todos').all();
----
-<ul>{todos.results.map(t => <li>{t.title}</li>)}</ul>
-```
-
-### Nuxt
-```typescript
-// server/api/todos.get.ts
-export default defineEventHandler(async (event) => {
-  const { DB } = event.context.cloudflare.env;
-  return await DB.prepare('SELECT * FROM todos').all();
-});
-```
-
-**⚠️ Framework Status** (2026):
-- ✅ **Supported**: SvelteKit, Astro, Nuxt, Qwik, Solid Start
-- ❌ **Deprecated**: Next.js (`@cloudflare/next-on-pages`), Remix (`@remix-run/cloudflare-pages`)
-
-For deprecated frameworks, see [gotchas.md](./gotchas.md#framework-specific) for migration options.
-
-[Framework Guides](https://developers.cloudflare.com/pages/framework-guides/)
+Follow [current Cloudflare framework guides](https://developers.cloudflare.com/workers/framework-guides/) for the installed adapter and chosen Pages/Workers target. For existing Pages projects, preserve working adapters and update binding access based on their actual version. Next.js and React Router have supported Workers deployment guides; an old Pages adapter's deprecation does not require a framework migration.
 
 ## Monorepo
 
@@ -199,6 +169,6 @@ Dashboard → Settings → Build → Root directory. Set to subproject (e.g., `a
 
 ## Best Practices
 
-**Performance**: Exclude static via `_routes.json`; cache with KV; keep bundle < 1MB  
-**Security**: Use secrets (not vars); validate inputs; rate limit with KV/DO  
+**Performance**: Exclude static via `_routes.json`; cache with KV; measure bundle/startup cost
+**Security**: Use secrets (not vars); validate inputs; enforce rate limits with a DO or rate-limiting Worker, not KV read-modify-write
 **Workflow**: Preview per branch; local dev with `wrangler pages dev`; instant rollbacks in Dashboard

@@ -1,5 +1,9 @@
 #!/bin/zsh
 
+# Remove the old project-relative entry, including when inherited from an
+# existing shell. Project tools should run through explicit package commands.
+path=("${(@)path:#./node_modules/.bin}")
+
 # ============================================================================
 # OH MY ZSH SETUP
 # ============================================================================
@@ -44,9 +48,7 @@ CDPATH=.:$HOME:$HOME/code:$HOME/Desktop
 PATH="/opt/homebrew/bin:$PATH"
 PATH="/usr/local/bin:$PATH"
 
-# node_modules (run locally-installed CLIs from the project root).
 # ~/bin and ~/.local/bin are added in .zshenv (portable + dedup-guarded).
-PATH="$PATH:./node_modules/.bin"
 
 # ============================================================================
 # TOOL INTEGRATIONS
@@ -101,7 +103,11 @@ source ~/.orbstack/shell/init.zsh 2>/dev/null || :
 # ENVIRONMENT VARIABLES
 # ============================================================================
 
-export RIPGREP_CONFIG_PATH=$HOME/.ripgreprc
+if [[ -f "$HOME/.ripgreprc" ]]; then
+  export RIPGREP_CONFIG_PATH="$HOME/.ripgreprc"
+elif [[ "${RIPGREP_CONFIG_PATH:-}" == "$HOME/.ripgreprc" ]]; then
+  unset RIPGREP_CONFIG_PATH
+fi
 export SCARF_ANALYTICS=false
 
 # ============================================================================

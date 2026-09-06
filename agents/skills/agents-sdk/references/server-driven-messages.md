@@ -9,7 +9,7 @@ Patterns for server-initiated LLM turns in `AIChatAgent` — from schedules, web
 ```typescript
 await this.saveMessages((existingMessages) => [
   ...existingMessages,
-  { role: "user", content: "Check for new notifications" }
+  { role: "user", id: crypto.randomUUID(), parts: [{ type: "text", text: "Check for new notifications" }] }
 ]);
 ```
 
@@ -20,7 +20,7 @@ await this.saveMessages((existingMessages) => [
 ```typescript
 await this.persistMessages([
   ...this.messages,
-  { role: "assistant", content: "System note: checked at " + new Date() }
+  { role: "assistant", id: crypto.randomUUID(), parts: [{ type: "text", text: "System note: checked at " + new Date() }] }
 ]);
 ```
 
@@ -29,11 +29,12 @@ await this.persistMessages([
 **Always call before `saveMessages` from non-chat contexts** (schedules, webhooks, email):
 
 ```typescript
-async checkNotifications(payload: unknown, schedule: Schedule) {
-  await this.waitUntilStable({ timeout: 30_000 });
+async checkNotifications(payload: unknown, schedule: Schedule<unknown>) {
+  const stable = await this.waitUntilStable({ timeout: 30_000 });
+  if (!stable) return; // Retry later; pending user interactions may still block the conversation.
   await this.saveMessages((msgs) => [
     ...msgs,
-    { role: "user", content: "Run scheduled notification check" }
+    { role: "user", id: crypto.randomUUID(), parts: [{ type: "text", text: "Run scheduled notification check" }] }
   ]);
 }
 ```
@@ -44,10 +45,10 @@ Runs after each LLM turn completes. Use for chaining:
 
 ```typescript
 async onChatResponse(result: ChatResponseResult) {
-  if (result.type === "finish" && needsFollowUp(result)) {
+  if (result.status === "completed" && needsFollowUp(result)) {
     await this.saveMessages((msgs) => [
       ...msgs,
-      { role: "user", content: "Continue with next step" }
+      { role: "user", id: crypto.randomUUID(), parts: [{ type: "text", text: "Continue with next step" }] }
     ]);
   }
 }

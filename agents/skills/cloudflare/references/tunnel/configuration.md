@@ -7,7 +7,7 @@ Tunnels use one of two config sources:
 | Config Source | Storage | Updates | Use Case |
 |---------------|---------|---------|----------|
 | Local | `config.yml` file | Edit file, restart | Dev, multi-env, version control |
-| Cloudflare | Dashboard/API | Instant, no restart | Production, centralized management |
+| Cloudflare | Dashboard/API | Distributed to connected replicas | Production, centralized management |
 
 **Token-based tunnels** = config source: Cloudflare
 **Locally-managed tunnels** = config source: local
@@ -87,7 +87,7 @@ originRequest:
 ### TLS Settings
 ```yaml
 originRequest:
-  noTLSVerify: true                      # Disable cert verification
+  noTLSVerify: false                     # Keep certificate verification enabled
   originServerName: "app.internal"       # Override SNI
   caPool: /path/to/ca.pem                # Custom CA
 ```
@@ -139,12 +139,12 @@ cloudflared tunnel run my-tunnel
 ### Cloudflare Config (Token-Based)
 ```bash
 # No config file needed
-cloudflared tunnel --no-autoupdate run --token <TOKEN>
+cloudflared tunnel --no-autoupdate run # TUNNEL_TOKEN provided securely
 ```
 
-Configure routes in dashboard: **Zero Trust** > **Networks** > **Tunnels** > [Tunnel] > **Public Hostname**
+Configure the selected tunnel routes in the current Cloudflare dashboard. Dashboard labels can change; match the account and tunnel UUID.
 
-**Pros:** Centralized updates, no file management, instant route changes
+**Pros:** Centralized updates and no ingress-file distribution; verify that replicas received the change
 **Cons:** Requires dashboard/API access, less portable
 
 ## Environment Variables
@@ -155,3 +155,7 @@ TUNNEL_ORIGIN_CERT=/path/to/cert.pem   # Override cert path (local config)
 NO_AUTOUPDATE=true                      # Disable auto-updates
 TUNNEL_LOGLEVEL=debug                   # Log level
 ```
+
+`http2Origin` requires an HTTPS origin with a valid certificate. `noTLSVerify: true` disables verification even when `caPool` is set; it is not a way to enable a custom CA. See [origin parameters](https://developers.cloudflare.com/tunnel/advanced/origin-parameters/).
+
+Private IP routes also require the client profile to send that CIDR through WARP, suitable Gateway network policy and any private DNS configuration. `warp-routing.enabled` alone does not configure the clients.

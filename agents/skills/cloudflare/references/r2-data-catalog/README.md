@@ -8,13 +8,13 @@ This reference is a fast-start with verified connection details and code. For li
 
 | Topic | URL |
 |-------|-----|
-| Overview / get started | `https://developers.cloudflare.com/r2/data-catalog/get-started/` |
-| Manage catalogs (enable, tokens) | `https://developers.cloudflare.com/r2/data-catalog/manage-catalogs/` |
-| Engine config examples | `https://developers.cloudflare.com/r2/data-catalog/config-examples/` (`pyiceberg/`, `spark-python/`, `spark-scala/`, `duckdb/`, `snowflake/`, `trino/`, `starrocks/`) |
-| Table maintenance (compaction, snapshots) | `https://developers.cloudflare.com/r2/data-catalog/table-maintenance/` |
-| Deleting data | `https://developers.cloudflare.com/r2/data-catalog/deleting-data/` |
-| Metrics (GraphQL) | `https://developers.cloudflare.com/r2/data-catalog/observability/metrics/` |
-| Pricing | `https://developers.cloudflare.com/r2/data-catalog/platform/pricing/` |
+| Overview / get started | `https://developers.cloudflare.com/r2-data-catalog/get-started/` |
+| Manage catalogs (enable, tokens) | `https://developers.cloudflare.com/r2-data-catalog/manage-catalogs/` |
+| Engine config examples | `https://developers.cloudflare.com/r2-data-catalog/config-examples/` (`pyiceberg/`, `spark-python/`, `spark-scala/`, `duckdb/`, `snowflake/`, `trino/`, `starrocks/`) |
+| Table maintenance (compaction, snapshots) | `https://developers.cloudflare.com/r2-data-catalog/table-maintenance/` |
+| Deleting data | `https://developers.cloudflare.com/r2-data-catalog/deleting-data/` |
+| Metrics (GraphQL) | `https://developers.cloudflare.com/r2-data-catalog/observability/metrics/` |
+| Pricing | `https://developers.cloudflare.com/r2-data-catalog/platform/pricing/` |
 | Iceberg spec | `https://iceberg.apache.org/spec/` |
 
 ## Connection Values

@@ -9,7 +9,10 @@ metadata:
 
 The Framer Motion module of Emil Kowalski's *Animations on the Web* course ([animations.dev](https://animations.dev/)), as a working reference.
 
-Framer Motion is now **Motion for React**. Nothing changed but the import path:
+Framer Motion is now **Motion for React**, imported from `motion/react` in the
+`motion` package. Read the installed version and the
+[official upgrade guide](https://motion.dev/docs/react-upgrade-guide) before a
+migration; changes between major versions go beyond renaming imports.
 
 ```jsx
 import { motion, AnimatePresence } from "motion/react";  // was "framer-motion"
@@ -41,11 +44,19 @@ The cost of all this: **magic**. Complex animations come out of very little code
 />
 ```
 
-`initial` is the start state, `animate` the end state. Values are interpolated in JavaScript, **outside React's render cycle** — an animating component doesn't re-render, which is what makes 60fps achievable.
+`initial` is the start state and `animate` the target. Motion uses a hybrid
+engine: eligible effects can use browser animation APIs while other features
+use JavaScript. Motion values avoid React's per-frame render work, but neither
+the syntax nor the driver guarantees a frame rate. Follow the
+[canonical motion policy](../animate/references/canonical-policy.md) and use
+`animation-performance` for a measured performance problem.
 
 ## Transitions and springs
 
-Without a `transition`, Motion picks per value type: physical values (`x`, `scale`) get a **spring**, everything else (`opacity`, `color`) gets a **tween**.
+Motion can choose different defaults by value and animation type. Set the
+transition explicitly when the behavior matters. For these product-UI recipes,
+`bounce: 0` is a design choice; it is not the library default. Check the
+[transition reference](https://motion.dev/docs/react-transitions) for the installed version.
 
 ```jsx
 transition={{ duration: 0.3, ease: "easeOut" }}                          // tween
@@ -107,7 +118,10 @@ The `layout` prop is the library's most powerful feature and the reason its anim
 - Add `layout` to **neighbouring elements too**, or they'll jump while the animating one glides.
 - **`layoutId`** connects two different elements: when one mounts carrying the same `layoutId` as one that just unmounted, Motion morphs between them. Tab indicators, App Store card → detail, button → popover, images flying into a bin.
 - **You can't steer a shared layout animation.** To add motion on top, animate the **parent** and let the children come along: `<motion.div animate={{ y: 73 }} transition={{ delay: 0.13 }}>`.
-- **Always set an animated `border-radius` as an inline pixel value** — `style={{ borderRadius: 12 }}`. Layout animations work by scaling, which distorts corners; Motion corrects for this only when the radius is in pixels, not from a class or a `rem` value.
+- Layout animations use transforms, which can distort corners and shadows.
+  Provide `borderRadius` and `boxShadow` through `style`, `animate`, or another
+  animation prop when using Motion's scale correction. Add `layout` to children
+  that also need correction. See the [layout guide](https://motion.dev/docs/react-layout-animations).
 
 Expect friction on complex cases — distortion, elements that won't line up. That's the magic tax. [Inside Framer's Magic Motion](https://www.nan.fyi/magic-motion) explains the mechanism if you need to reason about it.
 
@@ -120,14 +134,14 @@ import useMeasure from "react-use-measure";
 
 const [ref, bounds] = useMeasure();
 
-<motion.div animate={{ height: bounds.height ? bounds.height : null }}>
+<motion.div animate={{ height: bounds.height || "auto" }}>
   <div ref={ref} className="inner">{content}</div>
 </motion.div>
 ```
 
 - **The `ref` and the `animate={{ height }}` must be on different elements.** On the same one, the animated height sticks and the element stops reacting to content changes.
 - **Put the padding on the inner element** so the measurement includes it.
-- `bounds.height` is `0` on first render; falling back to `null` means `auto` and avoids a layout shift.
+- `bounds.height` is `0` on first render; falling back to `"auto"` preserves intrinsic sizing and avoids a layout shift.
 - `useMeasure` is a `ResizeObserver` wrapper — hand-rolling one is a few lines if you'd rather not add the dependency.
 
 ## Motion values
@@ -163,9 +177,12 @@ const clip  = useMotionTemplate`inset(0px ${clipValue}% 0px 0px)`;      // tagge
 
 ## Accessibility
 
-- `useReducedMotion()` branches values in a component; `<MotionConfig reducedMotion="user">` handles a whole app by animating only opacity and background.
-- Reduced motion means **gentler, not none** — keep opacity and color, drop the movement.
-- If you fake a placeholder with a real element (see the feedback popover), keep the input's actual `placeholder` attribute for screen readers and `aria-hidden` the fake one.
+- `useReducedMotion()` lets a component branch values. `<MotionConfig reducedMotion="user">`
+  disables transform and layout animation while preserving non-spatial effects
+  such as opacity and background color; check component overrides too.
+- Remove or reduce spatial and decorative motion. An instant state change is
+  valid; preserve meaning with a restrained non-spatial transition only when useful.
+- If you fake a placeholder with a real element (see the feedback popover), retain a real accessible label and optional placeholder, and mark the decorative copy `aria-hidden`.
 
 ## Debugging the magic
 
@@ -173,12 +190,12 @@ const clip  = useMotionTemplate`inset(0px ${clipValue}% 0px 0px)`;      // tagge
 | --- | --- |
 | Exit animation doesn't play | Missing `key`, so the component never unmounts. Then: wrong `mode`. |
 | Direction-aware slide always goes the same way | The exiting element has stale props — pass `custom` to both `AnimatePresence` and the element. |
-| Border radius warps during a morph | Radius came from a class or `rem`. Move it to inline `style={{ borderRadius: 12 }}`. |
-| Height animation freezes or jumps | `ref` and `animate={{ height }}` are on the same element, or the first-render `0` isn't falling back to `null`. |
+| Border radius warps during a morph | Check Motion's scale correction inputs and child layout behavior against the installed version. |
+| Height animation freezes or jumps | `ref` and `animate={{ height }}` are on the same element, or the first-render `0` isn't falling back to `"auto"`. |
 | Neighbouring elements jump during a layout animation | They need `layout` too. |
 | A `useMotionTemplate`-less string never updates | Motion values aren't reactive inside plain template literals. |
 | Spring looks jittery or wild | Raise `damping`. |
-| Both elements visible at once when switching fast | A known `AnimatePresence` bug; if you can't work around it, `11.0.10` predates it. |
+| Both elements visible at once when switching fast | Check whether the selected presence mode intentionally overlaps them; reproduce with the installed version and stable keys. Use an issue-linked, version-bounded workaround only after confirming a library bug. Do not downgrade to an arbitrary older major. |
 | Animation runs on first paint when it shouldn't | Add `initial={false}` to `AnimatePresence`. |
 
 ## Imperative animation

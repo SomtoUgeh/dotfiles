@@ -34,7 +34,7 @@ For SPAs, use `compatibility_date = "2025-04-01"` or later:
 }
 ```
 
-Navigation requests skip Worker invocation, reducing costs.
+SPA navigation can bypass the Worker unless `run_worker_first` covers the route. Protected assets must always pass through authentication, including navigation requests.
 
 ### 3. Type Safety with Bindings
 
@@ -89,7 +89,7 @@ interface Env {
 **Solution:** 
 - Hard refresh browser (Cmd+Shift+R / Ctrl+F5)
 - Use cache-busting (hashed filenames)
-- Verify deployment completed: `wrangler tail`
+- Verify the active deployment with `wrangler deployments list`; tailing logs does not prove deployment completion.
 
 ## Limits
 
@@ -97,7 +97,7 @@ interface Env {
 |----------------|------|------|-------|
 | Max asset size | 25 MiB | 25 MiB | Per file |
 | Total assets | 20,000 | **100,000** | Requires Wrangler 4.34.0+ (Sep 2025) |
-| Worker invocations | 100k/day | 10M/month | Optimize with `run_worker_first` patterns |
+| Worker invocations | Plan quota | Usage billed by plan | Included usage is not a universal paid request cap |
 | Asset storage | Unlimited | Unlimited | Included |
 
 ### Version Requirements

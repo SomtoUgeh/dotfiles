@@ -9,6 +9,8 @@ How Apple builds interfaces that stop feeling like a computer and start feeling 
 
 The through-line: **an interface feels alive when motion starts from the current on-screen value, inherits the user's velocity, projects momentum forward, and can be grabbed and reversed at any instant.** Springs are the tool that makes all of this natural, because they are inherently interruptible and velocity-aware.
 
+Follow the [canonical motion policy](../animate/references/canonical-policy.md). Web translations below are design starting points, not claims that a browser reproduces native Apple physics, haptics, or accessibility APIs.
+
 ## The Core Idea
 
 > "When we align the interface to the way we think and move, something magical happens — it stops feeling like a computer and starts feeling like a seamless extension of us."
@@ -58,7 +60,7 @@ Every animation must be interruptible and redirectable at any moment. A user mus
 
 - **Never lock out input during a transition.**
 - **Always animate from the *presentation* (current) value, never the target value.** On interrupt, read the element's live on-screen transform and start the new animation from there. Starting from the logical/target value causes a visible jump.
-- **Avoid CSS transitions and `@keyframes` for anything gesture-driven** — they can't be smoothly grabbed and reversed mid-flight. Springs animate from the current value by default, which is exactly what interruption needs.
+- Use direct pointer tracking while dragging and a velocity-aware runtime spring for release when needed. CSS transitions can retarget current values but do not inherently preserve release velocity; keyframe timelines need explicit playback control.
 - **When a gesture reverses, blend velocity — don't hard-cut it.** Replacing one animation with another at a reversal creates a velocity discontinuity, a "brick wall." Spring libraries that carry velocity through a re-target avoid it. (This is what iOS's *additive animations* do natively; on the web, choose a spring library that re-targets from the current velocity.)
 - **Decompose 2D motion into independent X and Y springs.** A single spring on a 2D distance desyncs when X and Y have different velocities.
 
@@ -85,7 +87,7 @@ Apple deliberately replaced the physics triplet (mass/stiffness/damping) with tw
 | Rotation | `0.8` | `0.4` |
 | Drawer / sheet | `0.8` | `0.3` |
 
-**Web mapping (Motion / Framer Motion):** the `bounce` + `duration` spring API maps closely to Apple's damping + response. A safe house style is `damping: 1.0` springs everywhere by default; reserve bounce for momentum-driven, physical interactions.
+**Web mapping (Motion / Framer Motion):** the `bounce` + `duration` spring API maps closely to Apple's damping + response. Apple's damping ratio is not Motion's `damping` coefficient: `damping: 1` in Motion is not critically damped. Use `bounce: 0` for this duration-based no-overshoot recipe; check the library's physics units before translating other values.
 
 ```js
 import { animate } from 'motion';
@@ -101,7 +103,7 @@ animate(el, { y: target }, { type: 'spring', bounce: 0.2, duration: 0.4 });
 
 When a gesture ends, the animation must **continue at the finger's exact velocity**, so there's no visible seam between dragging and animating. This is the detail that most separates "fluid" from "fine."
 
-Pass the pointer's release velocity as the spring's initial velocity. Some spring APIs want **relative** velocity — normalize it by the remaining distance to the target:
+Pass the pointer's release velocity as the spring's initial velocity. Some spring APIs want **relative** velocity — normalize it by the remaining distance to the target, guarding a zero/near-zero distance to avoid division by zero:
 
 ```
 relativeVelocity = gestureVelocity / (targetValue − currentValue)
@@ -193,7 +195,7 @@ Apple uses translucent materials as a floating functional layer that brings stru
 Three rules for combining senses (from *Designing Audio-Haptic Experiences*):
 
 1. **Causality** — it must be obvious what caused the feedback. Trigger it on the actual causal event (the toggle flipping, the item snapping home), and match its character to the action's physicality.
-2. **Harmony** — the visual, the sound, and the haptic must fire on the **same frame**. Latency between them destroys the illusion. Don't let a CSS transition lag the audio/haptic (Vibration API).
+2. **Harmony** — the visual, the sound, and the haptic must fire on the **same frame**. Latency between them destroys the illusion. Don't let a CSS transition lag the audio/haptic (where a supported web API and user permissions allow it). Browser Vibration API support is limited and does not provide Apple Core Haptics or guaranteed same-frame synchronization.
 3. **Utility** — add feedback only where it earns its place. Reserve haptics/sound for meaningful moments (success, error, commit, snap). Over-feedback trains users to ignore all of it.
 
 ## 14. Reduced motion & accessibility
@@ -238,7 +240,7 @@ Apple designs type to change shape with size; the same discipline applies on the
 
 ## 16. Design foundations — the eight principles
 
-The motion and craft above serve Apple's eight design principles (*Principles of Great Design*, WWDC 2026). Use these as the names you reason with:
+The motion and craft above serve Apple's eight design principles ([Principles of Great Design, WWDC 2026](https://developer.apple.com/videos/play/wwdc2026/250/)). Use these as the names you reason with:
 
 1. **Purpose.** Make with intention; decide what *not* to build. Every feature asks for the user's time, attention, and trust — spend that budget only where it pays off.
 2. **Agency.** Keep people in control: offer choices, don't force a single path. Back it with forgiveness — easy undo for slips, a confirmation dialog only for genuinely destructive, irreversible actions (use sparingly; overusing it trains people to click through).
@@ -268,7 +270,7 @@ Tactical rules that serve these:
 | --- | --- | --- |
 | Default UI spring | Critically damped, no overshoot | `damping 1.0`, `response 0.3–0.4` |
 | Momentum / flick spring | Under-damped, slight bounce | `damping ~0.8`, `response 0.3–0.4` |
-| Gesture → spring velocity | Hand off release velocity | `gestureVelocity / (target − current)` if normalized |
+| Gesture → spring velocity | Hand off release velocity | `gestureVelocity / (target − current)` if normalized; guard zero distance |
 | Flick landing point | Project momentum | `current + (v/1000)·d/(1−d)`, `d ≈ 0.998` |
 | Interrupt cleanly | Start from presentation (live) value | read the on-screen transform |
 | Avoid reversal "brick wall" | Carry velocity through re-target | spring that blends velocity |
@@ -280,3 +282,5 @@ Tactical rules that serve these:
 | Translucent chrome | `backdrop-filter` layer | content scrolls under |
 | Type tracking | Size-specific, never fixed | tighten large text (`-0.02em`), body near `0` |
 | Reduced motion | Cross-fade, not slide/spring | `@media (prefers-reduced-motion)` |
+
+Sources: [Designing Fluid Interfaces, WWDC 2018](https://developer.apple.com/videos/play/wwdc2018/803/), [Apple design principles](https://developer.apple.com/design/human-interface-guidelines/design-principles), [Motion transitions](https://motion.dev/docs/react-transitions).

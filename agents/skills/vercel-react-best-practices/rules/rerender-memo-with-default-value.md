@@ -9,9 +9,9 @@ tags: rerender, memo, optimization
 
 ## Extract Default Non-primitive Parameter Value from Memoized Component to Constant
 
-When memoized component has a default value for some non-primitive optional parameter, such as an array, function, or object, calling the component without that parameter results in broken memoization. This is because new value instances are created on every rerender, and they do not pass strict equality comparison in `memo()`.
+A default parameter is evaluated only when the component runs. Omitting it does not break that component's outer `memo` comparison: React compares incoming props before calling the component. If another prop or state makes it render, a newly created default object/function can invalidate a memoized child or an effect that consumes it.
 
-To address this issue, extract the default value into a constant.
+Hoist the default when it is passed to a memoized child or used as an effect dependency. Do not describe this as repairing the outer component's memoization.
 
 **Incorrect (`onClick` has different values on every rerender):**
 

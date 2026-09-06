@@ -15,6 +15,7 @@ const client = new Cloudflare({
 ### Python
 
 ```python
+import os
 from cloudflare import Cloudflare
 
 client = Cloudflare(api_token=os.environ.get("CLOUDFLARE_API_TOKEN"))
@@ -28,8 +29,10 @@ client = AsyncCloudflare(api_token=os.environ["CLOUDFLARE_API_TOKEN"])
 
 ```go
 import (
-    "github.com/cloudflare/cloudflare-go/v4"
-    "github.com/cloudflare/cloudflare-go/v4/option"
+    "github.com/cloudflare/cloudflare-go/v7"
+    "github.com/cloudflare/cloudflare-go/v7/option"
+    "github.com/cloudflare/cloudflare-go/v7/zones"
+    "os"
 )
 
 client := cloudflare.NewClient(
@@ -81,10 +84,13 @@ for zone in client.zones.list():
 
 ```go
 // Go: ListAutoPaging
-iter := client.Zones.ListAutoPaging(ctx, cloudflare.ZoneListParams{})
+iter := client.Zones.ListAutoPaging(ctx, zones.ZoneListParams{})
 for iter.Next() {
     zone := iter.Current()
     fmt.Println(zone.ID)
+}
+if err := iter.Err(); err != nil {
+    return err // inside a function returning error
 }
 ```
 
@@ -128,22 +134,22 @@ const zone = await client.zones.create({
 });
 
 // Update zone
-await client.zones.edit('zone-id', {
+await client.zones.edit({ zone_id: 'zone-id',
   paused: false,
 });
 
 // Delete zone
-await client.zones.delete('zone-id');
+await client.zones.delete({ zone_id: 'zone-id' });
 ```
 
 ```go
 // Go: requires cloudflare.F() wrapper
-zone, err := client.Zones.New(ctx, cloudflare.ZoneNewParams{
-    Account: cloudflare.F(cloudflare.ZoneNewParamsAccount{
+zone, err := client.Zones.New(ctx, zones.ZoneNewParams{
+    Account: cloudflare.F(zones.ZoneNewParamsAccount{
         ID: cloudflare.F("account-id"),
     }),
     Name: cloudflare.F("example.com"),
-    Type: cloudflare.F(cloudflare.ZoneNewParamsTypeFull),
+    Type: cloudflare.F(zones.TypeFull),
 })
 ```
 
@@ -169,9 +175,8 @@ for await (const record of client.dns.records.list({
 }
 
 // Update DNS record
-await client.dns.records.update({
+await client.dns.records.update('record-id', {
   zone_id: 'zone-id',
-  dns_record_id: 'record-id',
   type: 'A',
   name: 'subdomain.example.com',
   content: '203.0.113.1',
@@ -179,9 +184,8 @@ await client.dns.records.update({
 });
 
 // Delete DNS record
-await client.dns.records.delete({
+await client.dns.records.delete('record-id', {
   zone_id: 'zone-id',
-  dns_record_id: 'record-id',
 });
 ```
 

@@ -2,7 +2,7 @@
 
 ## Service Binding Patterns
 
-### RPC via Service Bindings
+### HTTP via Service Bindings
 
 ```typescript
 // auth-worker
@@ -21,44 +21,22 @@ const response = await env.AUTH_SERVICE.fetch(
 );
 ```
 
-**Why RPC?** Zero latency (same datacenter), no DNS, free, type-safe.
+**Why a service binding?** It targets the configured Worker without public DNS routing or API credentials. Calls still incur runtime work and latency.
 
 **HTTP vs Service:**
 ```typescript
-// ❌ HTTP (slow, paid, cross-region latency)
+// Public HTTP endpoint
 await fetch('https://auth-worker.example.com/validate');
 
-// ✅ Service binding (fast, free, same isolate)
+// Configured service binding
 await env.AUTH_SERVICE.fetch(new Request('https://fake-host/validate'));
 ```
 
-**URL doesn't matter:** Service bindings ignore hostname/protocol, routing happens via binding name.
+**Binding selects the target:** The target still receives the URL, path, query, and headers and may use them for routing or authorization.
 
 ### Typed Service RPC
 
-```typescript
-// shared-types.ts
-export interface AuthRequest { token: string; }
-export interface AuthResponse { valid: boolean; userId?: string; }
-
-// auth-worker
-export default {
-  async fetch(request: Request): Promise<Response> {
-    const body: AuthRequest = await request.json();
-    const response: AuthResponse = { valid: true, userId: '123' };
-    return Response.json(response);
-  }
-}
-
-// api-worker
-const response = await env.AUTH_SERVICE.fetch(
-  new Request('https://fake/validate', {
-    method: 'POST',
-    body: JSON.stringify({ token } satisfies AuthRequest)
-  })
-);
-const data: AuthResponse = await response.json();
-```
+Use a class extending `WorkerEntrypoint` for actual RPC, and generate the caller's binding type from that class. See the [runtime example](../workers/api.md#service-bindings). For HTTP JSON APIs, validate input and response shapes at runtime; a TypeScript annotation does not authenticate a token or validate JSON.
 
 ## Secrets Management
 
@@ -84,31 +62,9 @@ const response = await fetch('https://api.example.com', {
 
 ## Testing with Mock Bindings
 
-### Vitest Mock
+### Runtime tests
 
-```typescript
-import { vi } from 'vitest';
-
-const mockKV: KVNamespace = {
-  get: vi.fn(async (key) => key === 'test' ? 'value' : null),
-  put: vi.fn(async () => {}),
-  delete: vi.fn(async () => {}),
-  list: vi.fn(async () => ({ keys: [], list_complete: true, cursor: '' })),
-  getWithMetadata: vi.fn(),
-} as unknown as KVNamespace;
-
-const mockEnv: Env = { MY_KV: mockKV };
-const mockCtx: ExecutionContext = {
-  waitUntil: vi.fn(),
-  passThroughOnException: vi.fn(),
-};
-
-const response = await worker.fetch(
-  new Request('http://localhost/test'),
-  mockEnv,
-  mockCtx
-);
-```
+Use the [Wrangler harness](../wrangler/api.md) or Cloudflare Vitest integration for binding semantics. For pure-function tests define a narrow dependency interface and mock it directly; do not cast an incomplete object to `KVNamespace` or `ExecutionContext`.
 
 ## Binding Access Patterns
 
@@ -142,7 +98,7 @@ const config = await env.MY_KV.get('app-config', { type: 'json' });
 ```
 
 **Use when:** Read-heavy, <25MB, global distribution, eventual consistency OK  
-**Latency:** <10ms reads (cached), writes eventually consistent (60s)
+**Consistency:** Reads can be cached; propagation can take 60 seconds or more. Measure latency for the actual workload.
 
 ### D1: Relational Queries
 
@@ -154,17 +110,18 @@ const results = await env.DB.prepare(`
 ```
 
 **Use when:** Relational data, JOINs, ACID transactions  
-**Limits:** 10GB database size, 100k rows per query
+**Limits:** Check current D1 plan and query limits.
 
 ### R2: Large Objects
 
 ```typescript
 const object = await env.MY_BUCKET.get('large-file.zip');
+if (!object) return new Response('Not found', { status: 404 });
 return new Response(object.body);
 ```
 
 **Use when:** Files >25MB, S3-compatible API needed  
-**Limits:** 5TB per object, unlimited storage
+**Limits:** Check object-size, multipart, account, and billing limits.
 
 ### Durable Objects: Coordination
 
@@ -191,8 +148,7 @@ await stub.fetch(new Request('https://fake/increment'));
 **❌ Large data in vars:** `{ "vars": { "HUGE_CONFIG": "..." } }` (5KB max)  
 **✅** `env.MY_KV.put('config', data)`
 
-**❌ Caching env globally:** `const apiKey = env.API_KEY` outside fetch()  
-**✅** Access `env.API_KEY` per-request inside fetch()
+**Derived clients:** Handler injection makes dependencies explicit. Imported module-level env is supported, but cached derived clients need a binding-update/lifetime policy.
 
 ## See Also
 

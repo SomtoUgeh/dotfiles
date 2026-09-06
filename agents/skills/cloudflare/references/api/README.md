@@ -6,7 +6,8 @@ Guide for working with Cloudflare's REST API - authentication, SDK usage, common
 
 ```
 How are you calling the Cloudflare API?
-├─ From Workers runtime → Use bindings, not REST API (see ../bindings/)
+├─ Workers data access → Use the available product binding (see ../bindings/)
+├─ Workers control-plane operations (zones, DNS, configuration) → REST API/SDK
 ├─ Server-side (Node/Python/Go) → Official SDK (see api.md)
 ├─ CLI/scripts → Wrangler or curl (see configuration.md)
 ├─ Infrastructure-as-code → See ../pulumi/ or ../terraform/
@@ -19,7 +20,7 @@ How are you calling the Cloudflare API?
 |----------|---------|----------|-----------------|
 | TypeScript | `cloudflare` | Node.js, Bun, Next.js, Workers | 2 |
 | Python | `cloudflare` | FastAPI, Django, scripts | 2 |
-| Go | `cloudflare-go/v4` | CLI tools, microservices | 10 |
+| Go | `cloudflare-go/v7` | CLI tools, microservices | 2 |
 
 All SDKs are Stainless-generated from OpenAPI spec (consistent APIs).
 
@@ -37,9 +38,9 @@ All SDKs are Stainless-generated from OpenAPI spec (consistent APIs).
 
 | Limit | Value |
 |-------|-------|
-| Per user/token | 1200 requests / 5 minutes |
+| Per user or account token | 1200 requests / 5 minutes |
 | Per IP | 200 requests / second |
-| GraphQL | 320 / 5 minutes (cost-based) |
+| GraphQL | up to 320 / 5 minutes (query-cost dependent) |
 
 ## Reading Order
 

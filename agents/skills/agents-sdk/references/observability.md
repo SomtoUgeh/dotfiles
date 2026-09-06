@@ -9,14 +9,16 @@ Agents emit structured events via Node.js `diagnostics_channel`. Subscribe in de
 ```typescript
 import { subscribe } from "agents/observability";
 
-subscribe("agents:rpc", (event) => {
+subscribe("rpc", (event) => {
   console.log(`RPC call: ${event.payload.method}`);
 });
 
-subscribe("agents:state", (event) => {
+subscribe("state", (event) => {
   console.log(`State change on ${event.agent}`);
 });
 ```
+
+The typed helper accepts keys such as `"rpc"` and `"state"`. Raw `node:diagnostics_channel` subscriptions use the full names below.
 
 ## Available Channels
 

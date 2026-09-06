@@ -21,9 +21,10 @@ High-level guidance for Workers that invoke Durable Objects.
     ]
   },
 
-  "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["ChatRoom", "UserSession"] }
-  ],
+  "exports": {
+    "ChatRoom": { "type": "durable-object", "storage": "sqlite" },
+    "UserSession": { "type": "durable-object", "storage": "sqlite" }
+  },
 
   // Environment variables
   "vars": {
@@ -59,13 +60,15 @@ compatibility_flags = ["nodejs_compat"]
 name = "CHAT_ROOM"
 class_name = "ChatRoom"
 
-[[migrations]]
-tag = "v1"
-new_sqlite_classes = ["ChatRoom"]
+[exports.ChatRoom]
+type = "durable-object"
+storage = "sqlite"
 
 [vars]
 ENVIRONMENT = "production"
 ```
+
+Existing migration-based deployments remain supported. Keep their migration tags; do not combine `migrations` with Durable Object `exports` in the same configuration.
 
 ## TypeScript Types
 
@@ -120,10 +123,10 @@ export default {
     try {
       // Route to appropriate handler
       if (url.pathname.startsWith("/api/rooms")) {
-        return handleRooms(request, env);
+        return await handleRooms(request, env);
       }
       if (url.pathname.startsWith("/api/users")) {
-        return handleUsers(request, env);
+        return await handleUsers(request, env);
       }
 
       return new Response("Not Found", { status: 404 });
@@ -166,7 +169,12 @@ const SendMessageSchema = z.object({
 });
 
 async function handleSendMessage(request: Request, env: Env): Promise<Response> {
-  const body = await request.json();
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON" }, { status: 400 });
+  }
   const result = SendMessageSchema.safeParse(body);
 
   if (!result.success) {
@@ -269,12 +277,18 @@ async function callDO(stub: DurableObjectStub<ChatRoom>, method: string): Promis
 
 ```typescript
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  const timeout = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error("Timeout")), ms)
-  );
-  return Promise.race([promise, timeout]);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error("Timeout")), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
 }
 
+// This times out the wait; it does not cancel the underlying RPC.
 // Usage
 const result = await withTimeout(stub.processData(data), 5000);
 ```
@@ -341,6 +355,6 @@ wrangler deploy
 # Tail logs
 wrangler tail
 
-# List DOs
-wrangler d1 execute DB --command "SELECT * FROM _cf_DO"
+# Namespace inspection: use the Cloudflare dashboard or the documented
+# Durable Objects namespaces REST API. Wrangler has no durable-objects command.
 ```

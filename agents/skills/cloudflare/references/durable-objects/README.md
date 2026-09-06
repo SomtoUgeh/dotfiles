@@ -17,7 +17,7 @@ Durable Objects combine compute with storage in globally-unique, strongly-consis
 - **Co-located storage**: Fast, strongly-consistent storage with compute
 - **Automatic placement**: Objects spawn near first request location
 - **Stateful serverless**: In-memory state + persistent storage
-- **Single-threaded**: Serial request processing (no race conditions)
+- **Single-threaded**: One JavaScript thread; external I/O can allow request interleaving
 
 ## Rules of Durable Objects
 
@@ -45,7 +45,7 @@ All DOs extend `DurableObject` base class with constructor receiving `DurableObj
 
 - **Not Created**: DO ID exists but instance never spawned
 - **Active**: Processing requests, in-memory state valid, billed per GB-hour
-- **Hibernated**: WebSocket connections open but zero compute, zero cost
+- **Hibernated**: WebSocket connections open but no active compute duration charges; storage and other usage remain billable
 - **Evicted**: Removed from memory; next request triggers cold start
 - **Destroyed**: Data deleted via migration or manual deletion
 
@@ -94,8 +94,13 @@ See [DO Storage](../do-storage/README.md) for deep dive.
 import { DurableObject } from "cloudflare:workers";
 
 export class Counter extends DurableObject<Env> {
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    ctx.storage.sql.exec("CREATE TABLE IF NOT EXISTS counters (id INTEGER PRIMARY KEY, value INTEGER NOT NULL)");
+  }
+
   async increment(): Promise<number> {
-    const result = this.ctx.storage.sql.exec(
+    const result = this.ctx.storage.sql.exec<{ value: number }>(
       `INSERT INTO counters (id, value) VALUES (1, 1)
        ON CONFLICT(id) DO UPDATE SET value = value + 1
        RETURNING value`
@@ -173,7 +178,7 @@ npx wrangler deploy           # Deploy + auto-apply migrations
 
 ## In This Reference
 
-- **[Configuration](./configuration.md)** - wrangler.jsonc setup, migrations, bindings, environments
+- **[Configuration](./configuration.md)** - wrangler.jsonc lifecycle exports, legacy migrations, bindings, environments
 - **[API](./api.md)** - Class structure, ctx methods, alarms, WebSocket hibernation
 - **[Patterns](./patterns.md)** - Sharding, rate limiting, locks, real-time, sessions
 - **[Gotchas](./gotchas.md)** - Limits, hibernation caveats, common errors
@@ -182,4 +187,4 @@ npx wrangler deploy           # Deploy + auto-apply migrations
 
 - **[DO Storage](../do-storage/README.md)** - SQLite, KV, transactions (detailed storage guide)
 - **[Workers](../workers/README.md)** - Core Workers runtime features
-- **[WebSockets](../websockets/README.md)** - WebSocket APIs and patterns
+- **[WebSockets](https://developers.cloudflare.com/durable-objects/best-practices/websockets/)** - WebSocket APIs and patterns

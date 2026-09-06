@@ -47,7 +47,7 @@ npx wrangler pages dev ./dist
 npx wrangler pages deploy ./dist --project-name=my-project
 
 # Types
-npx wrangler types --path='./functions/types.d.ts'
+npx wrangler types ./functions/types.d.ts
 
 # Secrets
 echo "value" | npx wrangler pages secret put KEY --project-name=my-project

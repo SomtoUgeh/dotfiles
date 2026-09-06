@@ -14,13 +14,13 @@
 
 **Client (PartyTracks):**
 ```bash
-npm install partytracks @cloudflare/calls
+npm install partytracks rxjs
 ```
 
 **Client (React + PartyTracks):**
 ```bash
-npm install partytracks @cloudflare/calls observable-hooks
-# Observable hooks: useObservableAsValue, useValueAsObservable
+npm install partytracks rxjs react
+# Import hooks from partytracks/react
 ```
 
 **Client (Raw API):** Native browser WebRTC API only
@@ -39,6 +39,7 @@ npm install partytracks @cloudflare/calls observable-hooks
     "MAX_WEBCAM_QUALITY_LEVEL": "1080"
   },
   // Set secret: wrangler secret put CALLS_APP_SECRET
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
   "durable_objects": {
     "bindings": [
       {
@@ -94,37 +95,13 @@ const pc = new RTCPeerConnection({
 
 **Ports:** 3478 (UDP/TCP), 53 (UDP), 80 (TCP), 443 (TLS), 5349 (TLS)
 
-**When to use TURN:** Required for restrictive corporate firewalls/networks that block UDP. ~5-10% of connections fallback to TURN. STUN works for most users.
+**When to use TURN:** Required for restrictive corporate firewalls/networks that block UDP. Measure TURN usage on the networks your application supports.
 
-**ICE candidate filtering:** Cloudflare handles candidate filtering automatically. No need to manually filter candidates.
+Use the current TURN endpoint guidance when filtering browser-restricted ports; do not assume every returned candidate is usable in every browser.
 
-## Durable Object Boilerplate
+## Durable Object Presence
 
-Minimal presence system:
-
-```typescript
-export class Room {
-  private sessions = new Map<string, {userId: string, tracks: string[]}>();
-
-  async fetch(req: Request) {
-    const {pathname} = new URL(req.url);
-    const body = await req.json();
-    
-    if (pathname === '/join') {
-      this.sessions.set(body.sessionId, {userId: body.userId, tracks: []});
-      return Response.json({participants: this.sessions.size});
-    }
-    
-    if (pathname === '/publish') {
-      this.sessions.get(body.sessionId)?.tracks.push(...body.tracks);
-      // Broadcast to others via WebSocket (not shown)
-      return new Response('OK');
-    }
-    
-    return new Response('Not found', {status: 404});
-  }
-}
-```
+Use an authenticated room Durable Object to maintain participant membership and exchange authorized track metadata. Persist required state (or recover it from hibernating WebSockets); an in-memory Map alone disappears when the object restarts. Validate request bodies and derive user identity server-side. Remove membership and tracks on disconnect/leave and handle reconnect races. The migration above requires an exported `Room` class; remove the binding/migration if you do not implement one.
 
 ## Environment Validation
 

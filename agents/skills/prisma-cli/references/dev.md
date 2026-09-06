@@ -109,7 +109,7 @@ prisma dev rm myproject --force
 
 ## Configuration
 
-Configure your `prisma.config.ts` to use local Prisma Postgres:
+Configure your `prisma7.config.ts` to use local Prisma Postgres:
 
 ```typescript
 import 'dotenv/config'
@@ -148,10 +148,4 @@ export default defineConfig({
 
 ## Production Migration
 
-When ready for production, switch to Prisma Postgres cloud:
-
-```bash
-prisma init --db
-```
-
-Update your `DATABASE_URL` to the cloud connection string.
+Provision a cloud database through Console or an authorized provisioning workflow. Running `prisma init` in an already initialized project is not a data migration. Apply reviewed migrations and explicitly migrate any needed development data, then update the target connection string.

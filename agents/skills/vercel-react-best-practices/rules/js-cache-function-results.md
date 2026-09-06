@@ -33,9 +33,9 @@ function ProjectList({ projects }: { projects: Project[] }) {
 const slugifyCache = new Map<string, string>()
 
 function cachedSlugify(text: string): string {
-  if (slugifyCache.has(text)) {
-    return slugifyCache.get(text)!
-  }
+  const cached = slugifyCache.get(text)
+  if (cached !== undefined) return cached
+  if (slugifyCache.size >= 1000) slugifyCache.clear()
   const result = slugify(text)
   slugifyCache.set(text, result)
   return result
@@ -55,25 +55,7 @@ function ProjectList({ projects }: { projects: Project[] }) {
 }
 ```
 
-**Simpler pattern for single-value functions:**
-
-```typescript
-let isLoggedInCache: boolean | null = null
-
-function isLoggedIn(): boolean {
-  if (isLoggedInCache !== null) {
-    return isLoggedInCache
-  }
-  
-  isLoggedInCache = document.cookie.includes('auth=')
-  return isLoggedInCache
-}
-
-// Clear cache when auth changes
-function onAuthChange() {
-  isLoggedInCache = null
-}
-```
+Cache only pure computations. Include every input in the key, bound growth, and invalidate when inputs outside the key change. A cookie substring is not an authentication check; authenticate on the server for each protected operation.
 
 Use a Map (not a hook) so it works everywhere: utilities, event handlers, not just React components.
 

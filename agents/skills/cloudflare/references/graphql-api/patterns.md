@@ -110,7 +110,7 @@ query DNSQueryVolume($zoneTag: string!, $start: Time!, $end: Time!) {
 
 ## Storage Analytics (Account-Scoped)
 
-R2, KV, and D1 use `date` (Date type) filters instead of `datetime` (Time type).
+Storage datasets vary: inspect the specific input type for supported `date` (Date) and `datetime` (Time) filters. These are selection fragments requiring an account-scoped query and matching variable types.
 
 ```graphql
 # R2 operations

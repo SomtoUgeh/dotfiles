@@ -5,42 +5,46 @@ description: Reference for common AI SDK errors and how to resolve them.
 
 # Common Errors
 
+The snippets assume `model` is the project's configured provider instance or a
+model ID verified against the provider's current catalog. Keep that existing
+choice while applying the API migration shown.
+
 ## `maxTokens` → `maxOutputTokens`
 
 ```typescript
 // ❌ Incorrect
 const result = await generateText({
-  model: 'anthropic/claude-opus-4.5',
+  model,
   maxTokens: 512, // deprecated: use `maxOutputTokens` instead
   prompt: 'Write a short story',
 });
 
 // ✅ Correct
 const result = await generateText({
-  model: 'anthropic/claude-opus-4.5',
+  model,
   maxOutputTokens: 512,
   prompt: 'Write a short story',
 });
 ```
 
-## `maxSteps` → `stopWhen: isStepCount(n)`
+## `maxSteps` → `stopWhen: stepCountIs(n)`
 
 ```typescript
 // ❌ Incorrect
 const result = await generateText({
-  model: 'anthropic/claude-opus-4.5',
+  model,
   tools: { weather },
-  maxSteps: 5, // deprecated: use `stopWhen: isStepCount(n)` instead
+  maxSteps: 5, // deprecated: use `stopWhen: stepCountIs(n)` instead
   prompt: 'What is the weather in NYC?',
 });
 
 // ✅ Correct
-import { generateText, isStepCount } from 'ai';
+import { generateText, stepCountIs } from 'ai';
 
 const result = await generateText({
-  model: 'anthropic/claude-opus-4.5',
+  model,
   tools: { weather },
-  stopWhen: isStepCount(5),
+  stopWhen: stepCountIs(5),
   prompt: 'What is the weather in NYC?',
 });
 ```
@@ -78,7 +82,7 @@ import { generateObject } from 'ai'; // deprecated: use `generateText` with `out
 
 const result = await generateObject({
   // deprecated function
-  model: 'anthropic/claude-opus-4.5',
+  model,
   schema: z.object({
     // deprecated: use `Output.object({ schema })` instead
     recipe: z.object({
@@ -93,7 +97,7 @@ const result = await generateObject({
 import { generateText, Output } from 'ai';
 
 const result = await generateText({
-  model: 'anthropic/claude-opus-4.5',
+  model,
   output: Output.object({
     schema: z.object({
       recipe: z.object({
@@ -113,7 +117,7 @@ console.log(result.output); // typed object
 ```typescript
 // ❌ Incorrect
 const result = await generateText({
-  model: 'anthropic/claude-opus-4.5',
+  model,
   prompt: `Extract the user info as JSON: { "name": string, "age": number }
 
   Input: John is 25 years old`,
@@ -124,7 +128,7 @@ const parsed = JSON.parse(result.text);
 import { generateText, Output } from 'ai';
 
 const result = await generateText({
-  model: 'anthropic/claude-opus-4.5',
+  model,
   output: Output.object({
     schema: z.object({
       name: z.string(),
@@ -142,7 +146,7 @@ console.log(result.output); // { name: 'John', age: 25 }
 ```typescript
 // Output.array - for generating arrays of items
 const result = await generateText({
-  model: 'anthropic/claude-opus-4.5',
+  model,
   output: Output.array({
     element: z.object({
       city: z.string(),
@@ -154,7 +158,7 @@ const result = await generateText({
 
 // Output.choice - for selecting from predefined options
 const result = await generateText({
-  model: 'anthropic/claude-opus-4.5',
+  model,
   output: Output.choice({
     options: ['positive', 'negative', 'neutral'] as const,
   }),
@@ -163,15 +167,15 @@ const result = await generateText({
 
 // Output.json - for untyped JSON output
 const result = await generateText({
-  model: 'anthropic/claude-opus-4.5',
+  model,
   output: Output.json(),
   prompt: 'Return some JSON data',
 });
 ```
 
-## `toDataStreamResponse` → `createUIMessageStreamResponse`
+## `toDataStreamResponse` → UI message stream helpers
 
-When using `useChat` on the frontend, use `createUIMessageStreamResponse()` with `toUIMessageStream()` instead of `toDataStreamResponse()`. The UI message stream format is designed to work with the chat UI components and handles message state correctly.
+When using `useChat` on the frontend, return the UI message stream protocol instead of a text or legacy data stream. Current AI SDK 7 types expose standalone `toUIMessageStream()` and `createUIMessageStreamResponse()` helpers. Check the installed types: earlier AI SDK 7 releases may instead document `result.toUIMessageStreamResponse()`.
 
 ```typescript
 // ❌ Incorrect (when using useChat)
@@ -182,6 +186,12 @@ const result = streamText({
 return result.toDataStreamResponse(); // deprecated for useChat: use createUIMessageStreamResponse
 
 // ✅ Correct
+import {
+  createUIMessageStreamResponse,
+  streamText,
+  toUIMessageStream,
+} from 'ai';
+
 const result = streamText({
   // config
 });
@@ -219,7 +229,7 @@ export default function Page() {
 // ✅ Correct
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 
 export default function Page() {
   const [input, setInput] = useState('');
@@ -227,7 +237,7 @@ export default function Page() {
     transport: new DefaultChatTransport({ api: '/api/chat' }),
   });
 
-  const handleSubmit = e => {
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     sendMessage({ text: input });
     setInput('');
@@ -287,7 +297,7 @@ Typed tool parts also use different property names:
 }
 
 // ✅ Alternative - using isToolUIPart as a catch-all
-import { isToolUIPart } from 'ai';
+import { getToolName, isToolUIPart } from 'ai';
 
 {
   message.parts.map(part => {
@@ -298,7 +308,7 @@ import { isToolUIPart } from 'ai';
       // handle any tool part generically
       return (
         <div key={part.toolCallId}>
-          {part.toolName}: {part.state}
+          {getToolName(part)}: {part.state}
         </div>
       );
     }

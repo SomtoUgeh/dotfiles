@@ -74,6 +74,7 @@ where: { deletedAt: null }
 // Is not null
 where: { deletedAt: { not: null } }
 
+// MongoDB-only in supported Prisma versions; unavailable in Prisma 7
 // Using isSet (for optional fields)
 where: { middleName: { isSet: true } }
 ```
@@ -164,7 +165,7 @@ where: {
 
 ### every
 
-All related records match:
+All related records match (also true when there are no related records; combine with `some: {}` when at least one is required):
 
 ```typescript
 // Users where all posts are published
@@ -198,7 +199,7 @@ where: {
   }
 }
 
-// Users without profile
+// Users with a profile
 where: {
   profile: {
     isNot: null
@@ -247,7 +248,8 @@ where: {
 ## Full-Text Search
 
 ```typescript
-// Requires @@fulltext index
+// MySQL requires a matching @@fulltext index; PostgreSQL uses its
+// version-specific fullTextSearchPostgres preview feature instead.
 where: {
   content: {
     search: 'prisma database'

@@ -1,9 +1,11 @@
 ---
 name: frontend-design
-description: Create distinctive, production-grade frontend interfaces with high design quality. Use this skill when the user asks to build web components, pages, artifacts, posters, or applications (examples include websites, landing pages, dashboards, React components, HTML/CSS layouts, or when styling/beautifying any web UI). Generates creative, polished code and UI design that avoids generic AI aesthetics.
+description: Design and implement a production-grade web interface when no more specific supplied-design, image-first, redesign, or named-style workflow applies.
 ---
 
-This skill guides creation of distinctive, production-grade frontend interfaces that avoid generic "AI slop" aesthetics. Implement real working code with exceptional attention to aesthetic details and creative choices.
+This skill guides creation of distinctive, production-grade frontend interfaces. Implement real working code with close attention to aesthetic details and purposeful choices.
+
+Use this as the general frontend implementation skill. Route supplied screenshots to shared `image-to-code`, Figma sources to native `figma-design-to-code` when available or shared `implement-design` otherwise, existing-site redesigns to `redesign-existing-projects`, and visual-comp-only requests to `imagegen-frontend-web`. An explicit user choice overrides this routing. If the user chooses a named style, follow it without blending incompatible mandates from other visual skills.
 
 The user provides frontend requirements: a component, page, application, or interface to build. They may include context about the purpose, audience, or technical constraints.
 
@@ -26,16 +28,19 @@ Then implement working code (HTML/CSS/JS, React, Vue, etc.) that is:
 ## Frontend Aesthetics Guidelines
 
 Focus on:
-- **Typography**: Choose fonts that are beautiful, unique, and interesting. Avoid generic fonts like Arial and Inter; opt instead for distinctive choices that elevate the frontend's aesthetics; unexpected, characterful font choices. Pair a distinctive display font with a refined body font.
+- **Typography**: Choose legible type suited to the subject and existing brand. Establish a deliberate scale and hierarchy; use one family or a clearly differentiated pair. Preserve user-selected and established product fonts.
 - **Color & Theme**: Commit to a cohesive aesthetic. Use CSS variables for consistency. Dominant colors with sharp accents outperform timid, evenly-distributed palettes.
-- **Motion**: Use animations for effects and micro-interactions. Prioritize CSS-only solutions for HTML. Use Motion library for React when available. Focus on high-impact moments: one well-orchestrated page load with staggered reveals (animation-delay) creates more delight than scattered micro-interactions. Use scroll-triggering and hover states that surprise.
+- **Motion**: Make user actions and state changes easy to follow. Use non-interactive motion sparingly, respect reduced motion, and follow the repository's existing animation tools. Add a page entrance or scroll effect only when it serves the brief.
 - **Spatial Composition**: Unexpected layouts. Asymmetry. Overlap. Diagonal flow. Grid-breaking elements. Generous negative space OR controlled density.
 - **Backgrounds & Visual Details**: Create atmosphere and depth rather than defaulting to solid colors. Add contextual effects and textures that match the overall aesthetic. Apply creative forms like gradient meshes, noise textures, geometric patterns, layered transparencies, dramatic shadows, decorative borders, custom cursors, and grain overlays.
 
-NEVER use generic AI-generated aesthetics like overused font families (Inter, Roboto, Arial, system fonts), cliched color schemes (particularly purple gradients on white backgrounds), predictable layouts and component patterns, and cookie-cutter design that lacks context-specific character.
+Avoid thoughtless defaults such as an unrelated font swap, a decorative purple gradient, or a layout copied without regard for the product. Established brand fonts and system fonts are valid when the repository or user chose them.
 
-Interpret creatively and make unexpected choices that feel genuinely designed for the context. No design should be the same. Vary between light and dark themes, different fonts, different aesthetics. NEVER converge on common choices (Space Grotesk, for example) across generations.
+Interpret creatively where the brief leaves room. Choose light or dark mode, typography, and composition from the actual product context rather than forcing novelty across runs.
 
 **IMPORTANT**: Match implementation complexity to the aesthetic vision. Maximalist designs need elaborate code with extensive animations and effects. Minimalist or refined designs need restraint, precision, and careful attention to spacing, typography, and subtle details. Elegance comes from executing the vision well.
 
-Remember: the active agent is capable of extraordinary creative work. Don't hold back, show what can truly be created when thinking outside the box and committing fully to a distinctive vision.
+Before finishing, inspect the rendered interface and its primary interactions.
+Check responsive layout, keyboard focus, contrast, and reduced motion. Remove
+decorative labels, repeated effects, and placeholder copy that do not help the
+person using the product. Report any visual checks that could not run.

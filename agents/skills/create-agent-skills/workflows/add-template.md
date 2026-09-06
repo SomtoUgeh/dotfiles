@@ -1,74 +1,11 @@
-# Workflow: Add a Template to a Skill
+# Add a Template
 
-<required_reading>
-**Read these reference files NOW:**
-1. references/using-templates.md
-</required_reading>
+Read [using templates](../references/using-templates.md). Use the target and output format already supplied; ask only for essential gaps.
 
-<process>
-## Step 1: Identify the Skill
+1. Read the existing skill and output contract.
+2. Create a template only when stable structure improves the output. Use clear placeholders and minimal guidance.
+3. Link it from the entrypoint and producing workflow. Specify how evidence maps to fields and how missing inputs are reported.
+4. Populate a realistic fixture from explicitly supplied sample data. Parse structured output or inspect rendered documents.
+5. Test missing required input; do not fabricate values to fill the template.
 
-Ask (if not already provided):
-- Which skill needs a template?
-- What output does this template structure?
-
-## Step 2: Analyze Template Need
-
-Confirm this is a good template candidate:
-- [ ] Output has consistent structure across uses
-- [ ] Structure matters more than creative generation
-- [ ] Filling placeholders is more reliable than blank-page generation
-
-If not a good fit, suggest alternatives (workflow guidance, reference examples).
-
-## Step 3: Create Templates Directory
-
-```bash
-mkdir -p ~/.agents/skills/{skill-name}/templates
-```
-
-## Step 4: Design Template Structure
-
-Gather requirements:
-- What sections does the output need?
-- What information varies between uses? (→ placeholders)
-- What stays constant? (→ static structure)
-
-## Step 5: Write Template File
-
-Create `templates/{template-name}.md` with:
-- Clear section markers
-- `{{PLACEHOLDER}}` syntax for variable content
-- Brief inline guidance where helpful
-- Minimal example content
-
-## Step 6: Update Workflow to Use Template
-
-Find the workflow that produces this output. Add:
-```xml
-<process>
-...
-N. Read `templates/{template-name}.md`
-N+1. Copy template structure
-N+2. Fill each placeholder based on gathered context
-...
-</process>
-```
-
-## Step 7: Test
-
-Invoke the skill workflow and verify:
-- Template is read at the right step
-- All placeholders get filled appropriately
-- Output structure matches template
-- No placeholders left unfilled
-</process>
-
-<success_criteria>
-Template is complete when:
-- [ ] templates/ directory exists
-- [ ] Template file has clear structure with placeholders
-- [ ] At least one workflow references the template
-- [ ] Workflow instructions explain when/how to use template
-- [ ] Tested with real invocation
-</success_criteria>
+Complete when the template is reachable, the populated output validates, and unused placeholders are removed or explicitly unresolved.

@@ -73,25 +73,6 @@ create_symlink() {
     ln -sf "$source" "$target"
 }
 
-# Render a machine-local copy of a template file.
-render_agent_file() {
-    local source="$1"
-    local target="$2"
-
-    local target_dir
-    target_dir="$(dirname "$target")"
-    mkdir -p "$target_dir"
-
-    if [ -L "$target" ]; then
-        rm "$target"
-    fi
-
-    sed \
-        -e "s#\\\${HOME}/code/dotfiles#${DOTFILES_DIR}#g" \
-        -e "s#/Users/somto#${HOME}#g" \
-        "$source" > "$target"
-}
-
 # =============================================================================
 # Homebrew (bootstrap — everything below may depend on it)
 # =============================================================================
@@ -236,8 +217,10 @@ echo "Setting up git configurations..."
 create_symlink "$DOTFILES_DIR/git/.gitconfig" "$HOME/.gitconfig"
 create_symlink "$DOTFILES_DIR/git/.gitignore_global" "$HOME/.gitignore_global"
 
-# Global git hooks (worm guard). core.hooksPath in git/.gitconfig points here.
-create_symlink "$DOTFILES_DIR/git/hooks" "$HOME/.git-hooks"
+# Remove only the retired link owned by this checkout; preserve custom hooks.
+if [ -L "$HOME/.git-hooks" ] && [ "$(readlink "$HOME/.git-hooks")" = "$DOTFILES_DIR/git/hooks" ]; then
+    rm "$HOME/.git-hooks"
+fi
 
 # =============================================================================
 # Claude Code CLI
@@ -341,6 +324,10 @@ AGENTS_DIR="$DOTFILES_DIR/agents"
 mkdir -p "$HOME/.agents"
 create_symlink "$AGENTS_DIR/skills" "$HOME/.agents/skills"
 
+# Grok reads the same shared instructions directly, including on hosts without
+# Claude compatibility configuration. The neutral skill path is sufficient.
+create_symlink "$AGENTS_DIR/shared/AGENTS.md" "$HOME/.grok/AGENTS.md"
+
 # Claude Code
 mkdir -p "$HOME/.claude/hooks"
 create_symlink "$AGENTS_DIR/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
@@ -370,16 +357,9 @@ chmod +x "$HOME/.claude/hooks/git_guard.py" "$HOME/.claude/statusline.sh" "$HOME
 mkdir -p "$HOME/.codex"
 create_symlink "$AGENTS_DIR/codex/AGENTS.md" "$HOME/.codex/AGENTS.md"
 create_symlink "$AGENTS_DIR/shared/ETHOS.md" "$HOME/.codex/ETHOS.md"
-if [ -f "$AGENTS_DIR/codex/config.toml" ]; then
-    render_agent_file "$AGENTS_DIR/codex/config.toml" "$HOME/.codex/config.toml"
-    chmod 600 "$HOME/.codex/config.toml"
-    echo -e "${GREEN}✓ Rebuilt host-local Codex config: $HOME/.codex/config.toml${NC}"
-fi
-if [ -f "$AGENTS_DIR/codex/hooks.json" ]; then
-    render_agent_file "$AGENTS_DIR/codex/hooks.json" "$HOME/.codex/hooks.json"
-    chmod 600 "$HOME/.codex/hooks.json"
-    echo -e "${GREEN}✓ Rebuilt host-local Codex hooks: $HOME/.codex/hooks.json${NC}"
-fi
+uv run --script "$DOTFILES_DIR/scripts/sync_agent_config.py"
+# Warm the pinned hook environment before its first timed invocation.
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"true"}}' | uv run --script "$AGENTS_DIR/shared/hooks/git_guard.py"
 create_symlink "$AGENTS_DIR/codex/agents" "$HOME/.codex/agents"
 
 # OpenCode
@@ -586,15 +566,33 @@ echo "Setting up custom scripts in ~/bin..."
 
 mkdir -p "$HOME/bin"
 
-for script in "$DOTFILES_DIR/scripts/"*; do
-    if [ -f "$script" ]; then
-        script_name=$(basename "$script")
-        # Skip .DS_Store
-        if [ "$script_name" != ".DS_Store" ]; then
-            create_symlink "$script" "$HOME/bin/$script_name"
-            chmod +x "$HOME/bin/$script_name" 2>/dev/null || true
+# Only public commands belong on PATH. Tests and implementation modules stay
+# in the repository. Running the installer never starts a scanner or monitor.
+PUBLIC_SCRIPTS=(
+    setup_ssh_from_1password.sh
+    apply_github_rulesets.sh
+    enable_touchid_sudo.sh
+    setup_altschool_cloud.sh
+    verify_altschool_cloud.sh
+    scan_repo.sh
+    scan_remote.sh
+)
+for script_name in "${PUBLIC_SCRIPTS[@]}"; do
+    create_symlink "$DOTFILES_DIR/scripts/$script_name" "$HOME/bin/$script_name"
+done
+
+# Migrate links from the old install-everything loop without deleting user files.
+for target in "$HOME/bin/"*; do
+    [ -L "$target" ] || continue
+    source=$(readlink "$target")
+    case "$source" in "$DOTFILES_DIR/scripts/"*) ;; *) continue ;; esac
+    keep=0
+    for script_name in "${PUBLIC_SCRIPTS[@]}"; do
+        if [ "$source" = "$DOTFILES_DIR/scripts/$script_name" ] && [ "$target" = "$HOME/bin/$script_name" ]; then
+            keep=1
         fi
-    fi
+    done
+    [ "$keep" = 1 ] || rm "$target"
 done
 
 # =============================================================================

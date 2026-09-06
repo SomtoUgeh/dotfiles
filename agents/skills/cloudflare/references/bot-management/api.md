@@ -23,15 +23,16 @@ interface BotManagement {
 import type { IncomingRequestCfProperties } from '@cloudflare/workers-types';
 
 export default {
-  async fetch(request: Request): Promise<Response> {
-    const cf = request.cf as IncomingRequestCfProperties | undefined;
+  async fetch(request: Request<unknown, IncomingRequestCfProperties>): Promise<Response> {
+    const cf = request.cf;
     const botMgmt = cf?.botManagement;
-    
+
     if (!botMgmt) return fetch(request);
     if (botMgmt.verifiedBot) return fetch(request); // Allow verified bots
     if (botMgmt.score === 1) return new Response('Blocked', { status: 403 });
-    if (botMgmt.score < 30) return new Response('Challenge required', { status: 429 });
-    
+    if (botMgmt.score > 0 && botMgmt.score < 30) return new Response('Blocked by bot policy', { status: 403 });
+    // A plain Worker response does not execute a Managed Challenge; configure that action in WAF.
+
     return fetch(request);
   }
 };
@@ -68,7 +69,7 @@ import type { IncomingRequestCfProperties } from '@cloudflare/workers-types';
 interface JA4Signals {
   // Ratios (0.0-1.0)
   heuristic_ratio_1h?: number;  // Fraction flagged by heuristics
-  browser_ratio_1h?: number;    // Fraction from real browsers  
+  browser_ratio_1h?: number;    // Fraction from real browsers
   cache_ratio_1h?: number;      // Fraction hitting cache
   h2h3_ratio_1h?: number;       // Fraction using HTTP/2 or HTTP/3
   // Ranks (relative position in distribution)
@@ -82,21 +83,22 @@ interface JA4Signals {
 }
 
 export default {
-  async fetch(request: Request): Promise<Response> {
-    const cf = request.cf as IncomingRequestCfProperties | undefined;
-    const ja4Signals = cf?.ja4Signals as JA4Signals | undefined;
-    
-    if (!ja4Signals) return fetch(request); // Not available for HTTP or Worker routing
-    
+  async fetch(request: Request<unknown, IncomingRequestCfProperties>): Promise<Response> {
+    const cf = request.cf;
+    const ja4Signals = cf?.ja4Signals;
+
+    if (typeof ja4Signals !== "object" || ja4Signals === null) return fetch(request);
+
     // Check for anomalous behavior
     // High heuristic_ratio or low browser_ratio = suspicious
-    const heuristicRatio = ja4Signals.heuristic_ratio_1h ?? 0;
-    const browserRatio = ja4Signals.browser_ratio_1h ?? 0;
-    
-    if (heuristicRatio > 0.5 || browserRatio < 0.3) {
+    const heuristicRatio = "heuristic_ratio_1h" in ja4Signals ? ja4Signals.heuristic_ratio_1h : undefined;
+    const browserRatio = "browser_ratio_1h" in ja4Signals ? ja4Signals.browser_ratio_1h : undefined;
+
+    if ((typeof heuristicRatio === "number" && heuristicRatio > 0.5) ||
+        (typeof browserRatio === "number" && browserRatio < 0.3)) {
       return new Response('Suspicious traffic', { status: 403 });
     }
-    
+
     return fetch(request);
   }
 };
@@ -167,3 +169,5 @@ expect(cf.botManagement.score).toBe(99);
 ```
 
 For custom test data, mock request.cf in your test setup.
+
+Metadata source: [Bot Management variables](https://developers.cloudflare.com/bots/reference/bot-management-variables/). Bot classification, verified-bot status, and corporate-proxy status do not grant application authorization.

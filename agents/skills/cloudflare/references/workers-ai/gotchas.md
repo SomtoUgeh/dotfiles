@@ -1,114 +1,14 @@
-# Workers AI Gotchas
+# Workers AI troubleshooting
 
-## Critical: @cloudflare/ai is DEPRECATED
+- **Retired model:** inspect the current catalog. `@cf/meta/llama-3.1-8b-instruct` was deprecated May 30, 2026; select and test a supported replacement, such as the currently listed FP8 variant, rather than retrying forever.
+- **Local development misconception:** `wrangler dev` supports remote AI bindings. Inference uses real account resources; `--remote` is not required for the whole Worker.
+- **Binding missing:** check the exact environment configuration and regenerate types. A Vectorize binding is configured as an array.
+- **Broken SSE:** native text streams contain already-framed SSE bytes, not `{ response }` chunk objects. Forward them or use a proper parser.
+- **Wrong response shape:** distinguish native binding, REST envelope, OpenAI-compatible JSON, and binary models. Validate external JSON and handle absent output.
+- **Tool failures:** model support and schemas vary; there is no fixed “only these two model families support tools” rule. Validate names, arguments, authorization, and loop limits.
+- **Unexpected latency/cost:** cold-start time, context size, batch size, output length, and model load vary. Do not promise a 1–3 second first call or fixed neurons per request.
+- **Error code mismatch:** use the [current error table](https://developers.cloudflare.com/workers-ai/platform/errors/) and structured status, not a copied mapping or substring test against an arbitrary error message.
+- **Context rejected:** limits are model-specific and not universally 2K–8K. Bound inputs/output and inspect the selected model's context window.
+- **SDK endpoint mismatch:** configure the provider's base URL and compatible API family; a default Responses request may not match Workers AI's chat-completions endpoint.
 
-```typescript
-// ❌ WRONG - Don't install @cloudflare/ai
-import Ai from '@cloudflare/ai';
-
-// ✅ CORRECT - Use native binding
-export default {
-  async fetch(request: Request, env: Env) {
-    await env.AI.run('@cf/meta/llama-3.1-8b-instruct', { messages: [...] });
-  }
-}
-```
-
-## Development
-
-### "AI inference doesn't work locally"
-```bash
-# ❌ Local AI doesn't work
-wrangler dev
-# ✅ Use remote
-wrangler dev --remote
-```
-
-### "env.AI is undefined"
-Add binding to wrangler.jsonc:
-```jsonc
-{ "ai": { "binding": "AI" } }
-```
-
-## API Responses
-
-### Embedding response shape varies
-```typescript
-// @cf/baai/bge-base-en-v1.5 returns: { data: [[0.1, 0.2, ...]] }
-const embedding = response.data[0]; // Get first element
-```
-
-### Stream returns ReadableStream
-```typescript
-const stream = await env.AI.run(model, { messages: [...], stream: true });
-for await (const chunk of stream) { console.log(chunk.response); }
-```
-
-## Rate Limits & Pricing
-
-| Model Type | Neurons/Request |
-|------------|-----------------|
-| Small text (7B) | ~50-200 |
-| Large text (70B) | ~500-2000 |
-| Embeddings | ~5-20 |
-| Image gen | ~10,000+ |
-
-**Free tier**: 10,000 neurons/day
-
-```typescript
-// ❌ EXPENSIVE - 70B model
-await env.AI.run('@cf/meta/llama-3.1-70b-instruct', ...);
-// ✅ CHEAPER - Use smallest that works
-await env.AI.run('@cf/meta/llama-3.1-8b-instruct', ...);
-```
-
-## Model-Specific
-
-### Function calling
-Only `@cf/meta/llama-3.1-*` and `mistral-7b-instruct-v0.2` support tools.
-
-### Empty response
-Check context limits (2K-8K tokens). Validate input structure.
-
-### Inconsistent responses
-Set `temperature: 0` for deterministic outputs.
-
-### Cold start latency
-First request: 1-3s. Use AI Gateway caching for frequent prompts.
-
-## TypeScript
-
-```typescript
-interface Env {
-  AI: Ai; // From @cloudflare/workers-types
-}
-
-interface TextGenerationResponse { response: string; }
-interface EmbeddingResponse { data: number[][]; shape: number[]; }
-```
-
-## Common Errors
-
-### 7502: Model not found
-Check exact model name at developers.cloudflare.com/workers-ai/models/
-
-### 7504: Input validation failed
-```typescript
-// Text gen requires messages array
-await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
-  messages: [{ role: 'user', content: 'Hello' }]  // ✅
-});
-
-// Embeddings require text
-await env.AI.run('@cf/baai/bge-base-en-v1.5', { text: 'Hello' });  // ✅
-```
-
-## Vercel AI SDK Integration
-
-```typescript
-import { openai } from '@ai-sdk/openai';
-const model = openai('gpt-3.5-turbo', {
-  baseURL: 'https://api.cloudflare.com/client/v4/accounts/<ACCOUNT_ID>/ai/v1',
-  headers: { Authorization: 'Bearer <API_TOKEN>' }
-});
-```
+[Catalog](https://developers.cloudflare.com/workers-ai/models/) · [Limits](https://developers.cloudflare.com/workers-ai/platform/limits/) · [Pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/)

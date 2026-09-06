@@ -30,11 +30,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 // Method-specific
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const { request, env, params, data } = context;
-  
+
   const user = await env.DB.prepare(
     'SELECT * FROM users WHERE id = ?'
   ).bind(params.id).first();
-  
+
   return Response.json(user);
 };
 
@@ -72,7 +72,8 @@ export const onRequestGet: PagesFunction = async ({ params }) => {
 // Multi-segment: functions/files/[[path]].ts
 export const onRequestGet: PagesFunction = async ({ params }) => {
   // /files/docs/api/v1.md → params.path = ["docs", "api", "v1.md"]
-  const filePath = (params.path as string[]).join('/');
+  const value = params.path;
+  const filePath = Array.isArray(value) ? value.join('/') : value;
   return new Response(filePath);
 };
 ```
@@ -83,7 +84,8 @@ export const onRequestGet: PagesFunction = async ({ params }) => {
 // functions/_middleware.ts
 // Single
 export const onRequest: PagesFunction = async (context) => {
-  const response = await context.next();
+  const upstream = await context.next();
+  const response = new Response(upstream.body, upstream);
   response.headers.set('X-Custom-Header', 'value');
   return response;
 };
@@ -93,7 +95,8 @@ const errorHandler: PagesFunction = async (context) => {
   try {
     return await context.next();
   } catch (err) {
-    return new Response(err.message, { status: 500 });
+    console.error(err);
+    return new Response('Internal server error', { status: 500 });
   }
 };
 
@@ -116,12 +119,12 @@ export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
   // KV
   const cached = await env.KV.get('key', 'json');
   await env.KV.put('key', JSON.stringify({data: 'value'}), {expirationTtl: 3600});
-  
+
   // D1
   const result = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
-  
+
   // R2, Queue, AI - see respective reference docs
-  
+
   return Response.json({success: true});
 };
 ```
@@ -131,23 +134,23 @@ export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
 Full Workers API, bypasses file-based routing:
 
 ```javascript
-// functions/_worker.js
+// dist/_worker.js (the configured Pages build output directory)
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    
+
     // Custom routing
     if (url.pathname.startsWith('/api/')) {
       return new Response('API response');
     }
-    
+
     // REQUIRED: Serve static assets
     return env.ASSETS.fetch(request);
   }
 };
 ```
 
-**When to use**: WebSockets, complex routing, scheduled handlers, email handlers.
+**When to use**: Complex HTTP routing and framework output. Scheduled, queue, and email event handlers belong in separately deployed Workers; Pages advanced mode does not add those triggers.
 
 ## Smart Placement
 
@@ -168,37 +171,8 @@ Automatically optimizes function execution location based on traffic patterns.
 
 **When to use**: Global apps with centralized databases or geographically concentrated traffic sources.
 
-## getRequestContext (Framework SSR)
+## Framework SSR and adapter versions
 
-Access bindings in framework code:
+Binding access is adapter-specific. SvelteKit server load functions use `platform.env` (guard optional `platform` in prerender contexts); Nuxt Pages presets use their documented request context. Newer Astro Workers adapters may use `cloudflare:workers` rather than old `Astro.locals.runtime.env`. Match the installed adapter documentation.
 
-```typescript
-// SvelteKit
-import type { RequestEvent } from '@sveltejs/kit';
-export async function load({ platform }: RequestEvent) {
-  const data = await platform.env.DB.prepare('SELECT * FROM users').all();
-  return { users: data.results };
-}
-
-// Astro
-const { DB } = Astro.locals.runtime.env;
-const data = await DB.prepare('SELECT * FROM users').all();
-
-// Solid Start (server function)
-import { getRequestEvent } from 'solid-js/web';
-const event = getRequestEvent();
-const data = await event.locals.runtime.env.DB.prepare('SELECT * FROM users').all();
-```
-
-**✅ Supported adapters** (2026):
-- **SvelteKit**: `@sveltejs/adapter-cloudflare`
-- **Astro**: Built-in Cloudflare adapter
-- **Nuxt**: Set `nitro.preset: 'cloudflare-pages'` in `nuxt.config.ts`
-- **Qwik**: Built-in Cloudflare adapter
-- **Solid Start**: `@solidjs/start-cloudflare-pages`
-
-**❌ Deprecated/Unsupported**:
-- **Next.js**: Official adapter (`@cloudflare/next-on-pages`) deprecated. Use Vercel or self-host on Workers.
-- **Remix**: Official adapter (`@remix-run/cloudflare-pages`) deprecated. Migrate to supported frameworks.
-
-See [gotchas.md](./gotchas.md#framework-specific) for migration guidance.
+The deprecated Next-on-Pages adapter does not mean Cloudflare lacks Next.js support. Current [Next.js guidance](https://developers.cloudflare.com/workers/framework-guides/web-apps/nextjs/) recommends beta vinext with a compatibility check and documents OpenNext for existing applications; static exports can remain on Pages. React Router (formerly Remix) has a [Workers guide](https://developers.cloudflare.com/workers/framework-guides/web-apps/react-router/). Do not recommend changing frameworks just because an old adapter was deprecated.

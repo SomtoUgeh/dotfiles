@@ -36,6 +36,4 @@ pieces, rejected ideas, verification, and executor recommendation.
 
 ## Install
 
-```sh
-npx @agent-native/skills@latest add --skill plan-arbiter
-```
+This skill is shipped by the shared dotfiles skill catalog. Use the repository's agent setup to expose it to the selected harness; do not install a similarly named registry package without checking its source and provenance.

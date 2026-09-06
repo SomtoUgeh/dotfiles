@@ -23,14 +23,21 @@ export default {
 
 Keep sessions alive for performance:
 ```typescript
-let sessionId = await env.SESSION_KV.get("browser-session");
-if (sessionId) {
-  browser = await puppeteer.connect(env.MYBROWSER, sessionId);
-} else {
-  browser = await puppeteer.launch(env.MYBROWSER, { keep_alive: 600000 });
-  await env.SESSION_KV.put("browser-session", browser.sessionId(), { expirationTtl: 600 });
+// Coordinate this operation through one Durable Object owner.
+// Given an active session ID owned by that object:
+const browser = await puppeteer.connect(env.MYBROWSER, sessionId);
+try {
+  const context = await browser.createBrowserContext();
+  try {
+    const page = await context.newPage();
+    await page.goto("https://example.com");
+  } finally {
+    await context.close();
+  }
+} finally {
+  await browser.disconnect(); // Release connection while preserving the owned session.
 }
-// Don't close browser to keep session alive
+// Handle expired/busy sessions in the owner, and close the browser when retiring it.
 ```
 
 ## Common Operations
@@ -39,7 +46,7 @@ if (sessionId) {
 |------|------|
 | Screenshot | `await page.screenshot({ type: "png", fullPage: true })` |
 | PDF | `await page.pdf({ format: "A4", printBackground: true })` |
-| Extract data | `await page.evaluate(() => document.querySelector('h1').textContent)` |
+| Extract data | `await page.evaluate(() => document.querySelector('h1')?.textContent)` |
 | Fill form | `await page.type('#input', 'value'); await page.click('button')` |
 | Wait nav | `await Promise.all([page.waitForNavigation(), page.click('a')])` |
 
@@ -56,6 +63,7 @@ const titles = await Promise.all(pages.map(p => p.title()));
 ```typescript
 import { launch } from "@cloudflare/playwright";
 const browser = await launch(env.MYBROWSER);
+const page = await browser.newPage();
 await page.getByRole("button", { name: "Sign in" }).click();
 await page.getByLabel("Email").fill("user@example.com");
 await page.getByTestId("submit-button").click();
@@ -65,8 +73,8 @@ await page.getByTestId("submit-button").click();
 
 Isolated sessions without multiple browsers:
 ```typescript
-const ctx1 = await browser.createIncognitoBrowserContext();
-const ctx2 = await browser.createIncognitoBrowserContext();
+const ctx1 = await browser.createBrowserContext();
+const ctx2 = await browser.createBrowserContext();
 // Each has isolated cookies/storage
 ```
 
@@ -74,7 +82,9 @@ const ctx2 = await browser.createIncognitoBrowserContext();
 
 ```typescript
 const limits = await puppeteer.limits(env.MYBROWSER);
-if (limits.remaining < 60000) return new Response("Quota low", { status: 429 });
+if (limits.allowedBrowserAcquisitions === 0) {
+  return new Response("Browser acquisition limit", { status: 429 });
+}
 ```
 
 ## Error Handling
@@ -83,9 +93,11 @@ if (limits.remaining < 60000) return new Response("Quota low", { status: 429 });
 try {
   await page.goto(url, { timeout: 30000, waitUntil: "networkidle0" });
 } catch (e) {
-  if (e.message.includes("timeout")) return new Response("Timeout", { status: 504 });
+  if (e instanceof Error && e.message.includes("timeout")) return new Response("Timeout", { status: 504 });
   if (e.message.includes("Session limit")) return new Response("Too many sessions", { status: 429 });
 } finally {
   if (browser) await browser.close();
 }
 ```
+
+Current product name: **Browser Run**. The REST path remains `/browser-rendering`. [Official documentation](https://developers.cloudflare.com/browser-run/).

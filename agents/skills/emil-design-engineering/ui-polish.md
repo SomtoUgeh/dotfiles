@@ -6,7 +6,7 @@ Typography, visual design, layout, and visual refinements.
 
 ### Font Rendering
 
-Always apply antialiased font smoothing:
+On macOS, compare font weight before optionally applying this non-standard font-smoothing property:
 
 ```css
 body {
@@ -80,7 +80,7 @@ Larger text needs tighter letter spacing; smaller text needs looser spacing. Use
 ```tsx
 // Letter spacing is handled inside the Text component
 
-<Text size="lg>Heading</Text>
+<Text size="lg">Heading</Text>
 ```
 
 Keep in mind that this is font depended.
@@ -165,7 +165,7 @@ Do not replace page scrollbars with custom ones. Only customize scrollbars in sm
 
 ### Focus Outlines
 
-Do not change the default outline color to anything other than grey, black, or white. Custom colored outlines often clash with the interface.
+Use a visible focus indicator with sufficient contrast against adjacent colors. Brand-colored outlines are valid; check forced-colors mode and do not restrict focus to gray, black, or white.
 
 ## Layout
 
@@ -190,7 +190,7 @@ Use a fixed z-index scale. Avoid arbitrary values like `z-index: 9999`.
 }
 ```
 
-**Better approach:** Avoid z-index entirely when possible. Use `isolation: isolate` or `position: relative` to create new stacking contexts.
+**Better approach:** Avoid z-index entirely when possible. Use `isolation: isolate` to create a stacking context. `position: relative` alone does not create one; a positioned element also needs a non-auto `z-index`.
 
 ```css
 .card {

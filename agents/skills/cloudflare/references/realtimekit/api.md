@@ -1,212 +1,61 @@
 # RealtimeKit API Reference
 
-Complete API reference for Meeting object, REST endpoints, and SDK methods.
+Use installed SDK types as the source of method and event signatures. The core package exports `RTKParticipant`, `RTKSelf`, and other `RTK*` types; do not shadow them with handwritten partial classes.
 
-## Meeting Object API
-
-### `meeting.self` - Local Participant
+## Core SDK
 
 ```typescript
-// Properties: id, userId, name, audioEnabled, videoEnabled, screenShareEnabled, audioTrack, videoTrack, screenShareTracks, roomJoined, roomState
-// Methods
-await meeting.self.enableAudio() / disableAudio() / enableVideo() / disableVideo() / enableScreenShare() / disableScreenShare()
-await meeting.self.setName("Name")  // Before join only
-await meeting.self.setDevice(device)
-const devices = await meeting.self.getAllDevices() / getAudioDevices() / getVideoDevices() / getSpeakerDevices()
-// Events: 'roomJoined', 'audioUpdate', 'videoUpdate', 'screenShareUpdate', 'deviceUpdate', 'deviceListUpdate'
-meeting.self.on('roomJoined', () => {})
-meeting.self.on('audioUpdate', ({ audioEnabled, audioTrack }) => {})
+import RealtimeKitClient from '@cloudflare/realtimekit';
+const meeting = await RealtimeKitClient.init({ authToken, defaults: { audio: true, video: true } });
+await meeting.join();
+await meeting.self.enableAudio();
+await meeting.self.disableAudio();
+await meeting.self.enableVideo();
+await meeting.self.disableVideo();
+await meeting.self.enableScreenShare();
+await meeting.self.disableScreenShare();
+const devices = await meeting.self.getAllDevices();
+const camera = devices.find(device => device.kind === 'videoinput');
+if (camera) await meeting.self.setDevice(camera);
+const remoteParticipants = meeting.participants.joined.toArray();
+const countIncludingSelf = meeting.participants.joined.size + 1;
+await meeting.chat.sendTextMessage('Hello');
+await meeting.polls.create('Ready?', ['Yes', 'No'], false, false);
+await meeting.leave();
 ```
 
-### `meeting.participants` - Remote Participants
+`joined`, `active`, `waitlisted`, and `pinned` are SDK collections, not native Maps. Use their typed APIs (`size`, `get()`, `toArray()`). Remote participants and self are different types. Subscribe to media events to render track changes, not just joins/leaves.
 
-**Collections**:
-```typescript
-meeting.participants.joined / active / waitlisted / pinned  // Maps
-const participants = meeting.participants.joined.toArray()
-const count = meeting.participants.joined.size()
-const p = meeting.participants.joined.get('peer-id')
-```
+## Server API
 
-**Participant Properties**:
-```typescript
-participant.id / userId / name
-participant.audioEnabled / videoEnabled / screenShareEnabled
-participant.audioTrack / videoTrack / screenShareTracks
-```
+Base: `https://api.cloudflare.com/client/v4/accounts/{account_id}/realtime/kit/{app_id}`.
 
-**Events**:
-```typescript
-meeting.participants.joined.on('participantJoined', (participant) => {})
-meeting.participants.joined.on('participantLeft', (participant) => {})
-```
+- `POST /meetings`: create a meeting.
+- `POST /meetings/{meeting_id}/participants`: add a participant with server-selected `preset_name` and `custom_participant_id`.
+- `POST /meetings/{meeting_id}/participants/{participant_id}/token`: refresh its token.
+- Sessions, recordings, livestreams, presets, and webhooks have separate resource APIs. Use the [current API reference](https://developers.cloudflare.com/api/resources/realtime_kit/) for their paths and bodies.
 
-### `meeting.meta` - Metadata
-```typescript
-meeting.meta.meetingId / meetingTitle / meetingStartedTimestamp
-```
-
-### `meeting.chat` - Chat
-```typescript
-meeting.chat.messages  // Array
-await meeting.chat.sendTextMessage("Hello") / sendImageMessage(file)
-meeting.chat.on('chatUpdate', ({ message, messages }) => {})
-```
-
-### `meeting.polls` - Polling
-```typescript
-meeting.polls.items  // Array
-await meeting.polls.create(question, options, anonymous, hideVotes)
-await meeting.polls.vote(pollId, optionIndex)
-```
-
-### `meeting.plugins` - Collaborative Apps
-```typescript
-meeting.plugins.all  // Array
-await meeting.plugins.activate(pluginId) / deactivate()
-```
-
-### `meeting.ai` - AI Features
-```typescript
-meeting.ai.transcripts  // Live transcriptions (when enabled in Preset)
-```
-
-### Core Methods
-```typescript
-await meeting.join()   // Emits 'roomJoined' on meeting.self
-await meeting.leave()
-```
-
-## TypeScript Types
+The Cloudflare SDK unwraps the outer API envelope; the RealtimeKit response still has its own `success` and `data`. A participant token is `data.token` in that response, mapped to `authToken` when initializing the client.
 
 ```typescript
-import type { RealtimeKitClient, States, UIConfig, Participant } from '@cloudflare/realtimekit';
+import Cloudflare from 'cloudflare';
 
-// Main interface
-interface RealtimeKitClient {
-  self: SelfState;          // Local participant (id, userId, name, audioEnabled, videoEnabled, roomJoined, roomState)
-  participants: { joined, active, waitlisted, pinned };  // Reactive Maps
-  chat: ChatNamespace;      // messages[], sendTextMessage(), sendImageMessage()
-  polls: PollsNamespace;    // items[], create(), vote()
-  plugins: PluginsNamespace;  // all[], activate(), deactivate()
-  ai: AINamespace;          // transcripts[]
-  meta: MetaState;          // meetingId, meetingTitle, meetingStartedTimestamp
-  join(): Promise<void>;
-  leave(): Promise<void>;
-}
-
-// Participant (self & remote share same shape)
-interface Participant {
-  id: string;                      // Peer ID (changes on rejoin)
-  userId: string;                  // Persistent participant ID
-  name: string;
-  audioEnabled: boolean;
-  videoEnabled: boolean;
-  screenShareEnabled: boolean;
-  audioTrack: MediaStreamTrack | null;
-  videoTrack: MediaStreamTrack | null;
-  screenShareTracks: MediaStreamTrack[];
+interface Env { CLOUDFLARE_API_TOKEN: string; CLOUDFLARE_ACCOUNT_ID: string; REALTIMEKIT_APP_ID: string; }
+// Inputs below must come from your authenticated, authorized application session.
+async function addParticipant(env: Env, meetingId: string, userId: string, name: string, preset: string) {
+  const client = new Cloudflare({ apiToken: env.CLOUDFLARE_API_TOKEN });
+  const result = await client.realtimeKit.meetings.addParticipant(meetingId, {
+    account_id: env.CLOUDFLARE_ACCOUNT_ID,
+    app_id: env.REALTIMEKIT_APP_ID,
+    name,
+    preset_name: preset,
+    custom_participant_id: userId,
+  });
+  if (!result.success || !result.data?.token) throw new Error('Participant creation failed');
+  return { authToken: result.data.token };
 }
 ```
 
-## Store Architecture
+Authorize meeting membership before calling this function. Never let a request body choose a host preset. Handle SDK/network errors at the route boundary and return a generic error response without exposing credentials or upstream payloads.
 
-RealtimeKit uses reactive store (event-driven updates, live Maps):
-
-```typescript
-// Subscribe to state changes
-meeting.self.on('audioUpdate', ({ audioEnabled, audioTrack }) => {});
-meeting.participants.joined.on('participantJoined', (p) => {});
-
-// Access current state synchronously
-const isAudioOn = meeting.self.audioEnabled;
-const count = meeting.participants.joined.size();
-```
-
-**Key principles:** State updates emit events after changes. Use `.toArray()` sparingly. Collections are live Maps.
-
-## REST API
-
-Base: `https://api.cloudflare.com/client/v4/accounts/{account_id}/realtime/kit/{app_id}`
-
-### Meetings
-```bash
-GET    /meetings                                    # List all
-GET    /meetings/{meeting_id}                       # Get details
-POST   /meetings                                    # Create: {"title": "..."}
-PATCH  /meetings/{meeting_id}                       # Update: {"title": "...", "record_on_start": true}
-```
-
-### Participants
-```bash
-GET    /meetings/{meeting_id}/participants                          # List all
-GET    /meetings/{meeting_id}/participants/{participant_id}         # Get details
-POST   /meetings/{meeting_id}/participants                          # Add: {"name": "...", "preset_name": "...", "custom_participant_id": "..."}
-PATCH  /meetings/{meeting_id}/participants/{participant_id}         # Update: {"name": "...", "preset_name": "..."}
-DELETE /meetings/{meeting_id}/participants/{participant_id}         # Delete
-POST   /meetings/{meeting_id}/participants/{participant_id}/token   # Refresh token
-```
-
-### Active Session
-```bash
-GET  /meetings/{meeting_id}/active-session               # Get active session
-POST /meetings/{meeting_id}/active-session/kick          # Kick users: {"user_ids": ["id1", "id2"]}
-POST /meetings/{meeting_id}/active-session/kick-all      # Kick all
-POST /meetings/{meeting_id}/active-session/poll          # Create poll: {"question": "...", "options": [...], "anonymous": false}
-```
-
-### Recording
-```bash
-GET  /recordings?meeting_id={meeting_id}                 # List recordings
-GET  /recordings/active-recording/{meeting_id}           # Get active recording
-POST /recordings                                         # Start: {"meeting_id": "...", "type": "composite"} (or "track")
-PUT  /recordings/{recording_id}                          # Control: {"action": "pause"} (or "resume", "stop")
-POST /recordings/track                                   # Track recording: {"meeting_id": "...", "layers": [...]}
-```
-
-### Livestreaming
-```bash
-GET  /livestreams?exclude_meetings=false                                # List all
-GET  /livestreams/{livestream_id}                                       # Get details
-POST /meetings/{meeting_id}/livestreams                                 # Start for meeting
-POST /meetings/{meeting_id}/active-livestream/stop                      # Stop
-POST /livestreams                                                       # Create independent: returns {ingest_server, stream_key, playback_url}
-```
-
-### Sessions & Analytics
-```bash
-GET  /sessions                                                          # List all
-GET  /sessions/{session_id}                                             # Get details
-GET  /sessions/{session_id}/participants                                # List participants
-GET  /sessions/{session_id}/participants/{participant_id}               # Call stats
-GET  /sessions/{session_id}/chat                                        # Download chat CSV
-GET  /sessions/{session_id}/transcript                                  # Download transcript CSV
-GET  /sessions/{session_id}/summary                                     # Get summary
-POST /sessions/{session_id}/summary                                     # Generate summary
-GET  /analytics/daywise?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD      # Day-wise analytics
-GET  /analytics/livestreams/overall                                     # Livestream analytics
-```
-
-### Webhooks
-```bash
-GET    /webhooks                    # List all
-POST   /webhooks                    # Create: {"url": "https://...", "events": ["session.started", "session.ended"]}
-PATCH  /webhooks/{webhook_id}       # Update
-DELETE /webhooks/{webhook_id}       # Delete
-```
-
-## Session Lifecycle
-
-```
-Initialization → Join Intent → [Waitlist?] → Meeting Screen (Stage) → Ended
-                                   ↓ Approved
-                               [Rejected → Ended]
-```
-
-UI Kit handles state transitions automatically.
-
-## See Also
-
-- [Configuration](./configuration.md) - Setup and installation
-- [Patterns](./patterns.md) - Usage examples
-- [README](./README.md) - Overview and quick start
+[Configuration](configuration.md) · [Patterns](patterns.md) · [Overview](README.md)

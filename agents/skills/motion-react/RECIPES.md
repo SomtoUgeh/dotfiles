@@ -39,14 +39,14 @@ The Family-drawer problem: content changes, height must follow, and Motion can't
 ```jsx
 const [elementRef, bounds] = useMeasure();
 
-<motion.div animate={{ height: bounds.height ? bounds.height : null }} className="element">
+<motion.div animate={{ height: bounds.height || "auto" }} className="element">
   <div ref={elementRef} className="inner">   {/* padding lives here */}
     {content}
   </div>
 </motion.div>
 ```
 
-The `ref` and the animated height must be on different elements — otherwise the outer div keeps whatever height it was animated to and never reacts again. `null` on the first render means `auto`, which avoids a layout shift.
+The `ref` and the animated height must be on different elements — otherwise the outer div keeps whatever height it was animated to and never reacts again. `"auto"` on the first render preserves intrinsic sizing, which avoids a layout shift.
 
 ## Multi-step component
 
@@ -54,11 +54,11 @@ Steps slide in from the side, the container's height follows, and the direction 
 
 ```jsx
 const [currentStep, setCurrentStep] = useState(0);
-const [direction, setDirection] = useState();
+const [direction, setDirection] = useState(1);
 const [ref, bounds] = useMeasure();
 
 <MotionConfig transition={{ duration: 0.5, type: "spring", bounce: 0 }}>
-  <motion.div animate={{ height: bounds.height }} className="multi-step-wrapper">
+  <motion.div animate={{ height: bounds.height || "auto" }} className="multi-step-wrapper">
     <div className="multi-step-inner" ref={ref}>
       <AnimatePresence mode="popLayout" initial={false} custom={direction}>
         <motion.div
@@ -132,7 +132,7 @@ Four things carry this component:
 </AnimatePresence>
 ```
 
-**The trick is an illusion.** The grey "Feedback" text inside the popover is not the textarea's placeholder — it's a separate span sharing `layoutId="title"` with the button's label, so the button's own text appears to become the placeholder. A real placeholder attribute could never do that. Keep the textarea's actual `placeholder` for screen readers and hide it with `opacity: 0`; `aria-hidden` the decorative span.
+**The trick is an illusion.** The grey "Feedback" text inside the popover is not the textarea's placeholder — it's a separate span sharing `layoutId="title"` with the button's label, so the button's own text appears to become the placeholder. A real placeholder attribute could never do that. Give the textarea a persistent accessible label. A placeholder is supplementary, not a label. If hiding placeholder text, target `textarea::placeholder`; never set opacity on the textarea itself. Mark the decorative span `aria-hidden`.
 
 Two `layoutId`s (`wrapper`, `title`) do all the morphing. Inline pixel `borderRadius` on both states, or the corners distort. `mode="popLayout"` lets the form leave while the success state arrives — the fix when a swap like this looks broken. The blur on enter and exit softens the whole thing.
 
@@ -203,7 +203,7 @@ It isn't drawing, it's **unclipping** — `inset` from the right, exactly the CS
 
 Two details that finish it:
 
-- **Reset when the user leaves.** A component's default state is its most beautiful state, and an empty graph card left behind looks broken. Set the value back to `0` on a 1s timeout in `onPointerLeave`, storing the id in a ref and clearing it in `onPointerEnter` so a quick re-entry doesn't wipe the graph.
+- **Reset when the user leaves.** A component's default state is its most beautiful state, and an empty graph card left behind looks broken. Set the value back to `0` on a 1s timeout in `onPointerLeave`, storing the id in a ref and clearing it on re-entry and unmount so a stale timer cannot reset a new interaction.
 - **Use a different spring for the reset** than for the tracking — the snap back at tracking stiffness feels too fast. Swap the config on an `isHovering` state.
 
 ## App Store card → detail
@@ -235,4 +235,4 @@ Because it unmounts and remounts under the same `layoutId`, Motion slides it. Pu
 const isInView = useInView(ref, { once: true, margin: "100px" });
 ```
 
-`once` stops it re-firing, `margin` fires it when 100px of the element is visible. If Motion isn't already in the bundle, use the Intersection Observer API instead — this alone isn't worth the dependency.
+`once` stops it re-firing, positive `margin` expands the detection area, firing up to 100px before the element enters the viewport. Use `amount` for a visible fraction or a negative bottom margin to delay entry. If Motion isn't already in the bundle, use the Intersection Observer API instead — this alone isn't worth the dependency.

@@ -12,7 +12,7 @@ When a rule involves config fields or API signatures that may evolve, a **Retrie
 
 Set `compatibility_date` to today on new projects. Update periodically on existing ones to access new APIs and fixes.
 
-**Check**: `compatibility_date` exists. Flag if older than 6 months.
+**Check**: `compatibility_date` exists. Preserve an existing tested date; review compatibility changes and test before proposing an update. Age alone is not a correctness defect.
 
 ```jsonc
 // wrangler.jsonc
@@ -116,13 +116,19 @@ async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response
 
   // Track the pipeline promise — don't let it float
   ctx.waitUntil((async () => {
-    for (const url of urls) {
-      const response = await fetch(url);
-      if (response.body) {
-        await response.body.pipeTo(writable, { preventClose: true });
+    try {
+      for (const url of urls) {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Upstream failed (${response.status})`);
+        if (response.body) {
+          await response.body.pipeTo(writable, { preventClose: true });
+        }
       }
+      await writable.close();
+    } catch (error) {
+      await writable.abort(error); // Reject the reader instead of leaving it open.
+      throw error;
     }
-    await writable.close();
   })());
 
   return new Response(readable, {
@@ -171,12 +177,12 @@ waitUntil(somePromise);
 
 ### Use bindings for Cloudflare services, not REST APIs
 
-Bindings (KV, R2, D1, Queues, Workflows) are direct, in-process references — no network hop, no authentication, no extra latency. Using the Cloudflare REST API from a Worker wastes time and adds complexity.
+Bindings (KV, R2, D1, Queues, Workflows) provide runtime-managed access without handling REST credentials. Storage operations can still involve network I/O, latency, and usage charges. Using the Cloudflare REST API from a Worker wastes time and adds complexity.
 
 **Check**: no `fetch("https://api.cloudflare.com/client/v4/...")` calls for services available as bindings.
 
 ```ts
-// Binding — direct, zero-cost
+// Binding — runtime-managed access
 const object = await env.MY_BUCKET.get("my-file");
 ```
 
@@ -251,12 +257,18 @@ Hyperdrive maintains a regional connection pool, eliminating per-request TCP + T
 ```ts
 import { Client } from "pg";
 
+export default {
 async fetch(request: Request, env: Env): Promise<Response> {
   const client = new Client({ connectionString: env.HYPERDRIVE.connectionString });
-  await client.connect();
-  const result = await client.query("SELECT id, name FROM users LIMIT 10");
-  return Response.json(result.rows);
+  try {
+    await client.connect();
+    const result = await client.query("SELECT id, name FROM users LIMIT 10");
+    return Response.json(result.rows);
+  } finally {
+    await client.end();
+  }
 }
+} satisfies ExportedHandler<Env>;
 ```
 
 **Retrieve**: `/hyperdrive/` for current configuration and supported databases.
@@ -360,7 +372,7 @@ fetch("https://api.example.com/webhook", { method: "POST", body: JSON.stringify(
 
 ### Be aware of platform limits
 
-Workers have a 10ms CPU time limit (Bundled) or 30s (Standard/Unbound). Heavy synchronous work — tight loops, large JSON parsing, compute-intensive crypto — can hit the CPU limit and terminate the request.
+CPU limits depend on the plan, invocation type, and configured `limits.cpu_ms`. For HTTP Workers, current Free CPU time is 10 ms; Paid defaults to 30 seconds and can be configured up to 300,000 ms. Verify the current limits page before quoting these numbers; Bundled/Unbound are legacy plan labels. Heavy synchronous work — tight loops, large JSON parsing, compute-intensive crypto — can hit the CPU limit and terminate the request.
 
 **Check**: compute-heavy operations that run synchronously. Consider breaking work into smaller chunks, offloading to Queues/Workflows, or using WebAssembly for CPU-intensive tasks.
 
@@ -434,13 +446,13 @@ async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response
 
 ## Development & Testing
 
-### Test with @cloudflare/vitest-pool-workers
+### Test with @cloudflare/vitest-plugin
 
 Runs tests inside the Workers runtime with real bindings. Catches issues that Node.js-based tests miss.
 
-**Known pitfall**: the Vitest pool auto-injects `nodejs_compat`, so tests pass even if your wrangler config is missing the flag. Always confirm your `wrangler.jsonc` includes `nodejs_compat` if your code depends on Node.js built-ins.
+**Known pitfall**: the Workers test runtime can provide compatibility behavior that differs from deployment config, so tests may pass even if `wrangler.jsonc` is missing a required flag. Always confirm your config includes `nodejs_compat` if your code depends on Node.js built-ins.
 
-**Check**: test setup uses `@cloudflare/vitest-pool-workers`. Tests cover nullable returns (e.g., KV `.get()` returning `null`).
+**Check**: test setup uses `@cloudflare/vitest-plugin`. Tests cover nullable returns (e.g., KV `.get()` returning `null`).
 
 ```ts
 import { describe, it, expect } from "vitest";

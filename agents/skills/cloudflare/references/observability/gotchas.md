@@ -3,13 +3,13 @@
 ### "Logs not appearing"
 
 **Cause:** Observability disabled, Worker not redeployed, no traffic, low sampling rate, or log size exceeds 256 KB
-**Solution:** 
+**Solution:**
 ```bash
 # Verify config
-cat wrangler.jsonc | jq '.observability'
+cat wrangler.jsonc # Read JSONC directly; jq does not accept comments
 
 # Check deployment
-wrangler deployments list <WORKER_NAME>
+wrangler deployments list --name <WORKER_NAME>
 
 # Test with curl
 curl https://your-worker.workers.dev
@@ -41,25 +41,24 @@ Ensure `observability.traces.enabled = true`, set `head_sampling_rate` to 1.0 fo
 | Max log size | 256 KB | Logs exceeding this are truncated |
 | Default sampling rate | 1.0 (100%) | Reduce for high-traffic Workers |
 | Max destinations | Varies by plan | Check dashboard |
-| Trace context propagation | 100 spans max | Deep call chains may lose spans |
-| Analytics Engine write rate | 25 writes/request | Excess writes dropped silently |
+| Analytics Engine data points | 250 per invocation | One index and up to 20 blobs/20 doubles per point |
 
 ## Performance Gotchas
 
 ### Spectre Mitigation Timing
 
-**Problem:** `Date.now()` and `performance.now()` have reduced precision (coarsened to 100μs)
+**Problem:** Workers clocks advance with I/O rather than measuring time spent in synchronous JavaScript
 **Cause:** Spectre vulnerability mitigation in V8
-**Solution:** Accept reduced precision or use Workers Traces for accurate timing
+**Solution:** Use CPU profiling or execution telemetry for synchronous work; do not use a clock delta as a CPU benchmark
 ```typescript
-// Date.now() is coarsened - trace spans are accurate
+// Wall-clock deltas across I/O are useful; synchronous CPU timing needs profiling
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     // For user-facing timing, Date.now() is fine
     const start = Date.now();
     const response = await processRequest(request);
     const duration = Date.now() - start;
-    
+
     // For detailed performance analysis, use Workers Traces instead
     return response;
   }
@@ -81,35 +80,8 @@ SELECT blob1 AS customer_id, SUM(_sample_interval) AS total_calls
 FROM api_usage GROUP BY customer_id;
 ```
 
-### Trace Context Propagation Limits
+### Trace context and pricing
 
-**Problem:** Deep call chains lose trace context after 100 spans
-**Cause:** Cloudflare limits trace depth to prevent performance impact
-**Solution:** Design for flatter architectures or use custom correlation IDs for deep chains
-```typescript
-// For deep call chains, add custom correlation ID
-const correlationId = crypto.randomUUID();
-console.log({ correlationId, event: 'request_start' });
+Use the current [tracing limitations](https://developers.cloudflare.com/workers/observability/traces/) rather than assuming a universal 100-span depth limit. A custom correlation ID can aid logging, but is not a replacement for propagated trace context.
 
-// Pass correlationId through headers to downstream services
-await fetch('https://api.example.com', {
-  headers: { 'X-Correlation-ID': correlationId }
-});
-```
-
-## Pricing (2026)
-
-### Workers Traces
-- **GA Pricing (starts March 1, 2026):**
-  - $0.10 per 1M trace spans captured
-  - Retention: 14 days included
-- **Free tier:** 10M trace spans/month
-- **Note:** Beta usage (before March 1, 2026) is free
-
-### Workers Logs
-- **Included:** Free for all Workers
-- **Logpush:** Requires Business/Enterprise plan
-
-### Analytics Engine
-- **Included:** 10M writes/month on Paid Workers plan
-- **Additional:** $0.25 per 1M writes beyond included quota
+For current billing and retention, see [README.md](README.md). Workers Logs is metered with historical retention, tracing beta pricing has a dated transition, and Analytics Engine's published future rates are not proof that billing is active.
