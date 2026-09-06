@@ -44,6 +44,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 
 module_path = Path(sys.argv[2]).parent / "worm_guard_patterns.py"
 spec = importlib.util.spec_from_file_location("worm_guard_patterns", module_path)
@@ -111,6 +112,36 @@ class Scanner:
         self.git_objects = 0
         self.git_blobs = 0
         self.git_stores = set()
+        self.started = time.monotonic()
+        self.progress_status = ("discovering files", root)
+        self.progress_stop = threading.Event()
+        self.progress_thread = None
+
+    def progress(self, phase, path):
+        self.progress_status = (phase, path)
+
+    def start_progress(self):
+        print("Starting scan: " + display_path(self.root.parent, self.root), file=sys.stderr, flush=True)
+        self.progress_thread = threading.Thread(target=self.report_progress, daemon=True)
+        self.progress_thread.start()
+
+    def report_progress(self):
+        while not self.progress_stop.wait(5):
+            phase, path = self.progress_status
+            message = ("Progress: " + phase
+                       + "; files read=" + str(self.files_inspected)
+                       + "; Git objects read=" + str(self.git_objects)
+                       + "; elapsed=" + str(int(time.monotonic() - self.started)) + "s"
+                       + "; path=" + display_path(self.root, path))
+            try:
+                print(message, file=sys.stderr, flush=True)
+            except OSError:
+                return
+
+    def stop_progress(self):
+        self.progress_stop.set()
+        if self.progress_thread is not None:
+            self.progress_thread.join()
 
     def finding(self, group, path, line, reason):
         self.finding_counts[group] += 1
@@ -225,6 +256,7 @@ def filesystem_files(scanner):
     paths = set()
 
     def visit(directory, include_files=True):
+        scanner.progress("discovering files", directory)
         # Also recognize bare repositories (and a .git directory passed directly).
         if (directory / "HEAD").is_file() and (directory / "objects").is_dir() and (directory / "refs").is_dir():
             register_repository(scanner, directory, None)
@@ -339,6 +371,7 @@ def read_file(scanner, display, path):
 
 
 def scan_file(scanner, path):
+    scanner.progress("scanning files", path)
     try:
         if any(path.resolve(strict=True).samefile(trusted) for trusted in (scanner.scanner_path, module_path)):
             scanner.scanner_files_omitted += 1
@@ -532,6 +565,7 @@ def validate_object_store(scanner, root, visited, depth=0):
 
 
 def scan_git_objects(scanner, view, gitdir, hash_bytes, names):
+    scanner.progress("reading Git object inventory", gitdir)
     inventory = git_capture(scanner, view, ["cat-file", "--batch-all-objects", "--batch-check"], gitdir, "stored-object inventory failed or omitted data")
     if inventory is None:
         return
@@ -553,6 +587,7 @@ def scan_git_objects(scanner, view, gitdir, hash_bytes, names):
             try:
                 for oid, kind, size in objects:
                     location = gitdir / "objects" / oid.decode("ascii")
+                    scanner.progress("scanning stored Git objects", location)
                     if size > MAX_TEXT_BYTES:
                         scanner.error(location, "stored object exceeds inspection limit")
                         continue
@@ -621,6 +656,7 @@ def scan_git_objects(scanner, view, gitdir, hash_bytes, names):
 
 
 def scan_repository(scanner, gitdir, worktree):
+    scanner.progress("checking Git metadata", gitdir)
     common = gitdir
     pointer = gitdir / "commondir"
     if pointer.exists() or pointer.is_symlink():
@@ -704,6 +740,7 @@ def scan_repository(scanner, gitdir, worktree):
                 commit, author, committer, author_date, committer_date = fields
                 if author == committer and author_date.rsplit(b" ", 1)[-1] != committer_date.rsplit(b" ", 1)[-1]:
                     scanner.finding("timezone", gitdir, None, "same-name author/committer offsets differ at commit " + commit[:12].decode("ascii", "replace"))
+        scanner.progress("checking Git integrity", gitdir)
         with git_command(view, ["fsck", "--full", "--no-dangling", "--no-progress"], stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
             try:
                 output, errors = process.communicate(timeout=GIT_TIMEOUT_SECONDS)
@@ -803,6 +840,7 @@ def main():
         return 20
     scanner = Scanner(root, scanner_path)
     try:
+        scanner.start_progress()
         paths = filesystem_files(scanner)
         processed = set()
         while pending := set(scanner.repositories) - processed:
@@ -811,15 +849,21 @@ def main():
                 paths.update(scan_repository(scanner, gitdir, scanner.repositories[gitdir]))
         for path in sorted(paths, key=lambda value: os.fsencode(str(value))):
             scan_file(scanner, path)
-        return render(scanner, bool(scanner.repositories))
     except (KeyboardInterrupt, SystemExit):
         raise
     except Exception:
         print("inspection incomplete: unexpected scanner failure", file=sys.stderr)
         return 20
+    finally:
+        scanner.stop_progress()
+    return render(scanner, bool(scanner.repositories))
 
 
-raise SystemExit(main())
+try:
+    raise SystemExit(main())
+except KeyboardInterrupt:
+    print("inspection incomplete: scan interrupted; no complete result.", file=sys.stderr, flush=True)
+    raise SystemExit(20)
 PY
   rc=$?
   case "$rc" in

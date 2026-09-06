@@ -314,6 +314,11 @@ project discovery, environment-file loading and downloads disabled. The remote
 scanner uses GitHub GET requests, verifies blob hashes and sizes, and never
 clones or executes the repository. Both use the same detection rules.
 
+Local scans print a start message immediately and progress every five seconds,
+including the current phase and file. Large build output is still inspected;
+it is not silently skipped to speed up a scan. Ctrl+C reports an interrupted,
+incomplete scan without a Python traceback.
+
 Exit codes: **0 = requested checks completed without findings; 1 = findings;
 2 = incomplete.** A signature match needs investigation; it does not prove
 execution or machine compromise. An incomplete scan is not a clean verdict.
@@ -333,6 +338,8 @@ Scanner changes can be checked offline from this checkout:
 ./tests/test_scan_remote.sh
 ./tests/test_scan_bootstrap.sh
 ./tests/test_scanner_install.sh
+uv run --no-project python tests/test_worm_guard_patterns.py
+uv run --no-project python tests/test_scan_progress.py
 ```
 
 ### Manual inventory scans

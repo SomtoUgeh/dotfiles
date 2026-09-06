@@ -42,9 +42,9 @@ fetch_scanners() {
     download "https://raw.githubusercontent.com/SomtoUgeh/dotfiles/main/scripts/$name" "$SCAN_WORK/$name"
     verify "$SCAN_WORK/$name" "$digest"
   done <<'SCANNERS'
-fbc61a3dd6b409fc636558fea34388b9dd855a6ab2c8bf86bcd0f9141c1b4076 scan_repo.sh
+79ac632ce78aad03e7b835ce63b4e382aac307eca85ba0d14a406cc8f723728f scan_repo.sh
 637183e27a2c2111accc640a91a0fdc4f3613b8d68cb78995438faf5771415ae scan_remote.sh
-dcc90789c753f4bad15f6adffd18a1a91b96db8cdaeba6e37dda6cdf048feff9 worm_guard_patterns.py
+ed37284ab6078f0b59c953ef8a16dfce41c07d4806640341e2c990c02d18c456 worm_guard_patterns.py
 775a287e026ba33378368ac75a8dba31dbb857134d201965a697049cf9ef6871 worm_guard_runtime.sh
 SCANNERS
 }
@@ -176,6 +176,7 @@ main() {
   trap 'exit 2' HUP INT TERM
   # Resolve the target first, then keep every setup/API command outside that repository.
   cd -- "$SCAN_WORK" || fail 'cannot enter temporary directory'
+  printf 'Preparing scanner...\n' >&2
   fetch_scanners
   setup_dependencies "$os" "$mode"
   if [ "$mode" = local ]; then

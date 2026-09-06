@@ -50,8 +50,38 @@ def decode_text(data):
 
 
 def first_line(lines, pattern):
+    pattern = re.compile(pattern.pattern, pattern.flags | re.IGNORECASE)
     for number, line in enumerate(lines, 1):
-        if re.search(pattern.pattern, line, pattern.flags | re.IGNORECASE):
+        if pattern.search(line):
+            return number
+    return None
+
+
+def escaped_require_line(lines):
+    # Remember the first opener until a closing parenthesis. Retrying a greedy
+    # suffix at every nested require( makes missing escapes quadratic.
+    tokens = re.compile(r"require\(|\)|\\u00[0-9a-f]{2}", re.IGNORECASE)
+    for number, value in enumerate(lines, 1):
+        opened = False
+        for match in tokens.finditer(value):
+            token = match.group().lower()
+            if token == "require(":
+                opened = True
+            elif token == ")":
+                opened = False
+            elif opened:
+                return number
+    return None
+
+
+def font_command_line(lines):
+    command = re.compile(r"\bnode(?:\.exe)?\s", re.IGNORECASE)
+    extension = re.compile(r"\.(?:woff2?|ttf|otf|ttc|eot)\b", re.IGNORECASE)
+    for number, value in enumerate(lines, 1):
+        # Lines have no CR/LF. Any extension after the earliest command also
+        # satisfies the original command-plus-arbitrary-suffix expression.
+        match = command.search(value)
+        if match is not None and extension.search(value, match.end()):
             return number
     return None
 
@@ -66,7 +96,6 @@ def scan_text(scanner, path, text):
         r"global\.r\s*=\s*require|A8-(?:3997|5657)-1|"
         + re.escape("rmcej" + "%otb%") + "|" + re.escape("Cot" + "%3t=shtP") + r"|_\$_1e42"
     )
-    escaped_require = re.compile(r"require\([^)]*\\u00[0-9a-fA-F]{2}")
     network = re.compile(
         r"trongrid\.io|bsc-" + r"dataseed|bsc-rpc\.publicnode\.com|"
         r"fullnode\.mainnet\.aptoslabs\.com|166\.88\.54\.158|"
@@ -97,7 +126,8 @@ def scan_text(scanner, path, text):
         stripped = value.lstrip()
         if stripped.startswith(("#", "//", "*", "/*")):
             continue
-        if re.search(r"[\t\v\f\r ]{50,}\S", value):
+        # Try each whitespace run once, including when it has no following text.
+        if re.search(r"(?<![\t\v\f\r ])[\t\v\f\r ]{50,}\S", value):
             scanner.finding("padding", path, number, "50 or more whitespace characters before content")
             break
     if not any(pattern.search(relative) for pattern in GENERATED_NAMES):
@@ -105,7 +135,7 @@ def scan_text(scanner, path, text):
             if len(value) > 2000:
                 scanner.finding("long-line", path, number, "line exceeds 2000 characters")
                 break
-    line = first_line(lines, escaped_require)
+    line = escaped_require_line(lines)
     if line is not None:
         scanner.finding("escaped-require", path, line, "require contains a Unicode escape")
     line = first_line(lines, network)
@@ -130,7 +160,7 @@ def scan_text(scanner, path, text):
     line = first_line(lines, re.compile(task_pattern))
     if line is not None:
         scanner.finding("auto-run", path, line, "editor task can run when the folder opens")
-    line = first_line(lines, re.compile(r"\bnode(?:\.exe)?\s+[^\r\n]*?\.(?:woff2?|ttf|otf|ttc|eot)\b", re.IGNORECASE))
+    line = font_command_line(lines)
     if line is not None:
         scanner.finding("font-command", path, line, "node executes a file with a font extension")
 
