@@ -529,7 +529,7 @@ else
 fi
 run_relative_case
 
-grep -q 'advisory only; createRequire is legitimate' "$TEST_ROOT/clean.out" \
+grep -q 'createRequire in ESM is legitimate' "$TEST_ROOT/clean.out" \
   || fail 'benign createRequire was not classified as advisory-only'
 grep -q 'known bootstrap signature' "$TEST_ROOT/tracked-extensionless.out" \
   || fail 'tracked extensionless file under an excluded untracked directory was missed'

@@ -11,8 +11,8 @@
 # Every GitHub request is a GET. Repository content is decoded as inert bytes,
 # checked against its Git blob SHA and size, and never executed or checked out.
 #
-# Exit 0: requested coverage completed with no findings.
-# Exit 1: requested coverage completed and findings exist.
+# Exit 0: requested coverage completed without campaign or review signals.
+# Exit 1: requested coverage completed with campaign or review signals.
 # Exit 2: requested coverage is incomplete or could not be proved.
 
 set -u
@@ -82,6 +82,8 @@ STOP_REASON=""
 
 findings=0
 reviews=0
+advisories=0
+repeated_console_items=0
 unknowns=0
 accounts_checked=0
 repos_checked=0
@@ -108,15 +110,39 @@ record_json() { # destination kind message repo ref sha path
   fi
   return 0
 }
+show_signal() { # severity message; evidence is recorded separately on every ref
+  local key
+  if [ "$EVIDENCE_READY" = 1 ]; then
+    if key=$(printf '%s\0' "${CURRENT_REPO:-}" "${CURRENT_BLOB_SHA:-${CURRENT_SHA:-}}" "${CURRENT_PATH:-}" "$1" "$2" | git hash-object --stdin); then
+      if [ -f "$WORK/shown/$key" ]; then
+        repeated_console_items=$((repeated_console_items + 1))
+        return
+      fi
+      : > "$WORK/shown/$key" || EVIDENCE_FAILED=1
+    else
+      EVIDENCE_FAILED=1
+    fi
+  fi
+  case "$1" in
+    indicator) red "  !! $2" ;;
+    review) ylw "  ?  $2" ;;
+    advisory) printf '  i  %s\n' "$2" ;;
+  esac
+}
 note() {
-  red "  !! $1"
+  show_signal indicator "$1"
   findings=$((findings + 1))
   [ "$EVIDENCE_READY" = 0 ] || record_json "$WORK/findings.jsonl" indicator "$1" "${CURRENT_REPO:-}" "${CURRENT_REF:-}" "${CURRENT_SHA:-}" "${CURRENT_PATH:-}"
 }
 review() {
-  ylw "  ?  $1"
+  show_signal review "$1"
   reviews=$((reviews + 1))
   [ "$EVIDENCE_READY" = 0 ] || record_json "$WORK/reviews.jsonl" review "$1" "${CURRENT_REPO:-}" "${CURRENT_REF:-}" "${CURRENT_SHA:-}" "${CURRENT_PATH:-}"
+}
+advisory() {
+  show_signal advisory "$1"
+  advisories=$((advisories + 1))
+  [ "$EVIDENCE_READY" = 0 ] || record_json "$WORK/advisories.jsonl" advisory "$1" "${CURRENT_REPO:-}" "${CURRENT_REF:-}" "${CURRENT_SHA:-}" "${CURRENT_PATH:-}"
 }
 unknown() {
   red "  ?? $1"
@@ -149,8 +175,10 @@ write_evidence() { # exit status
     --argjson binary_blobs "$binary_blobs" --argjson font_blobs "$font_blobs" \
     --argjson gitlinks "$gitlinks" --argjson findings_count "$findings" \
     --argjson reviews_count "$reviews" --argjson incomplete_count "$unknowns" \
+    --argjson advisory_count "$advisories" \
     --slurpfile ref_rows "$WORK/refs.jsonl" --slurpfile finding_rows "$WORK/findings.jsonl" \
     --slurpfile review_rows "$WORK/reviews.jsonl" --slurpfile incomplete_rows "$WORK/incomplete.jsonl" \
+    --slurpfile advisory_rows "$WORK/advisories.jsonl" \
     --slurpfile exclusion_rows "$WORK/exclusions.jsonl" '
       {schema:1,run_id:$run_id,scan_complete:$scan_complete,started_at:$started_at,finished_at:$finished_at,status:$status,exit_code:$exit_code,
        request:{account:$account_filter,repo:$repo_filter,ref:$ref_filter,ref_scope:(if $ref_filter=="" then "all-current-tips" else "single-ref" end),inventory_file:$inventory,all_readable:($all_readable==1)},
@@ -159,8 +187,9 @@ write_evidence() { # exit status
          verified_cache_hits:$cache_hits,text_blobs_scanned:$text_blobs,binary_blobs_classified:$binary_blobs,
          clean_detector_results_reused:$detector_cache_hits,
          font_blobs_validated:$font_blobs,gitlinks_omitted:$gitlinks,findings:$findings_count,
-         review_items:$reviews_count,incomplete_checks:$incomplete_count},
+         review_items:$reviews_count,advisory_items:$advisory_count,incomplete_checks:$incomplete_count},
        refs:$ref_rows,findings:$finding_rows,reviews:$review_rows,incomplete:$incomplete_rows,
+       advisories:$advisory_rows,
        exclusions:$exclusion_rows,
        coverage:["requested: fetch every blob in each returned recursive tree or load it from verified cache",
          "requested: check decoded blobs against Git blob SHA and size",
@@ -169,9 +198,27 @@ write_evidence() { # exit status
        limitations:["current branch and tag tips only; commit history, pull-request refs, releases, LFS objects, Actions artifacts, packages, and gists are outside this run",
          "recursive Git trees are an API view; a truncated or malformed tree makes the run incomplete",
          "gitlinks are recorded but submodule repositories are not recursively scanned",
-         "binary blobs other than tracked font formats receive integrity and classification checks, not text signatures",
+         "binary blobs receive fixed indicator-byte checks, not executable analysis or proof of safety",
          "verified decoded blobs are retained in the local state cache until that cache is manually removed",
          "signature detection cannot prove absence of an unknown variant"]}' > "$tmp" && mv "$tmp" "$EVIDENCE_FILE"
+}
+
+print_summary() {
+  echo
+  case "$1" in
+    0) grn 'COMPLETE — no campaign or review signals in the documented scope.' ;;
+    1) ylw 'COMPLETE — campaign or review signals require investigation.' ;;
+    *) red 'INCOMPLETE — requested coverage could not be established.' ;;
+  esac
+  printf 'Coverage: %s account(s), %s repo(s), %s/%s ref(s); %s blob occurrence(s), %s unique verified blob(s), %s cache hit(s).\n' \
+    "$accounts_checked" "$repos_checked" "$refs_checked" "$refs_attempted" "$blob_occurrences" "$unique_blobs" "$cache_hits"
+  printf 'Signals: %s campaign match(es), %s review signal(s), %s advisory item(s); %s incomplete check(s).\n' \
+    "$findings" "$reviews" "$advisories" "$unknowns"
+  if [ "$repeated_console_items" -gt 0 ]; then
+    printf '%s repeated message(s) omitted above; every ref occurrence remains in JSON evidence.\n' "$repeated_console_items"
+  fi
+  [ "$gitlinks" -eq 0 ] || ylw "$gitlinks gitlink(s) were recorded as omissions; this is not a full submodule-content verdict."
+  printf 'Matches do not establish execution or infection. Evidence: %s\n' "$EVIDENCE_FILE"
 }
 
 finish() {
@@ -187,7 +234,7 @@ finish() {
        [ "$accounts_checked" -eq 0 ] || [ "$refs_checked" -ne "$refs_attempted" ]; then
       rc=2
     elif [ "$rc" = 0 ] || [ "$rc" = 1 ]; then
-      if [ "$findings" -gt 0 ]; then rc=1; else rc=0; fi
+      if [ "$findings" -gt 0 ] || [ "$reviews" -gt 0 ]; then rc=1; else rc=0; fi
     else
       rc=2
     fi
@@ -197,6 +244,7 @@ finish() {
     red "could not write $EVIDENCE_FILE"
     rc=2
   fi
+  [ "$EVIDENCE_READY" = 0 ] || print_summary "$rc"
   [ -z "$WORK" ] || rm -rf "$WORK"
   exit "$rc"
 }
@@ -232,9 +280,9 @@ done
 worm_guard_runtime || exit 2
 umask 077
 WORK=$(mktemp -d) || exit 2
-mkdir -p "$STATE_DIR" "$CACHE_DIR" "$WORK/verified" "$WORK/clean-results" || exit 2
+mkdir -p "$STATE_DIR" "$CACHE_DIR" "$WORK/verified" "$WORK/clean-results" "$WORK/shown" || exit 2
 chmod 700 "$STATE_DIR" "$CACHE_DIR" 2>/dev/null || exit 2
-for evidence_part in refs findings reviews incomplete exclusions; do
+for evidence_part in refs findings reviews advisories incomplete exclusions; do
   : > "$WORK/$evidence_part.jsonl" || exit 2
 done
 EVIDENCE_READY=1
@@ -343,6 +391,7 @@ detect_blob() { # mode path inert-file
     case "$kind" in
       finding) note "$label ${DISPLAY_PATH:-path} — $reason" ;;
       review) review "$label ${DISPLAY_PATH:-path} — $reason" ;;
+      advisory) advisory "$label ${DISPLAY_PATH:-path} — $reason" ;;
       *) unknown "shared detector returned an invalid result" ;;
     esac
   done < "$WORK/detection.tsv"
@@ -356,9 +405,9 @@ scan_text() {
 scan_ref() { # repo display-ref optional-known-sha
   local repo=$1 display_ref=$2 requested=${3:-$2} commit="$WORK/commit.json" tree="$WORK/tree.json"
   local sha before_unknowns encoded entry path bsha bsize btype mode encoding ref_outcome display_path
-  local memo memo_text memo_binary memo_font memo_extra detector_unknowns detector_findings detector_reviews
+  local memo memo_text memo_binary memo_font memo_extra detector_unknowns detector_findings detector_reviews detector_advisories
   local before_text before_binary before_font
-  CURRENT_REPO=$repo CURRENT_REF=$display_ref CURRENT_SHA="" CURRENT_PATH=""
+  CURRENT_REPO=$repo CURRENT_REF=$display_ref CURRENT_SHA="" CURRENT_PATH="" CURRENT_BLOB_SHA=""
   before_unknowns=$unknowns
   refs_attempted=$((refs_attempted + 1))
   if ! encoded=$(jq -rn --arg ref "$requested" '$ref | @uri'); then
@@ -381,7 +430,7 @@ scan_ref() { # repo display-ref optional-known-sha
   fi
   printf '  checking %s [%s] commit %s\n' "$repo" "$display_ref" "$sha"
   if jq -e '.commit as $c | $c.author.name != $c.committer.name and $c.author.email == $c.committer.email' "$commit" >/dev/null 2>&1; then
-    note "$repo [$display_ref] ghost-commit metadata: same email but different author/committer names"
+    review "ghost-commit metadata: same email but different author/committer names"
   fi
   if ! fetch_tree "$repo" "$sha" "$tree"; then
     unknown "$repo [$display_ref] tree unreadable after 3 tries — ref not checked"
@@ -407,13 +456,14 @@ scan_ref() { # repo display-ref optional-known-sha
     path=$(printf '%s' "$encoded" | base64 -d 2>/dev/null && printf '.') || { unknown "$repo [$display_ref] tree path could not be decoded"; continue; }
     path=${path%.}
     CURRENT_PATH=$path
+    CURRENT_BLOB_SHA=$bsha
     if [ "$btype" = commit ] || [ "$mode" = 160000 ]; then
       gitlinks=$((gitlinks + 1))
       record_json "$WORK/exclusions.jsonl" gitlink "submodule content not recursively scanned" "$repo" "$display_ref" "$bsha" "$path"
       continue
     fi
     if ! read_blob "$repo" "$bsha" "$bsize"; then
-      display_path=$(printf '%s' "$path" | jq -Rs '@json') || display_path='(path unavailable)'
+      display_path=$(printf '%s' "$path" | jq -Rs '.') || display_path='(path unavailable)'
       unknown "$repo [$display_ref] $display_path — blob read, size, or SHA validation failed"
       [ "$API_STOP" = 0 ] || break
       continue
@@ -434,15 +484,16 @@ scan_ref() { # repo display-ref optional-known-sha
         *) unknown "$repo [$display_ref] invalid detector cache entry" ;;
       esac
     fi
-    display_path=$(printf '%s' "$path" | jq -Rs '@json') || { unknown "$repo [$display_ref] tree path could not be escaped for display"; continue; }
+    display_path=$(printf '%s' "$path" | jq -Rs '.') || { unknown "$repo [$display_ref] tree path could not be escaped for display"; continue; }
     DISPLAY_PATH=$display_path
-    detector_unknowns=$unknowns detector_findings=$findings detector_reviews=$reviews
+    detector_unknowns=$unknowns detector_findings=$findings detector_reviews=$reviews detector_advisories=$advisories
     before_text=$text_blobs before_binary=$binary_blobs before_font=$font_blobs
     detect_blob metadata "$path" "$BLOB_PATH"
     if is_font_path "$path"; then font_blobs=$((font_blobs + 1)); fi
     encoding=$(file -b --mime-encoding "$BLOB_PATH" 2>/dev/null) || { unknown "$repo [$display_ref] $display_path — content classification failed"; continue; }
     if [ "$encoding" = binary ]; then
       binary_blobs=$((binary_blobs + 1))
+      detect_blob binary "$path" "$BLOB_PATH"
     elif [ "$encoding" = us-ascii ] || [ "$encoding" = utf-8 ] || [ "$encoding" = unknown-8bit ]; then
       scan_text "$path" "$BLOB_PATH"
     else
@@ -453,11 +504,12 @@ scan_ref() { # repo display-ref optional-known-sha
       fi
     fi
     if [ "$unknowns" = "$detector_unknowns" ] && [ "$findings" = "$detector_findings" ] &&
-       [ "$reviews" = "$detector_reviews" ]; then
+       [ "$reviews" = "$detector_reviews" ] && [ "$advisories" = "$detector_advisories" ]; then
       printf '%s %s %s\n' "$((text_blobs - before_text))" "$((binary_blobs - before_binary))" "$((font_blobs - before_font))" > "$memo" || unknown "$repo [$display_ref] detector cache write failed"
     fi
   done < "$WORK/entries"
   CURRENT_PATH=""
+  CURRENT_BLOB_SHA=""
   if [ "$unknowns" = "$before_unknowns" ]; then
     refs_checked=$((refs_checked + 1))
     ref_outcome=checked
@@ -612,23 +664,4 @@ for acct in $ACCOUNTS; do
 done
 
 RUN_FINISHED=1
-echo
-printf 'Completed checks: %s account(s), %s repo(s), %s/%s ref(s); %s blob occurrence(s), %s unique verified blob(s), %s cache hit(s); %s text, %s binary, %s font; %s finding(s), %s review item(s), %s incomplete check(s), %s gitlink omission(s).\n' \
-  "$accounts_checked" "$repos_checked" "$refs_checked" "$refs_attempted" "$blob_occurrences" "$unique_blobs" "$cache_hits" \
-  "$text_blobs" "$binary_blobs" "$font_blobs" "$findings" "$reviews" "$unknowns" "$gitlinks"
-printf 'Evidence: %s\n' "$EVIDENCE_FILE"
-if [ "$unknowns" -gt 0 ] || [ "$repos_checked" -eq 0 ]; then
-  red 'INCOMPLETE — this run does not establish a clean result.'
-  exit 2
-fi
-if [ "$findings" -gt 0 ]; then
-  red "$findings indicator(s) found — review before using affected repositories."
-  exit 1
-fi
-if [ "$gitlinks" -gt 0 ]; then
-  grn 'requested blob checks complete; no indicators in scanned blobs'
-  ylw "$gitlinks gitlink(s) were recorded as omissions, so this is not a full submodule-content verdict."
-else
-  grn 'requested checks complete; no indicators within the documented coverage'
-fi
 exit 0

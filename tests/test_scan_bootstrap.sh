@@ -58,10 +58,10 @@ export CASE=stub FIXTURE_EXIT=0
 run 0 local "$T/local target"
 printf '%s\n' "$T/local target" > "$T/expected"
 cmp "$T/expected" "$T/args"
-[ "$(grep -c '^download ' "$T/events")" = 4 ]
+[ "$(grep -c '^download ' "$T/events")" = 6 ]
 echo 'PASS embedded manifest matches actual scanner files; local path with spaces forwarded'
-run 0 local "$T/local target" --include-generated --details
-printf '%s\n' "$T/local target" --include-generated --details > "$T/expected"
+run 0 local "$T/local target" --include-generated --details --workstation --check-signing
+printf '%s\n' "$T/local target" --include-generated --details --workstation --check-signing > "$T/expected"
 cmp "$T/expected" "$T/args"
 echo 'PASS local scope and detail arguments forwarded'
 run 0 repo owner/repo --ref 'feature/a+b#ref'

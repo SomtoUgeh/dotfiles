@@ -23,7 +23,7 @@ class ScanInteractionTests(unittest.TestCase):
             project.mkdir()
             (project / "example.txt").write_text("ordinary text\n")
             ready = base / "ready"
-            for name in ("scan_repo.sh", "worm_guard_runtime.sh", "worm_guard_patterns.py"):
+            for name in ("scan_repo.sh", "worm_guard_local.py", "worm_guard_runtime.sh", "worm_guard_patterns.py"):
                 (tools / name).write_bytes((ROOT / "scripts" / name).read_bytes())
             # Delay a trusted fixture helper, never the target's code. This makes
             # progress and interrupt tests independent of CPU speed or file size.

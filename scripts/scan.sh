@@ -5,7 +5,7 @@ fail() { printf 'INCOMPLETE: %s\n' "$*" >&2; exit 2; }
 
 usage() {
   cat <<'USAGE'
-Usage: scan.sh local [DIRECTORY] [--include-generated] [--details]
+Usage: scan.sh local [DIRECTORY] [--include-generated] [--details] [--workstation] [--check-signing]
        scan.sh repo OWNER/REPO [--ref BRANCH_TAG_OR_SHA]
 
 Downloads verified scanner files and installs missing dependencies.
@@ -15,6 +15,8 @@ gh, jq, file and iconv are already installed in standard locations.
 GitHub scans use your normal gh login or GH_TOKEN/GITHUB_TOKEN.
 Local scans exclude untracked build caches by default and report their paths.
 Use --include-generated to read them too; --details shows more review locations.
+Use --workstation for local process/startup checks outside DIRECTORY.
+Use --check-signing to review missing commit signature headers (no verification).
 Exit: 0 no findings in scope; 1 matches/review signals; 2 incomplete/setup failed.
 USAGE
 }
@@ -44,10 +46,12 @@ fetch_scanners() {
     download "https://raw.githubusercontent.com/SomtoUgeh/dotfiles/main/scripts/$name" "$SCAN_WORK/$name"
     verify "$SCAN_WORK/$name" "$digest"
   done <<'SCANNERS'
-76f78405fbfeab9f1e07eb890d262df5be5bd7fbfb58bd66eb50e48a62142891 scan_repo.sh
-637183e27a2c2111accc640a91a0fdc4f3613b8d68cb78995438faf5771415ae scan_remote.sh
-cef0c40097484118548fe1dbeff200c6ef57cab72e2a46b23ba491238d6a522c worm_guard_patterns.py
+cdbac2a4a73dbe1f652ade2fd91130f05ccbee7d56f4c9bfa2160fe2a92c9646 scan_repo.sh
+2dbf6b05c4c30c50dd65a317e7feb551f0651708b047a36598404e15c880f84a scan_remote.sh
+6cc409bd2bd3e2e796c0b2f0309cd8054e5b9ba86907dfc926cdce92a063f4fa worm_guard_patterns.py
 775a287e026ba33378368ac75a8dba31dbb857134d201965a697049cf9ef6871 worm_guard_runtime.sh
+2626a586be7d149bb28570209720cc2ea96e6f18c17a3d4e50731eef2107519d worm_guard_host.py
+91e732fe086cfa7a2697d437884519e966e3fdf7770ff917abad5b36eda82576 worm_guard_local.py
 SCANNERS
 }
 
@@ -158,8 +162,8 @@ main() {
       if [ "$#" -gt 0 ] && [[ "$1" != --* ]]; then target=$1; shift; fi
       while [ "$#" -gt 0 ]; do
         case "$1" in
-          --include-generated|--details) local_args+=("$1") ;;
-          *) fail 'usage: scan.sh local [DIRECTORY] [--include-generated] [--details]' ;;
+          --include-generated|--details|--workstation|--check-signing) local_args+=("$1") ;;
+          *) fail 'usage: scan.sh local [DIRECTORY] [--include-generated] [--details] [--workstation] [--check-signing]' ;;
         esac
         shift
       done

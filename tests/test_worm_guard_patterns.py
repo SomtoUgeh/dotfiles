@@ -86,6 +86,46 @@ class DetectorTests(unittest.TestCase):
             for group, pattern in originals.items():
                 self.assertEqual(group in actual, bool(pattern.search(value)), (group, value))
 
+    def test_both_postcss_names_and_package_boundaries(self):
+        for filename in ('package.json', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml'):
+            for name in ('postcss-minify-selector', 'postcss-minify-selector-parser'):
+                results = Results()
+                patterns.scan_text(results, Results.root / filename, '"' + name + '": "1.0.0"')
+                self.assertIn('package', results.groups, (filename, name))
+        for name in ('postcss-minify-selectors', 'postcss-minify-selector-parser-safe',
+                     'safe-postcss-minify-selector', 'postcss-selector-parser'):
+            results = Results()
+            patterns.scan_text(results, Results.root / 'package.json', '"' + name + '": "1.0.0"')
+            self.assertNotIn('package', results.groups, name)
+
+    def test_automatic_task_setting_values(self):
+        for value, expected in (('true', True), ('"on"', True), ('false', False),
+                                ('"off"', False), ('"auto"', False), ('"only"', False)):
+            results = Results()
+            patterns.scan_text(results, Results.root / '.vscode/settings.json',
+                               '{"task.allowAutomaticTasks": ' + value + '}')
+            self.assertEqual('auto-run' in results.groups, expected, value)
+
+    def test_binary_markers_are_review_signals_without_execution_claims(self):
+        for marker in (b'rmcej' + b'%otb%', b'global["_V"]', b'A8-' + b'5657-1',
+                       b'166.88.' + b'54.158', b'LAST_' + b'COMMIT_DATE'):
+            results = Results()
+            patterns.scan_binary(results, Results.root / 'sample.bin', b'\0' + marker + b'\0')
+            self.assertIn('binary-indicator', results.groups, marker)
+            self.assertFalse(patterns.CAMPAIGN_GROUPS.intersection(results.groups))
+        results = Results()
+        patterns.scan_binary(results, Results.root / 'sample.bin', b'\0ordinary bytes\0')
+        self.assertEqual(results.groups, {})
+
+    def test_generic_dropper_names_and_seeds_are_review_only(self):
+        for name in ('config.bat', 'settings.ps1'):
+            results = Results()
+            patterns.scan_metadata(results, Results.root / name, b'ordinary content')
+            self.assertIn('generic-artifact', results.groups)
+            self.assertFalse(patterns.CAMPAIGN_GROUPS.intersection(results.groups))
+        self.assertIn('obfuscation-seed', scan('285' + '7687'))
+        self.assertNotIn('obfuscation-seed', scan('1285' + '76870'))
+
 
 if __name__ == "__main__":
     unittest.main()

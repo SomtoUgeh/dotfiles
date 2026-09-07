@@ -283,7 +283,7 @@ People without these dotfiles can download and run just the scanner:
 Run these from a trusted terminal. The downloaded script is executable code
 from this repository; inspect `scripts/scan.sh` first if needed. `pipefail`
 keeps an initial curl failure from returning success. The bootstrap downloads
-all four scanner files into a temporary directory and checks their SHA-256
+all six scanner files into a temporary directory and checks their SHA-256
 digests before loading them. A failed or mismatched download stops the run.
 It removes the temporary scripts on exit and preserves the scanner's exit code.
 
@@ -315,7 +315,10 @@ Dependencies, unreadable files, oversized files and missing shallow history are
 reported scope limits; inspect the report. It runs Python through uv with
 project discovery, environment-file loading and downloads disabled. The remote
 scanner uses GitHub GET requests, verifies blob hashes and sizes, and never
-clones or executes the repository. Both use the same detection rules.
+clones or executes the repository. Both use the same detection rules and campaign
+classification. `scan_repo.sh` selects the isolated runtime and delegates to
+`worm_guard_local.py`; `worm_guard_patterns.py` contains the shared rules and
+`worm_guard_host.py` contains optional workstation checks.
 
 Local scans print a start message immediately and progress every five seconds,
 including the current phase and file. By default, untracked files under `.next`,
@@ -327,13 +330,39 @@ build caches too; oversized or changing files can make that scan incomplete.
 Dependency exclusions still apply. Ctrl+C reports an interrupted, incomplete
 scan without a Python traceback.
 
-The local report starts with campaign matches, review signals, and inspection
+Reports distinguish campaign matches, review signals, and inspection
 errors as separate counts. Exact campaign markers are distinguished from generic
 patterns such as long lines, public blockchain endpoints, and active Git hooks.
-Neither category proves execution or infection. Review groups show three example
-locations by default; `--details` shows up to 20 per group. Counts include all
-matches, even when the list is capped. These options also work directly with
+Neither category proves execution or infection. Local groups show three example
+locations by default; `--details` shows every finding, error and context advisory.
+The display limit does not discard collected evidence. These options work directly with
 `scan_repo.sh /path/to/repo --include-generated --details`.
+
+Binary files and stored binary blobs receive raw indicator-byte checks. A compiled
+scanner can contain the same constants, so these matches are review signals.
+Package checks cover both `postcss-minify-selector` and `postcss-minify-selector-parser`,
+including lockfiles. Automatic-task checks recognise legacy `true` and `"on"`;
+whether a workspace setting takes effect depends on the editor version and scope.
+Generic dropper names and numeric seeds are also review signals. Configuration
+size, terminal visibility, `createRequire`, and `.env` presence produce context
+advisories, not proof of infection or missing ignore rules.
+
+For broader local checks, add `--workstation` to either local entrypoint. This
+explicitly extends scope to the user's `.node_modules`, shell startup files,
+running processes, current-user cron and macOS launch-item names. It does not
+inspect all persistence mechanisms or assess the entire machine. Command lines
+and file contents are not printed. Unreadable, symlinked, oversized or failed
+checks report incomplete; startup files are never executed. Startup-file symlinks
+within the user's home are inspected safely; links outside it remain incomplete.
+
+`--check-signing` optionally checks for embedded signature headers in up to 20
+recent commits across local refs per repository. It does not invoke signing
+helpers or verify signatures; unsigned commits are review signals.
+
+```bash
+# Use the checkout's implementation directly, without fetching published files
+bash scripts/scan_repo.sh /path/to/repo --include-generated --details --workstation --check-signing
+```
 
 Exit codes: **0 = requested checks completed without findings; 1 = campaign matches or review signals;
 2 = incomplete.** A signature match needs investigation; it does not prove
@@ -347,6 +376,9 @@ Remote reports live in `~/.local/state/worm-guard`; the local scanner prints
 to the terminal, so redirect its output there when preserving a report. Keep
 incident evidence separate from dotfiles. `WORMGUARD_STATE` selects another state directory for
 an isolated investigation. Remote receipts are in `scan-last-run.json`.
+Remote console output groups identical signals across refs; the receipt retains
+every affected ref and its immutable commit. Context advisories are separate
+from review signals and do not change the exit code by themselves.
 Scanner changes can be checked offline from this checkout:
 
 ```bash
@@ -355,6 +387,7 @@ Scanner changes can be checked offline from this checkout:
 ./tests/test_scan_bootstrap.sh
 ./tests/test_scanner_install.sh
 uv run --no-project python tests/test_worm_guard_patterns.py
+uv run --no-project python tests/test_worm_guard_host.py
 uv run --no-project python tests/test_scan_progress.py
 uv run --no-project python tests/test_scan_scope.py
 ```

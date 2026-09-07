@@ -24,6 +24,7 @@ printf 'notes about branch_%s.json\n' 'structure' > "$T/fixtures/docs"
 printf 'not-a-font\n' > "$T/fixtures/fakefont"
 printf 'wOF2real-font\n' > "$T/fixtures/font"
 printf '\000\001\002\003' > "$T/fixtures/binary"
+printf '\000inert A8-%s-1\000' 5657 > "$T/fixtures/binarymarker"
 printf '\377\376g\000l\000o\000b\000a\000l\000.\000i\000=\000"\000A\0008\000-\0003\0009\0009\0007\000-\0001\000"\000;\000\n\000' > "$T/fixtures/utf16"
 cp "$ROOT/scan_remote.sh" "$T/fixtures/scanner"
 cp "$ROOT/worm_guard_patterns.py" "$T/fixtures/core"
@@ -34,7 +35,7 @@ cp "$ROOT/worm_guard_patterns.py" "$T/fixtures/core"
   printf '%s%s\n' 'ghu_' 'AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHHIIII'
 } > "$T/fixtures/union"
 
-for name in safe other shim minified tiny docs fakefont font binary utf16 scanner core union; do
+for name in safe other shim minified tiny docs fakefont font binary binarymarker utf16 scanner core union; do
   upper=$(printf '%s' "$name" | tr '[:lower:]' '[:upper:]')
   eval "export SHA_$upper=$(git hash-object --no-filters "$T/fixtures/$name")"
   eval "export SIZE_$upper=$(wc -c < "$T/fixtures/$name" | tr -d ' ')"
@@ -88,6 +89,9 @@ case "$endpoint" in
       pages-merged)
         printf '[{"name":"main","commit":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},{"name":"page-two","commit":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}]\n'
         ;;
+      repeated-content)
+        printf '[{"name":"main","commit":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},{"name":"page-two","commit":{"sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}}]\n'
+        ;;
       *) printf '[{"name":"main","commit":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}]\n[{"name":"page-two","commit":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}]\n' ;;
     esac
     ;;
@@ -111,13 +115,19 @@ case "$endpoint" in
         touch "$WORMGUARD_STATE/first-ref-started"
       fi
     fi
-    printf '{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","commit":{"author":{"name":"Tester","email":"a@example.test"},"committer":{"name":"Tester","email":"a@example.test"}}}\n'
+    commit_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    committer=Tester
+    if [ "$MOCK_CASE" = repeated-content ] && [ "${endpoint##*/}" = bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb ]; then
+      commit_sha=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    fi
+    [ "$MOCK_CASE" != ghost-review ] || committer=Different
+    printf '{"sha":"%s","commit":{"author":{"name":"Tester","email":"a@example.test"},"committer":{"name":"%s","email":"a@example.test"}}}\n' "$commit_sha" "$committer"
     ;;
   repos/*/git/trees/*)
     [ "$MOCK_CASE" != tree-error ] || exit 1
     [ "$MOCK_CASE" != malformed-tree ] || { printf '{"tree":[{"type":"blob","path":"x","sha":"bad","size":1}],"truncated":false}\n'; exit; }
     case "$MOCK_CASE" in
-      infected|signal-*)
+      infected|repeated-content|signal-*)
         jq -n --arg a "$SHA_TINY" --argjson az "$SIZE_TINY" --arg b "$SHA_DOCS" --argjson bz "$SIZE_DOCS" \
           --arg c "$SHA_FAKEFONT" --argjson cz "$SIZE_FAKEFONT" \
           '{tree:[{type:"blob",mode:"100644",path:"src/tiny.js",sha:$a,size:$az},
@@ -143,9 +153,11 @@ case "$endpoint" in
         jq -n --arg a "$a" --argjson az "$az" \
           '{tree:[{type:"blob",mode:"100644",path:"source.py",sha:$a,size:$az}],truncated:false}'
         ;;
-      utf16)
-        jq -n --arg a "$SHA_UTF16" --argjson az "$SIZE_UTF16" \
-          '{tree:[{type:"blob",mode:"100644",path:"utf16.js",sha:$a,size:$az}],truncated:false}'
+      utf16|binarymarker)
+        if [ "$MOCK_CASE" = utf16 ]; then a=$SHA_UTF16; az=$SIZE_UTF16; path=utf16.js;
+        else a=$SHA_BINARYMARKER; az=$SIZE_BINARYMARKER; path=image.bin; fi
+        jq -n --arg a "$a" --argjson az "$az" --arg path "$path" \
+          '{tree:[{type:"blob",mode:"100644",path:$path,sha:$a,size:$az}],truncated:false}'
         ;;
       gitlink)
         printf '{"tree":[{"type":"commit","mode":"160000","path":"vendor/sub","sha":"cccccccccccccccccccccccccccccccccccccccc"}],"truncated":false}\n'
@@ -191,7 +203,7 @@ case "$endpoint" in
     if [ "$MOCK_CASE" = blob-error ]; then exit 1; fi
     if [ "$MOCK_CASE" = rate-error ]; then printf 'API rate limit exceeded\n' >&2; exit 1; fi
     file=""
-    for name in safe other shim minified tiny docs fakefont font binary utf16 scanner core union; do
+    for name in safe other shim minified tiny docs fakefont font binary binarymarker utf16 scanner core union; do
       upper=$(printf '%s' "$name" | tr '[:lower:]' '[:upper:]')
       eval "candidate=\${SHA_$upper}"
       [ "$sha" != "$candidate" ] || { file="$FIXTURE_DIR/$name"; break; }
@@ -326,13 +338,27 @@ grep -q 'worm-marker.*src/tiny.js' "$T/result"
 grep -q 'worm-artifact.*SECURITY' "$T/result"
 grep -q 'fake-font.*assets/renamed.woff2' "$T/result"
 echo 'PASS tiny source, extensionless text, campaign marker, renamed font'
+jq -e '.counts.findings==2 and .counts.review_items==3 and
+  (.findings|length)==2 and (.reviews|length)==3 and
+  all(.findings[]; .message|test("worm-marker|worm-artifact")) and
+  any(.reviews[]; .message|startswith("fake-font"))' "$WORMGUARD_STATE/scan-last-run.json" >/dev/null
+grep -Fq 'worm-marker "src/tiny.js"' "$T/result"
+! grep -Fq '\"src/tiny.js\"' "$T/result"
+echo 'PASS campaign and generic signals have distinct evidence severity and paths are quoted once'
 
 export MOCK_CASE=benign
 new_case benign
 run_scan 0 --account personal --repo test/repo --ref main
 grep -q 'createRequire.*vite.config.mjs' "$T/result"
-grep -q '0 finding(s), 1 review item(s)' "$T/result"
+grep -q '0 campaign match(es), 0 review signal(s), 1 advisory item(s)' "$T/result"
+jq -e '.counts.findings==0 and .counts.review_items==0 and .counts.advisory_items==1 and
+  (.reviews|length)==0 and (.advisories|length)==1 and .advisories[0].kind=="advisory"' "$WORMGUARD_STATE/scan-last-run.json" >/dev/null
 echo 'PASS innocent minified text and createRequire shim do not become findings'
+run_scan 0 --account personal --repo test/repo
+jq -e '.counts.advisory_items==2 and (.advisories|length)==2 and
+  ([.advisories[].ref]|unique|length)==2' "$WORMGUARD_STATE/scan-last-run.json" >/dev/null
+[ "$(grep -c 'createRequire.*vite.config.mjs' "$T/result")" = 1 ]
+echo 'PASS advisory-only scans remain successful and preserve every ref occurrence'
 
 export MOCK_CASE=scanner-source
 new_case scanner-source
@@ -368,6 +394,14 @@ run_scan 1 --account personal --repo test/repo --ref main
 grep -q 'worm-marker.*utf16.js' "$T/result"
 echo 'PASS UTF-16 text is decoded and scanned'
 
+export MOCK_CASE=binarymarker
+new_case binarymarker
+run_scan 1 --account personal --repo test/repo --ref main
+grep -q 'binary-indicator.*image.bin' "$T/result"
+jq -e '.counts.binary_blobs_classified==1 and .counts.findings==0 and .counts.review_items==1 and
+  .scan_complete and .status=="findings" and .exit_code==1' "$WORMGUARD_STATE/scan-last-run.json" >/dev/null
+echo 'PASS raw indicator bytes in binary blobs are inspected'
+
 export MOCK_CASE=path-artifact
 new_case path
 run_scan 1 --account personal --repo test/repo --ref main
@@ -381,7 +415,8 @@ if LC_ALL=C grep -q $'\033]' "$T/result"; then
   echo 'FAIL raw OSC terminal escape from Git path reached stdout' >&2
   exit 1
 fi
-grep -Fq '\\u001b' "$T/result"
+grep -Fq '\u001b' "$T/result"
+! grep -Fq '\\u001b' "$T/result"
 jq -e '.findings[0].path | contains("\u001b") and contains("\n")' "$WORMGUARD_STATE/scan-last-run.json" >/dev/null
 echo 'PASS control characters in paths are escaped for terminal output and preserved in JSON'
 
@@ -440,14 +475,28 @@ export MOCK_CASE=path-sensitive
 new_case path-sensitive
 run_scan 1 --account personal --repo test/repo --ref main
 grep -q 'long-line.*vite.config.mjs' "$T/result"
+jq -e '.scan_complete and .status=="findings" and .exit_code==1 and
+  .counts.findings==0 and .counts.review_items==1' "$WORMGUARD_STATE/scan-last-run.json" >/dev/null
 echo 'PASS clean byte memo respects exact path detection rules'
 
-export MOCK_CASE=infected
+export MOCK_CASE=repeated-content
 new_case repeated-findings
 run_scan 1 --account personal --repo test/repo
-[ "$(grep -c 'worm-marker.*src/tiny.js' "$T/result")" = 2 ]
-jq -e '[.findings[]|select(.path=="src/tiny.js")|.ref]|unique|length==2' "$WORMGUARD_STATE/scan-last-run.json" >/dev/null
-echo 'PASS repeated infected blobs retain findings on every affected ref'
+[ "$(grep -c 'worm-marker.*src/tiny.js' "$T/result")" = 1 ]
+[ "$(grep -c 'fake-font.*assets/renamed.woff2' "$T/result")" = 1 ]
+grep -q '5 repeated message(s) omitted above' "$T/result"
+jq -e '.counts.findings==4 and .counts.review_items==6 and
+  (.findings|length)==4 and (.reviews|length)==6 and
+  ([.findings[]|select(.path=="src/tiny.js")|.ref]|unique|length)==2 and
+  ([.findings[]|select(.path=="src/tiny.js")|.sha]|unique|length)==2' "$WORMGUARD_STATE/scan-last-run.json" >/dev/null
+echo 'PASS repeated blobs across distinct commits print once while every ref retains evidence and counts'
+
+export MOCK_CASE=ghost-review
+new_case ghost-review
+run_scan 1 --account personal --repo test/repo --ref main
+jq -e '.scan_complete and .counts.findings==0 and .counts.review_items==1 and
+  (.reviews[0].message|startswith("ghost-commit"))' "$WORMGUARD_STATE/scan-last-run.json" >/dev/null
+echo 'PASS differing author and committer metadata requires review, not a campaign verdict'
 
 export MOCK_CASE=sort-error
 new_case inventory-transform

@@ -29,6 +29,9 @@ GENERATED_NAMES = (
     re.compile(r"(?:^|/)bundle\.[^.]+$|\.bundle\.", re.IGNORECASE),
     re.compile(r"\.map$", re.IGNORECASE),
 )
+OBFUSCATION_SEED = re.compile(
+    r"(?<![0-9])(?:" + "|".join(("285" + "7687", "266" + "7686", "111" + "1436", "389" + "6884")) + r")(?![0-9])"
+)
 
 def decode_text(data):
     encodings = (
@@ -91,40 +94,44 @@ def font_command_line(lines):
     return None
 
 
+bootstrap_pattern = re.compile(
+    r"global\[['\"](?:!|_V|_t_t|r|m)['\"]\]|global\.i\s*=|"
+    r"global\.r\s*=\s*require"
+)
+bootstrap = re.compile(
+    r"A8-(?:3997|5657)-1|"
+    + re.escape("rmcej" + "%otb%") + "|" + re.escape("Cot" + "%3t=shtP") + r"|_\$_1e42"
+)
+blockchain_rpc = re.compile(
+    r"trongrid\.io|bsc-" + r"dataseed|bsc-rpc\.publicnode\.com|"
+    r"fullnode\.mainnet\.aptoslabs\.com"
+)
+network = re.compile(
+    r"166\.88\.54\.158|"
+    r"(?:default-configuration|vscode-settings-bootstrap|vscode-settings-config|"
+    r"vscode-bootstrapper|vscode-load-config|260120)\.vercel\.app|"
+    + re.escape("TMfKQEd7TJJa5xNZ" + "JZ2Lep838vrzrs7mAP") + "|"
+    + re.escape("TXfxHUet9pJVU1Bg" + "VkBAbrES4YUc1nGzcG") + "|"
+    + re.escape("0xbe037400670fbf1c32364f762975908d" + "c43eeb38759263e7dfcdabc76380811e") + "|"
+    + re.escape("0x3f0e5781d0855fb460661ac63257376d" + "b1941b2bb522499e4757ecb3ebd5dce3") + "|"
+    + re.escape("2[gWfGj;<:-93Z" + "^C") + "|" + re.escape("m6:tTh^D)cBz?NM" + "]")
+)
+package = re.compile(
+    r"(?<![a-z0-9._-])(?:tailwindcss-(?:style-animate|typography-style|style-modify|animate-style)|"
+    r"tailwind-(?:mainanimation|autoanimation|animationbased)|"
+    r"postcss-minify-selector(?:-parser)?|html-to-gutenberg|fetch-page-assets|aes-decode-runner-pro)(?![a-z0-9._-])"
+)
+
+artifact = re.compile(r"branch_" + r"structure\.json|temp_" + r"(?:auto|interactive)_push\.(?:bat|sh)|truffle" + "Secrets", re.IGNORECASE)
+take_home = re.compile(re.escape("e9b53a7c-2342-4b15" + "-b02d-bd8b8f6a03f9"))
+PACKAGE_FILES = {"package.json", "package-lock.json", "yarn.lock", "pnpm-lock.yaml"}
+
+
 def scan_text(scanner, path, text):
     relative = os.path.relpath(str(path), str(scanner.root))
     lines = text.splitlines()
     suffix = path.suffix.lower()
 
-    bootstrap_pattern = re.compile(
-        r"global\[['\"](?:!|_V|_t_t|r|m)['\"]\]|global\.i\s*=|"
-        r"global\.r\s*=\s*require"
-    )
-    bootstrap = re.compile(
-        r"A8-(?:3997|5657)-1|"
-        + re.escape("rmcej" + "%otb%") + "|" + re.escape("Cot" + "%3t=shtP") + r"|_\$_1e42"
-    )
-    blockchain_rpc = re.compile(
-        r"trongrid\.io|bsc-" + r"dataseed|bsc-rpc\.publicnode\.com|"
-        r"fullnode\.mainnet\.aptoslabs\.com"
-    )
-    network = re.compile(
-        r"166\.88\.54\.158|"
-        r"(?:default-configuration|vscode-settings-bootstrap|vscode-settings-config|"
-        r"vscode-bootstrapper|vscode-load-config|260120)\.vercel\.app|"
-        + re.escape("TMfKQEd7TJJa5xNZ" + "JZ2Lep838vrzrs7mAP") + "|"
-        + re.escape("TXfxHUet9pJVU1Bg" + "VkBAbrES4YUc1nGzcG") + "|"
-        + re.escape("0xbe037400670fbf1c32364f762975908d" + "c43eeb38759263e7dfcdabc76380811e") + "|"
-        + re.escape("0x3f0e5781d0855fb460661ac63257376d" + "b1941b2bb522499e4757ecb3ebd5dce3") + "|"
-        + re.escape("2[gWfGj;<:-93Z" + "^C") + "|" + re.escape("m6:tTh^D)cBz?NM" + "]")
-    )
-    package = re.compile(
-        r"tailwindcss-(?:style-animate|typography-style|style-modify|animate-style)|"
-        r"tailwind-(?:mainanimation|autoanimation|animationbased)|"
-        r"postcss-minify-selector-parser|html-to-gutenberg|fetch-page-assets|aes-decode-runner-pro"
-    )
-
-    artifact = re.compile(r"branch_" + r"structure\.json|temp_" + r"(?:auto|interactive)_push\.(?:bat|sh)|truffle" + "Secrets", re.IGNORECASE)
     line = first_line(lines, artifact)
     if line is not None:
         scanner.finding("artifact", path, line, "known propagation artifact name")
@@ -159,7 +166,21 @@ def scan_text(scanner, path, text):
     if line is not None:
         scanner.finding("blockchain-rpc", path, line, "public blockchain endpoint; legitimate code can match")
 
+    seed = first_line(lines, OBFUSCATION_SEED)
+    if seed is not None:
+        scanner.finding("obfuscation-seed", path, seed, "numeric obfuscator seed; ordinary numbers can match")
+    if re.fullmatch(r"(?:postcss|tailwind|eslint|next|vite|webpack|babel|vue|astro|jest|gridsome|nuxt)\.config\..+|truffle\.js", path.name):
+        if len(text.encode("utf-8")) > 3000:
+            scanner.advisory(path, None, "configuration exceeds 3000 bytes; size alone is not suspicious")
+    if path.name == "settings.json" and ".vscode" in path.parts:
+        line = first_line(lines, re.compile(r"terminal\.integrated\.hideOnStartup"))
+        if line is not None:
+            scanner.advisory(path, line, "terminal visibility preference; review alongside unexpected automatic tasks")
+
     if path.name == ".gitignore":
+        line = first_line(lines, re.compile(r"(?:temp_auto_push|temp_interactive_push|config)\.bat"))
+        if line is not None:
+            scanner.finding("generic-artifact", path, line, "ignore rule mentions a possible helper script; review context")
         ignore_names = {"temp_" + "auto_push.bat", "temp_" + "interactive_push.bat", "branch_" + "structure.json"}
         for number, value in enumerate(lines, 1):
             stripped = value.strip()
@@ -167,13 +188,13 @@ def scan_text(scanner, path, text):
                 scanner.finding("gitignore", path, number, "known self-hiding or helper entry")
                 break
 
-    line = first_line(lines, re.compile(r"\bcreateRequire\s*\(\s*import\.meta\.url\s*\)"))
+    line = first_line(lines, re.compile(r"\bcreateRequire\b"))
     if line is not None:
         scanner.advisory(path, line, "createRequire in ESM is legitimate by itself; correlate with findings")
 
-    task_pattern = r'"runOn"\s*:\s*"folder' + r'Open"|"task\.allowAutomaticTasks"\s*:\s*true'
+    task_pattern = r'"runOn"\s*:\s*"folder' + r'Open"|"task\.allowAutomaticTasks"\s*:\s*(?:true\b|"on")'
     if ".vscode" in path.parts or suffix in {".json", ".jsonc"}:
-        task_pattern = r"folder" + r"Open|(?:task\.)?allowAutomaticTasks['\"]?\s*:\s*true"
+        task_pattern = r"folder" + r"Open|(?:task\.)?allowAutomaticTasks['\"]?\s*:\s*(?:true\b|['\"]on['\"])"
     line = first_line(lines, re.compile(task_pattern))
     if line is not None:
         scanner.finding("auto-run", path, line, "editor task can run when the folder opens")
@@ -182,14 +203,14 @@ def scan_text(scanner, path, text):
         scanner.finding("font-command", path, line, "node command text and a font extension occur on the same line; execution is not established")
 
     line = first_line(lines, re.compile(r"\bLAST_" + r"COMMIT_DATE\b"))
-    if line is not None and suffix in {".bat", ".ps1", ".sh"}:
+    if line is not None:
         scanner.finding("commit-tamper", path, line, "commit-date rewrite marker")
 
-    if path.name in {"package.json", "package-lock.json", "yarn.lock", "pnpm-lock.yaml"}:
+    if path.name in PACKAGE_FILES:
         line = first_line(lines, package)
         if line is not None:
             scanner.finding("package", path, line, "known malicious package name")
-    line = first_line(lines, re.compile(re.escape("e9b53a7c-2342-4b15" + "-b02d-bd8b8f6a03f9")))
+    line = first_line(lines, take_home)
     if line is not None:
         scanner.finding("take-home", path, line, "known weaponized sample identifier")
     line = first_line(lines, re.compile(r"gh[ou]_[A-Za-z0-9]{36}"))
@@ -203,9 +224,27 @@ def scan_metadata(scanner, path, data):
     name = path.name.lower()
     if re.fullmatch(r"temp_" + r"(?:auto|interactive)_push\.(?:bat|sh)|branch_" + r"structure\.json|truffle" + r"secrets.*", name):
         scanner.finding("artifact-path", path, 1, "known propagation artifact filename")
+    if name in {"config.bat", "settings.ps1"}:
+        scanner.finding("generic-artifact", path, 1, "possible dropper filename; legitimate scripts can use this name")
     validator = FONT_SIGNATURES.get(path.suffix.lower())
     if validator is not None and not validator(data):
         scanner.finding("fake-font", path, 1, "content does not match the font extension")
+
+
+# Use the same indicators on raw bytes without treating binary data as JavaScript.
+# In particular, compiled scanners can legitimately contain all these constants.
+BINARY_PATTERNS = tuple(
+    re.compile(pattern.pattern.encode("ascii"), re.IGNORECASE)
+    for pattern in (bootstrap, bootstrap_pattern, network, blockchain_rpc, artifact, take_home,
+                    re.compile(r"\bLAST_" + r"COMMIT_DATE\b"), OBFUSCATION_SEED)
+)
+
+
+def scan_binary(scanner, path, data):
+    package_match = path.name in PACKAGE_FILES and re.search(package.pattern.encode("ascii"), data, re.I)
+    if package_match or any(pattern.search(data) for pattern in BINARY_PATTERNS):
+        scanner.finding("binary-indicator", path, None,
+                        "indicator bytes in binary content; detector caches and other legitimate binaries can match")
 
 
 class RemoteResults:
@@ -213,14 +252,16 @@ class RemoteResults:
 
     def finding(self, group, path, line, reason):
         labels = {"bootstrap": "worm-marker", "padding": "hidden-padding", "artifact": "worm-artifact", "artifact-path": "worm-artifact-path"}
-        print("finding\t" + labels.get(group, group) + "\t" + reason)
+        kind = "finding" if group in CAMPAIGN_GROUPS else "review"
+        print(kind + "\t" + labels.get(group, group) + "\t" + reason)
 
     def advisory(self, path, line, reason):
-        print("review\tcreateRequire\t" + reason)
+        label = "createRequire" if reason.startswith("createRequire") else "context"
+        print("advisory\t" + label + "\t" + reason)
 
 
 def main():
-    if len(sys.argv) != 4 or sys.argv[1] not in {"text", "metadata"}:
+    if len(sys.argv) != 4 or sys.argv[1] not in {"text", "metadata", "binary"}:
         return 2
     mode, name, source = sys.argv[1:]
     try:
@@ -229,6 +270,8 @@ def main():
         path = Path(name)
         if mode == "metadata":
             scan_metadata(RemoteResults(), path, data)
+        elif mode == "binary":
+            scan_binary(RemoteResults(), path, data)
         else:
             text = decode_text(data)
             if text is TEXT_DECODE_ERROR or text is None:
