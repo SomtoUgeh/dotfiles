@@ -14,7 +14,7 @@ Usage: setup_altschool_cloud.sh [options]
 Options:
   --host HOST         SSH host alias (default: altschool)
   --auth              Run interactive GitHub, Grok, and OpenCode login
-  --update            Update Bun, Grok, and OpenCode after installation
+  --update            Update Bun, Grok, and OpenCode 2 after installation
   --repo OWNER/REPO   Shallow clone under ~/code/TalentQL; no dependency install
   -h, --help          Show this help
 EOF
@@ -150,15 +150,19 @@ if [ ! -x "$HOME/.grok/bin/grok" ]; then
   install_script https://x.ai/cli/install.sh
 fi
 
-if [ ! -x "$HOME/.opencode/bin/opencode" ]; then
-  install_script https://opencode.ai/install
+if [ ! -x "$HOME/.opencode/bin/opencode2" ]; then
+  installer="$(mktemp)"
+  curl -fsSL https://opencode.ai/v2/install -o "$installer"
+  bash "$installer" --no-modify-path
+  rm -f "$installer"
 fi
 
 mkdir -p "$HOME/.local/bin" "$HOME/code/TalentQL"
 ln -sfn "$HOME/.bun/bin/bun" "$HOME/.local/bin/bun"
 ln -sfn "$HOME/.bun/bin/bun" "$HOME/.local/bin/bunx"
 ln -sfn "$HOME/.grok/bin/grok" "$HOME/.local/bin/grok"
-ln -sfn "$HOME/.opencode/bin/opencode" "$HOME/.local/bin/opencode"
+rm -f "$HOME/.opencode/bin/opencode" "$HOME/.local/bin/opencode"
+ln -sfn "$HOME/.opencode/bin/opencode2" "$HOME/.local/bin/opencode2"
 
 if ! grep -Fq '$HOME/.local/bin' "$HOME/.profile"; then
   cat >>"$HOME/.profile" <<'PROFILE'
@@ -173,7 +177,7 @@ export PATH="$HOME/.local/bin:$PATH"
 if [ "$UPDATE" = "1" ]; then
   bun upgrade
   grok update
-  opencode upgrade
+  opencode2 upgrade
 fi
 
 if [ ! -f "$HOME/.gitconfig-personal" ]; then
@@ -205,7 +209,7 @@ if [ "$AUTH" = "1" ]; then
   # The single-quoted command must expand HOME on the remote host.
   # shellcheck disable=SC2016
   run_interactive \
-    'auth_file="$HOME/.local/share/opencode/auth.json"; if [ -s "$auth_file" ] && jq -e "has(\"xai\")" "$auth_file" >/dev/null; then opencode auth list; else opencode auth login --provider xAI; fi'
+    'auth_file="$HOME/.local/share/opencode/auth.json"; if [ -s "$auth_file" ] && jq -e "has(\"xai\")" "$auth_file" >/dev/null; then opencode2 auth list; else opencode2 auth login xAI; fi'
 fi
 
 if [ -n "$REPOSITORY" ]; then

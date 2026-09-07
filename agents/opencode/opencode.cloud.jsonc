@@ -1,49 +1,33 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "autoupdate": true,
+  "update": "auto",
   "model": "xai/grok-4.6",
-  "skills": {
-    "paths": ["~/code/personal/dotfiles/agents/skills"],
-  },
+  "skills": ["~/code/personal/dotfiles/agents/skills"],
   "mcp": {
-    "context7": {
-      "type": "remote",
-      "url": "https://mcp.context7.com/mcp",
-      "enabled": true,
-    },
-    "cloudflare-docs": {
-      "type": "remote",
-      "url": "https://docs.mcp.cloudflare.com/mcp",
-      "enabled": true,
-    },
-    "shadcn": {
-      "type": "local",
-      "command": ["npx", "-y", "shadcn@4.19.1", "mcp"],
-      "enabled": true,
-    },
-  },
-  "permission": {
-    "*": "allow",
-    "edit": "allow",
-    "bash": "allow",
-    "webfetch": "allow",
-    "question": "allow",
-    "skill": "allow",
-    "todowrite": "allow",
-    "task": {
-      "*": "allow",
-    },
-    "external_directory": "allow",
-    "doom_loop": "allow",
-    "read": {
-      "*": "allow",
-      "*.env": "deny",
-      "*.env.*": "deny",
-      "*.env.example": "allow",
-      "~/.config/agent-secrets/**": "deny",
-      "~/.config/gh/**": "deny",
-      "~/.grok/auth.json": "deny",
-      "~/.local/share/opencode/auth.json": "deny",
+    "servers": {
+      "context7": {
+        "type": "remote",
+        "url": "https://mcp.context7.com/mcp",
+      },
+      "cloudflare-docs": {
+        "type": "remote",
+        "url": "https://docs.mcp.cloudflare.com/mcp",
+      },
+      "shadcn": {
+        "type": "local",
+        "command": ["npx", "-y", "shadcn@4.19.1", "mcp"],
+      },
     },
   },
+  "permissions": [
+    { "action": "*", "resource": "*", "effect": "allow" },
+    { "action": "external_directory", "resource": "*", "effect": "allow" },
+    { "action": "read", "resource": "*.env", "effect": "deny" },
+    { "action": "read", "resource": "*.env.*", "effect": "deny" },
+    { "action": "read", "resource": "*.env.example", "effect": "allow" },
+    { "action": "read", "resource": "~/.config/agent-secrets/**", "effect": "deny" },
+    { "action": "read", "resource": "~/.config/gh/**", "effect": "deny" },
+    { "action": "read", "resource": "~/.grok/auth.json", "effect": "deny" },
+    { "action": "read", "resource": "~/.local/share/opencode/auth.json", "effect": "deny" },
+  ],
 }

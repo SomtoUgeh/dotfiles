@@ -1,183 +1,74 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "autoupdate": true,
-  "plugin": [],
+  "update": "auto",
   "mcp": {
-    "context7": {
-      "type": "remote",
-      "url": "https://mcp.context7.com/mcp",
-      "enabled": true,
-      "headers": {
-        "CONTEXT7_API_KEY": "{env:CONTEXT7_API_KEY}",
+    "servers": {
+      "context7": {
+        "type": "remote",
+        "url": "https://mcp.context7.com/mcp",
+        "oauth": false,
+        "headers": {
+          "CONTEXT7_API_KEY": "{env:CONTEXT7_API_KEY}",
+        },
       },
-    },
-    "posthog": {
-      "type": "remote",
-      "url": "https://mcp-eu.posthog.com/mcp",
-      "enabled": false,
-    },
-    "agentation": {
-      "type": "local",
-      "command": ["npx", "-y", "agentation-mcp", "server"],
-      "enabled": true,
-    },
-    "shadcn": {
-      "type": "local",
-      "command": ["npx", "-y", "shadcn@latest", "mcp"],
-      "enabled": true,
-    },
-    "paper": {
-      "type": "remote",
-      "url": "http://127.0.0.1:29979/mcp",
-      "enabled": false,
-    },
-    "cloudflare": {
-      "type": "remote",
-      "url": "https://mcp.cloudflare.com/mcp",
-      "enabled": true,
-      "oauth": {},
-    },
-    "cloudflare-docs": {
-      "type": "remote",
-      "url": "https://docs.mcp.cloudflare.com/mcp",
-      "enabled": true,
-    },
-    "cloudflare-bindings": {
-      "type": "remote",
-      "url": "https://bindings.mcp.cloudflare.com/mcp",
-      "enabled": true,
-      "oauth": {},
-    },
-    "cloudflare-builds": {
-      "type": "remote",
-      "url": "https://builds.mcp.cloudflare.com/mcp",
-      "enabled": true,
-      "oauth": {},
-    },
-    "cloudflare-observability": {
-      "type": "remote",
-      "url": "https://observability.mcp.cloudflare.com/mcp",
-      "enabled": true,
-      "oauth": {},
-    },
-    "digitalocean-accounts": {
-      "type": "remote",
-      "url": "https://accounts.mcp.digitalocean.com/mcp",
-      "enabled": true,
-      "oauth": false,
-      "headers": {
-        "Authorization": "Bearer {env:DIGITALOCEAN_API_TOKEN}",
+      "posthog": {
+        "type": "remote",
+        "url": "https://mcp-eu.posthog.com/mcp",
+        "disabled": true,
       },
-    },
-    "digitalocean-droplets": {
-      "type": "remote",
-      "url": "https://droplets.mcp.digitalocean.com/mcp",
-      "enabled": true,
-      "oauth": false,
-      "headers": {
-        "Authorization": "Bearer {env:DIGITALOCEAN_API_TOKEN}",
+      "agentation": {
+        "type": "local",
+        "command": ["npx", "-y", "agentation-mcp", "server"],
       },
-    },
-    "digitalocean-networking": {
-      "type": "remote",
-      "url": "https://networking.mcp.digitalocean.com/mcp",
-      "enabled": true,
-      "oauth": false,
-      "headers": {
-        "Authorization": "Bearer {env:DIGITALOCEAN_API_TOKEN}",
+      "shadcn": {
+        "type": "local",
+        "command": ["npx", "-y", "shadcn@latest", "mcp"],
       },
-    },
-    "digitalocean-docs": {
-      "type": "remote",
-      "url": "https://docs.mcp.digitalocean.com/mcp",
-      "enabled": true,
-      "oauth": false,
-      "headers": {
-        "Authorization": "Bearer {env:DIGITALOCEAN_API_TOKEN}",
+      "paper": {
+        "type": "remote",
+        "url": "http://127.0.0.1:29979/mcp",
+        "disabled": true,
+      },
+      "cloudflare": {
+        "type": "remote",
+        "url": "https://mcp.cloudflare.com/mcp",
+      },
+      "cloudflare-docs": {
+        "type": "remote",
+        "url": "https://docs.mcp.cloudflare.com/mcp",
+      },
+      "cloudflare-bindings": {
+        "type": "remote",
+        "url": "https://bindings.mcp.cloudflare.com/mcp",
+      },
+      "cloudflare-builds": {
+        "type": "remote",
+        "url": "https://builds.mcp.cloudflare.com/mcp",
+      },
+      "cloudflare-observability": {
+        "type": "remote",
+        "url": "https://observability.mcp.cloudflare.com/mcp",
+      },
+      // 1Password item: Personal / DigitalOcean API Token / token
+      "digitalocean": {
+        "type": "local",
+        "command": [
+          "bash",
+          "-c",
+          "exec \"$HOME/.config/opencode/digitalocean-mcp.sh\"",
+        ],
       },
     },
   },
-  "permission": {
-    "*": "allow",
-    "cloudflare*": "ask",
-    "cloudflare-docs_*": "allow",
-    "digitalocean-*": "ask",
-    "digitalocean-docs_*": "allow",
-    "edit": "allow",
-    "bash": "allow",
-    "webfetch": "allow",
-    "question": "allow",
-    "skill": "allow",
-    "todoread": "allow",
-    "todowrite": "allow",
-    "task": {
-      "*": "allow",
-    },
-    "external_directory": "allow",
-    "doom_loop": "allow",
-    "read": {
-      "*": "allow",
-      "*.env": "deny",
-      "*.env.*": "deny",
-      "*.env.example": "allow",
-    },
-  },
-  "agent": {
-    "build": {
-      "mode": "primary",
-      "permission": {
-        "*": "allow",
-        "cloudflare*": "ask",
-        "cloudflare-docs_*": "allow",
-        "digitalocean-*": "ask",
-        "digitalocean-docs_*": "allow",
-        "edit": "allow",
-        "bash": "allow",
-        "webfetch": "allow",
-        "question": "allow",
-        "skill": "allow",
-        "todoread": "allow",
-        "todowrite": "allow",
-        "task": {
-          "*": "allow",
-        },
-        "external_directory": "allow",
-        "doom_loop": "allow",
-        "read": {
-          "*": "allow",
-          "*.env": "deny",
-          "*.env.*": "deny",
-          "*.env.example": "allow",
-        },
-      },
-    },
-    "plan": {
-      "mode": "primary",
-      "permission": {
-        "*": "allow",
-        "cloudflare*": "ask",
-        "cloudflare-docs_*": "allow",
-        "digitalocean-*": "ask",
-        "digitalocean-docs_*": "allow",
-        "edit": "allow",
-        "bash": "allow",
-        "webfetch": "allow",
-        "question": "allow",
-        "skill": "allow",
-        "todoread": "allow",
-        "todowrite": "allow",
-        "task": {
-          "*": "allow",
-        },
-        "external_directory": "allow",
-        "doom_loop": "allow",
-        "read": {
-          "*": "allow",
-          "*.env": "deny",
-          "*.env.*": "deny",
-          "*.env.example": "allow",
-        },
-      },
-    },
-  },
+  "permissions": [
+    { "action": "*", "resource": "*", "effect": "allow" },
+    { "action": "external_directory", "resource": "*", "effect": "allow" },
+    { "action": "cloudflare*", "resource": "*", "effect": "ask" },
+    { "action": "cloudflare-docs_*", "resource": "*", "effect": "allow" },
+    { "action": "digitalocean*", "resource": "*", "effect": "ask" },
+    { "action": "digitalocean-docs_*", "resource": "*", "effect": "allow" },
+    { "action": "read", "resource": "*.env", "effect": "deny" },
+    { "action": "read", "resource": "*.env.*", "effect": "deny" },
+    { "action": "read", "resource": "*.env.example", "effect": "allow" },
+  ],
 }

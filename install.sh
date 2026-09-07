@@ -235,6 +235,20 @@ else
 fi
 
 # =============================================================================
+# OpenCode 2 CLI
+# =============================================================================
+echo ""
+echo "Installing OpenCode 2 CLI..."
+
+rm -f "$HOME/.opencode/bin/opencode" "$HOME/.local/bin/opencode"
+export PATH="$HOME/.opencode/bin:$PATH"
+if [ -x "$HOME/.opencode/bin/opencode2" ]; then
+    echo "✓ OpenCode 2 already installed"
+else
+    curl -fsSL https://opencode.ai/v2/install | bash -s -- --no-modify-path
+fi
+
+# =============================================================================
 # JavaScript runtimes (bun, pnpm) — official installers, not Homebrew
 # =============================================================================
 # shell/.zshrc already wires both (BUN_INSTALL=~/.bun, PNPM_HOME=~/Library/pnpm).
@@ -375,6 +389,8 @@ create_symlink "$AGENTS_DIR/skills" "$HOME/.config/opencode/skills"
 # dangling link, fails, and `set -e` aborts the entire installer. create_symlink
 # clears a broken link and recreates it correctly on its own.
 create_symlink "$AGENTS_DIR/opencode/plugins" "$HOME/.config/opencode/plugins"
+create_symlink "$AGENTS_DIR/opencode/digitalocean-mcp.sh" "$HOME/.config/opencode/digitalocean-mcp.sh"
+chmod +x "$AGENTS_DIR/opencode/digitalocean-mcp.sh" 2>/dev/null || true
 
 # Claude plugins: declared once in the symlinked settings.json (enabledPlugins +
 # extraKnownMarketplaces) — the single source of truth. Claude also syncs these

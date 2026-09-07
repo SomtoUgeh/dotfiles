@@ -21,37 +21,66 @@ function runShapingRipple(tool, args, directory) {
   return result.stderr || "Shaping reminder triggered";
 }
 
-export const ShapingRipplePlugin = async ({ client, directory }) => {
-  await client.app.log({
-    body: {
-      service: "shared-hooks",
-      level: "info",
-      message: "OpenCode shaping ripple hooks initialized",
-    },
-  });
+function shouldInspect(tool, args) {
+  if (!args || typeof args !== "object") {
+    return false;
+  }
+  if (tool === "apply_patch") {
+    return typeof (args.patchText ?? args.command ?? args.patch) === "string";
+  }
+  if (tool === "edit" || tool === "write") {
+    const path = args.filePath ?? args.file_path;
+    return typeof path === "string" && path.endsWith(".md");
+  }
+  return false;
+}
 
-  return {
-    "tool.execute.after": async (input, output) => {
-      const isPatch = input.tool === "apply_patch" && typeof input.args?.patchText === "string";
-      const isMarkdownEdit = (input.tool === "edit" || input.tool === "write")
-        && typeof input.args?.filePath === "string" && input.args.filePath.endsWith(".md");
-      if (!isPatch && !isMarkdownEdit) {
+function rippleMessage(tool, args, directory) {
+  if (!shouldInspect(tool, args)) {
+    return "";
+  }
+  return runShapingRipple(tool, args, directory);
+}
+
+function appendReminder(value, message) {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    if (typeof value.output === "string") {
+      value.output = [value.output, message].filter(Boolean).join("\n\n");
+      return value;
+    }
+    if (typeof value.content === "string") {
+      value.content = [value.content, message].filter(Boolean).join("\n\n");
+      return value;
+    }
+    if (Array.isArray(value.content)) {
+      value.content = [...value.content, { type: "text", text: message }];
+      return value;
+    }
+    value.content = message;
+    return value;
+  }
+  if (typeof value === "string") {
+    return [value, message].filter(Boolean).join("\n\n");
+  }
+  return message;
+}
+
+export default {
+  id: "shaping-ripple",
+  async setup(ctx) {
+    const directory = ctx.location?.directory;
+    if (!directory) {
+      return;
+    }
+    await ctx.tool.hook("execute.after", async (event) => {
+      if (event.status === "error") {
         return;
       }
-
-      const message = runShapingRipple(input.tool, input.args, directory);
+      const message = rippleMessage(event.tool, event.input, directory);
       if (!message) {
         return;
       }
-
-      output.output = [output.output, message].filter(Boolean).join("\n\n");
-      await client.app.log({
-        body: {
-          service: "shared-hooks",
-          level: "info",
-          message: `Shaping ripple result emitted for ${input.tool}`,
-        },
-      });
-    },
-  };
+      event.result = appendReminder(event.result, message);
+    });
+  },
 };

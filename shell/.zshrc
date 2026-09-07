@@ -81,6 +81,9 @@ export PATH="$PATH:$HOME/.lmstudio/bin"
 # matching the OrbStack pattern below)
 command -v direnv >/dev/null && eval "$(direnv hook zsh)"
 
+# 1Password shell plugins (doctl, etc.). Created by `op plugin init`.
+[[ -r "$HOME/.config/op/plugins.sh" ]] && source "$HOME/.config/op/plugins.sh"
+
 # Keep the GitHub CLI account aligned with the current code root. Register
 # after direnv so a repository's own .envrc cannot shadow the parent account.
 autoload -Uz add-zsh-hook
@@ -269,7 +272,7 @@ gif() {
 export STARSHIP_CONFIG="$HOME/.config/starship.toml"
 eval "$(starship init zsh)"
 
-# opencode
+# OpenCode 2
 export PATH="$HOME/.opencode/bin:$PATH"
 
 # Pass unmatched globs as literal strings (prevents [HAW-1234] from being interpreted)

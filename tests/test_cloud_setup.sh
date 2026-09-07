@@ -82,7 +82,7 @@ bash "$fixture/clone-run.sh" "$fixture/home" "$fixture/args" "$fixture/clone.sh"
 [ ! -e "$fixture/args" ]
 # Missing Node must reach the toolchain summary rather than abort.
 {
-  printf '%s\n' 'set -euo pipefail' 'failures=0' 'TOOLCHAIN_ONLY=1' 'ok() { :; }' 'fail() { failures=$((failures+1)); }' 'node() { return 127; }' 'bun() { echo fixture; }' 'grok() { echo fixture; }' 'opencode() { echo fixture; }'
+  printf '%s\n' 'set -euo pipefail' 'failures=0' 'TOOLCHAIN_ONLY=1' 'ok() { :; }' 'fail() { failures=$((failures+1)); }' 'node() { return 127; }' 'bun() { echo fixture; }' 'grok() { echo fixture; }' 'opencode2() { echo fixture; }'
   sed -n '/^if node_version=/,/^if systemctl/{ /^if systemctl/!p; }' "$root/scripts/verify_altschool_cloud.sh"
 } > "$fixture/verify.sh"
 status=0

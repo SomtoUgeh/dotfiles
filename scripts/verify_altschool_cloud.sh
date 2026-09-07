@@ -92,7 +92,7 @@ else
   fail "Unexpected SSH identity: $(id -un)@$(hostname)"
 fi
 
-for tool in git gh delta git-lfs node npm bun grok opencode gcc g++ make jq rg tmux; do
+for tool in git gh delta git-lfs node npm bun grok opencode2 gcc g++ make jq rg tmux; do
   if command -v "$tool" >/dev/null 2>&1; then
     ok "$tool: $(command -v "$tool")"
   else
@@ -112,7 +112,7 @@ else
   fail "Node version could not be read"
 fi
 
-for tool in bun grok opencode; do
+for tool in bun grok opencode2; do
   if version=$("$tool" --version 2>/dev/null); then
     ok "$tool: $version"
   else
@@ -308,7 +308,7 @@ if [ "$SMOKE" = "1" ] && [ "$failures" -eq 0 ]; then
     fail "Grok live request returned an unexpected response"
   fi
 
-  opencode_reply="$(opencode run -m xai/grok-4.6 'Reply exactly: OPENCODE_OK')"
+  opencode_reply="$(opencode2 run -m xai/grok-4.6 'Reply exactly: OPENCODE_OK')"
   if printf '%s' "$opencode_reply" | grep -q "OPENCODE_OK"; then
     ok "OpenCode live request succeeded"
   else

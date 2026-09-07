@@ -139,7 +139,7 @@ The last verified core versions were:
 | Zsh | `5.9` |
 | Starship | `1.26.0` |
 | Grok | `1.0.13` |
-| OpenCode | `1.18.25` |
+| OpenCode 2 | `opencode2` beta |
 
 The VM also has pnpm, uv, ast-grep, eza, bat, fzf, direnv, fd, tree,
 ShellCheck, tmux, ripgrep, jq, GitHub CLI, and standard build tools.
@@ -164,7 +164,7 @@ credential paths. The cloud Zsh configuration starts Grok with the explicit
 | `git/.gitconfig` | Shared Git config. Cloud installer links it and seeds personal identity files |
 | `scripts/verify_altschool_cloud.sh` | Checks host identity, tools, resources, auth, tunnel service, and optional live model requests |
 | `shell/.zshrc.cloud` | Cloud Zsh, history, aliases, PATH, direnv, and Starship setup |
-| `agents/opencode/opencode.cloud.jsonc` | Cloud OpenCode model, MCP, permission, and credential-read policy |
+| `agents/opencode/opencode.cloud.jsonc` | Cloud OpenCode 2 model, MCP, permissions, and credential-read policy |
 | `templates/ssh-config.template` | Local private aliases and the dedicated development-tunnel alias, installed by `setup_ssh_from_1password.sh` |
 
 ## Commands

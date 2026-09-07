@@ -94,7 +94,7 @@ tests and shared skill validation; `bun tests/test_agent_hooks.mjs` checks the
 OpenCode adapters. Existing unrelated local settings and
 `~/.codex/skills` remain outside the shared library's ownership.
 
-OpenCode setup includes:
+OpenCode 2 (`opencode2`) setup includes:
 
 - `~/.config/opencode/AGENTS.md`
 - `~/.config/opencode/opencode.jsonc`

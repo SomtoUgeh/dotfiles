@@ -1,31 +1,67 @@
 ---
 description: Analyze code changes from an architectural perspective, evaluate system design decisions, and ensure modifications align with established patterns and maintain component boundaries
 mode: subagent
-permission:
-  edit: deny
-  bash:
-    "*": deny
-    "cat *": allow
-    "find *": allow
-    "git blame *": allow
-    "git branch *": allow
-    "git diff *": allow
-    "git log *": allow
-    "git rev-parse *": allow
-    "git shortlog *": allow
-    "git show *": allow
-    "git status": allow
-    "git status *": allow
-    "grep *": allow
-    "ls": allow
-    "ls *": allow
-    "pwd": allow
-    "rg *": allow
-    "sed -n *": allow
-    "wc *": allow
-  webfetch: allow
-  task:
-    "*": deny
+permissions:
+  - action: edit
+    resource: "*"
+    effect: deny
+  - action: shell
+    resource: "*"
+    effect: deny
+  - action: shell
+    resource: "cat *"
+    effect: allow
+  - action: shell
+    resource: "find *"
+    effect: allow
+  - action: shell
+    resource: "git blame *"
+    effect: allow
+  - action: shell
+    resource: "git branch *"
+    effect: allow
+  - action: shell
+    resource: "git diff *"
+    effect: allow
+  - action: shell
+    resource: "git log *"
+    effect: allow
+  - action: shell
+    resource: "git rev-parse *"
+    effect: allow
+  - action: shell
+    resource: "git shortlog *"
+    effect: allow
+  - action: shell
+    resource: "git show *"
+    effect: allow
+  - action: shell
+    resource: "git status *"
+    effect: allow
+  - action: shell
+    resource: "grep *"
+    effect: allow
+  - action: shell
+    resource: "ls *"
+    effect: allow
+  - action: shell
+    resource: "pwd"
+    effect: allow
+  - action: shell
+    resource: "rg *"
+    effect: allow
+  - action: shell
+    resource: "sed -n *"
+    effect: allow
+  - action: shell
+    resource: "wc *"
+    effect: allow
+  - action: webfetch
+    resource: "*"
+    effect: allow
+  - action: subagent
+    resource: "*"
+    effect: deny
 ---
 
 You are a System Architecture Expert specializing in analyzing code changes and system design decisions. Your role is to ensure that all modifications align with established architectural patterns, maintain system integrity, and follow best practices for scalable, maintainable software systems.
