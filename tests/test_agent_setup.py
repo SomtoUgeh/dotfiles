@@ -49,6 +49,10 @@ class GuardTests(unittest.TestCase):
             "git restore -SW a", "git branch -df old", "git branch -D old",
             "git push origin +HEAD:main", "git push --force origin main",
             "git stash clear", "git rm tracked", "git checkout HEAD -- tracked",
+            "git push https://github.com/SomtoUgeh/dotfiles.git HEAD:main",
+            "GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git -c credential.helper='!gh auth git-credential' push https://github.com/SomtoUgeh/dotfiles.git HEAD:main",
+            "git remote set-url origin https://github.com/SomtoUgeh/dotfiles.git",
+            "git clone https://gist.github.com/abc.git",
         ]
         for command in commands:
             with self.subTest(command=command):

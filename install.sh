@@ -217,6 +217,14 @@ echo "Setting up git configurations..."
 create_symlink "$DOTFILES_DIR/git/.gitconfig" "$HOME/.gitconfig"
 create_symlink "$DOTFILES_DIR/git/.gitignore_global" "$HOME/.gitignore_global"
 
+# Repo-local rewrite so ignoring ~/.gitconfig still cannot push this
+# checkout over GitHub HTTPS.
+if [ -d "$DOTFILES_DIR/.git" ]; then
+    git -C "$DOTFILES_DIR" config --local --unset-all "url.git@github-personal:.insteadof" 2>/dev/null || true
+    git -C "$DOTFILES_DIR" config --local --add "url.git@github-personal:.insteadof" "https://github.com/"
+    git -C "$DOTFILES_DIR" config --local --add "url.git@github-personal:.insteadof" "git@github.com:"
+fi
+
 # Remove only the retired link owned by this checkout; preserve custom hooks.
 if [ -L "$HOME/.git-hooks" ] && [ "$(readlink "$HOME/.git-hooks")" = "$DOTFILES_DIR/git/hooks" ]; then
     rm "$HOME/.git-hooks"

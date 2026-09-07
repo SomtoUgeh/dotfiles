@@ -34,9 +34,12 @@ bashlex.heredoc.makeheredoc = read_heredoc
 BUILD_DIRS = {"node_modules", ".next", "dist", "build", "__pycache__",
               ".pytest_cache", ".mypy_cache", "target", ".gradle", ".cache"}
 GIT_VALUE_FLAGS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env"}
+GITHUB_HTTPS = re.compile(r"^https://(?:github\.com|gist\.github\.com)(?:[/:?]|$)", re.I)
 
 
 def unwrap(words: list[str]) -> list[str]:
+    while words and re.match(r"^[A-Za-z_][A-Za-z_0-9]*=", words[0]):
+        words = words[1:]
     while words and posixpath.basename(words[0]) in {"command", "builtin", "exec", "env", "sudo", "noglob"}:
         wrapper, *words = words
         if posixpath.basename(wrapper) == "command" and words and words[0] in {"-v", "-V"}:
@@ -106,6 +109,8 @@ def check_words(words: list[str], depth: int) -> str:
     if not args:
         return ""
     subcommand, *args = args
+    if any(GITHUB_HTTPS.search(arg) for arg in args):
+        return "git GitHub HTTPS bypasses SSH identities and 1Password signing"
     option_args = args[:args.index("--")] if "--" in args else args
     flags, short = set(option_args), short_flags(option_args)
     if subcommand == "reset" and flags.intersection({"--hard", "--merge"}):

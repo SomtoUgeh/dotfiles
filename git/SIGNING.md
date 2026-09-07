@@ -19,7 +19,9 @@ an unmapped directory fail loudly rather than pick a wrong identity.
 
 `github.com` resolves to the **work** key. Personal repos use the
 `github-personal` alias, and the personal gitconfig rewrites URLs onto it, so
-you rarely type it.
+you rarely type it. The dotfiles checkout also stores that rewrite in
+`.git/config`, and the agent git guard blocks `https://github.com` / gist
+URLs, so skipping `~/.gitconfig` is not enough to push over HTTPS.
 
 Rebuild on a new machine: `scripts/setup_ssh_from_1password.sh`
 
