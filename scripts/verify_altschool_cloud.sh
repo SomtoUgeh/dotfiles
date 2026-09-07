@@ -239,6 +239,60 @@ else
   fail "Gitconfig is not linked to the dotfiles git folder"
 fi
 
+if command -v opencode >/dev/null 2>&1; then
+  fail "V1 opencode CLI is still on PATH at $(command -v opencode)"
+else
+  ok "V1 opencode CLI is not on PATH"
+fi
+
+if [ -e "$HOME/.config/opencode/plugin" ] || [ -e "$HOME/.config/opencode/tui.json" ] ||
+   [ -e "$HOME/.config/opencode/tui.jsonc" ]; then
+  fail "V1 OpenCode plugin/ or tui.json paths are still present"
+else
+  ok "V1 OpenCode plugin/ and tui.json paths are absent"
+fi
+
+if [ -d "$HOME/.config/opencode/plugins" ] &&
+   [ ! -L "$HOME/.config/opencode/plugins" ] &&
+   [ -f "$HOME/.config/opencode/plugins/git-guard.js" ] &&
+   [ -f "$HOME/.config/opencode/plugins/shaping-ripple.js" ]; then
+  ok "OpenCode hook plugins are linked"
+else
+  fail "OpenCode hook plugins are not linked"
+fi
+
+plugin_list="$(opencode2 plugin list 2>/dev/null || true)"
+if printf '%s\n' "$plugin_list" | grep -q '^git-guard[[:space:]]' &&
+   printf '%s\n' "$plugin_list" | grep -q '^shaping-ripple[[:space:]]'; then
+  ok "OpenCode hook plugins are loaded"
+else
+  fail "OpenCode hook plugins are not loaded"
+fi
+
+if health="$(opencode2 api get /api/health 2>/dev/null)" &&
+   printf '%s' "$health" | jq -e '.healthy == true' >/dev/null; then
+  ok "OpenCode service is healthy"
+else
+  fail "OpenCode service is not healthy"
+fi
+
+mcp_list="$(opencode2 mcp list 2>/dev/null || true)"
+for name in context7 cloudflare-docs shadcn; do
+  if printf '%s\n' "$mcp_list" | grep -Eq "$name[[:space:]]+connected"; then
+    ok "OpenCode MCP $name is connected"
+  else
+    fail "OpenCode MCP $name is not connected"
+  fi
+done
+
+agents_link="$(readlink "$HOME/.config/opencode/agents" 2>/dev/null || true)"
+if [ -L "$HOME/.config/opencode/agents" ] &&
+   [[ "$agents_link" == */agents/opencode/agents ]]; then
+  ok "OpenCode agents are linked"
+else
+  fail "OpenCode agents are not linked"
+fi
+
 if [ -L "$HOME/.gitignore_global" ] && [ -f "$HOME/.gitignore_global" ]; then
   ok "Global gitignore is linked"
 else

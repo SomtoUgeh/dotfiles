@@ -272,8 +272,29 @@ link_path "$DOTFILES_DIR/agents/shared/AGENTS.md" "$HOME/.grok/AGENTS.md"
 link_path "$DOTFILES_DIR/agents/opencode/AGENTS.md" "$HOME/.config/opencode/AGENTS.md"
 link_path "$DOTFILES_DIR/agents/shared/ETHOS.md" "$HOME/.config/opencode/ETHOS.md"
 link_path "$DOTFILES_DIR/agents/opencode/opencode.cloud.jsonc" "$HOME/.config/opencode/opencode.jsonc"
+# OpenCode 2 config, agents, commands, skills, and hook plugins.
+# V1 leftover npm plugin installs in the config directory are not used.
+rm -rf "$HOME/.config/opencode/node_modules"
+rm -f "$HOME/.config/opencode/package.json" \
+  "$HOME/.config/opencode/package-lock.json" \
+  "$HOME/.config/opencode/bun.lock" \
+  "$HOME/.config/opencode/.gitignore"
+# V1 discovered `plugin/` (singular). Keep only the V2 `plugins/` directory.
+if [ -e "$HOME/.config/opencode/plugin" ] || [ -L "$HOME/.config/opencode/plugin" ]; then
+  mv "$HOME/.config/opencode/plugin" "$HOME/.config/opencode/plugin.backup.$timestamp"
+fi
+link_path "$DOTFILES_DIR/agents/opencode/agents" "$HOME/.config/opencode/agents"
 link_path "$DOTFILES_DIR/agents/opencode/commands" "$HOME/.config/opencode/commands"
 link_path "$DOTFILES_DIR/agents/skills" "$HOME/.config/opencode/skills"
+# Linux inotify cannot watch a plugins directory that is itself a symlink.
+if [ -L "$HOME/.config/opencode/plugins" ]; then
+  rm "$HOME/.config/opencode/plugins"
+fi
+mkdir -p "$HOME/.config/opencode/plugins"
+for plugin in "$DOTFILES_DIR/agents/opencode/plugins/"*.js; do
+  [ -e "$plugin" ] || continue
+  link_path "$plugin" "$HOME/.config/opencode/plugins/$(basename "$plugin")"
+done
 
 export PATH="$HOME/.local/bin:$HOME/.bun/bin:$HOME/.grok/bin:$HOME/.opencode/bin:$PATH"
 

@@ -18,6 +18,8 @@ _add_to_path() {
 _add_to_path "$HOME/bin"
 _add_to_path "$HOME/.local/bin"   # also covers uv, pipx, and the Claude CLI
 _add_to_path "$HOME/.bun/bin"
+_add_to_path "$HOME/.grok/bin"
+_add_to_path "$HOME/.opencode/bin"
 _add_to_path "$HOME/.cargo/bin"
 
 unset -f _add_to_path

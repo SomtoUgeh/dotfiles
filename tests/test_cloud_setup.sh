@@ -89,4 +89,28 @@ status=0
 bash "$fixture/verify.sh" > "$fixture/result" || status=$?
 [ "$status" = 1 ]
 grep -q 'Toolchain verification finished with 1 failure' "$fixture/result"
-printf '%s\n' 'PASS: Linux signing works and custom config survives; clone is shallow and existing checkout untouched; missing Node reports a summary.'
+# OpenCode 2 cloud links include hook plugins and agents; V1 npm leftovers are removed.
+opencode_home="$fixture/opencode-home"
+mkdir -p "$opencode_home/.config/opencode/node_modules/left" \
+  "$opencode_home/.config/opencode/plugin"
+printf '%s\n' '{"private":true}' > "$opencode_home/.config/opencode/package.json"
+printf '%s\n' 'node_modules' > "$opencode_home/.config/opencode/.gitignore"
+ln -s /missing/plugins "$opencode_home/.config/opencode/plugins"
+{
+  printf '%s\n' 'set -eu' 'DOTFILES_DIR="$1"' 'timestamp=test'
+  sed -n '/^link_path() {/,/^}$/p' "$root/scripts/install_cloud_dotfiles.sh"
+  sed -n '/^# OpenCode 2 config, agents, commands, skills, and hook plugins\./,/^done$/p' "$root/scripts/install_cloud_dotfiles.sh"
+} > "$fixture/opencode-links.sh"
+env HOME="$opencode_home" bash "$fixture/opencode-links.sh" "$root"
+[ ! -e "$opencode_home/.config/opencode/node_modules" ]
+[ ! -e "$opencode_home/.config/opencode/package.json" ]
+[ ! -e "$opencode_home/.config/opencode/.gitignore" ]
+[ ! -e "$opencode_home/.config/opencode/plugin" ]
+[ -d "$opencode_home/.config/opencode/plugin.backup.test" ]
+[ -d "$opencode_home/.config/opencode/plugins" ]
+[ ! -L "$opencode_home/.config/opencode/plugins" ]
+[ "$(readlink "$opencode_home/.config/opencode/plugins/git-guard.js")" = "$root/agents/opencode/plugins/git-guard.js" ]
+[ "$(readlink "$opencode_home/.config/opencode/plugins/shaping-ripple.js")" = "$root/agents/opencode/plugins/shaping-ripple.js" ]
+[ "$(readlink "$opencode_home/.config/opencode/agents")" = "$root/agents/opencode/agents" ]
+
+printf '%s\n' 'PASS: Linux signing works and custom config survives; clone is shallow and existing checkout untouched; missing Node reports a summary; OpenCode plugins and agents are linked.'
