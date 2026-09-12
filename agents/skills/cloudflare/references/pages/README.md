@@ -24,21 +24,22 @@ npx wrangler pages deploy ./dist --project-name=my-project --branch=staging
 
 ### 3. C3 CLI
 ```bash
-npm create cloudflare@latest my-app
-# Select framework → auto-setup + deploy
+npm create cloudflare@latest my-app -- --platform=pages
+# Select a supported Pages framework/template; review generated setup
 ```
 
 ## vs Workers
 
-- **Pages**: Static sites, JAMstack, frameworks, git workflow, file-based routing
-- **Workers**: Pure APIs, complex routing, WebSockets, scheduled tasks, email handlers
+- **Pages**: Keep existing Pages deployments and choose it when the requested platform and framework support Pages. Functions provide file-based routing.
+- **Workers**: Supports static sites, full-stack frameworks, APIs, WebSockets, scheduled tasks, and email handlers. Git-based builds are also available.
+- **New projects**: Check the [current framework guide](https://developers.cloudflare.com/workers/framework-guides/) and deployment requirements before selecting a platform.
 - **Combine**: Pages Functions use Workers runtime, can bind to Workers
 
 ## Quick Start
 
 ```bash
 # Create
-npm create cloudflare@latest
+npm create cloudflare@latest my-app -- --platform=pages
 
 # Local dev
 npx wrangler pages dev ./dist
@@ -63,16 +64,17 @@ npx wrangler pages deployment tail --project-name=my-project
 - [Framework Guides](https://developers.cloudflare.com/pages/framework-guides/)
 - [Discord #functions](https://discord.com/channels/595317990191398933/910978223968518144)
 
-## Reading Order
+## Choose a Reference
 
-**New to Pages?** Start here:
-1. README.md (you are here) - Overview & quick start
-2. [configuration.md](./configuration.md) - Project setup, wrangler.jsonc, bindings
-3. [api.md](./api.md) - Functions API, routing, context
-4. [patterns.md](./patterns.md) - Common implementations
-5. [gotchas.md](./gotchas.md) - Troubleshooting & pitfalls
+Load the file that answers the current task; follow additional references only when needed.
 
-**Quick reference?** Jump to relevant file above.
+This directory owns Pages project setup, builds, deployment, and platform troubleshooting. For function routing, EventContext, middleware, and handler implementation, start with [Pages Functions](../pages-functions/README.md). The local API and patterns files retain Pages integration examples; do not load both sets by default.
+
+- Setup, bindings, and deployment configuration → [configuration.md](configuration.md)
+- Function handlers, routing, and runtime behavior → [Pages Functions API](../pages-functions/api.md)
+- Pages integration and advanced-mode examples → [api.md](api.md)
+- Implementing a specific integration or use case → [patterns.md](patterns.md)
+- Diagnosing failures and checking relevant limits → [gotchas.md](gotchas.md)
 
 ## In This Reference
 

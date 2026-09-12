@@ -1,6 +1,6 @@
 ---
 name: animation-performance
-description: Diagnose and improve measured web-animation performance. Use for jank, dropped frames, long main-thread work, layout or paint cost, compositor behavior, React updates during motion, and evidence-based choices about animation drivers and layer promotion.
+description: "Diagnose measured web-animation jank, dropped frames, layout/paint cost, main-thread work, and compositor behavior. Use evidence to choose animation drivers and layers."
 metadata:
   short-description: Diagnose animation bottlenecks with browser recordings
 ---

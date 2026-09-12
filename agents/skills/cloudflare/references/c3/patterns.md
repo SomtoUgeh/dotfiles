@@ -56,21 +56,21 @@ Templates are repositories in a supported degit URL format. Inspect the template
 
 ## Existing Projects
 
-```bash
-# Add Cloudflare to existing Worker
-npm create cloudflare@latest . -- --type=pre-existing --existing-script=my-existing-worker
+To download a deployed Worker into a new directory:
 
-# Add to existing framework app
-npm create cloudflare@latest . -- --framework=next --platform=workers --lang=ts
+```bash
+npm create cloudflare@latest my-worker-copy -- --existing-script=my-existing-worker
 ```
+
+For an existing local Worker or framework app, inspect its source, adapter, scripts, and Wrangler configuration before changing them. Follow the matching [Workers framework guide](https://developers.cloudflare.com/workers/framework-guides/) or [Pages-to-Workers migration](https://developers.cloudflare.com/workers/static-assets/migration-guides/migrate-from-pages/) when that migration is requested. C3 deployed-script cloning is not a local migration command.
 
 ## Post-Creation Checklist
 
+Use the generated project scripts and provision only resources required by the chosen template; these commands are examples.
+
 1. Review `wrangler.jsonc` - set `compatibility_date`, verify `name`
-2. Create bindings: `wrangler kv namespace create`, `wrangler d1 create`, `wrangler r2 bucket create`
+2. Reuse or create required bindings: `wrangler kv namespace create`, `wrangler d1 create`, `wrangler r2 bucket create`
 3. Generate types: `npm run cf-typegen`
 4. Test: `npm run dev`
 5. Provision required secrets: `wrangler secret put SECRET_NAME`
 6. Deploy when ready: `npm run deploy`
-
-`--existing-script` downloads a deployed Worker; it does not convert local source or migrate an existing framework app. For an existing app, follow its current Workers framework guide. Workers Static Assets also support static sites, and Workers Builds supports Git workflows; Pages is an explicit framework-dependent choice. Inspect generated package scripts instead of assuming every framework uses the same names.

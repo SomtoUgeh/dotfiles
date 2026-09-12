@@ -1,6 +1,6 @@
 ---
 name: web-typography
-description: Design or review typography for prose-heavy web pages, articles, documentation, and reading interfaces. Use when type scale, line length, leading, font choice, or reading comfort is a central part of the request; skip for routine UI text changes.
+description: "Design or review typography for prose-heavy pages, articles, docs, and reading interfaces when type scale, line length, leading, font choice, or reading comfort is central."
 ---
 
 # Web Typography

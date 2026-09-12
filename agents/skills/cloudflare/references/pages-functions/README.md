@@ -79,19 +79,16 @@ export function onRequest(context) {
 - **TypeScript:** Full type support via `wrangler types` command
 - **Advanced mode:** Use `_worker.js` for custom routing logic
 
-## Reading Order
+## Choose a Reference
 
-**New to Pages Functions?** Start here:
-1. [README.md](./README.md) - Overview, routing, decision tree (you are here)
-2. [configuration.md](./configuration.md) - TypeScript setup, wrangler.jsonc, bindings
-3. [api.md](./api.md) - EventContext, handlers, bindings reference
-4. [patterns.md](./patterns.md) - Middleware, auth, CORS, rate limiting, caching
-5. [gotchas.md](./gotchas.md) - Common errors, debugging, limits
+Load the file that answers the current task; follow additional references only when needed.
 
-**Quick reference lookup:**
-- Bindings table → [api.md](./api.md)
-- Error diagnosis → [gotchas.md](./gotchas.md)
-- TypeScript setup → [configuration.md](./configuration.md)
+This directory owns function routing, EventContext, middleware, and handler implementation. Use [Pages](../pages/README.md) for project builds and deployment; read its examples only when the task also needs platform integration.
+
+- Setup, bindings, and deployment configuration → [configuration.md](configuration.md)
+- API calls, handlers, and runtime behavior → [api.md](api.md)
+- Implementing a specific integration or use case → [patterns.md](patterns.md)
+- Diagnosing failures and checking relevant limits → [gotchas.md](gotchas.md)
 
 ## See Also
 - [pages](../pages/) - Pages platform overview and static site deployment

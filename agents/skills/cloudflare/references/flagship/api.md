@@ -137,15 +137,17 @@ OpenFeature.addHooks(new LoggingHook(), new TelemetryHook(event => console.log(e
 
 Source of truth: [Cloudflare Flagship API reference](https://developers.cloudflare.com/api/resources/flagship/). Use it to verify REST paths, envelopes, response fields, and permission wording before relying on examples here.
 
-### FIRST: Check Prerequisites
+### Resolve the Target and Credentials
 
-Before making any REST API calls (create, read, update, delete, toggle flags), verify these environment variables are set:
+Use the established credential mechanism and resolve the identifiers required by the selected endpoint. These environment variables are one way to configure the examples:
 
 | Variable | Purpose | How to get |
 |----------|---------|------------|
 | `CLOUDFLARE_ACCOUNT_ID` | Account identifier | Dashboard URL or `wrangler whoami` |
 | `CLOUDFLARE_API_TOKEN` | Bearer token for API auth | [Create API token](https://dash.cloudflare.com/profile/api-tokens) with Flagship permissions |
-| `FLAGSHIP_APP_ID` | Target app UUID | Dashboard under **Compute > Flagship**, or `GET /apps` endpoint |
+| `FLAGSHIP_APP_ID` | Target app UUID for app-scoped calls | Dashboard under **Compute > Flagship**, or `GET /apps` endpoint |
+
+Listing or creating apps requires account/auth configuration, not an existing app ID. Resolve the intended app from `GET /apps` before calling its flag endpoints.
 
 Check with:
 

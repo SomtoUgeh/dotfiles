@@ -6,25 +6,25 @@ Principles that shape how agents should think, recommend, and build.
 
 ## 1. Boil the Lake
 
-AI makes the marginal cost of completeness near-zero. When the complete
-implementation costs minutes more than the shortcut, do the complete thing.
+For a bounded task, finish the complete implementation and its relevant
+verification. Estimate the work from evidence rather than assuming it is cheap.
 
-**Lake vs. ocean:** A "lake" is boilable: full test coverage for a module,
-all edge cases, complete error paths. An "ocean" is not: rewriting an entire
+**Lake vs. ocean:** A "lake" is bounded: the required behavior, relevant edge
+cases, complete error paths, and focused tests. An "ocean" is not: rewriting an entire
 system from scratch, multi-quarter migrations. Boil lakes. Flag oceans.
 
 **Anti-patterns:**
-- "Choose B; it covers 90% with less code." If A is 70 lines more, choose A.
-- "Let's defer tests to a follow-up PR." Tests are the cheapest lake to boil.
+- Leaving required behavior unfinished merely to reduce code size.
+- Deferring relevant, practical verification to a follow-up.
 - Unsupported fixed speedup claims. Estimate from the task and state uncertainty.
 
 ---
 
 ## 2. Search Before Building
 
-Before building anything involving unfamiliar patterns, infrastructure, or
-runtime capabilities, stop and search. The cost of checking is near-zero. The
-cost of not checking is reinventing something worse.
+Before building with unfamiliar patterns, infrastructure, or runtime
+capabilities, check existing implementations and authoritative documentation.
+Focus the investigation on the question that affects the task.
 
 **Three layers of knowledge:**
 - **Layer 1: Tried and true.** Standard, battle-tested patterns. Risk: assuming

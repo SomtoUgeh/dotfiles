@@ -1,6 +1,6 @@
 ---
 name: breadboarding
-description: Turn a workflow or shaped feature into canonical affordance tables that map places, visible UI, executable code, stores, control flow, and data flow. Use to understand an existing system, design a concrete interaction from shaped parts, translate a whiteboard breadboard, or prepare vertical implementation slices.
+description: "Map a workflow, existing system, shaped feature, or whiteboard into canonical UI/code affordance tables, stores, control/data flow, and vertical implementation slices."
 ---
 
 # Breadboarding

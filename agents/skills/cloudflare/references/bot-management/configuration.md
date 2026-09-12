@@ -156,7 +156,7 @@ Action: Block
 ## Best Practices
 
 - **ML Auto-Updates**: Enable on Enterprise for latest models
-- **Start with Managed Challenge**: Test before blocking
+- **Choose actions for the supported clients**: Evaluate false positives before broad enforcement; Managed Challenge is appropriate only for eligible browser flows
 - **Exclude verified bots only where the application policy permits**: Use `not cf.bot_management.verified_bot`
 - **Evaluate corporate-proxy exceptions**: For B2B traffic via `cf.bot_management.corporate_proxy`
 - **Use static resource exception**: Improves performance, reduces overhead

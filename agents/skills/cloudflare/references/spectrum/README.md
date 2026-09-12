@@ -33,12 +33,14 @@ As checked 2026-09-05: Pro supports one Minecraft app and one SSH app; Business 
    - CNAME (hostname) → See [configuration.md](configuration.md#cname-origin)
    - Load balancer (HA/failover) → See [configuration.md](configuration.md#load-balancer-origin)
 
-## Reading Order
+## Choose a Reference
 
-1. Start with [patterns.md](patterns.md) for your specific protocol
-2. Then [configuration.md](configuration.md) for your origin type
-3. Check [gotchas.md](gotchas.md) before going to production
-4. Use [api.md](api.md) for programmatic access
+Load the file that answers the current task; follow additional references only when needed.
+
+- Setup, bindings, and deployment configuration → [configuration.md](configuration.md)
+- API calls, handlers, and runtime behavior → [api.md](api.md)
+- Implementing a specific integration or use case → [patterns.md](patterns.md)
+- Diagnosing failures and checking relevant limits → [gotchas.md](gotchas.md)
 
 ## See Also
 

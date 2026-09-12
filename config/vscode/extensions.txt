@@ -1,4 +1,5 @@
-# VSCode extensions — installed by install.sh via 'code --install-extension'.
+# VSCode / Cursor extensions — installed by install.sh via
+# 'code --install-extension' and 'cursor --install-extension'.
 # Regenerate with: code --list-extensions > config/vscode/extensions.txt
 #   (then re-add these comments — '>' overwrites, '>>' would duplicate lines)
 # Lines starting with # are ignored.
@@ -36,5 +37,7 @@ GitHub.vscode-pull-request-github
 anthropic.claude-code
 
 # Theme and icons (workbench.colorTheme, workbench.iconTheme)
+# lakshits11.monokai-pirokai is on the VS Code Marketplace but not Cursor's.
+# install.sh packages the VS Code copy as a VSIX when the Cursor CLI misses.
 lakshits11.monokai-pirokai
 monokai.theme-monokai-pro-vscode

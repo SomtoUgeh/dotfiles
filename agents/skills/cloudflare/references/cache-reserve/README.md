@@ -74,7 +74,6 @@ Cache Reserve only stores assets meeting **ALL** criteria:
 Use this checklist to verify if an asset is eligible:
 
 - [ ] Zone has Cache Reserve enabled
-- [ ] Zone has Tiered Cache enabled (required)
 - [ ] Asset TTL ≥ 10 hours (36,000 seconds)
 - [ ] `Content-Length` header present on origin response
 - [ ] No `Set-Cookie` header (or uses private directive)
@@ -83,7 +82,7 @@ Use this checklist to verify if an asset is eligible:
 - [ ] Not a range request (no HTTP 206 support)
 - [ ] Not O2O (Orange-to-Orange) proxied request
 
-**All boxes must be checked for Cache Reserve eligibility.**
+**All asset eligibility conditions above must hold.** Tiered Cache is recommended to reduce origin requests and storage operations, but is not an asset eligibility prerequisite. See [current Cache Reserve guidance](https://developers.cloudflare.com/cache/advanced-configuration/cache-reserve/#tips-and-best-practices).
 
 ### Not Eligible
 
@@ -106,7 +105,7 @@ https://dash.cloudflare.com/caching/cache-reserve
 
 **Prerequisites:**
 - Paid Cache Reserve plan or Smart Shield Advanced required
-- Tiered Cache required for optimal performance
+- Tiered Cache recommended to reduce origin requests and storage operation costs
 
 ## Essential Commands
 

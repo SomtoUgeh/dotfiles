@@ -31,8 +31,7 @@ export class MyContainer extends Container {
 export default {
   async fetch(request: Request, env: Env) {
     const container = env.MY_CONTAINER.getByName("instance-1");
-    await container.startAndWaitForPorts();
-    return container.fetch(request);
+    return container.fetch(request); // SDK starts the container and waits for readiness.
   }
 };
 ```

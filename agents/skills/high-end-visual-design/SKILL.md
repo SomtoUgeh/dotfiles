@@ -3,100 +3,75 @@ name: high-end-visual-design
 description: Apply a polished luxury-agency web aesthetic when the user explicitly asks for premium, luxury, or high-end agency art direction.
 ---
 
-# Agent Skill: Principal UI/UX Architect & Motion Choreographer (Awwwards-Tier)
+# Luxury Web Art Direction
 
-This is a selectable visual direction. Preserve the user's brand, content, accessibility constraints, and existing stack. Do not combine it with industrial, minimalist, or other named styles unless the user explicitly asks for a hybrid and resolves their conflicts.
+Use this selectable direction when explicitly requested. Preserve the user's
+brand, content, licensed assets, accessibility constraints, and existing stack.
+The options below support art direction; they do not override established fonts,
+components, or the requested layout. Combine named styles only when requested.
+Follow the [canonical motion policy](../animate/references/canonical-policy.md).
 
-Follow the [canonical motion policy](../animate/references/canonical-policy.md). The treatments below are art-direction options, not permission to remove accessibility, override established branding, invent licensed assets, or force every component to animate.
+## Choose a direction from the brief
 
-## 1. Meta Information & Core Directive
-- **Persona:** `Vanguard_UI_Architect`
-- **Objective:** You engineer $150k+ agency-level digital experiences, not just websites. Your output must exude haptic depth, cinematic spatial rhythm, obsessive micro-interactions, and flawless fluid motion.
-- **The Variance Mandate:** NEVER generate the exact same layout or aesthetic twice in a row. You must dynamically combine different premium layout archetypes and texture profiles while strictly adhering to the elite "Apple-esque / Linear-tier" design language.
+Use an existing reference or brand first. Otherwise select a coherent palette,
+typography, and composition from these starting points. Consistency across pages
+matters more than inventing a different aesthetic on each invocation.
 
-## 2. THE "ABSOLUTE ZERO" DIRECTIVE (STRICT ANTI-PATTERNS)
-If your generated code includes ANY of the following, the design instantly fails:
-- **Banned Fonts:** Inter, Roboto, Arial, Open Sans, Helvetica. Use a suitable available/licensed face such as `Geist` or `Plus Jakarta Sans`; verify assets and licenses before naming commercial fonts in code. Preserve established project fonts when required.
-- **Banned Icons:** Standard thick-stroked Lucide, FontAwesome, or Material Icons. Use only ultra-light, precise lines (e.g., Phosphor Light, Remix Line).
-- **Banned Borders & Shadows:** Generic 1px solid gray borders. Harsh, dark drop shadows (`shadow-md`, `rgba(0,0,0,0.3)`).
-- **Banned Layouts:** Edge-to-edge sticky navbars glued to the top. Symmetrical, boring 3-column Bootstrap-style grids without massive whitespace gaps.
-- **Motion:** Prefer deliberate timing; linear progress/rotation, named curves, instant feedback, and reduced-motion static states remain valid.
+- **Ethereal glass:** OLED black, restrained luminous accents, fine translucent
+  edges, geometric typography. Use blur sparingly with legible opaque fallbacks.
+- **Editorial luxury:** warm cream, sage or espresso, a licensed expressive serif
+  for headings, generous whitespace, optional subtle paper grain.
+- **Soft structuralism:** silver-grey or white, bold typography, airy spacing,
+  soft ambient shadows where they clarify depth.
 
-## 3. THE CREATIVE VARIANCE ENGINE
-Before writing code, deliberately select ONE combination from the following archetypes based on the prompt's context to ensure the output is uniquely tailored but always premium:
+An asymmetric bento can organize varied content; an editorial split can pair a
+strong headline with imagery. Overlapping cards can create depth when they keep
+reading order and touch targets clear. These are options, not a required menu.
+Use available licensed typefaces and a consistent icon family. Prefer deliberate
+borders and shadows over adding decoration to every surface.
 
-### A. Vibe & Texture Archetypes (Pick 1)
-1. **Ethereal Glass (SaaS / AI / Tech):** Deepest OLED black (`#050505`), radial mesh gradients (e.g., subtle glowing purple/emerald orbs) in the background. Vantablack cards with heavy `backdrop-blur-2xl` and pure white/10 hairlines. Wide geometric Grotesk typography.
-2. **Editorial Luxury (Lifestyle / Real Estate / Agency):** Warm creams (`#FDFBF7`), muted sage, or deep espresso tones. High-contrast Variable Serif fonts for massive headings. Subtle CSS noise/film-grain overlay (`opacity-[0.03]`) for a physical paper feel.
-3. **Soft Structuralism (Consumer / Health / Portfolio):** Silver-grey or completely white backgrounds. Massive bold Grotesk typography. Airy, floating components with unbelievably soft, highly diffused ambient shadows.
+## Optional component treatments
 
-### B. Layout Archetypes (Pick 1)
-1. **The Asymmetrical Bento:** A masonry-like CSS Grid of varying card sizes (e.g., `col-span-8 row-span-2` next to stacked `col-span-4` cards) to break visual monotony.
-   - **Mobile Collapse:** Falls back to a single-column stack (`grid-cols-1`) with generous vertical gaps (`gap-6`). All `col-span` overrides reset to `col-span-1`.
-2. **The Z-Axis Cascade:** Elements are stacked like physical cards, slightly overlapping each other with varying depths of field, some with a subtle `-2deg` or `3deg` rotation to break the digital grid.
-   - **Mobile Collapse:** Remove all rotations and negative-margin overlaps below `768px`. Stack vertically with standard spacing. Overlapping elements cause touch-target conflicts on mobile.
-3. **The Editorial Split:** Massive typography on the left half (`w-1/2`), with interactive, scrollable horizontal image pills or staggered interactive cards on the right.
-   - **Mobile Collapse:** Converts to a full-width vertical stack (`w-full`). Typography block sits on top, interactive content flows below with horizontal scroll preserved if needed.
+Apply a treatment only where it strengthens the chosen direction:
 
-**Mobile Override (Universal):** Any asymmetric layout above `md:` MUST aggressively fall back to `w-full`, `px-4`, `py-8` on viewports below `768px`. Choose `min-h-[100svh]` for stable small-viewport height or `min-h-[100dvh]` to follow browser-chrome changes. `dvh` can resize during scrolling; test the intended behavior and keyboard state.
+- **Double bezel:** a subtle outer shell around an inner surface can frame a
+  hero image or feature card. Keep radii concentric (inner radius = outer radius
+  minus inset). Flat cards, ordinary inputs, and undecorated content remain valid.
+- **Inset CTA icon:** a pill button may include a visually inset circular arrow
+  wrapper. Keep it one semantic button; never nest interactive buttons. Existing
+  button shapes and simple text-plus-icon treatments are equally valid.
+- **Spatial rhythm:** generous section spacing and occasional eyebrow labels can
+  support hierarchy. Derive spacing from content and responsive tokens instead
+  of imposing one minimum padding or a badge above every heading.
+- **Floating navigation:** a detached pill works for short navigation. Use a
+  conventional header when it better fits the information architecture.
 
-## 4. HAPTIC MICRO-AESTHETICS (COMPONENT MASTERY)
+## Motion and responsive behavior
 
-### A. The "Double-Bezel" (Doppelrand / Nested Architecture)
-Never place a premium card, image, or container flatly on the background. They must look like physical, machined hardware (like a glass plate sitting in an aluminum tray) using nested enclosures.
-- **Outer Shell:** A wrapper `div` with a subtle background (`bg-black/5` or `bg-white/5`), a hairline outer border (`ring-1 ring-black/5` or `border border-white/10`), a specific padding (e.g., `p-1.5` or `p-2`), and a large outer radius (`rounded-[2rem]`).
-- **Inner Core:** The actual content container inside the shell. It has its own distinct background color, its own inner highlight (`shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)]`), and a mathematically calculated smaller radius (e.g., `rounded-[calc(2rem-0.375rem)]`) for concentric curves.
+Use motion to clarify an interaction, with explicit animated properties and
+appropriate timing. Simple color feedback and instant state changes are valid.
+Optional press scaling, icon movement, or hamburger-to-close morphs must preserve
+focus, keyboard/touch operation, and reduced-motion alternatives.
 
-### B. Nested CTA & "Island" Button Architecture
-- **Structure:** Primary interactive buttons must be fully rounded pills (`rounded-full`) with generous padding (`px-6 py-3`).
-- **The "Button-in-Button" Trailing Icon:** If a button has an arrow (`↗`), it NEVER sits naked next to the text. It must be nested inside its own distinct circular wrapper (e.g., `w-8 h-8 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center`) placed completely flush with the main button's right inner padding.
+A mobile menu can be a panel or overlay depending on its content. Do not require
+heavy blur, full-screen expansion, or staggered links. Keep navigation immediately
+usable. Occasional scroll reveals must preserve visible content if JavaScript
+fails and omit decorative travel or delay under reduced motion.
 
-### C. Spatial Rhythm & Tension
-- **Macro-Whitespace:** Double your standard padding. Use `py-24` to `py-40` for sections. Allow the design to breathe heavily.
-- **Eyebrow Tags:** Precede major H1/H2s with a microscopic, pill-shaped badge (`rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.2em] font-medium`).
+Collapse asymmetric layouts where content needs it; remove overlaps or rotations
+that obstruct mobile targets. Use project breakpoints and spacing tokens. Choose
+`svh` for stable small-viewport height or `dvh` to track browser chrome only after
+checking the intended scrolling and keyboard behavior.
 
-## 5. MOTION CHOREOGRAPHY (FLUID DYNAMICS)
-Use motion where it clarifies the interaction. Specify properties explicitly (for example, `transition-transform duration-200 ease-[cubic-bezier(0.32,0.72,0,1)]`), and remove spatial effects under reduced motion. Cubic-bezier timing is not a runtime spring simulation.
+## Verify the result
 
-### A. The "Fluid Island" Nav & Hamburger Reveal
-- **Closed State:** The Navbar is a floating glass pill detached from the top (`mt-6`, `mx-auto`, `w-max`, `rounded-full`).
-- **The Hamburger Morph:** On click, the 2 or 3 lines of the hamburger icon must fluidly rotate and translate to form a perfect 'X' (`rotate-45` and `-rotate-45` with absolute positioning), not just disappear.
-- **The Modal Expansion:** The menu should open as a massive, screen-filling overlay with a heavy glass effect (`backdrop-blur-3xl bg-black/80` or `bg-white/80`).
-- **Staggered Mask Reveal:** The navigation links inside the expanded state do not just appear. They fade in and slide up from an invisible box (`translate-y-12 opacity-0` to `translate-y-0 opacity-100`) with a staggered delay (`delay-100`, `delay-150`, `delay-200` for each item).
+Render the important states at desktop and mobile sizes. Check hierarchy, real
+content, focus, keyboard/touch interaction, reduced motion, and loading/failure
+states appropriate to the change. Use the existing stacking scale for overlays;
+texture layers must not intercept input or obscure content.
 
-### B. Magnetic Button Hover Physics
-- Use the `group` utility. On hover, do not just change the background color.
-- Scale the entire button down slightly (`active:scale-[0.98]`) to simulate physical pressing.
-- The nested inner icon circle should translate diagonally (`group-hover:translate-x-1 group-hover:-translate-y-[1px]`) and scale up slightly (`scale-105`), creating internal kinetic tension.
-
-### C. Scroll Interpolation (Entry Animations)
-- Optional occasional reveals can use a small fade-up. Keep content visible when JavaScript fails, omit decorative delay and travel under reduced motion, and do not force 800ms+ entrances on product controls.
-- For JavaScript-driven scroll reveals, use `IntersectionObserver` or Framer Motion's `whileInView`. A scroll listener does not itself force reflow; avoid expensive layout reads/writes per event, clean up listeners/observers, and profile when continuous tracking is required.
-
-## 6. PERFORMANCE GUARDRAILS
-- **Animation cost:** Prefer transform/opacity when geometry remains correct. Dimension, blur, clipping, and shadow work need measurement; no property or will-change hint guarantees GPU acceleration.
-- **Blur cost:** Large surfaces, scrolling, and changing backgrounds can be expensive. Fixed/sticky placement is not a performance guarantee; measure on supported browsers/devices and provide a legible opaque fallback.
-- **Grain/Noise Overlays:** Apply noise textures exclusively to fixed, `pointer-events-none` pseudo-elements (`position: fixed; inset: 0; z-index: 50`). Never attach them to scrolling containers.
-- **Z-Index Discipline:** Do not use arbitrary `z-50` or `z-[9999]`. Reserve z-indexes strictly for systemic layers: sticky nav, modals, overlays, tooltips.
-
-## 7. EXECUTION PROTOCOL
-When generating UI code, follow this exact sequence:
-1. **[SILENT THOUGHT]** Roll the Variance Engine (Section 3). Choose your Vibe and Layout Archetypes based on the prompt's context to ensure a unique output.
-2. **[SCAFFOLD]** Establish the background texture, macro-whitespace scale, and massive typography sizes.
-3. **[ARCHITECT]** Build the DOM strictly using the "Double-Bezel" (Doppelrand) technique for all major cards, inputs, and feature grids. Use exaggerated squircle radii (`rounded-[2rem]`).
-4. **[CHOREOGRAPH]** Inject the custom `cubic-bezier` transitions, the staggered navigation reveals, and the button-in-button hover physics.
-5. **[OUTPUT]** Render and verify the interface and its fallbacks; report any untested state or visual inference.
-
-## 8. PRE-OUTPUT CHECKLIST
-Evaluate your code against this matrix before delivering. This is the last filter.
-- [ ] No banned fonts, icons, borders, shadows, layouts, or motion patterns from Section 2 are present
-- [ ] A Vibe Archetype and Layout Archetype from Section 3 were consciously selected and applied
-- [ ] All major cards and containers use the Double-Bezel nested architecture (outer shell + inner core)
-- [ ] CTA buttons use the Button-in-Button trailing icon pattern where applicable
-- [ ] Section padding is at minimum `py-24` — the layout breathes heavily
-- [ ] Timing fits the interaction, including constant progress and reduced motion
-- [ ] Optional reveals preserve content access, keyboard focus, and both motion preferences
-- [ ] Layout collapses gracefully below `768px` to single-column with `w-full` and `px-4`
-- [ ] Rendering cost is measured where effects or layout work warrant it
-- [ ] Blur surfaces remain readable, with tested performance and opaque fallbacks
-- [ ] The overall impression reads as "$150k agency build", not "template with nice fonts"
+Prefer transform/opacity when they preserve geometry. Measure costly blur,
+shadow, clipping, or layout effects when warranted; fixed placement and
+`will-change` do not guarantee acceleration. Test opaque fallbacks for translucent
+surfaces. Report untested states and visual inferences rather than claiming a
+universal quality score from a checklist of decorative effects.

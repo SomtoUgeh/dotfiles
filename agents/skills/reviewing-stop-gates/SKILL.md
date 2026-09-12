@@ -1,6 +1,6 @@
 ---
 name: reviewing-stop-gates
-description: Reviews stop-gate requests scoped to the immediately previous assistant turn. Use when the user asks for a stop-gate review, allow/block decision, or previous-turn-only review, especially when non-editing turns should return ALLOW immediately.
+description: "Review a stop-gate request for the immediately previous assistant turn and return ALLOW/BLOCK. Use for previous-turn-only gate decisions."
 ---
 
 # Reviewing Stop Gates

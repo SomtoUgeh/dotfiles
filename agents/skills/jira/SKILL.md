@@ -1,6 +1,6 @@
 ---
 name: jira
-description: This skill provides workflows for managing Jira tickets using Atlassian's official CLI (acli). It should be used when creating, viewing, searching, or managing Jira work items from the command line. Triggers on "create jira ticket", "search jira", "view issue", "jira cli", "jira workitem".
+description: "Create, view, search, or manage Jira work items with Atlassian's official acli CLI."
 ---
 
 # ACLI - Atlassian CLI for Jira

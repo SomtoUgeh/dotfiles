@@ -66,14 +66,14 @@ Color is a scarce resource, utilized only for semantic meaning or subtle accents
 - System Icons: Use "Phosphor Icons (Bold or Fill weights)" or "Radix UI Icons" for a technical, slightly thicker-stroke aesthetic. Standardize stroke width across all icons.
 - Illustrations: Monochromatic, rough continuous-line ink sketches on a white background, featuring a single offset geometric shape filled with a muted pastel color.
 - Photography: Use high-quality, desaturated images with a warm tone. Apply subtle overlays (`opacity: 0.04` warm grain) to blend photos into the monochrome palette. Never use oversaturated stock photos. Use project assets or clearly labelled placeholders; introduce remote image dependencies only when they fit the task and its privacy/loading constraints.
-- Hero & Section Backgrounds: Sections should not feel empty and flat. Use subtle full-width background imagery at very low opacity, soft radial light spots (`radial-gradient` with warm tones at `opacity: 0.03`), or minimal geometric line patterns to add depth without breaking the clean aesthetic.
+- Hero & Section Backgrounds: Flat warm surfaces and whitespace are the default. Optional desaturated imagery or minimal geometric line patterns can add structure when the content benefits; do not add decorative gradients.
 
 ## 7. Subtle Motion & Micro-Animations
 Motion should feel invisible — present but never distracting. The goal is quiet sophistication, not spectacle.
-- Scroll Entry: Elements fade in gently as they enter the viewport. Use `translateY(12px)` + `opacity: 0` resolving over `600ms` with `cubic-bezier(0.16, 1, 0.3, 1)`. Use `IntersectionObserver`, never `window.addEventListener('scroll')`.
+- Optional Scroll Entry: Occasional elements may fade in gently as they enter the viewport. Use `translateY(12px)` + `opacity: 0` resolving over `600ms` with `cubic-bezier(0.16, 1, 0.3, 1)`. Use `IntersectionObserver`, never `window.addEventListener('scroll')`.
 - Hover States: Cards lift with an ultra-subtle shadow shift (`box-shadow` transitioning from `0 0 0` to `0 2px 8px rgba(0,0,0,0.04)` over `200ms`). Buttons respond with `scale(0.98)` on `:active`.
-- Staggered Reveals: Lists and grid items enter with a cascade delay (`animation-delay: calc(var(--index) * 80ms)`). Keep content available immediately; omit decorative staggering under reduced motion.
-- Background Ambient Motion: Optional. A single, very slow-moving radial gradient blob (`animation-duration: 20s+`, `opacity: 0.02-0.04`) drifting behind hero sections. Must be applied to a `position: fixed; pointer-events: none` layer. Never on scrolling containers.
+- Optional Staggered Reveals: Occasional lists and grid items can enter with a cascade delay (`animation-delay: calc(var(--index) * 80ms)`). Keep content available immediately; omit decorative staggering under reduced motion.
+- Backgrounds: Keep decorative textures static. Ambient motion is unnecessary for this restrained direction.
 - Performance: Prefer transform/opacity when they preserve geometry; profile other properties and add will-change only after demonstrating a benefit.
 
 ## 8. Execution Protocol
@@ -83,5 +83,5 @@ When tasked with writing frontend code (HTML, React, Tailwind, Vue) or designing
 3. Apply the custom typographic hierarchy and monochromatic color variables immediately.
 4. Ensure every card, divider, and border adheres strictly to the `1px solid #EAEAEA` rule.
 5. Add only purposeful motion; verify reduced-motion, keyboard/touch, and no-JavaScript states.
-6. Ensure sections have visual depth through imagery, ambient gradients, or subtle textures — no empty flat backgrounds.
+6. Check hierarchy and whitespace; add restrained imagery or texture only where it supports the content. Flat backgrounds are valid.
 7. Provide code that reflects this high-end, uncluttered, editorial aesthetic natively without requiring manual adjustments.

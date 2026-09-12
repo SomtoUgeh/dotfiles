@@ -82,9 +82,9 @@ If the feature description is already clear, proceed directly to research withou
 
 ## Main Tasks
 
-### 1. Local Research (Always Runs - Parallel)
+### 1. Local Context
 
-Gather local context. Delegate only when a callable researcher can answer a bounded question independently; otherwise research locally:
+Reuse relevant context already read in this task. Inspect only the gaps needed to ground the plan; do not repeat a repository survey for a small change with verified context. Delegate only when a callable researcher can answer a bounded question independently; otherwise research locally:
 
 - Launch subagent `repo-research-analyst` with prompt (feature_description)
 
@@ -245,7 +245,7 @@ If changes are made, re-render the breadboard tables and update the slice summar
 
 ### 4. Generate the chosen spec
 
-Read [spec-templates.md](references/spec-templates.md) for the selected MINIMAL, STANDARD, or COMPREHENSIVE format. Use only the sections the requested scope needs.
+Read only the selected template: [MINIMAL](references/spec-minimal.md), [STANDARD](references/spec-standard.md), or [COMPREHENSIVE](references/spec-comprehensive.md). Use only the sections the requested scope needs.
 
 ### 5. Spec Formatting
 
@@ -320,21 +320,11 @@ Each story must have exactly one category:
 
 Read [prd-schema.md](references/prd-schema.md) for the schema, field meanings, examples, and validation checklist. Validate unique IDs, valid dependencies, acyclicity, and coverage of every acceptance criterion.
 
-### 6.5. Mandatory Diagrams
+### 6.5. Diagrams Where They Clarify the Plan
 
-No non-trivial flow goes undiagrammed. Use ASCII art inline while thinking through flows, then produce Mermaid diagrams for the final spec.md.
+Include a diagram when it resolves a concrete ambiguity or makes relationships easier to verify: component boundaries, multi-step data flow, consequential state transitions, complex branching, or dependency order. A simple bug or linear flow can be explained in prose or acceptance criteria. Do not require a diagram for every stateful object or an ASCII draft before a final diagram.
 
-**Produce all that apply:**
-1. **System architecture** — new components and their relationships to existing ones
-2. **Data flow** — including shadow paths (nil, empty, error)
-3. **State machine** — for every new stateful object, include invalid transitions
-4. **Processing pipeline** — for background jobs, queues, multi-step transforms
-5. **Decision tree** — for complex branching logic
-6. **Dependency graph** — what depends on what, build/deploy order
-
-Use an available Mermaid renderer or `technical-svg-diagrams` when an exported diagram is needed. Do not require an uninstalled skill.
-
-Drawing forces thinking. If you can't diagram it, you don't understand it yet.
+Use Mermaid in the spec when useful. Include error paths and invalid transitions relevant to the diagram’s purpose. Use an available renderer or `technical-svg-diagrams` only when an exported diagram is needed.
 
 ### 7. Final Review
 
@@ -345,7 +335,7 @@ Drawing forces thinking. If you can't diagram it, you don't understand it yet.
 - [ ] prd.json stories cover all acceptance criteria
 - [ ] Dependencies are correctly mapped
 - [ ] Code references use file:line format
-- [ ] Mandatory diagrams included (architecture, data flow, state machines as applicable)
+- [ ] Diagrams included where they clarify consequential relationships or transitions; prose covers simple flows
 
 ## Output Structure
 

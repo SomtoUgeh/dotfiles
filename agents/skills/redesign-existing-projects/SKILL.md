@@ -12,51 +12,53 @@ Preserve explicit user choices, brand rules, accessibility constraints, and work
 When applied to an existing project, follow this sequence:
 
 1. **Scan** — Read the codebase. Identify the framework, styling method (Tailwind, vanilla CSS, styled-components, etc.), and current design patterns.
-2. **Diagnose** — Run through the audit below. List every generic pattern, weak point, and missing state you find.
+2. **Diagnose** — Inspect the rendered interface against the brief. Report usability, hierarchy, consistency, or accessibility problems with evidence. A familiar font, layout, or component is not a defect by itself.
 3. **Fix** — Apply targeted upgrades working with the existing stack. Do not rewrite from scratch. Improve what's there.
 
 ## Design Audit
+
+Distinguish functional/accessibility defects from aesthetic options. For the latter, name the observed mismatch with the brief before changing anything; keep an established choice that works. The examples below are alternatives, not requirements to replace conventional patterns. Do not add imagery, texture, motion, dependencies, or new product scope merely to satisfy a checklist.
 
 ### Typography
 
 Check for these problems and fix the ones supported by the interface:
 
-- **Browser default fonts or Inter everywhere.** Replace with a font that has character. Good options: `Geist`, `Outfit`, `Cabinet Grotesk`, `Satoshi`. For editorial/creative projects, pair a serif header with a sans-serif body.
-- **Headlines lack presence.** Increase size for display text, tighten letter-spacing, reduce line-height. Headlines should feel heavy and intentional.
+- **Typeface does not fit the brief or harms readability.** Preserve established fonts, including Inter and system fonts. If a change is justified, evaluate available fonts against the brand, loading cost, and rendered text; an editorial brief may benefit from a serif/sans pairing.
+- **Headlines do not establish the intended hierarchy.** Tune size, weight, spacing, and line-height against the rendered page; a restrained headline may fit the brief.
 - **Body text too wide.** Limit paragraph width to roughly 65 characters. Increase line-height for readability.
-- **Only Regular (400) and Bold (700) weights used.** Introduce Medium (500) and SemiBold (600) for more subtle hierarchy.
+- **Text hierarchy is unclear.** Adjust size, spacing, or weight as needed. Two weights may be sufficient; add weights only when they distinguish meaningful levels.
 - **Numbers in proportional font.** Use a monospace font or enable tabular figures (`font-variant-numeric: tabular-nums`) for data-heavy interfaces.
-- **Missing letter-spacing adjustments.** Use negative tracking for large headers, positive tracking for small caps or labels.
-- **All-caps subheaders everywhere.** Try lowercase italics, sentence case, or small-caps instead.
+- **Tracking hurts legibility or hierarchy.** Adjust only where the font, size, and rendered text warrant it.
+- **Subheader treatment hurts reading or conflicts with the voice.** Compare case and emphasis options; preserve readable all-caps when intentional.
 - **Orphaned words.** Single words sitting alone on the last line. Fix with `text-wrap: balance` or `text-wrap: pretty`.
 
 ### Color and Surfaces
 
-- **Pure `#000000` background.** Replace with off-black, dark charcoal, or tinted dark (`#0a0a0a`, `#121212`, or a dark navy).
-- **Oversaturated accent colors.** Keep saturation below 80%. Desaturate accents so they blend with neutrals instead of screaming.
-- **More than one accent color.** Pick one. Remove the rest. Consistency beats variety.
-- **Mixing warm and cool grays.** Stick to one gray family. Tint all grays with a consistent hue (warm or cool, not both).
-- **Purple/blue "AI gradient" aesthetic.** This is the most common AI design fingerprint. Replace with neutral bases and a single, considered accent.
-- **Generic `box-shadow`.** Tint shadows to match the background hue. Use colored shadows (e.g., dark blue shadow on a blue background) instead of pure black at low opacity.
-- **Flat design with zero texture.** Add subtle noise, grain, or micro-patterns to backgrounds. Pure flat vectors feel sterile.
-- **Perfectly even gradients.** Break the uniformity with radial gradients, noise overlays, or mesh gradients instead of standard linear 45-degree fades.
+- **Dark surfaces obscure hierarchy or strain readability.** Test contrast and separation; pure black and tinted darks are both valid when they fit the design.
+- **Accent colors compete with content or fail contrast.** Adjust the palette against rendered evidence; do not impose a universal saturation cutoff.
+- **Accent colors have inconsistent roles.** Define clear semantic and brand roles. Preserve multiple accents when they support those roles.
+- **Neutral colors appear inconsistent.** Check their semantic and brand roles before consolidating them; intentional warm/cool contrast may be useful.
+- **Gradients conflict with the brief or reduce legibility.** Adjust them only for that observed problem; hue alone is not evidence of poor design.
+- **Shadows obscure surface relationships.** Tune hue, opacity, and spread to clarify elevation; neutral shadows are valid.
+- **Surface treatment does not support the intended hierarchy.** Flat surfaces are valid. Consider texture only when the brief calls for it and it preserves legibility.
+- **Gradient treatment lacks the intended emphasis.** Compare linear, radial, or other treatments against the brief; uniformity alone does not require a change.
 - **Inconsistent lighting direction.** Audit all shadows to ensure they suggest a single, consistent light source.
-- **Random dark sections in a light mode page (or vice versa).** A single dark-background section breaking an otherwise light page looks like a copy-paste accident. Either commit to a full dark mode or keep a consistent background tone throughout. If contrast is needed, use a slightly darker shade of the same palette — not a sudden jump to `#111` in the middle of a cream page.
-- **Empty, flat sections with no visual depth.** Sections that are just text on a plain background feel unfinished. Add high-quality background imagery (blurred, overlaid, or masked), subtle patterns, or ambient gradients. Use reliable placeholder sources like `https://picsum.photos/seed/{name}/1920/1080` when real assets are not available. Experiment with background images behind hero sections, feature blocks, or CTAs — even a subtle full-width photo at low opacity adds presence.
+- **A contrasting section disrupts hierarchy or readability.** Check whether its contrast intentionally groups content or emphasizes an action. Keep purposeful mixed light/dark sections; adjust only the observed mismatch.
+- **Sections lack a clear content hierarchy.** Improve grouping, typography, and spacing first. Add relevant imagery only when it serves the brief; keep prototypes clearly labelled and do not introduce arbitrary stock photos into an existing product.
 
 ### Layout
 
-- **Everything centered and symmetrical.** Break symmetry with offset margins, mixed aspect ratios, or left-aligned headers over centered content.
-- **Three equal card columns as feature row.** This is the most generic AI layout. Replace with a 2-column zig-zag, asymmetric grid, horizontal scroll, or masonry layout.
+- **Alignment weakens scanning or emphasis.** Compare centered and asymmetric arrangements when evidence supports changing the composition.
+- **Feature grouping hides differences or breaks responsiveness.** Choose a layout that supports comparison and reading order. Equal card columns are valid when they serve the content.
 - **Full-screen sections clipped by browser chrome.** Choose `min-height: 100svh` for a stable small viewport or `100dvh` to track the changing viewport. `dvh` can resize during scrolling; test browser chrome and keyboard states.
 - **Complex flexbox percentage math.** Replace with CSS Grid for reliable multi-column structures.
 - **No max-width container.** Add a container constraint (around 1200-1440px) with auto margins so content doesn't stretch edge-to-edge on wide screens.
-- **Cards of equal height forced by flexbox.** Allow variable heights or use masonry when content varies in length.
-- **Uniform border-radius on everything.** Vary the radius: tighter on inner elements, softer on containers.
-- **No overlap or depth.** Elements sit flat next to each other. Use negative margins to create layering and visual depth.
-- **Symmetrical vertical padding.** Top and bottom padding are always identical. Adjust optically — bottom padding often needs to be slightly larger.
-- **Dashboard always has a left sidebar.** Try top navigation, a floating command menu, or a collapsible panel instead.
-- **Missing whitespace.** Double the spacing. Let the design breathe. Dense layouts work for data dashboards, not for marketing pages.
+- **Card sizing creates clipping or excessive empty space.** Balance content fit with aligned comparison; equal heights and variable heights are both valid.
+- **Corner treatment conflicts with nesting or the visual system.** Adjust radii only where that improves consistency; uniform radii are valid.
+- **Layer relationships are unclear.** Use spacing, borders, or elevation to express them; do not add overlap just for decoration.
+- **Padding appears optically unbalanced.** Adjust against rendered content rather than enforcing either symmetry or asymmetry.
+- **Navigation does not fit task frequency or screen size.** Preserve a useful sidebar; compare alternatives only for an observed navigation problem.
+- **Crowding hurts reading or interaction.** Increase spacing where needed while preserving useful density; validate the result at target sizes.
 - **Buttons not bottom-aligned in card groups.** When cards have different content lengths, CTAs end up at random heights. Pin buttons to the bottom of each card so they form a clean horizontal line regardless of content above.
 - **Feature lists starting at different vertical positions.** In pricing tables or comparison cards, the list of features should start at the same Y position across all columns. Use consistent spacing above the list or fixed-height title/price blocks.
 - **Inconsistent vertical rhythm in side-by-side elements.** When placing cards, columns, or panels next to each other, align shared elements (titles, descriptions, prices, buttons) across all items. Misaligned baselines make the layout look broken.
@@ -64,11 +66,11 @@ Check for these problems and fix the ones supported by the interface:
 
 ### Interactivity and States
 
-- **No hover states on buttons.** Add background shift, slight scale, or translate on hover.
-- **No active/pressed feedback.** Add a subtle `scale(0.98)` or `translateY(1px)` on press to simulate a physical click.
+- **Interactive controls lack pointer feedback.** Add suitable hover feedback where useful, gated for hover-capable pointers; movement is optional.
+- **Pressed state is unclear.** Use color, border, or restrained movement when it clarifies activation; preserve reduced-motion behavior.
 - **Unclear state changes.** Add the least feedback that clarifies the action. Instant changes are valid for frequent actions and reduced motion; avoid blanket transitions.
 - **Missing focus ring.** Ensure visible focus indicators for keyboard navigation. This is an accessibility requirement, not optional.
-- **No loading states.** Replace generic circular spinners with skeleton loaders that match the layout shape.
+- **Loading lacks clear feedback.** Use the existing spinner, progress indicator, or skeleton that best communicates the wait and preserves layout.
 - **No empty states.** An empty dashboard showing nothing is a missed opportunity. Design a composed "getting started" view.
 - **No error states.** Add clear, inline error messages for forms. Do not use `window.alert()`.
 - **Dead links.** Buttons that link to `#`. Either link to real destinations or visually disable them.
@@ -78,35 +80,35 @@ Check for these problems and fix the ones supported by the interface:
 
 ### Content
 
-- **Generic names like "John Doe" or "Jane Smith".** Use diverse, realistic-sounding names.
+- **Example identities distract from the task.** Use clearly labelled sample data appropriate to the prototype; preserve real identities.
 - **Unsupported numbers or contact details.** Preserve source data. Use clearly labelled sample data in prototypes; never invent metrics, prices, testimonials, or reachable contact details to make a product look credible.
-- **Placeholder company names like "Acme Corp", "Nexus", "SmartFlow".** Invent contextual, believable brand names.
+- **Placeholder company names are mistaken for real brands.** Label them as samples; preserve established product names.
 - **AI copywriting cliches.** Never use "Elevate", "Seamless", "Unleash", "Next-Gen", "Game-changer", "Delve", "Tapestry", or "In the world of...". Write plain, specific language.
-- **Exclamation marks in success messages.** Remove them. Be confident, not loud.
+- **Success messages conflict with the product voice.** Prefer clear confirmation; punctuation alone is not a defect.
 - **"Oops!" error messages.** Be direct: "Connection failed. Please try again."
 - **Passive voice.** Use active voice: "We couldn't save your changes" instead of "Mistakes were made."
 - **Suspicious or missing publication dates.** Verify the content source. Preserve actual dates and mark unknown dates; never randomize them to appear real.
-- **Same avatar image for multiple users.** Use unique assets for every distinct person.
+- **Avatars misidentify people.** Preserve verified assets; use initials or clearly labelled placeholders when a real image is unavailable.
 - **Lorem Ipsum.** Never use placeholder latin text. Write real draft copy.
-- **Title Case On Every Header.** Use sentence case instead.
+- **Heading case is inconsistent with the product voice.** Follow the existing style guide; sentence case and title case are both valid.
 
 ### Component Patterns
 
-- **Generic card look (border + shadow + white background).** Remove the border, or use only background color, or use only spacing. Cards should exist only when elevation communicates hierarchy.
-- **Always one filled button + one ghost button.** Add text links or tertiary styles to reduce visual noise.
-- **Pill-shaped "New" and "Beta" badges.** Try square badges, flags, or plain text labels.
-- **Accordion FAQ sections.** Use a side-by-side list, searchable help, or inline progressive disclosure.
-- **3-card carousel testimonials with dots.** Replace with a masonry wall, embedded social posts, or a single rotating quote.
-- **Pricing table with 3 towers.** Highlight the recommended tier with color and emphasis, not just extra height.
-- **Modals for everything.** Use inline editing, slide-over panels, or expandable sections instead of popups for simple actions.
-- **Avatar circles exclusively.** Try squircles or rounded squares for a less generic look.
-- **Light/dark toggle always a sun/moon switch.** Use a dropdown, system preference detection, or integrate it into settings.
-- **Footer link farm with 4 columns.** Simplify. Focus on main navigational paths and legally required links.
+- **Card grouping obscures hierarchy.** Adjust borders, elevation, background, or spacing to clarify relationships; conventional cards may already do this well.
+- **Actions compete for attention.** Clarify primary, secondary, and tertiary actions. Keep familiar filled/ghost combinations when their priority is clear.
+- **Badges overpower the content.** Reduce emphasis or change their treatment only when they distract or misrepresent status.
+- **FAQs are hard to find or scan.** Compare an accordion, inline list, or search based on content length and user tasks; an accordion alone is not a defect.
+- **Testimonials are hard to browse or verify.** Improve controls and source attribution. Preserve real quotes and choose a layout that supports reading.
+- **Pricing tiers are hard to compare.** Align shared features and make meaningful differences clear; preserve useful column layouts.
+- **Modal interaction interrupts a simple task.** Consider inline editing or a panel when it improves the flow. Keep necessary dialog semantics and focus behavior.
+- **Avatar treatment conflicts with the visual system.** Standardize shape and crop; circles are a valid default.
+- **Theme controls are unclear or inaccessible.** Preserve a recognizable toggle or settings control that communicates its current state and system preference.
+- **Footer organization hides important destinations.** Group links around navigation needs and preserve required legal links.
 
 ### Iconography
 
-- **Lucide or Feather icons exclusively.** These are the "default" AI icon choice. Use Phosphor, Heroicons, or a custom set for differentiation.
-- **Rocketship for "Launch", shield for "Security".** Replace cliche metaphors with less obvious icons (bolt, fingerprint, spark, vault).
+- **Icons are unclear or inconsistent with the brand.** Prefer the existing icon set, including Lucide or Feather; replace it only for a demonstrated mismatch.
+- **Icon metaphors confuse the action.** Prefer recognizable meaning over novelty; keep conventional icons when clear.
 - **Inconsistent stroke widths across icons.** Audit all icons and standardize to one stroke weight.
 - **Missing favicon.** Always include a branded favicon.
 - **Stock "diverse team" photos.** Use real team photos, candid shots, or a consistent illustration style instead of uncanny stock imagery.
@@ -133,7 +135,7 @@ Check for these problems and fix the ones supported by the interface:
 
 ## Upgrade Techniques
 
-When upgrading a project, pull from these high-impact techniques to replace generic patterns:
+Use these optional techniques only when the brief and observed problem justify them; conventional or static treatments may be the best fit:
 
 ### Typography Upgrades
 - **Variable font animation.** Interpolate weight or width on scroll or hover for text that feels alive.
@@ -166,14 +168,14 @@ Apply changes in this order for maximum visual impact with minimum risk:
 2. **Color palette cleanup** — remove clashing or oversaturated colors
 3. **Hover and active states** — makes the interface feel alive
 4. **Layout and spacing** — proper grid, max-width, consistent padding
-5. **Replace generic components** — swap cliche patterns for modern alternatives
+5. **Component fit** — revise components only where their behavior or presentation does not serve the task
 6. **Add loading, empty, and error states** — makes it feel finished
 7. **Polish typography scale and spacing** — the premium final touch
 
 ## Rules
 
 - Work with the existing tech stack. Do not migrate frameworks or styling libraries.
-- Do not break existing functionality. Test after every change.
+- Preserve existing functionality. After a coherent edit, run focused checks for the affected flows and inspect the rendered result. Repeat checks when new edits or failures warrant it.
 - Before importing any new library, check the project's dependency file first.
 - If the project uses Tailwind, check the version (v3 vs v4) before modifying config.
 - If the project has no framework, use vanilla CSS.

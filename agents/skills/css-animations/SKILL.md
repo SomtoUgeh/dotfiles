@@ -1,6 +1,6 @@
 ---
 name: css-animations
-description: Implement web motion with CSS transitions, keyframes, transforms, 3D, `clip-path`, and `@starting-style`. Use when writing or fixing CSS-only entrances, exits, hover and press feedback, autonomous loops, multi-step sequences, staggers, or touch-safe hover states. Use `animate` for overall direction and focused skills for performance diagnosis or reduced-motion design.
+description: "Implement or debug CSS transitions, keyframes, transforms, clip-path, starting styles, staggers, and touch-safe hover/press feedback. Use animate for overall motion direction."
 metadata:
   short-description: Animate with CSS the way the animations.dev course teaches
 ---

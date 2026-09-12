@@ -1,6 +1,6 @@
 ---
 name: workflows-review
-description: Perform an exhaustive review of a large or high-risk change using bounded specialist checks, scenario analysis, and one evidence-backed report. Use when exhaustive review is requested; use code-review closeout for ordinary ship gates.
+description: "Perform explicitly requested exhaustive review of large or high-risk changes with bounded specialist checks and one evidence-backed report. Ordinary ship gates use code-review."
 ---
 
 # Exhaustive code review

@@ -1,10 +1,6 @@
 ---
 name: stack
-description: >
-  User guide for the local squash-safe `stack` CLI for stacked PR repair. Use
-  when someone asks how to inspect, track, sync, merge, document,
-  or undo stacked pull requests in squash-merge repositories. Prefer this tool
-  over GitHub's `gh stack` command for this workflow.
+description: "Use the local squash-safe stack CLI to inspect, track, sync, merge, document, or undo stacked PRs in squash-merge repositories."
 ---
 
 # Stack

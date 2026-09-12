@@ -1,6 +1,6 @@
 ---
 name: sandbox-migrate-to-next
-description: Use when porting a Cloudflare Sandbox app from stable @cloudflare/sandbox to @cloudflare/sandbox@next (Sandbox SDK 1.0 preview), or when the user asks to migrate or upgrade to Sandbox 1.0 / @next. Not for day-to-day stable work (sandbox-stable) or new @next apps (sandbox-next).
+description: "Migrate Cloudflare Sandbox from stable @cloudflare/sandbox to @next (1.0 preview) when explicitly requested. New preview apps use sandbox-next."
 ---
 
 # Migrate stable → Sandbox SDK 1.0 preview (`@next`)

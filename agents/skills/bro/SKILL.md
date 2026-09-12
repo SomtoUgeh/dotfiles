@@ -33,7 +33,7 @@ Source material: the **previous assistant message** in this conversation (and on
 2. ...
 3. ...
 
-Next: [one concrete thing under ~2 minutes]
+[Only if needed: who owns the next action, and what it is]
 ```
 
 If the last message was already a finished answer with nothing left to do, drop the steps and the `Next:` line. Just say the thing simply.
@@ -70,10 +70,10 @@ More than one step → numbered list. One step per line. No "and then" stuffed i
 
 ### 4. One next step at the end
 
-If work remains, end with **one** thing they can do in under two minutes.
+If the next action belongs to the user (a decision, missing input, or an explicitly requested manual step), state one concrete action. Do not transfer unfinished agent work to the user. For ongoing authorized work, state the agent's next action; a rewrite-only request does not itself authorize new execution.
 
 Bad: "Let me know if you want to dig deeper."  
-Good: "Next: run `npm test` and paste the first failing line."
+Good for ongoing agent work: "The fix is in. I still need to run the auth tests."
 
 ### 5. Cut tangents
 
@@ -85,7 +85,7 @@ One topic only. Side issues become one line at most:
 
 If the last message was mid-task, open or close with progress in plain words:
 
-"Step 3 of 5 done: schema updated. Next: backfill the column."
+"The schema is updated. The remaining agent work is to backfill the column and verify it."
 
 ### 7. Specific time, if you mention time
 
@@ -167,7 +167,6 @@ Idempotent means safe to run twice — second run doesn't mess things up.
 
 Use it when a request might be retried (network blip, double-click, queue redelivery).
 
-Next: if you want, point me at one endpoint and I'll say whether it already is.
 ```
 
 ### Already simple → bro

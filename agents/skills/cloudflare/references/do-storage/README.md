@@ -55,12 +55,15 @@ export class Counter extends DurableObject<Env> {
 - **PITR** (`getBookmarkForTime()`, `onNextSessionRestoreBookmark()`)
 - **Alarms** (`setAlarm()`, `alarm()` handler)
 
-## Reading Order
+## Choose a Reference
 
-**New to DO storage:** configuration.md → api.md → patterns.md → gotchas.md  
-**Building features:** patterns.md → api.md → gotchas.md  
-**Debugging issues:** gotchas.md → api.md  
-**Writing tests:** testing.md
+Load the file that answers the current task; follow additional references only when needed.
+
+- Setup, bindings, and deployment configuration → [configuration.md](configuration.md)
+- API calls, handlers, and runtime behavior → [api.md](api.md)
+- Implementing a specific integration or use case → [patterns.md](patterns.md)
+- Diagnosing failures and checking relevant limits → [gotchas.md](gotchas.md)
+- Testing storage, alarms, and recovery → [testing.md](testing.md)
 
 ## In This Reference
 

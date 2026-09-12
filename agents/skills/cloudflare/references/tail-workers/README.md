@@ -56,12 +56,14 @@ Need observability for Workers?
    └─ Use `wrangler tail` (different from Tail Workers)
 ```
 
-## Reading Order
+## Choose a Reference
 
-1. **[configuration.md](configuration.md)** - Set up Tail Workers
-2. **[api.md](api.md)** - Handler signature, types, redaction
-3. **[patterns.md](patterns.md)** - Common use cases and integrations
-4. **[gotchas.md](gotchas.md)** - Pitfalls and debugging tips
+Load the file that answers the current task; follow additional references only when needed.
+
+- Setup, bindings, and deployment configuration → [configuration.md](configuration.md)
+- API calls, handlers, and runtime behavior → [api.md](api.md)
+- Implementing a specific integration or use case → [patterns.md](patterns.md)
+- Diagnosing failures and checking relevant limits → [gotchas.md](gotchas.md)
 
 ## Quick Example
 

@@ -1,6 +1,6 @@
 ---
 name: sandbox-next
-description: Use when building or changing Cloudflare Sandbox apps on @cloudflare/sandbox@next (Sandbox SDK 1.0 preview)—code execution, AI runners, interpreters, CI-like jobs, terminals, files, mounts, tunnels, preview URLs, lifecycle, or errors. Not for the default stable package (use sandbox-stable) or for porting stable to @next (use sandbox-migrate-to-next).
+description: "Build or debug Cloudflare Sandbox apps explicitly using @cloudflare/sandbox@next (1.0 preview). Stable apps use sandbox-stable; migrations use sandbox-migrate-to-next."
 ---
 
 # Sandbox SDK — `@next` (1.0 preview)

@@ -43,7 +43,7 @@ pnpm create cloudflare@latest [name] [-- flags]
 ```bash
 CLOUDFLARE_API_TOKEN=xxx    # For deployment
 CLOUDFLARE_ACCOUNT_ID=xxx   # Account ID
-CF_TELEMETRY_DISABLED=1     # Disable telemetry
+CREATE_CLOUDFLARE_TELEMETRY_DISABLED=1     # Disable telemetry
 ```
 
 ## Exit Codes
@@ -68,8 +68,9 @@ npm create cloudflare@latest my-app -- --framework=next --lang=ts --no-git --no-
 # GitHub template
 npm create cloudflare@latest -- --template=cloudflare/templates/worker-openapi
 
-# Convert existing project
-npm create cloudflare@latest . -- --type=pre-existing --existing-script=my-existing-worker
+# Download deployed Worker into a new directory
+npm create cloudflare@latest my-worker-copy -- --existing-script=my-existing-worker
 ```
 
-`--existing-script` downloads a deployed Worker; it does not convert local source or migrate an existing framework app. For an existing app, follow its current Workers framework guide. Workers Static Assets also support static sites, and Workers Builds supports Git workflows; Pages is an explicit framework-dependent choice. Inspect generated package scripts instead of assuming every framework uses the same names.
+
+For local app adaptation, use the framework migration guidance in [README.md](README.md#platform-selection). Verify flags with the selected CLI help and [C3 docs](https://developers.cloudflare.com/pages/get-started/c3/).

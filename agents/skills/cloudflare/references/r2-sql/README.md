@@ -51,12 +51,14 @@ R2 SQL is read-only and supports a broad analytical SQL surface (SELECT, JOINs, 
 
 There is no `env.R2_SQL` binding. Query from a Worker via `fetch()` to the REST endpoint with the token as a secret (see [patterns.md](patterns.md#dashboard-worker)).
 
-## Reading Order
+## Choose a Reference
 
-1. [configuration.md](configuration.md) — enable catalog, tokens, env setup
-2. [api.md](api.md) — SQL syntax templates, JOIN/window examples, response format, data types
-3. [patterns.md](patterns.md) — CLI/REST/Worker queries, use cases, pagination, performance
-4. [gotchas.md](gotchas.md) — what works vs. not, performance, troubleshooting
+Load the file that answers the current task; follow additional references only when needed.
+
+- Setup, bindings, and deployment configuration → [configuration.md](configuration.md)
+- API calls, handlers, and runtime behavior → [api.md](api.md)
+- Implementing a specific integration or use case → [patterns.md](patterns.md)
+- Diagnosing failures and checking relevant limits → [gotchas.md](gotchas.md)
 
 ## See Also
 

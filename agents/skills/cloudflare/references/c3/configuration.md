@@ -46,6 +46,8 @@ Error: Invalid KV namespace ID "placeholder_kv_id"
 
 ## Scripts
 
+Inspect `package.json`; these are example Worker scripts, not names guaranteed for every framework.
+
 ```json
 {
   "scripts": {
@@ -74,10 +76,8 @@ interface Env {
 ## Post-Creation Checklist
 
 1. Review `wrangler.jsonc` - check name, compatibility_date
-2. Replace placeholder binding IDs with real resource IDs
+2. If bindings contain placeholders, replace them with the intended existing or newly provisioned resource IDs
 3. Run `npm run cf-typegen`
 4. Test: `npm run dev`
 5. Provision required secrets for the target Worker using `npx wrangler secret put SECRET_NAME`
 6. Deploy when configuration and secrets are ready: `npm run deploy`
-
-`--existing-script` downloads a deployed Worker; it does not convert local source or migrate an existing framework app. For an existing app, follow its current Workers framework guide. Workers Static Assets also support static sites, and Workers Builds supports Git workflows; Pages is an explicit framework-dependent choice. Inspect generated package scripts instead of assuming every framework uses the same names.

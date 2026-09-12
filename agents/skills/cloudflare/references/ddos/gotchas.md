@@ -38,7 +38,7 @@ const config = {
 ### "Log action not available"
 
 **Cause**: Not on Enterprise Advanced DDoS plan
-**Solution**: Use `managed_challenge` with low sensitivity for testing
+**Solution**: Inspect the phase and supported actions. Verify against representative traffic in a bounded scope; do not substitute a browser challenge for observation on machine API or network traffic.
 
 ### "Rule limit exceeded"
 
@@ -88,12 +88,7 @@ const config = {
 
 ## Tuning Strategy
 
-1. Start with `log` action + `medium` sensitivity
-2. Monitor for 24-48 hours
-3. Identify false positives, add exceptions
-4. Gradually increase to `default` sensitivity
-5. Change action from `log` → `managed_challenge` → `block`
-6. Document all adjustments
+Inspect the affected rule, traffic, phase, and plan before choosing an override. Use observation where supported and appropriate; determine its duration from representative legitimate and attack traffic, not a fixed waiting period. During an active incident, apply the authorized bounded mitigation and verify its effects. Managed Challenge is for compatible browser traffic, not a required stage for every protocol or API. Keep changes narrow and retain the prior configuration for recovery.
 
 ## Best Practices
 

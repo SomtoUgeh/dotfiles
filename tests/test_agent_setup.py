@@ -14,6 +14,7 @@ import tempfile
 import unittest
 
 import tomlkit
+import yaml
 
 sys.dont_write_bytecode = True
 
@@ -31,6 +32,70 @@ guard = load("guard", "agents/shared/hooks/git_guard.py")
 ripple = load("ripple", "agents/skills/shaping/shaping-ripple.py")
 setup = load("setup", "scripts/sync_agent_config.py")
 validator = load("validator", "agents/skills/create-agent-skills/scripts/quick_validate.py")
+roles = load("roles", "scripts/sync_agent_roles.py")
+
+
+class RoleTests(unittest.TestCase):
+    def test_tracked_roles_match_canonical_prompts(self):
+        self.assertEqual(roles.sync(REPO, check=True), [])
+
+    def test_native_settings_survive_regeneration_and_check_is_read_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            source = repo / "agents/shared/roles"
+            source.mkdir(parents=True)
+            (source / "_common.md").write_text("Respect the assigned scope.\n")
+            (source / "example.md").write_text('---\ndescription: "Answer a specific question: with evidence."\n---\nKeep `\\paths` and "quotes" intact.\n')
+            originals = {
+                "codex": '# local policy\nname = "example"\ndescription = "old"\nmodel = "chosen-model"\nsandbox_mode = "read-only"\ndeveloper_instructions = "old"\n',
+                "claude": '---\nname: example\ndescription: old\nmodel: inherit\ntools: Read, Grep\n---\nold\n',
+                "opencode": '---\ndescription: old\nmode: subagent\npermissions:\n  - action: edit\n    resource: "*"\n    effect: deny\n---\nold\n',
+            }
+            paths = {}
+            for harness, content in originals.items():
+                path = repo / "agents" / harness / "agents" / ("example.toml" if harness == "codex" else "example.md")
+                path.parent.mkdir(parents=True)
+                path.write_text(content)
+                paths[harness] = path
+            self.assertEqual(len(roles.sync(repo, check=True)), 3)
+            self.assertEqual({key: path.read_text() for key, path in paths.items()}, originals)
+            self.assertEqual(len(roles.sync(repo)), 3)
+            expected = 'Respect the assigned scope.\n\nKeep `\\paths` and "quotes" intact.\n'
+            for harness, path in paths.items():
+                with self.subTest(harness=harness):
+                    if harness == "codex":
+                        before = tomlkit.parse(originals[harness])
+                        after = tomlkit.parse(path.read_text())
+                        self.assertEqual(after.pop("developer_instructions"), expected)
+                        before.pop("developer_instructions")
+                        self.assertIn("# local policy", path.read_text())
+                    else:
+                        before, _ = roles.markdown_parts(originals[harness])
+                        after, body = roles.markdown_parts(path.read_text())
+                        self.assertEqual(body, expected.strip())
+                    before.pop("description")
+                    self.assertEqual(after.pop("description"), "Answer a specific question: with evidence.")
+                    self.assertEqual(after, before)
+            self.assertEqual(roles.sync(repo), [])
+
+    def test_invalid_source_does_not_write_any_native_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            source = repo / "agents/shared/roles"
+            source.mkdir(parents=True)
+            (source / "_common.md").write_text("Shared constraints.\n")
+            (source / "a.md").write_text("---\ndescription: Valid\n---\nNew body.\n")
+            (source / "z.md").write_text("---\ndescription: [invalid\n---\nBody.\n")
+            originals = {}
+            for harness in ("claude", "codex", "opencode"):
+                path = repo / "agents" / harness / "agents" / ("a.toml" if harness == "codex" else "a.md")
+                path.parent.mkdir(parents=True)
+                content = 'description = "old"\ndeveloper_instructions = "old"\n' if harness == "codex" else '---\ndescription: old\n---\nold\n'
+                path.write_text(content)
+                originals[path] = content
+            with self.assertRaises(yaml.YAMLError):
+                roles.sync(repo)
+            self.assertEqual({path: path.read_text() for path in originals}, originals)
 
 
 class GuardTests(unittest.TestCase):

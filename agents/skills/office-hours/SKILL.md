@@ -1,6 +1,6 @@
 ---
 name: office-hours
-description: Run an explicit pre-build product diagnostic to test demand, users, scope, and premises before solution shaping. Use when the user asks for office hours, asks whether an idea is worth building, or requests a hard product critique.
+description: "Run a pre-build product diagnostic when asked for office hours, whether an idea is worth building, or a hard product critique. Test demand, users, scope, and premises."
 ---
 
 # Office Hours

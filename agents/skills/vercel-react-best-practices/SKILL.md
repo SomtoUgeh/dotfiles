@@ -1,6 +1,6 @@
 ---
 name: vercel-react-best-practices
-description: React and Next.js performance optimization guidelines from Vercel Engineering. This skill should be used when writing, reviewing, or refactoring React/Next.js code to ensure optimal performance patterns. Triggers on tasks involving React components, Next.js pages, data fetching, bundle optimization, or performance improvements.
+description: "Optimize or review React/Next.js performance, including data fetching, rendering, bundles, and component patterns, using Vercel guidance."
 license: MIT
 ---
 
@@ -61,7 +61,7 @@ Reference these guidelines when:
 
 ### 4. Client-Side Data Fetching (MEDIUM-HIGH)
 
-- `client-swr-dedup` - Use SWR for automatic request deduplication
+- `client-swr-dedup` - Deduplicate through the existing data owner; SWR examples apply to SWR projects
 - `client-event-listeners` - Deduplicate global event listeners
 - `client-passive-event-listeners` - Use passive listeners for scroll
 - `client-localstorage-schema` - Version and minimize localStorage data
@@ -90,11 +90,11 @@ Reference these guidelines when:
 - `rendering-content-visibility` - Use content-visibility for long lists
 - `rendering-hoist-jsx` - Extract static JSX outside components
 - `rendering-svg-precision` - Reduce SVG coordinate precision
-- `rendering-hydration-no-flicker` - Use inline script for client-only data
+- `rendering-hydration-no-flicker` - Keep server output and first client render consistent
 - `rendering-hydration-suppress-warning` - Suppress expected mismatches
 - `rendering-activity` - Use Activity component for show/hide
 - `rendering-conditional-render` - Use ternary, not && for conditionals
-- `rendering-usetransition-loading` - Prefer useTransition for loading state
+- `rendering-usetransition-loading` - React 19 async Actions when no existing request owner supplies pending state
 - `rendering-resource-hints` - Use React DOM resource hints for preloading
 - `rendering-script-defer-async` - Load external scripts without blocking rendering
 
@@ -122,7 +122,7 @@ Reference these guidelines when:
 
 ## How to Use
 
-Read individual rule files for detailed explanations and code examples:
+Read the applicable individual rule before treating a quick-reference summary as a prescription. Preserve the existing framework, data owner, and supported version; use only rules relevant to the observed task. Rule files provide detailed explanations and code examples:
 
 ```
 rules/async-parallel.md

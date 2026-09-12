@@ -61,12 +61,14 @@ R2 Bucket  ── Parquet data files + Iceberg metadata
 
 **Status:** Open beta. Available to all R2 subscribers; verify pricing/billing status in docs.
 
-## Reading Order
+## Choose a Reference
 
-1. [configuration.md](configuration.md) — enable catalog, tokens, maintenance, client connection
-2. [api.md](api.md) — control-plane REST (incl. get-table), PyIceberg client, maintenance
-3. [patterns.md](patterns.md) — PyIceberg + PySpark templates, partitioning, external engines
-4. [gotchas.md](gotchas.md) — auth errors, maintenance behavior, troubleshooting
+Load the file that answers the current task; follow additional references only when needed.
+
+- Setup, bindings, and deployment configuration → [configuration.md](configuration.md)
+- API calls, handlers, and runtime behavior → [api.md](api.md)
+- Implementing a specific integration or use case → [patterns.md](patterns.md)
+- Diagnosing failures and checking relevant limits → [gotchas.md](gotchas.md)
 
 ## See Also
 

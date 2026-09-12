@@ -1,6 +1,6 @@
 ---
 name: animate
-description: Decide whether and how a web interaction should animate, then coordinate its easing, duration, physicality, interruption, and spatial continuity. Use for motion direction across a component or flow, including entrances, exits, gestures, drawers, popovers, morphs, and shared-element transitions. Route CSS or React implementation, measured performance debugging, and reduced-motion design to their focused skills.
+description: "Decide whether and how a web interaction should animate: purpose, timing, physicality, interruption, and spatial continuity. Coordinate motion direction across a component or flow."
 metadata:
   short-description: Design and build web animations that feel right (animations.dev course)
 ---
@@ -94,15 +94,7 @@ Built-in named curves are useful baselines. When they feel flat in context, try
 a stronger custom curve before changing duration. Asymmetric curves with a fast
 start and slow settle often suit responsive entrances.
 
-Curves worth reaching for:
-
-```css
---ease-out-expo:      cubic-bezier(0.19, 1, 0.22, 1);        /* strong ease-out: hovers, reveals */
---ease-out-quad:      cubic-bezier(0.25, 0.46, 0.45, 0.94);  /* button press */
---ease-in-out-cubic:  cubic-bezier(0.645, 0.045, 0.355, 1);  /* on-screen back-and-forth */
---ease-vaul:          cubic-bezier(0.32, 0.72, 0, 1);        /* iOS sheet — extremely steep start */
---ease-drawer-height: cubic-bezier(0.25, 1, 0.5, 1);         /* snappy height change */
-```
+Use the custom-curve examples in [css-animations](../css-animations/SKILL.md) when warranted; preserve existing product tokens first. For adaptive drawer height, `cubic-bezier(0.25, 1, 0.5, 1)` is another starting point.
 
 **Pair entering and exiting elements to the same direction and curve family** so the interaction reads as one coherent space.
 
@@ -146,13 +138,7 @@ momentum, interruptible gestures, and cursor-following. Simple color or opacity
 changes rarely need a spring. CSS can approximate a sampled spring with
 `linear()`, while a runtime spring can react continuously to changed input.
 
-```js
-// Apple / Motion style (easier to reason about) — great for UI text/state swaps
-{ type: "spring", duration: 0.3, bounce: 0 }
-{ type: "spring", duration: 0.5, bounce: 0.2 }
-// Physics form (more control)
-{ type: "spring", stiffness: 100, damping: 10, mass: 0.75 }
-```
+For duration-and-bounce or physics configurations, use [references/framer-motion.md](references/framer-motion.md) and the installed Motion version.
 
 - **Default bounce to 0.** No overshoot keeps UI natural and elegant. Add bounce only intentionally — a slight bounce at the *end of a drag* (a drag applies force); a press-to-close gets none. Bounce is personality: more = playful, zero = serious.
 - **Bounce scales inversely with element size** — smaller elements need *more* bounce to read the same amount.
@@ -198,14 +184,7 @@ Under reduced motion, remove or reduce spatial movement, zooming, parallax, and
 decorative loops. Preserve meaning with an instant change or a restrained
 non-spatial transition such as opacity or color when that helps comprehension.
 
-```css
-@media (prefers-reduced-motion: reduce) {
-  .element { animation: fade 0.2s ease; }
-}
-@media (hover: hover) and (pointer: fine) {
-  .element:hover { transform: scale(1.02); } /* gate hover — touch fires false hovers on tap */
-}
-```
+Use the `animation-accessibility` recipes for reduced-motion variants and touch-safe hover gating.
 
 In Motion for React, `useReducedMotion()` can branch values, and
 `<MotionConfig reducedMotion="user">` disables transform and layout animation

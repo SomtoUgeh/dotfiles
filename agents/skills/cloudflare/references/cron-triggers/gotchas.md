@@ -117,7 +117,7 @@ The local scheduled test route is not automatically deployed. If you add an HTTP
 - Verify idempotency logic with duplicate `scheduledTime` values
 - Test error handling and retry behavior
 
-**Production:** Start with long intervals (`*/30 * * * *`), monitor Cron Events for 24h, set up alerts before reducing interval
+**Production:** Preserve the requested schedule. Choose any staged rollout and observation window from job impact, execution cost, and representative traffic; monitor Cron Events and failures. A 30-minute starting interval or 24-hour wait is not a universal prerequisite.
 
 ## Resources
 

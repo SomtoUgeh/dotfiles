@@ -388,7 +388,13 @@ create_symlink "$AGENTS_DIR/codex/agents" "$HOME/.codex/agents"
 mkdir -p "$HOME/.config/opencode"
 create_symlink "$AGENTS_DIR/opencode/AGENTS.md" "$HOME/.config/opencode/AGENTS.md"
 create_symlink "$AGENTS_DIR/shared/ETHOS.md" "$HOME/.config/opencode/ETHOS.md"
-create_symlink "$AGENTS_DIR/opencode/opencode.jsonc" "$HOME/.config/opencode/opencode.jsonc"
+# Executor setup materializes a host-local config with resolved executable paths.
+# Preserve it (and other custom configs) when reinstalling the dotfiles.
+if [ -f "$HOME/.config/opencode/opencode.jsonc" ] && [ ! -L "$HOME/.config/opencode/opencode.jsonc" ]; then
+    echo "Preserving host-local OpenCode configuration"
+else
+    create_symlink "$AGENTS_DIR/opencode/opencode.jsonc" "$HOME/.config/opencode/opencode.jsonc"
+fi
 create_symlink "$AGENTS_DIR/opencode/agents" "$HOME/.config/opencode/agents"
 create_symlink "$AGENTS_DIR/opencode/commands" "$HOME/.config/opencode/commands"
 create_symlink "$AGENTS_DIR/skills" "$HOME/.config/opencode/skills"
@@ -485,9 +491,68 @@ create_symlink "$DOTFILES_DIR/config/zed/settings.json" "$ZED_CONFIG_DIR/setting
 create_symlink "$DOTFILES_DIR/config/zed/keymap.json" "$ZED_CONFIG_DIR/keymap.json"
 
 # =============================================================================
-# VSCode
+# VSCode + Cursor
 # =============================================================================
+# Both editors share config/vscode/{vscode-settings,vscode-keybindings,extensions}.
+# Cursor is VS Code–compatible; keeping one manifest avoids drift.
 echo ""
+
+install_vscode_compat_extensions() {
+    local cli="$1"
+    local label="$2"
+    local manifest="$DOTFILES_DIR/config/vscode/extensions.txt"
+
+    if [ ! -f "$manifest" ]; then
+        return
+    fi
+    if ! command -v "$cli" &> /dev/null; then
+        echo -e "${YELLOW}$label CLI not on PATH — skipping extension install${NC}"
+        return
+    fi
+
+    echo "Installing $label extensions..."
+    while IFS= read -r ext || [ -n "$ext" ]; do
+        [[ "$ext" =~ ^#.*$ || -z "$ext" ]] && continue
+        echo "  Installing extension: $ext"
+        if "$cli" --install-extension "$ext" --force &> /dev/null; then
+            continue
+        fi
+        # Cursor's marketplace is a subset of VS Code's. Package a local VS Code
+        # copy as a VSIX and install that (folder copies are not picked up).
+        local vscode_ext
+        vscode_ext=$(ls -d "$HOME/.vscode/extensions/${ext}-"* 2>/dev/null | sort -V | tail -1 || true)
+        if [ -n "$vscode_ext" ] && [ -f "$vscode_ext/package.json" ]; then
+            local stage vsix
+            stage=$(mktemp -d)
+            vsix="$stage/package.vsix"
+            mkdir -p "$stage/extension"
+            /bin/cp -R "$vscode_ext/." "$stage/extension/"
+            if [ -f "$stage/extension/.vsixmanifest" ]; then
+                mv "$stage/extension/.vsixmanifest" "$stage/extension.vsixmanifest"
+            fi
+            printf '%s\n' '<?xml version="1.0" encoding="utf-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension=".json" ContentType="application/json"/><Default Extension=".vsixmanifest" ContentType="text/xml"/></Types>' > "$stage/[Content_Types].xml"
+            (cd "$stage" && /usr/bin/zip -qr "$vsix" extension extension.vsixmanifest '[Content_Types].xml')
+            if "$cli" --install-extension "$vsix" --force &> /dev/null; then
+                echo -e "${YELLOW}  Marketplace miss — installed from VS Code copy: $(basename "$vscode_ext")${NC}"
+            else
+                echo -e "${YELLOW}  Failed: $ext${NC}"
+            fi
+            /bin/rm -rf "$stage" "$vsix"
+        else
+            echo -e "${YELLOW}  Failed: $ext${NC}"
+        fi
+    done < "$manifest"
+}
+
+ensure_editor_cli() {
+    # Put the app's CLI on PATH via ~/bin (already on PATH from .zshenv).
+    local app_bin="$1"
+    local name="$2"
+    if [ -x "$app_bin" ]; then
+        mkdir -p "$HOME/bin"
+        create_symlink "$app_bin" "$HOME/bin/$name"
+    fi
+}
 
 VSCODE_CONFIG_DIR="$HOME/Library/Application Support/Code/User"
 # mkdir -p (don't guard on the dir existing): on a fresh machine VSCode hasn't
@@ -498,16 +563,23 @@ if [ -d "/Applications/Visual Studio Code.app" ]; then
     mkdir -p "$VSCODE_CONFIG_DIR"
     create_symlink "$DOTFILES_DIR/config/vscode/vscode-settings.json" "$VSCODE_CONFIG_DIR/settings.json"
     create_symlink "$DOTFILES_DIR/config/vscode/vscode-keybindings.json" "$VSCODE_CONFIG_DIR/keybindings.json"
+    ensure_editor_cli "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" "code"
+    install_vscode_compat_extensions "code" "VSCode"
+fi
 
-    # Install extensions from the manifest (VSCode has no auto-install like Zed,
-    # so themes/icons would silently fall back without this). Needs the `code` CLI.
-    if [ -f "$DOTFILES_DIR/config/vscode/extensions.txt" ] && command -v code &> /dev/null; then
-        echo "Installing VSCode extensions..."
-        while IFS= read -r ext || [ -n "$ext" ]; do
-            [[ "$ext" =~ ^#.*$ || -z "$ext" ]] && continue
-            echo "  Installing extension: $ext"
-            code --install-extension "$ext" --force &> /dev/null || echo -e "${YELLOW}  Failed: $ext${NC}"
-        done < "$DOTFILES_DIR/config/vscode/extensions.txt"
+CURSOR_CONFIG_DIR="$HOME/Library/Application Support/Cursor/User"
+if [ -d "/Applications/Cursor.app" ]; then
+    echo "Setting up Cursor configuration..."
+    mkdir -p "$CURSOR_CONFIG_DIR"
+    create_symlink "$DOTFILES_DIR/config/vscode/vscode-settings.json" "$CURSOR_CONFIG_DIR/settings.json"
+    create_symlink "$DOTFILES_DIR/config/vscode/vscode-keybindings.json" "$CURSOR_CONFIG_DIR/keybindings.json"
+    ensure_editor_cli "/Applications/Cursor.app/Contents/Resources/app/bin/cursor" "cursor"
+    # Prefer the freshly linked ~/bin/cursor; fall back to the app bundle path.
+    if command -v cursor &> /dev/null; then
+        install_vscode_compat_extensions "cursor" "Cursor"
+    elif [ -x "/Applications/Cursor.app/Contents/Resources/app/bin/cursor" ]; then
+        PATH="/Applications/Cursor.app/Contents/Resources/app/bin:$PATH" \
+            install_vscode_compat_extensions "cursor" "Cursor"
     fi
 fi
 

@@ -78,15 +78,14 @@ curl "http://localhost:8787/cdn-cgi/local/scheduled?cron=*/5+*+*+*+*"
 - **Propagation:** 15min global deployment
 - **Timezone:** UTC only
 
-## Reading Order
+## Choose a Reference
 
-**New to cron triggers?** Start here:
-1. This README - Overview and quick start
-2. [configuration.md](./configuration.md) - Set up your first cron trigger
-3. [api.md](./api.md) - Understand the handler API
-4. [patterns.md](./patterns.md) - Common use cases and examples
+Load the file that answers the current task; follow additional references only when needed.
 
-**Troubleshooting?** Jump to [gotchas.md](./gotchas.md)
+- Setup, bindings, and deployment configuration → [configuration.md](configuration.md)
+- API calls, handlers, and runtime behavior → [api.md](api.md)
+- Implementing a specific integration or use case → [patterns.md](patterns.md)
+- Diagnosing failures and checking relevant limits → [gotchas.md](gotchas.md)
 
 ## In This Reference
 - [configuration.md](./configuration.md) - wrangler config, env-specific schedules, Green Compute

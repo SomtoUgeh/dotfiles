@@ -190,7 +190,29 @@ alias yolo="claude --dangerously-skip-permissions"
 alias yolo-tg="claude --dangerously-skip-permissions --channels plugin:telegram@claude-plugins-official"
 
 # AltSchool VM
-alias altschool-up="pgrep -f '^ssh .*altschool-tunnel$' >/dev/null || command ssh -fN altschool-tunnel"
+unalias altschool-up 2>/dev/null
+typeset -g _executor_login_script="${${(%):-%x}:A:h}/../scripts/executor_cloud_login.py"
+function executor-cloud-login() {
+  command uv run --script "$_executor_login_script" "$@"
+}
+
+function altschool-up() {
+  if [[ $# -gt 1 || ( $# -eq 1 && "$1" != --ssh ) ]]; then
+    print -u2 'Usage: altschool-up [--ssh]'
+    return 2
+  fi
+  command ssh -o ConnectTimeout=15 -o ClearAllForwardings=yes altschool true || return
+  if ! pgrep -f '^ssh .*altschool-tunnel$' >/dev/null; then
+    command ssh -o ExitOnForwardFailure=yes -fN altschool-tunnel || return
+  fi
+  executor-cloud-login altschool --check-local || return
+  print 'AltSchool is ready.'
+  if [[ "$1" == --ssh ]]; then
+    ssh altschool
+    return $?
+  fi
+  return 0
+}
 
 # ============================================================================
 # FUNCTIONS

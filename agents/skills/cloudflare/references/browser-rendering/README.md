@@ -43,28 +43,14 @@
 
 Account defaults and usage charges: [current limits](https://developers.cloudflare.com/browser-run/limits/) and [pricing](https://developers.cloudflare.com/browser-run/pricing/).
 
-## Reading Order
+## Choose a Reference
 
-**New to Browser Rendering:**
-1. [configuration.md](configuration.md) - Setup and deployment
-2. [patterns.md](patterns.md) - Common use cases with examples
-3. [api.md](api.md) - API reference
-4. [gotchas.md](gotchas.md) - Avoid common pitfalls
+Load the file that answers the current task; follow additional references only when needed.
 
-**Specific task:**
-- **Setup/deployment** → [configuration.md](configuration.md)
-- **API reference/endpoints** → [api.md](api.md)
-- **Example code/patterns** → [patterns.md](patterns.md)
-- **Debugging/troubleshooting** → [gotchas.md](gotchas.md)
-
-**REST API users:**
-- Start with [api.md](api.md) REST API section
-- Check [gotchas.md](gotchas.md) for rate limits
-
-**Workers users:**
-- Start with [configuration.md](configuration.md)
-- Review [patterns.md](patterns.md) for session management
-- Reference [api.md](api.md) for Workers Bindings
+- Setup, bindings, and deployment configuration → [configuration.md](configuration.md)
+- API calls, handlers, and runtime behavior → [api.md](api.md)
+- Implementing a specific integration or use case → [patterns.md](patterns.md)
+- Diagnosing failures and checking relevant limits → [gotchas.md](gotchas.md)
 
 ## In This Reference
 

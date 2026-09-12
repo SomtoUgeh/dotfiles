@@ -78,12 +78,14 @@ These are non-obvious and prevent most failures — see [gotchas.md](gotchas.md)
 - **Schema validation is deferred** — invalid events are accepted then silently dropped. Monitor via GraphQL error metrics.
 - **Binding field renamed `pipeline` → `stream`** (June 2026); old field still accepted.
 
-## Reading Order
+## Choose a Reference
 
-1. [configuration.md](configuration.md) — schema, streams, sinks, pipelines (CLI + REST + Terraform), bindings
-2. [api.md](api.md) — `send()`, HTTP ingest, REST API, pipeline SQL, lifecycle states
-3. [patterns.md](patterns.md) — fire-and-forget, validation, Logpush, observability, end-to-end
-4. [gotchas.md](gotchas.md) — silent drops, immutability, REST≠CLI field names
+Load the file that answers the current task; follow additional references only when needed.
+
+- Setup, bindings, and deployment configuration → [configuration.md](configuration.md)
+- API calls, handlers, and runtime behavior → [api.md](api.md)
+- Implementing a specific integration or use case → [patterns.md](patterns.md)
+- Diagnosing failures and checking relevant limits → [gotchas.md](gotchas.md)
 
 ## See Also
 

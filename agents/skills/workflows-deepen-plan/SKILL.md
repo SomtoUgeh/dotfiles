@@ -1,6 +1,6 @@
 ---
 name: workflows-deepen-plan
-description: Deepen an existing implementation plan with targeted repository research, relevant current documentation, and bounded specialist review. Use when the user asks to strengthen or research a plan before implementation.
+description: "Strengthen an existing implementation plan with targeted repository research, current documentation, and bounded specialist review before implementation."
 ---
 
 # Deepen a Plan

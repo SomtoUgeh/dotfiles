@@ -8,11 +8,15 @@ Bindings are how Workers access Cloudflare resources (storage, compute, services
 
 ## Reading Order
 
-1. **This file** - Binding catalog and selection guide
-2. **[api.md](api.md)** - TypeScript types and env access patterns
-3. **[configuration.md](configuration.md)** - Complete wrangler.jsonc examples
-4. **[patterns.md](patterns.md)** - Best practices and common patterns
-5. **[gotchas.md](gotchas.md)** - Critical pitfalls and troubleshooting
+Load the reference for the current task:
+
+- Select a binding: use the catalog below.
+- Add or change a binding: [configuration.md](configuration.md).
+- Access bindings or generate types: [api.md](api.md).
+- Design service calls, tests, or storage access: [patterns.md](patterns.md).
+- Diagnose a failure: [gotchas.md](gotchas.md).
+
+Follow product-specific links only for the selected binding.
 
 ## Binding Catalog
 

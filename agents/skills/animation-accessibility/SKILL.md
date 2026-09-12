@@ -1,6 +1,6 @@
 ---
 name: animation-accessibility
-description: Design and verify reduced-motion behavior for web interfaces. Use when adding or reviewing `prefers-reduced-motion`, replacing spatial motion with a safer state change, handling autoplaying or looping media, smooth scrolling, or configuring framework hooks such as `useReducedMotion` and `MotionConfig`.
+description: "Design or verify reduced-motion behavior for web animation, autoplay, loops, and smooth scrolling, including prefers-reduced-motion and framework motion settings."
 metadata:
   short-description: Ship animations that respect reduced motion (animations.dev course)
 ---

@@ -1,6 +1,6 @@
 ---
 name: imagegen-frontend-web
-description: Generate coherent, implementation-ready visual references for a website or web page. Use when the user explicitly asks for frontend comps, section images, or image-first art direction without code implementation.
+description: "Generate website/page visual references when the user requests frontend comps, section images, or image-first art direction without code implementation."
 ---
 
 # Frontend Reference Image Generation

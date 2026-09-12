@@ -109,20 +109,14 @@ curl -H "Authorization: Bearer $TOKEN" \
 # Observe cf-placement inside the Worker, then use wrangler tail.
 ```
 
-## Reading Order
+## Choose a Reference
 
-**First time?** Start here:
-1. This README - understand core concepts and when to use Smart Placement
-2. [configuration.md](./configuration.md) - set up wrangler.jsonc and understand limitations
-3. [patterns.md](./patterns.md) - see practical examples for your use case
-4. [api.md](./api.md) - monitor and verify Smart Placement is working
-5. [gotchas.md](./gotchas.md) - troubleshoot common issues
+Load the file that answers the current task; follow additional references only when needed.
 
-**Quick lookup:**
-- "Should I enable Smart Placement?" → See "When to Use" above
-- "How do I configure it?" → [configuration.md](./configuration.md)
-- "How do I split frontend/backend?" → [patterns.md](./patterns.md)
-- "Why isn't it working?" → [gotchas.md](./gotchas.md)
+- Setup, bindings, and deployment configuration → [configuration.md](configuration.md)
+- API calls, handlers, and runtime behavior → [api.md](api.md)
+- Implementing a specific integration or use case → [patterns.md](patterns.md)
+- Diagnosing failures and checking relevant limits → [gotchas.md](gotchas.md)
 
 ## In This Reference
 

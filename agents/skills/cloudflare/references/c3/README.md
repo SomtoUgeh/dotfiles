@@ -15,30 +15,15 @@ npm create cloudflare@latest my-api -- --type=hello-world --lang=ts
 npm create cloudflare@latest my-site -- --framework=astro --platform=pages
 ```
 
-## Platform Decision Tree
+## Platform Selection
 
-```
-What are you building?
+- New API, WebSocket, scheduled, or email Worker: use Workers (C3 default).
+- New static or full-stack site: check the framework's supported Workers setup, including Static Assets. Use Pages when the user or existing deployment targets Pages and the framework supports it; specify `--platform=pages`.
+- Git builds and branch previews alone do not require Pages: [Workers Builds](https://developers.cloudflare.com/workers/ci-cd/builds/) also supports Git integration.
+- Download a deployed Worker into a new local directory: use `--existing-script=my-existing-worker`. This downloads deployed code; it does not convert local source.
+- Adapt an existing local app: inspect its current framework/configuration and use the matching [Workers framework guide](https://developers.cloudflare.com/workers/framework-guides/). Do not scaffold over an existing application as a generic migration step.
 
-├─ API / WebSocket / Cron / Email handler
-│   └─ Workers (default) - no --platform flag needed
-│       npm create cloudflare@latest my-api -- --type=hello-world
-
-├─ Static site / SSG / Documentation
-│   └─ Pages - requires --platform=pages
-│       npm create cloudflare@latest my-site -- --framework=astro --platform=pages
-
-├─ Full-stack app (Next.js/Remix/SvelteKit)
-│   ├─ Need Durable Objects, Queues, or Workers-only features?
-│   │   └─ Workers (default)
-│   └─ Otherwise use Pages for git integration and branch previews
-│       └─ Add --platform=pages
-
-└─ Convert existing project
-    └─ npm create cloudflare@latest . -- --type=pre-existing --existing-script=my-existing-worker
-```
-
-**Critical:** Pages projects require `--platform=pages` flag. Without it, C3 defaults to Workers.
+Verify flags against the selected C3 version's help. See [C3 documentation](https://developers.cloudflare.com/pages/get-started/c3/) for platform selection and deployed-script cloning.
 
 ## Interactive Flow
 
@@ -84,9 +69,11 @@ pnpm create cloudflare@latest
 | Understand generated files | configuration |
 | Full CLI reference | api |
 | Create custom template | patterns → configuration |
-| Convert existing project | README → patterns |
+| Download deployed Worker or adapt local app | Platform Selection above → patterns |
 
 ## Post-Creation
+
+Inspect generated package scripts; the commands below illustrate a Worker project and vary by framework.
 
 ```bash
 cd my-app
@@ -109,5 +96,3 @@ npm run deploy
 - **wrangler/README.md** - Wrangler CLI beyond initial setup
 - **d1/README.md** - SQLite database
 - **r2/README.md** - Object storage
-
-`--existing-script` downloads a deployed Worker; it does not convert local source or migrate an existing framework app. For an existing app, follow its current Workers framework guide. Workers Static Assets also support static sites, and Workers Builds supports Git workflows; Pages is an explicit framework-dependent choice. Inspect generated package scripts instead of assuming every framework uses the same names.

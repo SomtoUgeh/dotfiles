@@ -247,6 +247,10 @@
 	"typescript.updateImportsOnFileMove.enabled": "always",
 	"window.clickThroughInactive": false,
 	"window.closeWhenEmpty": true,
+	"window.autoDetectColorScheme": true,
+	"remote.SSH.remotePlatform": {
+		"altschool": "linux"
+	},
 	"window.nativeTabs": true,
 	"window.openFilesInNewWindow": "off",
 	"window.restoreFullscreen": true,
@@ -297,4 +301,5 @@
 		"https://developer.microsoft.com/json-schemas/": true,
 		"https://biomejs.dev": true,
 	},
+	"todo-tree.ripgrep.ripgrep": "/opt/homebrew/bin/rg",
 }

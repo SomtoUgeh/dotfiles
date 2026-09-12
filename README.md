@@ -57,7 +57,8 @@ The install script creates this folder layout:
 - Custom aliases and functions
 
 ### Editors
-- **VS Code** (primary) - settings, keybindings and extension list tracked
+- **VS Code** - settings, keybindings and extension list tracked
+- **Cursor** - same settings/keybindings/extensions as VS Code; `cursor` CLI linked into `~/bin`
 - **Zed** - fast native editor; extensions auto-install on first launch
 
 ### Terminal
@@ -100,7 +101,7 @@ dotfiles/
 │   ├── .gitignore_global
 │   └── SIGNING.md          # two-identity SSH signing setup
 ├── config/
-│   ├── vscode/             # settings, keybindings, extensions.txt
+│   ├── vscode/             # shared VS Code + Cursor settings/keybindings/extensions
 │   ├── zed/                # settings and keymap
 │   ├── ghostty/            # Ghostty terminal config
 │   ├── cmux/               # cmux terminal config

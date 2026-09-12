@@ -1,6 +1,6 @@
 ---
 name: brandkit
-description: Create a premium brand-kit image or identity-system board from a brand brief or references. Use for logo systems, brand-guideline boards, identity decks, visual-world presentations, and art-directed brand applications. Do not use for a single unrelated illustration or for implementing a brand in code.
+description: "Create a brand-kit image or identity-system board from a brief or references: logos, guidelines, identity decks, and brand applications. Use for visual identity deliverables."
 ---
 
 # Brand-kit image generation

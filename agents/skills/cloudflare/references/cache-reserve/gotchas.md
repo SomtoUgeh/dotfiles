@@ -92,7 +92,7 @@ Asset not caching in Cache Reserve?
    → Yes: Continue to step 2
 
 2. Is Tiered Cache enabled?
-   → No: Enable Tiered Cache to reduce storage operations
+   → No: Evaluate enabling Tiered Cache to reduce storage operations; continue checking asset eligibility
    → Yes: Continue to step 3
 
 3. Does asset have TTL ≥ 10 hours?

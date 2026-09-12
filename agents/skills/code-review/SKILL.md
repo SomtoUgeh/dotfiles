@@ -1,11 +1,6 @@
 ---
 name: code-review
-description: >
-  Code review in three modes: closeout (ship/commit gate, default), axes
-  (Standards + Spec in parallel), or hand-off to exhaustive workflows-review.
-  Use when reviewing a branch, PR, uncommitted work, "is this ready",
-  autoreview, second-model review, or "review since X". Also covers
-  pre-commit structured review contracts from openclaw-style closeout.
+description: "Review a PR, branch, uncommitted change, or work since a revision. Use closeout for ship/commit gates, axes for standards versus spec, and workflows-review for exhaustive review."
 ---
 
 # Code review

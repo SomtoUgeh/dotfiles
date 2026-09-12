@@ -1,6 +1,6 @@
 ---
 name: animation-vocabulary
-description: Reverse-lookup glossary that turns a vague description of a web animation or motion effect into its exact term ("the bouncy thing when a popover opens" → Pop in; "the iOS rubber-band scroll" → Rubber-banding; "one shape turning into another" → Morph). Use when the user asks "what's it called when…", or describes a motion effect without knowing its name and wants the right word to prompt an AI or designer with. For naming an effect, not designing or building one. Terms are drawn from the Animations on the Web course (animations.dev).
+description: "Name a web animation effect from a loose description, such as a bouncing popover or shape morph. Use for terminology questions, not implementation."
 metadata:
   short-description: Name a web animation effect from a loose description
 ---

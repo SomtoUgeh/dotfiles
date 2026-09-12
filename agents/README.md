@@ -1,6 +1,6 @@
 # Agents
 
-Agent configuration for Claude Code, Codex, OpenCode, and Grok.
+Agent configuration for Claude Code, Codex, OpenCode, Grok Build, and Cursor.
 
 ## Layout
 
@@ -10,11 +10,27 @@ Agent configuration for Claude Code, Codex, OpenCode, and Grok.
   agents. `CLAUDE.md` symlinks to shared instructions.
 - `codex/`: Codex instructions, config, and TOML agents.
 - `opencode/`: OpenCode instructions, config, commands, and agents.
+- `executor/`: local shared MCP gateway setup, migration, verification, and recovery.
 - `skills/`: shared `SKILL.md` packages exposed at `~/.agents/skills`.
 
 Each tool folder owns real files in that tool's format, except shared
 instruction symlinks. Keep shared scripts and server inventory in `shared/`; do
 not put tool-specific syntax there.
+
+## Shared MCP gateway
+
+[Executor setup and operations](executor/README.md) documents the opt-in local
+MCP gateway for Codex, Claude Code, Grok Build, and Cursor. Run
+`uv run --script scripts/setup_executor.py --check` to preview client setup
+after installing Executor. The script preserves unrelated settings and writes
+private backups. Migration of verified direct Codex connections is a separate
+explicit option; fresh machines and the VM keep their existing direct defaults.
+
+Executor owns integration connections and tool policies. Shared skills, hooks,
+plugins, and app-specific tools still belong to their existing owners. The
+`shared/mcp.json` file is an inventory, not an automatically imported runtime
+catalog. `claude/mcp.json` is empty: Exa is supplied by Executor. The duplicate
+Context7 plugins and Codex Granola plugin are disabled in favor of the gateway.
 
 ## Shared Skills
 
@@ -23,8 +39,8 @@ not put tool-specific syntax there.
 Cloudflare guidance comes only from this shared library. Do not also install
 the Cloudflare skill plugin in individual tools. `agents-sdk` covers agent
 building and MCP servers; `sandbox-stable`, `sandbox-next`, and the migration
-skill cover the Sandbox SDK. The direct Cloudflare MCP connection is configured
-separately and does not require the skill plugin.
+skill cover the Sandbox SDK. The Cloudflare MCP connection is configured through Executor on migrated
+local setups and directly elsewhere; neither requires the skill plugin.
 
 Keep one default owner for overlapping skills:
 
@@ -65,6 +81,23 @@ The installer links it to:
 Model versions belong in each tool's configuration. Shared instructions and
 skills use the selected model and describe roles and required capabilities.
 See [runtime equivalents](skills/RUNTIME_TOOLS.md) for tool-specific mappings.
+
+## Shared specialist prompts
+
+`shared/roles/` owns specialist descriptions and review standards. Each role has
+a Markdown source, with `_common.md` supplying the shared scope and evidence
+rules. Native files keep their model, tool, and permission settings; the prompt
+body and description are generated copies. Grok uses its existing discovery
+paths rather than a separate set of review standards.
+
+After editing shared role prompts, run `uv run --script scripts/sync_agent_roles.py`
+from the repository root. `--check` reports drift without writing. This command
+updates only tracked native role files; it does not change host-local config.
+The setup tests verify parity and preservation of native settings. No extra
+runtime read of the canonical source is needed because native prompts contain
+the generated text.
+
+## Host-local configuration
 
 Codex config stays host-local. `uv run --script scripts/sync_agent_config.py`
 (from the repository root) adds missing template defaults while preserving

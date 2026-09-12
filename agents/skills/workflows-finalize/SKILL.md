@@ -1,6 +1,6 @@
 ---
 name: workflows-finalize
-description: Review, fix, simplify, and validate an implemented change for ship readiness. Use when the user asks to finalize, harden, or make code shippable; do not publish, push, open a PR, merge, or deploy unless separately authorized.
+description: "Review, fix, simplify, and validate implemented code for ship readiness when asked to finalize or harden it. Publishing and other external actions require authorization."
 ---
 
 # Finalize

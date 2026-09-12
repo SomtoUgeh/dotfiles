@@ -1,6 +1,6 @@
 ---
 name: prisma-postgres
-description: Prisma Postgres setup and operations guidance across Console, create-db CLI, Management API, and Management API SDK. Use when creating Prisma Postgres databases, working in Prisma Console, provisioning with create-db/create-pg/create-postgres, or integrating programmatic provisioning with service tokens or OAuth.
+description: "Provision or operate hosted Prisma Postgres through Console, create-db CLI, Management API, or its SDK, including programmatic provisioning and authentication."
 license: MIT
 metadata:
   author: prisma

@@ -1,6 +1,6 @@
 ---
 name: agents-sdk
-description: Build AI agents on Cloudflare Workers using the Agents SDK. Load when creating stateful agents, durable workflows, real-time WebSocket apps, scheduled tasks, MCP servers, chat applications, voice agents, or browser automation. Covers Agent class, state management, callable RPC, Workflows, durable execution, queues, retries, observability, and React hooks. Biases towards retrieval from Cloudflare docs over pre-trained knowledge.
+description: "Explain, build, or debug Cloudflare Agents SDK applications: stateful agents, chat, MCP, scheduling, workflows, voice, and browser tools on Workers."
 ---
 
 # Cloudflare Agents SDK
@@ -70,13 +70,15 @@ The Agents SDK provides:
 - **Browser tools** (experimental) — CDP-powered browsing via `agents/browser`
 - **Think** (experimental) — Higher-level chat agent via `@cloudflare/think`
 
-## FIRST: Verify Installation
+## Check the project before implementation
 
-```bash
-npm ls agents  # Should show agents package
-```
+Inspect the manifest, lockfile, installed version, and existing package manager.
+For documentation questions or reviews, use these and the matching official docs
+without installing dependencies. Install missing packages only as part of
+authorized implementation; use the repository's package manager and version policy.
+The npm commands below are examples for npm projects.
 
-If not installed:
+For a project that needs the SDK:
 ```bash
 npm install agents
 ```

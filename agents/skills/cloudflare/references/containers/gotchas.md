@@ -38,20 +38,9 @@ return container.fetch(request);
 
 Call `this.renewActivityTimeout()` when appropriate. Writing arbitrary Durable Object storage does not renew container activity. Use a bounded job lifetime and clear renewal timers; long work that must survive request termination needs durable orchestration.
 
-### ⚠️ blockConcurrencyWhile for Startup
+### Startup across restarts
 
-**Problem:** Race conditions during initialization
-
-**Fix:** Use `blockConcurrencyWhile` for atomic initialization
-
-```typescript
-await this.ctx.blockConcurrencyWhile(async () => {
-  if (!this.initialized) {
-    await this.startAndWaitForPorts();
-    this.initialized = true;
-  }
-});
-```
+The SDK coordinates startup and readiness for `fetch()` and `containerFetch()`. Use `startAndWaitForPorts()` for explicit prewarming or direct port access; do not cache readiness in a permanent `initialized` boolean because the container can stop while its Durable Object remains alive. Reserve `blockConcurrencyWhile` for application state initialization that actually needs serialization. See the [Container interface](https://developers.cloudflare.com/containers/reference/container-class/#start-and-stop).
 
 ### ⚠️ Lifecycle Hooks Block Requests
 

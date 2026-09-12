@@ -7,7 +7,7 @@ tags: client, swr, event-listeners, subscription
 
 ## Deduplicate Global Event Listeners
 
-Use `useSWRSubscription()` to share global event listeners across component instances.
+When duplicate listeners cause a measured problem, reuse the application’s existing subscription mechanism. In a project already using SWR, `useSWRSubscription()` can share global event listeners across component instances. Do not introduce SWR solely to follow this example.
 
 **Incorrect (N instances = N listeners):**
 

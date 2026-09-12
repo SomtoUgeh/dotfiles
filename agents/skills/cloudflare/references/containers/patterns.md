@@ -12,8 +12,7 @@ export default {
   async fetch(request: Request, env: Env) {
     const sessionId = await authenticatedSessionId(request, env) // Application verifies the session; do not trust a raw header;
     const container = env.SESSION_BACKEND.getByName(sessionId);
-    await container.startAndWaitForPorts();
-    return container.fetch(request);
+    return container.fetch(request); // SDK starts the container and waits for readiness.
   }
 };
 ```
@@ -28,8 +27,7 @@ import { getRandom } from "@cloudflare/containers";
 export default {
   async fetch(request: Request, env: Env) {
     const container = await getRandom(env.STATELESS_API, 3); // import getRandom from @cloudflare/containers
-    await container.startAndWaitForPorts();
-    return container.fetch(request);
+    return container.fetch(request); // SDK starts the container and waits for readiness.
   }
 };
 ```
@@ -42,8 +40,7 @@ export default {
 export default {
   async fetch(request: Request, env: Env) {
     const container = env.GLOBAL_SERVICE.getByName("singleton");
-    await container.startAndWaitForPorts();
-    return container.fetch(request);
+    return container.fetch(request); // SDK starts the container and waits for readiness.
   }
 };
 ```
@@ -58,8 +55,6 @@ export default {
     if (request.headers.get("Upgrade") === "websocket") {
       const sessionId = await authenticatedSessionId(request, env) // Application verifies the session; do not trust a raw header;
       const container = env.WS_BACKEND.getByName(sessionId);
-      await container.startAndWaitForPorts();
-      
       // ⚠️ MUST use fetch(), not containerFetch()
       return container.fetch(request);
     }
@@ -141,8 +136,6 @@ export default {
           throw new Error("Invalid job payload");
         }
         const container = env.PROCESSOR.getByName(msg.body.jobId);
-        await container.startAndWaitForPorts();
-        
         const response = await container.fetch("http://container/process", {
           method: "POST",
           body: JSON.stringify(msg.body)

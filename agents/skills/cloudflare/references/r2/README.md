@@ -63,15 +63,14 @@ Configure the consuming Worker separately:
 
 R2 publishes events directly; no producer binding is required. Validate each message against the [event notification schema](https://developers.cloudflare.com/r2/buckets/event-notifications/) and make processing idempotent. Object creation includes `PutObject`, `CopyObject`, and `CompleteMultipartUpload`; do not handle only `PutObject` when all uploads matter.
 
-## Reading Order
+## Choose a Reference
 
-**First-time users:** README → configuration.md → api.md → patterns.md
-**Specific tasks:**
-- Setup: configuration.md
-- Client uploads: patterns.md (presigned URLs)
-- Public static site: patterns.md (public access + custom domain)
-- Processing uploads: README (event notifications) + queues reference
-- Debugging: gotchas.md
+Load the file that answers the current task; follow additional references only when needed.
+
+- Setup, bindings, and deployment configuration → [configuration.md](configuration.md)
+- API calls, handlers, and runtime behavior → [api.md](api.md)
+- Implementing a specific integration or use case → [patterns.md](patterns.md)
+- Diagnosing failures and checking relevant limits → [gotchas.md](gotchas.md)
 
 ## In This Reference
 

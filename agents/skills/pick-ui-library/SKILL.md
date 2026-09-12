@@ -1,6 +1,6 @@
 ---
 name: pick-ui-library
-description: Picks the tool for a UI or motion task from the set the "Animations on the Web" course (animations.dev) actually uses and trusts, instead of hand-rolling a toast or installing whatever is trending. Use when choosing between CSS, WAAPI, Motion, GSAP and React Spring for an animation; when a task needs a dropdown, navigation menu, dialog, tooltip, tabs, select, toast or drawer; or when weighing a third-party dependency against building it yourself. Triggers on — which library, what should I use, install, add a dependency, package, bundle size, headless, unstyled primitives, accessible dropdown, focus management, Radix, Base UI, React Aria, Sonner, toast, Vaul, drawer, sheet, Framer Motion, motion/react, GSAP, React Spring, WAAPI, Web Animations API, AnimatePresence, layoutId, shared layout, Intersection Observer, View Transitions.
+description: "Choose a UI primitive or animation library, or assess build-versus-dependency tradeoffs. Use when library selection is unresolved; preserve suitable existing dependencies."
 metadata:
   short-description: Pick the animation or UI library the animations.dev course trusts
 ---

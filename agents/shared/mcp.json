@@ -1,5 +1,15 @@
 {
   "servers": {
+    "executor": {
+      "type": "stdio",
+      "command": "executor",
+      "args": [
+        "mcp",
+        "--elicitation-mode",
+        "browser",
+        "--no-artifacts"
+      ]
+    },
     "figma-remote-mcp": {
       "type": "http",
       "url": "https://mcp.figma.com/mcp"
@@ -10,14 +20,7 @@
     },
     "exa": {
       "type": "http",
-      "url": "https://mcp.exa.ai/mcp",
-      "tools": [
-        "get_code_context_exa",
-        "web_search_exa",
-        "web_search_advanced_exa",
-        "deep_researcher_start",
-        "deep_researcher_check"
-      ]
+      "url": "https://mcp.exa.ai/mcp"
     }
   }
 }

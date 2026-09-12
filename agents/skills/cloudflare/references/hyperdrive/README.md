@@ -62,13 +62,14 @@ export default {
 | **postgres.js** | Advanced features, template literals, streaming | Lighter than pg, `prepare: true` is default |
 | **mysql2** | MySQL/MariaDB/PlanetScale | MySQL only, less mature support |
 
-## Reading Order
+## Choose a Reference
 
-| New to Hyperdrive | Implementing | Troubleshooting |
-|-------------------|--------------|-----------------|
-| 1. README (this) | 1. [configuration.md](./configuration.md) | 1. [gotchas.md](./gotchas.md) |
-| 2. [configuration.md](./configuration.md) | 2. [api.md](./api.md) | 2. [patterns.md](./patterns.md) |
-| 3. [api.md](./api.md) | 3. [patterns.md](./patterns.md) | 3. [api.md](./api.md) |
+Load the file that answers the current task; follow additional references only when needed.
+
+- Setup, bindings, and deployment configuration → [configuration.md](configuration.md)
+- API calls, handlers, and runtime behavior → [api.md](api.md)
+- Implementing a specific integration or use case → [patterns.md](patterns.md)
+- Diagnosing failures and checking relevant limits → [gotchas.md](gotchas.md)
 
 ## In This Reference
 - [configuration.md](./configuration.md) - Setup, wrangler config, Smart Placement

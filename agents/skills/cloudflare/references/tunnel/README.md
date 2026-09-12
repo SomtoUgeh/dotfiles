@@ -97,22 +97,15 @@ ingress:
   - service: http_status:404
 ```
 
-## Reading Order
+## Choose a Reference
 
-**New to Cloudflare Tunnel:**
-1. This README (overview, quick start)
-2. [networking.md](./networking.md) - Firewall rules, connectivity pre-checks
-3. [configuration.md](./configuration.md) - Config file options, ingress rules
-4. [patterns.md](./patterns.md) - Docker, Kubernetes, production deployment
-5. [gotchas.md](./gotchas.md) - Troubleshooting, best practices
+Load the file that answers the current task; follow additional references only when needed.
 
-**Enterprise deployment:**
-1. [networking.md](./networking.md) - Corporate firewall requirements
-2. [gotchas.md](./gotchas.md) - HA setup, security best practices
-3. [patterns.md](./patterns.md) - Kubernetes, rolling updates
-
-**Programmatic control:**
-1. [api.md](./api.md) - REST API, TypeScript SDK
+- Firewall rules and connectivity → [networking.md](networking.md)
+- Setup, bindings, and deployment configuration → [configuration.md](configuration.md)
+- API calls, handlers, and runtime behavior → [api.md](api.md)
+- Implementing a specific integration or use case → [patterns.md](patterns.md)
+- Diagnosing failures and checking relevant limits → [gotchas.md](gotchas.md)
 
 ## In This Reference
 

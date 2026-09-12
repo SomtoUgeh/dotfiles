@@ -1,6 +1,6 @@
 ---
 name: motion-react
-description: Build animations with Motion for React (`motion/react`, formerly Framer Motion) the way the "Animations on the Web" course (animations.dev) teaches — and debug them when the magic misfires. Use when writing motion components, exit animations, layout or shared-element morphs, springs, motion values, or drag gestures; when deciding whether a job needs the library at all; or when an exit animation won't play, a morph distorts its border radius, a direction-aware slide points the wrong way, or an auto height jumps. Triggers on — motion/react, framer-motion, motion.div, initial animate exit, AnimatePresence, popLayout, mode wait, layout animation, layoutId, shared element transition, variants, custom prop, MotionConfig, useMotionValue, useSpring, useTransform, useMotionTemplate, useInView, useReducedMotion, useAnimate, useMeasure, animate height auto, drag, dragConstraints, dragMomentum, whileTap, spring bounce, stiffness, damping.
+description: "Build or debug Motion for React (motion/react, formerly Framer Motion): exits, layout/shared-element transitions, springs, motion values, height changes, and drag gestures."
 metadata:
   short-description: Build and debug Motion for React animations (animations.dev)
 ---

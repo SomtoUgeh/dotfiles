@@ -1,6 +1,6 @@
 ---
 name: blog-post-writer
-description: Transform brain dumps into polished blog posts in Nick Nisi's voice. Use when the user wants to write a blog post with scattered ideas, talking points, and conclusions that need organization into a cohesive narrative with Nick's conversational, authentic, and thoughtful tone.
+description: "Turn scattered ideas into a cohesive blog post in Nick Nisi's conversational, thoughtful voice."
 ---
 
 # Nick Nisi Blog Writer

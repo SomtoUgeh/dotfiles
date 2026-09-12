@@ -68,19 +68,14 @@ See [gotchas.md](./gotchas.md) for detailed solutions.
 - 5,000 msgs/second per queue
 - Paid retention configurable up to 14 days; Free retention is 24 hours
 
-## Reading Order
+## Choose a Reference
 
-**New to Queues?** Start here:
-1. [configuration.md](./configuration.md) - Set up queues, bindings, consumers
-2. [api.md](./api.md) - Send messages, handle batches, ack/retry patterns
-3. [patterns.md](./patterns.md) - Real-world examples and integrations
-4. [gotchas.md](./gotchas.md) - Critical warnings and troubleshooting
+Load the file that answers the current task; follow additional references only when needed.
 
-**Task-based routing:**
-- Setup queue → [configuration.md](./configuration.md)
-- Send/receive messages → [api.md](./api.md)
-- Implement specific pattern → [patterns.md](./patterns.md)
-- Debug/troubleshoot → [gotchas.md](./gotchas.md)
+- Setup, bindings, and deployment configuration → [configuration.md](configuration.md)
+- API calls, handlers, and runtime behavior → [api.md](api.md)
+- Implementing a specific integration or use case → [patterns.md](patterns.md)
+- Diagnosing failures and checking relevant limits → [gotchas.md](gotchas.md)
 
 ## In This Reference
 

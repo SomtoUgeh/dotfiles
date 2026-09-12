@@ -1,6 +1,6 @@
 ---
 name: web-perf
-description: Measure and diagnose web page performance using an available browser trace or profiling tool. Use for page-load, responsiveness, Core Web Vitals, Lighthouse, or network-performance investigations; report only metrics actually observed.
+description: "Measure and diagnose page load, responsiveness, Core Web Vitals, Lighthouse, or network performance using browser traces and observed metrics."
 ---
 
 # Web Performance Audit

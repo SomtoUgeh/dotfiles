@@ -1,6 +1,6 @@
 ---
 name: file-todos
-description: Create, triage, update, and complete the repository's markdown todo files. Use for the file-based `todos/` queue, its schema, dependencies, work logs, and lifecycle; do not use for application Todo models or temporary session progress.
+description: "Manage the repository's markdown todos/ queue: triage, dependencies, work logs, and completion. Excludes application Todo models and temporary session progress."
 ---
 
 # File Todos

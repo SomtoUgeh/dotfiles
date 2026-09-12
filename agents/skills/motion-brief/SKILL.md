@@ -1,13 +1,13 @@
 ---
 name: motion-brief
-description: Interview the user relentlessly about an animation before any of it gets built — one decision at a time, each with a recommended answer — until a motion brief has no blanks. Use when motion needs to be decided or stress-tested before it's implemented, when the user says "grill me" / "write a motion brief" / "help me decide how this should animate", when an animation has been rebuilt several times and still feels wrong, or when another skill needs the motion specified before it writes code. Produces a brief, not an implementation.
+description: "Create a motion brief or interview when explicitly requested to decide or stress-test an animation. Resolve material choices and use labelled defaults; routine implementation uses animate."
 metadata:
-  short-description: Interview the user into a motion brief before any animation gets built
+  short-description: Settle material motion decisions and record a usable brief
 ---
 
 # Motion Brief
 
-A motion designer settles every movement, its timing, and its relationship to every other movement before a single frame gets made. Do that for the interface: interview the user down the decision tree of one animation until a **motion brief** has no blanks, then stop.
+Use this skill for an explicitly requested motion brief or interview. Establish the purpose and material behavior of one animation, then record a usable brief. Routine animation implementation can use `animate` and existing defaults without opening an interview.
 
 Animations get rebuilt three times not because the code was wrong but because nobody decided what the motion was for. This skill front-loads that decision. **It does not write the animation.** The brief is the deliverable for interview-only requests. If implementation is already explicitly authorized, use the agreed decisions and continue without asking for the same approval again.
 
@@ -15,8 +15,8 @@ Follow the [canonical motion policy](../animate/references/canonical-policy.md).
 
 ## The three rules
 
-1. **One question at a time.** Ask, then wait for the answer before forming the next question — later questions genuinely depend on earlier ones. A batch of questions gets a batch of shrugs.
-2. **Facts you look up. Decisions you ask.** Anything discoverable in the filesystem — the component, its trigger, the animation stack, the existing easing tokens — you find yourself. Asking the user something you could have read wastes the interview's credibility and their patience.
+1. **Ask only unresolved, material questions.** Use one question at a time when later choices depend on the answer. Skip questions already answered by the request, code, or agreed defaults.
+2. **Look up facts; recommend decisions.** Anything discoverable in the filesystem — the component, its trigger, the animation stack, the existing easing tokens — you find yourself. Asking the user something you could have read wastes the interview's credibility and their patience.
 3. **Never ask for a number the user can't feel.** "What duration?" and "which cubic-bezier?" are unanswerable. Ask for the _sensation_ or a _reference product_, then propose the number yourself and let them react to it. People can't author 240ms; they can tell you 240ms feels slow.
 
 Every question ships with **your recommended answer**, so the user can agree in one word and the interview stays cheap.
@@ -31,22 +31,22 @@ Before the first question, read the code. Establish:
 - Existing **motion tokens** — custom `cubic-bezier` values, duration variables, `--ease-*` in the theme, and what sibling components already do.
 - Whether **`prefers-reduced-motion`** is handled anywhere globally.
 
-Done when you can state all five, or state plainly that one doesn't exist in this codebase. Report the recon in three or four lines, then go straight to the first question — no preamble, no plan announcement.
+Done when you can state all five, or state plainly that one doesn't exist in this codebase. Report the recon in three or four lines, then ask the first material unresolved question, or write the brief when the available context is sufficient.
 
 From here on, every question is grounded in what you found: _"The drawer currently uses `@keyframes` — what should happen if the user swipes it back down mid-open?"_ beats _"should it be interruptible?"_ every time.
 
 ## Step 2 — The two questions that can end the interview
 
-Ask these first. Both can end in a **cut**, and a cut is a successful outcome — it's the answer an agent never volunteers on its own.
+Resolve these first from context; ask only where the answer is unclear. Either can support a **cut**, which is a valid outcome.
 
 1. **Frequency.** "How many times a day does one user see this?" For a rapidly repeated action, recommend immediate feedback and cut any motion that delays or disconnects input. Keyboard input or a count alone is not an automatic ban; test the actual flow.
 2. **Purpose.** "What does the motion tell the user that the static change doesn't?" Valid answers: feedback, spatial consistency, state indication, explanation, preventing a jarring change, or — for something seen rarely — delight. "It looks cool" on a frequently-seen element is not one.
 
-If either lands on a cut, write the brief as a cut with the reasoning and stop. Do not soften it into "a very subtle version."
+If the agreed verdict is a cut, record the reasoning. Finish an interview-only request there; continue already authorized implementation with the static state.
 
 ## Step 3 — Choreograph the movement
 
-3. **Which properties actually differ** between state A and state B. Force the user to name both states out loud; this is where `transition: all` dies and where an animation of four properties turns out to need two.
+3. **Which properties actually differ** between state A and state B. Identify both states from the interface and ask only if the intended change is unclear; animate only the properties that communicate it.
 4. **Where it comes from and where it goes.** Is it anchored to a trigger, or centered? Does the exit mirror the entry? Which direction is "forward"? Motion that enters one way and leaves another breaks the sense of a single coherent space.
 5. **What happens mid-flight.** "If they trigger it again — or reverse it — halfway through, what should it do?" This is the one question that decides `@keyframes` vs transitions vs springs, and skipping it is how toasts end up jumping.
 
@@ -62,7 +62,7 @@ If either lands on a cut, write the brief as a cut with the reasoning and stop. 
 
 ## Step 6 — The brief
 
-The interview ends when the brief has **no blanks** — not when the user seems satisfied, and not when you feel ready to code. If a field is still empty, there's another question to ask.
+The brief is ready when material decisions are resolved and remaining choices have reasonable, labelled defaults. Mark irrelevant fields as not applicable. Respect a request to stop interviewing or use your judgment; a blank template field alone is not a reason to ask another question.
 
 ```markdown
 ## Motion brief — <component>
@@ -106,9 +106,9 @@ Recommend these unless the interview gives you a reason to depart. Never present
 
 ## When the user stalls
 
-"Just make it nice" is not an answer — it's a decision handed back to you. Convert it into a concrete choice: two named options with your recommendation first, and what each would feel like in one clause. _"Snap in at 180ms like a Linear menu, or ease in over 300ms with a slight settle like a Notion panel? I'd take the first — you said this opens on every row hover."_
+"Just make it nice" delegates judgment. Choose the default that fits the product, record the assumption, and proceed. Offer a concrete two-way choice only when the user wants to explore alternatives or the choice materially changes the result.
 
-If they still can't say, take the default, record it in the brief as **assumed**, and move on. An assumption written down is worth more than a question left open.
+Record defaults as **assumed** so the user can revise them without another interview.
 
 ## Companion skills
 

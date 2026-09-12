@@ -41,7 +41,7 @@ await container.start({ envVars: { KEY: "value" } });
 
 Returns when **process starts**, NOT when ports ready. Use for fire-and-forget.
 
-### startAndWaitForPorts() - Recommended (20s timeout)
+### startAndWaitForPorts() - Explicit readiness (20s timeout)
 
 ```typescript
 await container.startAndWaitForPorts();  // Uses requiredPorts
@@ -52,7 +52,7 @@ await container.startAndWaitForPorts({
 });
 ```
 
-Returns when **ports listening**. Use before HTTP/TCP requests.
+Returns when **ports listening**. Use for explicit prewarming or before direct TCP/port operations. SDK `fetch()` and `containerFetch()` already start the container and wait for their target port.
 
 **Port resolution:** explicit ports → requiredPorts → defaultPort → port 33
 

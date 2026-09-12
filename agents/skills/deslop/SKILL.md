@@ -1,12 +1,6 @@
 ---
 name: deslop
-description: >
-  Remove AI slop from code or writing. Use for branch code cleanup (redundant
-  comments, defensive over-engineering, type hacks, over-abstraction) or for
-  prose drafts that need less AI-sounding language while preserving voice. Also
-  use when the user asks whether writing reads as AI, to audit or scan for slop
-  patterns without rewriting. Triggers: deslop, no-ai-slop, remove AI slop,
-  clean up this branch, is this AI, less AI-sounding, humanize this draft.
+description: "Audit or remove AI slop in code or prose: redundant comments, type hacks, over-engineering, or formulaic writing. Preserve behavior and voice; audit-only requests return findings."
 ---
 
 # Deslop

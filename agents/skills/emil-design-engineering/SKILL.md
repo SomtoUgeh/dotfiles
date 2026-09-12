@@ -1,6 +1,6 @@
 ---
 name: emil-design-engineering
-description: "Apply Emil Kowalski's design-engineering craft to polished, accessible web interfaces. Use for broad UI review and implementation across forms, controls, touch behavior, typography, layout stability, component APIs, marketing pages, and performance, or for a focused local polish pass when an interface feels off. Route deep motion work to the focused motion skills."
+description: "Apply Emil Kowalski's craft to polished, accessible web UI: forms, controls, touch, typography, stable layout, and local polish. Route deep motion work to focused skills."
 ---
 
 # Emil's Design Engineering Principles

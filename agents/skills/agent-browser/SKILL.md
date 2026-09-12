@@ -1,6 +1,6 @@
 ---
 name: agent-browser
-description: Use the agent-browser CLI for browser or Electron automation when the user requests it, the repository already depends on it, or its session and cloud-browser features are needed. For ordinary browser work, use the active runtime's available browser capability when the CLI is absent.
+description: "Automate browsers or Electron with agent-browser when explicitly requested, already used by the repo, or needed for its session/cloud-browser features."
 ---
 
 # agent-browser

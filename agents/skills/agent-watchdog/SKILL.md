@@ -1,6 +1,6 @@
 ---
 name: agent-watchdog
-description: Use when asked to watch, babysit, audit, review, compare, or fix another agent's work from a Codex session ID, Claude Code session/transcript, chat/thread link, PR, branch, log, or pasted run summary. Monitor until the other agent is done or blocked, reconstruct what the user asked, inspect what the agent actually changed and verified, report gaps, and optionally make scoped fixes when the user authorizes repair.
+description: "Watch, audit, compare, or repair another agent's work from sessions, transcripts, tasks, PRs, branches, or logs. Use for agent-run oversight; repair requires authorization."
 ---
 
 # Agent Watchdog

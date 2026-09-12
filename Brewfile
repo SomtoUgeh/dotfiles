@@ -80,6 +80,7 @@ brew "mas"                    # Install Mac App Store apps (see bottom of file)
 
 # Editors & terminals
 cask "visual-studio-code"
+cask "cursor"                 # AI-native editor (shares VS Code settings/extensions)
 cask "zed"                    # Fast modern editor
 
 # Dev tooling

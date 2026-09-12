@@ -18,6 +18,7 @@ import tempfile
 import tomlkit
 
 REPO = Path(__file__).resolve().parent.parent
+EXECUTOR_DIRECT_DEFAULTS = ("cloudflare", "context7", "exa", "granola", "openaiDeveloperDocs", "paper", "playwright", "posthog", "postman")
 OVERLAPPING_PLUGIN_SKILLS = {
     "build-web-apps": ("react-best-practices", "stripe-best-practices"),
     "product-design": ("image-to-code",),
@@ -117,6 +118,12 @@ def sync(home: Path, repo: Path, check: bool = False) -> list[Path]:
     current_text = config.read_text() if config.exists() else ""
     current = tomlkit.parse(current_text)
     defaults = tomlkit.parse((repo / "agents/codex/config.toml").read_text())
+    gateway = current.get("mcp_servers", {}).get("executor")
+    if isinstance(gateway, MutableMapping) and gateway.get("enabled") is not False:
+        # An opted-in host gets these tools from Executor. Preserve existing
+        # custom entries, but never recreate removed direct definitions.
+        for name in EXECUTOR_DIRECT_DEFAULTS:
+            defaults.get("mcp_servers", {}).pop(name, None)
     seed_defaults(current, defaults)
     seed_skill_choices(current, home)
     # Only retire the obsolete bundled notifier when its executable is missing.

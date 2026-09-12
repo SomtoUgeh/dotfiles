@@ -120,11 +120,11 @@ Sensitive: Low threshold (score < 50) + JSD
 ## Zero Trust for Bots
 
 ```txt
-1. Default deny (all scores < 30)
-2. Allowlist verified bots
+1. Choose score thresholds from observed traffic and the application policy
+2. Exempt verified bots only where that policy permits
 3. Authenticate mobile apps (fingerprints alone cannot authorize)
-4. Allowlist corporate proxies
-5. Allowlist static resources
+4. Evaluate narrowly scoped corporate-proxy exceptions for legitimate clients
+5. Exempt static resources only where the content and abuse policy permit
 ```
 
 ## JavaScript detection scope

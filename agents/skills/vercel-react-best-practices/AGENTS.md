@@ -1048,7 +1048,7 @@ Reference: [https://nextjs.org/docs/app/api-reference/functions/after](https://n
 Automatic deduplication and efficient data fetching patterns reduce redundant network requests.
 
 ### 4.1 Deduplicate Global Event Listeners
-Use `useSWRSubscription()` to share global event listeners across component instances.
+When duplicate listeners cause a measured problem, reuse the application’s existing subscription mechanism. In a project already using SWR, `useSWRSubscription()` can share global event listeners across component instances. Do not introduce SWR solely to follow this example.
 
 **Incorrect (N instances = N listeners):**
 
@@ -1160,7 +1160,7 @@ useEffect(() => {
 ---
 
 ### 4.3 Use SWR for Automatic Deduplication
-SWR enables request deduplication, caching, and revalidation across component instances.
+Preserve the application’s existing data-fetching library and use its deduplication, caching, and revalidation features. The examples below apply to projects already using SWR; TanStack Query or another established owner should retain the same responsibility. Choose a new library only when the task requires that decision.
 
 **Incorrect (no deduplication, each instance fetches):**
 

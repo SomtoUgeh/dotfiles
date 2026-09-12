@@ -1,11 +1,15 @@
 ---
 name: diagnosing-bugs
-description: Diagnosis loop for hard bugs and performance regressions. Use when the user says "diagnose"/"debug this", or reports something broken/throwing/failing/slow.
+description: "Diagnose bugs or performance regressions whose cause is uncertain, using a focused reproduction and evidence-ranked hypotheses. Scale investigation to the actual uncertainty."
 ---
 
 # Diagnosing Bugs
 
-A discipline for hard bugs. Skip phases only when explicitly justified.
+Use this loop for uncertain or hard-to-reproduce bugs and performance regressions.
+Scale the investigation to the uncertainty. When a trace, failing test, or direct
+code evidence already establishes the cause, apply the authorized narrow fix and
+verify the original symptom; do not manufacture extra hypotheses or minimise a
+repro that already isolates the fault.
 
 When exploring the codebase, read `CONTEXT.md` (if it exists) to get a clear mental model of the relevant modules, and check ADRs in the area you're touching.
 
@@ -13,9 +17,9 @@ When exploring the codebase, read `CONTEXT.md` (if it exists) to get a clear men
 
 **This is the skill.** Everything else is mechanical. If you have a **tight** pass/fail signal for the bug — one that goes red on _this_ bug — you will find the cause; bisection, hypothesis-testing, and instrumentation all just consume it. If you don't have one, no amount of staring at code will save you.
 
-Spend disproportionate effort here. **Be aggressive. Be creative. Refuse to give up.**
+Invest enough to distinguish the reported failure from nearby symptoms. Timebox unsuccessful approaches; switch methods or identify missing evidence rather than repeating unproductive attempts.
 
-### Ways to construct one — try them in roughly this order
+### Ways to construct one — choose the smallest suitable method
 
 1. **Failing test** at whatever seam reaches the bug — unit, integration, e2e.
 2. **Curl / HTTP script** against a running dev server.
@@ -28,7 +32,7 @@ Spend disproportionate effort here. **Be aggressive. Be creative. Refuse to give
 9. **Differential loop.** Run the same input through old-version vs new-version (or two configs) and diff outputs.
 10. **HITL bash script.** Last resort. If a human must click, drive _them_ with `scripts/hitl-loop.template.sh` so the loop is still structured. Captured output feeds back to you.
 
-Build the right feedback loop, and the bug is 90% fixed.
+A useful feedback loop makes competing explanations easier to distinguish.
 
 ### Tighten the loop
 
@@ -42,7 +46,7 @@ A 30-second flaky loop is barely better than no loop; a 2-second deterministic o
 
 ### Non-deterministic bugs
 
-The goal is not a clean repro but a **higher reproduction rate**. Loop the trigger 100×, parallelise, add stress, narrow timing windows, inject sleeps. A 50%-flake bug is debuggable; 1% is not — keep raising the rate until it's debuggable.
+Seek a measurable reproduction rate. Bounded repetition, controlled stress, or timing instrumentation can help; keep load within an authorized test environment and report attempts and observed failures. A rare failure remains evidence even when its rate cannot be increased.
 
 ### When you cannot build a loop yet
 
@@ -78,19 +82,20 @@ Confirm:
 
 ### Minimise
 
-Once it's red, shrink the repro to the **smallest scenario that still goes red**. Cut inputs, callers, config, data, and steps **one at a time**, re-running the loop after each cut — keep only what's load-bearing for the failure.
+When extra inputs obscure the cause, shrink the repro to a scenario that isolates the failure. Cut inputs, callers, config, data, and steps **one at a time**, re-running the loop after each cut — keep only what's load-bearing for the failure.
 
 Why bother: a minimal repro shrinks the hypothesis space in Phase 3 (fewer moving parts left to suspect) and becomes the clean regression test in Phase 5.
 
-Done when **every remaining element is load-bearing** — removing any one of them makes the loop go green.
+Stop shrinking when the repro isolates the suspected cause and supports a meaningful regression check. Further minimisation is useful only if it can change the diagnosis.
 
-When reproduction is available, do not proceed to a fix until you have reproduced
-and minimised. When it is unavailable, continue diagnosis only: rank hypotheses,
-collect discriminating evidence, and state what remains unverified.
+Prefer a reproduced failure before fixing. If reproduction is unavailable but
+direct evidence establishes the defect, an authorized narrow fix can proceed with
+focused checks; clearly state that the original runtime symptom remains unverified.
+If the cause is uncertain, collect discriminating evidence before changing behavior.
 
 ## Phase 3 — Hypothesise
 
-Generate **3–5 ranked hypotheses** before testing any of them. Single-hypothesis generation anchors on the first plausible idea.
+Rank the plausible causes supported by current evidence. Test the leading cause directly when the evidence is strong; add competing hypotheses when ambiguity remains or the first prediction fails. Do not fill a quota.
 
 Each hypothesis must be **falsifiable**: state the prediction it makes.
 
@@ -98,7 +103,7 @@ Each hypothesis must be **falsifiable**: state the prediction it makes.
 
 If you cannot state the prediction, the hypothesis is a vibe — discard or sharpen it.
 
-**Show the ranked list to the user before testing.** They often have domain knowledge that re-ranks instantly ("we just deployed a change to #3"), or know hypotheses they've already ruled out. Cheap checkpoint, big time saver. Don't block on it — proceed with your ranking if the user is AFK.
+Share the leading hypothesis and next discriminating check when useful. Ask only for missing context that materially changes the investigation; routine testing needs no user checkpoint.
 
 ## Phase 4 — Instrument
 

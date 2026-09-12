@@ -30,22 +30,18 @@ Deploy: `wrangler deploy`
 
 ## When to Use Workers Static Assets vs Pages
 
-| Factor | Workers Static Assets | Cloudflare Pages |
-|--------|----------------------|------------------|
-| **Use case** | Hybrid apps (static + dynamic API) | Static sites, SSG |
-| **Worker control** | Full control over routing | Limited (Functions) |
-| **Configuration** | Code-first, flexible | Git-based, opinionated |
-| **Dynamic routing** | Worker-first patterns | Functions (functions/) |
-| **Best for** | Full-stack apps, SPAs with APIs | Jamstack, static docs |
+Workers Static Assets supports pure static sites, SPAs, and full-stack apps. Pages supports static sites and dynamic Pages Functions. Both platforms support Git-based deployment workflows; Git integration alone does not select Pages.
 
-For new projects, check the [current framework guide](https://developers.cloudflare.com/workers/framework-guides/) and adapter support. Workers Static Assets supports pure static sites as well as full-stack apps. Do not send every framework or static site to Pages; preserve the existing platform unless migration is part of the task.
+For new projects, check the [current framework guide](https://developers.cloudflare.com/workers/framework-guides/) and adapter support. Preserve an existing platform unless migration is part of the task. Choose routing and configuration according to that platform rather than treating static versus dynamic content as the deciding factor.
 
-## Reading Order
+## Choose a Reference
 
-1. **configuration.md** - Setup, wrangler.jsonc options, routing patterns
-2. **api.md** - ASSETS binding API, request/response handling
-3. **patterns.md** - Common patterns (SPA, API routes, auth, A/B testing)
-4. **gotchas.md** - Limits, errors, performance tips
+Load the file that answers the current task; follow additional references only when needed.
+
+- Setup, bindings, and deployment configuration → [configuration.md](configuration.md)
+- API calls, handlers, and runtime behavior → [api.md](api.md)
+- Implementing a specific integration or use case → [patterns.md](patterns.md)
+- Diagnosing failures and checking relevant limits → [gotchas.md](gotchas.md)
 
 ## In This Reference
 

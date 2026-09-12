@@ -7,7 +7,7 @@ tags: client, swr, deduplication, data-fetching
 
 ## Use SWR for Automatic Deduplication
 
-SWR enables request deduplication, caching, and revalidation across component instances.
+Preserve the application’s existing data-fetching library and use its deduplication, caching, and revalidation features. The examples below apply to projects already using SWR; TanStack Query or another established owner should retain the same responsibility. Choose a new library only when the task requires that decision.
 
 **Incorrect (no deduplication, each instance fetches):**
 

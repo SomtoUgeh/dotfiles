@@ -1,6 +1,6 @@
 ---
 name: image-to-code
-description: Implement a web interface from supplied or intentionally generated visual references with close visual fidelity. Use when the user provides a screenshot or design image, or explicitly requests an image-first implementation workflow.
+description: "Implement a web interface with close fidelity to supplied screenshots/design images or intentionally generated references in an explicitly requested image-first workflow."
 ---
 
 # Image to Code

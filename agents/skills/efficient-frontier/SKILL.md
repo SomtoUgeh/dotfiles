@@ -1,6 +1,6 @@
 ---
 name: efficient-frontier
-description: Coordinate broad work through independent, bounded subagents while keeping decomposition, integration, and final review with the lead agent. Use when delegation reduces a concrete research, implementation, or verification bottleneck.
+description: "Coordinate broad research, implementation, or verification through bounded independent agents when delegation resolves a concrete bottleneck."
 ---
 
 # Efficient Frontier

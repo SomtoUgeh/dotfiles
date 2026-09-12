@@ -1,6 +1,6 @@
 ---
 name: tanstack-router-best-practices
-description: TanStack Router best practices for type-safe routing, data loading, search params, and navigation. Activate when building React applications with complex routing needs.
+description: "Implement or review TanStack Router type-safe routes, loaders, search parameters, and navigation."
 ---
 
 # TanStack Router Best Practices

@@ -38,6 +38,61 @@ a reason to stop work when the fallback can complete it.
   Shared role guidance lives in `agents/shared/AGENTS.md`. Verify an actual
   distinct model before promising a cross-model review.
 
+## Executor routing
+
+On configured hosts, prefer `executor_cloud` for internet services and `executor`
+for tools that need the current host's filesystem, projects, browser, or desktop.
+Explicit user tool choices take precedence. Local Executor on the AltSchool VM
+means the Linux VM; it cannot access the Mac's Paper app or desktop 1Password.
+Canva currently remains on the Mac-local gateway by user choice. Discover the
+live catalog rather than assuming a service exists on both gateways.
+
+### Calling tools
+
+1. Find the selected gateway's callable `skills`, `execute`, and `resume` tools
+   in the active harness. Their prefixes differ between agents; do not invent
+   names. Call that gateway's `skills({ name: "execute" })` before writing code.
+   This is an MCP tool call, not a request to load a filesystem skill named
+   `executor` or `executor_cloud`.
+2. Inside its `execute`, use `tools.search({ query, namespace, limit })`, then
+   `tools.describe.tool({ path })`. Read the current input/output schemas and
+   use the returned full path for the intended account/connection. Use
+   `tools.executor.coreTools.connections.list({})` when account selection is
+   unclear; do not assume every service uses the same owner or connection name.
+3. Call the discovered tool through `tools[path](input)`. Check the execution
+   status and the tool's `{ ok, data }` / `{ ok: false, error }` envelope;
+   upstream MCP results can also contain `isError`. Return only needed fields,
+   keeping credentials and large payloads out of logs. Follow the gateway's
+   current execute skill for files, images, pagination, and other result types.
+4. If execution pauses, follow its returned interaction and resume instructions
+   under existing user authorization. Complete user-only approvals in the
+   indicated UI. Never bypass an agent denial or gateway approval by switching
+   transports, changing policies, or invoking the upstream service directly.
+
+Authentication, agent permissions, Executor policies, and upstream service
+permissions are separate layers. Identify which layer failed. Cloud sign-in is
+per device; upstream credentials stay in Executor. Never copy OAuth caches or
+put service tokens into skills. For local failures, check the service and any
+required open app/project. After a repair or migration, verify a harmless real
+read through the intended gateway; discovery or a healthy badge alone is not
+proof. Do not recreate direct MCP duplicates to work around an unresolved error.
+
+### Existing plugin skills
+
+Keep domain workflows and use an equivalent discovered Executor operation when
+its capability and permissions match. A skill's native tool name is not proof
+that the tool is available or that a REST endpoint is equivalent. Figma REST
+`figma_api`, for example, does not replace native Figma MCP design editing.
+Native app/browser tools and unsupported capabilities retain their own tools.
+Leave installed plugin caches unchanged; report an unavailable capability when
+there is no verified equivalent.
+
+See the [Executor setup guide](../executor/README.md) for configuration and
+migration, and the [Cloudflare guide](../executor/cloud.md) for device auth,
+service ownership, verification evidence, and recovery. Resolve these references
+from the real dotfiles directory when reading through a symlink. These guides
+record setup evidence, not continuous health guarantees.
+
 ## Skill ownership
 
 | Job | Default owner | Overlapping copy |

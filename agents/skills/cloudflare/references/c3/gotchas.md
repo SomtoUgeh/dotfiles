@@ -18,16 +18,13 @@ npx wrangler kv namespace create MY_KV  # Get real ID
 ### Name Conflict
 
 **Error:** "Worker already exists"
-**Fix:** Change `name` in wrangler.jsonc
+**Fix:** Confirm the target account/environment and whether this is the intended existing Worker. Change `name` only when creating a distinct Worker.
 
 ## Platform Selection
 
-| Need | Platform |
-|------|----------|
-| Git integration, branch previews | `--platform=pages` |
-| Durable Objects, D1, Queues | Workers (default) |
+Check the existing deployment, requested platform, and framework support. Workers supports Static Assets and Git builds; Pages remains an explicit supported target rather than the only option for static sites or previews. See [platform selection](README.md#platform-selection).
 
-Wrong platform? Recreate with correct `--platform` flag.
+On a mismatch, preserve local changes and adapt the existing project using the matching framework/migration guide. Recreate only a disposable scaffold with no work to preserve.
 
 ## TypeScript Issues
 
@@ -73,7 +70,7 @@ env:
 ## Compatibility Date
 
 **"Feature X requires compatibility_date >= ..."**
-**Fix:** Update `compatibility_date` in wrangler.jsonc to today's date
+**Fix:** Identify the required behavior and minimum compatibility date or flag. Preserve the existing date unless a change is needed, then test the affected behavior at the selected date. Do not upgrade all compatibility behavior merely because today is later.
 
 ## Node.js Version
 
@@ -87,8 +84,6 @@ env:
 | Invalid namespace ID | Placeholder binding | Create resource, update config |
 | Not authenticated | No login | `npx wrangler login` |
 | Cannot find KVNamespace | Missing types | `npm run cf-typegen` |
-| Worker already exists | Name conflict | Change `name` |
+| Worker already exists | Existing target or name conflict | Confirm intended target before renaming |
 | CI hangs | Missing flags | Add --type, --lang, --no-deploy |
 | Template not found | Bad name | Check cloudflare/templates |
-
-`--existing-script` downloads a deployed Worker; it does not convert local source or migrate an existing framework app. For an existing app, follow its current Workers framework guide. Workers Static Assets also support static sites, and Workers Builds supports Git workflows; Pages is an explicit framework-dependent choice. Inspect generated package scripts instead of assuming every framework uses the same names.

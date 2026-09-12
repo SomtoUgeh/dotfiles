@@ -62,10 +62,14 @@ These reference files cover API shapes, code patterns, and debugging. APIs also 
 - **Pricing:** https://developers.cloudflare.com/workflows/reference/pricing/
 - **Workers API:** https://developers.cloudflare.com/workflows/build/workers-api/
 
-## Reading Order
+## Choose a Reference
 
-**Getting Started:** configuration.md → api.md → patterns.md  
-**Troubleshooting:** gotchas.md
+Load the file that answers the current task; follow additional references only when needed.
+
+- Setup, bindings, and deployment configuration → [configuration.md](configuration.md)
+- API calls, handlers, and runtime behavior → [api.md](api.md)
+- Implementing a specific integration or use case → [patterns.md](patterns.md)
+- Diagnosing failures and checking relevant limits → [gotchas.md](gotchas.md)
 
 ## In This Reference
 - [configuration.md](./configuration.md) - wrangler.jsonc setup, step config, bindings

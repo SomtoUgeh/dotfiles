@@ -17,7 +17,7 @@ const limits = await puppeteer.limits(env.MYBROWSER);
 // Acquisition/concurrency state, not a remaining-browser-milliseconds balance.
 ```
 
-## Always Close Browsers
+## Release the Browser Resources You Own
 
 ```typescript
 const browser = await puppeteer.launch(env.MYBROWSER);
@@ -30,7 +30,7 @@ try {
 }
 ```
 
-**Workers vs REST:** REST auto-closes after timeout. Workers must call `close()` or session stays open until `keep_alive` expires.
+Close one-shot browsers in `finally`, including error paths. When borrowing an owned reusable session, close the per-task context and disconnect the client instead; the session owner closes the browser when retiring it. See [session reuse](patterns.md#session-reuse). REST requests manage their own browser lifecycle.
 
 ## Optimize Concurrency
 
