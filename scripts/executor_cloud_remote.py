@@ -55,7 +55,9 @@ def probe(check_local=False):
         send({"id": 1, "method": "initialize", "params": {
             "protocolVersion": "2025-03-26", "capabilities": {},
             "clientInfo": {"name": "executor-cloud-login", "version": "1.0.0"}}})
-        deadline = time.monotonic() + 330
+        deadline = time.monotonic() + 45
+        awaiting_auth = False
+        phase = "initialization"
         while time.monotonic() < deadline:
             try:
                 kind, line = events.get(timeout=1)
@@ -66,6 +68,10 @@ def probe(check_local=False):
             if kind == "err" and line:
                 for url in re.findall(r"https://[^\s\x1b]+", line):
                     if "code_challenge=" in url:
+                        if not awaiting_auth:
+                            deadline = time.monotonic() + 330
+                            awaiting_auth = True
+                            phase = "browser authorization"
                         emit("authorize", url=url)
                 continue
             if kind != "out":
@@ -77,6 +83,8 @@ def probe(check_local=False):
                 raise RuntimeError("Cloud MCP request failed; renew login or inspect the server")
             request_id = message.get("id")
             if request_id == 1:
+                deadline = time.monotonic() + 45
+                phase = "cloud read"
                 send({"method": "notifications/initialized"})
                 send({"id": 2, "method": "tools/call", "params": {
                     "name": "skills", "arguments": {"name": "execute"}}})
@@ -94,7 +102,7 @@ def probe(check_local=False):
                     raise RuntimeError("Cloud GitHub read did not succeed; check its connection/policy")
                 emit("ready")
                 return
-        raise RuntimeError("Cloud login timed out after 330 seconds")
+        raise RuntimeError(f"Executor {phase} timed out; SSH access is independent of Executor")
     finally:
         if process.poll() is None:
             os.killpg(process.pid, 15)

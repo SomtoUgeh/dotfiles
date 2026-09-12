@@ -101,9 +101,11 @@ altschool-up --ssh
 
 This checks SSH reachability, keeps the existing development port forwards,
 starts/checks VM-local Executor, verifies a real cloud GitHub read, then enters
-SSH through the normal shell wrapper. It does not power on a stopped VM. Any
-failed check stops the sequence. Plain `altschool-up` performs the same checks
-without entering SSH.
+SSH through the normal shell wrapper. It does not power on a stopped VM.
+With `--ssh`, an Executor failure prints a warning and still opens your shell;
+plain `altschool-up` returns failure. SSH/forwarding failures and Ctrl+C stop the
+sequence. Plain `ssh altschool` always opens a shell without Executor checks.
+Running a dev server in another session does not prevent additional SSH sessions.
 
 To renew/check only the VM cloud login:
 
@@ -113,7 +115,8 @@ executor-cloud-login altschool
 uv run --script scripts/executor_cloud_login.py altschool
 ```
 
-Cached authentication needs no browser. When renewal is required, the helper
+Cached authentication needs no browser. Ordinary initialization and cloud reads
+have 45-second limits; browser authorization gets 330 seconds. When renewal is required, the helper
 opens the Mac browser and temporarily forwards the adapter's exact callback
 port. Complete Cloudflare login/consent; the helper verifies GitHub and closes
 its temporary connection. Cancellation also closes it. A busy callback port

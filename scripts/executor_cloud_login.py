@@ -18,6 +18,7 @@ import threading
 import time
 from urllib.parse import parse_qs, urlsplit
 import urllib.request
+import urllib.error
 import webbrowser
 
 
@@ -45,8 +46,17 @@ def discover_endpoint(cloud_url):
     if parsed.scheme != "https" or parsed.username or parsed.password or parsed.path != "/mcp":
         raise ValueError("Expected a credential-free HTTPS cloud MCP URL")
     origin = f"https://{parsed.netloc}"
-    with urllib.request.urlopen(origin + "/.well-known/oauth-authorization-server", timeout=15) as response:
-        metadata = json.load(response)
+    request = urllib.request.Request(
+        origin + "/.well-known/oauth-authorization-server",
+        headers={"User-Agent": "executor-cloud-login/1.0", "Accept": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            metadata = json.load(response)
+    except urllib.error.HTTPError as error:
+        raise RuntimeError(f"OAuth discovery returned HTTP {error.code}; check Cloudflare access for this computer") from None
+    except urllib.error.URLError:
+        raise RuntimeError("OAuth discovery could not connect; check this computer's network") from None
     endpoint = metadata["authorization_endpoint"]
     if urlsplit(endpoint).scheme != "https":
         raise ValueError("OAuth authorization endpoint must use HTTPS")

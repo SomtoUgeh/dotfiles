@@ -205,8 +205,17 @@ function altschool-up() {
   if ! pgrep -f '^ssh .*altschool-tunnel$' >/dev/null; then
     command ssh -o ExitOnForwardFailure=yes -fN altschool-tunnel || return
   fi
-  executor-cloud-login altschool --check-local || return
-  print 'AltSchool is ready.'
+  local executor_status=0
+  executor-cloud-login altschool --check-local || executor_status=$?
+  if (( executor_status == 130 )); then
+    return 130
+  elif (( executor_status != 0 )); then
+    print -u2 'Executor is not ready. Retry with: executor-cloud-login altschool'
+    [[ "$1" == --ssh ]] || return "$executor_status"
+    print -u2 'Opening SSH; Executor authentication is still pending.'
+  else
+    print 'AltSchool is ready.'
+  fi
   if [[ "$1" == --ssh ]]; then
     ssh altschool
     return $?
