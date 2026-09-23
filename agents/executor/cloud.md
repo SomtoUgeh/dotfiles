@@ -56,7 +56,8 @@ unverified.
 
 - Console: https://executor-cloudflare.somto.workers.dev
 - MCP: https://executor-cloudflare.somto.workers.dev/mcp
-- Release: `v1.6.8`, commit `2dc399e51094fccd2a45103a38d77179c6d648ff`
+- Release: `v1.6.10`, commit `3890d6f5e5efd1530f0dba0fe23ada95a39caf86`
+- Deployed: 23 September 2026, Worker version `931ad061-cdb6-40cf-8d2b-93d1e8f6ca96`
 - Worker: `executor-cloudflare`
 - D1: `executor`, ID `106e2ccd-22b7-421f-8455-fc5fa75b66db`
 - R2: `executor-blobs`
@@ -69,13 +70,22 @@ This release also uses the Worker Loader binding for isolated code execution.
 The brief website deployment summary omits R2 and Durable Objects; inspect the
 release's actual Wrangler config before upgrading.
 
+Upgraded in place from `v1.6.8` on 23 September 2026. The Wrangler config's
+bindings and Durable Object migrations were unchanged between those tags. The
+deploy kept the existing D1 database, `executor-blobs`, Access variables, and
+`EXECUTOR_SECRET_KEY`. Unauthenticated console and MCP requests still receive
+Cloudflare Access's OAuth 401 challenge. A hosted GitHub `get_me` through the
+cloud gateway returned `SomtoUgeh` after the deploy. The Mac and AltSchool VM
+local CLIs were not part of this deploy and remain on `v1.6.8` until each
+machine runs `bun add --global executor@1.6.10` and `executor install`.
+
 ## Reproduce or maintain
 
 Use a dedicated checkout of the official repository. Preserve its release pin
 and lockfile; never deploy a moving default branch without checking the changes.
 
 ```sh
-git clone --branch v1.6.8 --depth 1 https://github.com/UsefulSoftwareCo/executor.git
+git clone --branch v1.6.10 --depth 1 https://github.com/UsefulSoftwareCo/executor.git
 ```
 
 From that checkout:
