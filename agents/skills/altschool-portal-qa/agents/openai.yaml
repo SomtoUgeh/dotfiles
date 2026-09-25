@@ -1,0 +1,3 @@
+interface:
+  display_name: "AltSchool Portal QA"
+  short_description: "QA and debug the AltSchool student portal and Core admin"
