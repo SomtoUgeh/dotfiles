@@ -213,6 +213,19 @@ class SkillTests(unittest.TestCase):
 
 
 class ConfigTests(unittest.TestCase):
+    def test_shaping_hook_command_is_absolute_after_home_expansion(self):
+        settings = json.loads((REPO / "agents/claude/settings.json").read_text())
+        command = settings["hooks"]["PostToolUse"][0]["hooks"][0]["command"]
+        self.assertEqual(command, "${HOME}/.agents/skills/shaping/shaping-ripple.sh")
+        home = Path("/tmp/agent-home")
+        rendered = setup.render_hooks(home, REPO)
+        expected = str(home / ".agents/skills/shaping/shaping-ripple.sh")
+        self.assertEqual(rendered["hooks"]["PostToolUse"][0]["hooks"][0]["command"], expected)
+        self.assertEqual(
+            setup.resolve_hook_command('"${HOME}/.agents/skills/shaping/shaping-ripple.sh"', home, REPO),
+            expected,
+        )
+
     def test_duplicate_plugin_skills_are_disabled_by_path_after_upgrade(self):
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory)

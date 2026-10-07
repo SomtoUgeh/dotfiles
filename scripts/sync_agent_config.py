@@ -57,17 +57,24 @@ def seed_skill_choices(current, home: Path) -> None:
             overrides.append(entry)
 
 
+def resolve_hook_command(command: str, home: Path, repo: Path) -> str:
+    """Resolve path placeholders. Quoted forms are replaced first so a leftover
+    wrapping quote cannot make Grok treat the path as relative to ~/.claude/.
+    """
+    command = command.replace('"${DOTFILES_DIR}/agents/shared/hooks/git_guard.py"', shlex.quote(str(repo / "agents/shared/hooks/git_guard.py")))
+    command = command.replace("${DOTFILES_DIR}/agents/shared/hooks/git_guard.py", shlex.quote(str(repo / "agents/shared/hooks/git_guard.py")))
+    ripple = shlex.quote(str(home / ".agents/skills/shaping/shaping-ripple.sh"))
+    command = command.replace('"${HOME}/.agents/skills/shaping/shaping-ripple.sh"', ripple)
+    command = command.replace("${HOME}/.agents/skills/shaping/shaping-ripple.sh", ripple)
+    return command
+
+
 def render_hooks(home: Path, repo: Path) -> dict:
     data = json.loads((repo / "agents/codex/hooks.json").read_text())
     for groups in data["hooks"].values():
         for group in groups:
             for hook in group["hooks"]:
-                # The template contains quoted path placeholders. Shell-quote
-                # their resolved values so spaces and shell metacharacters work.
-                command = hook["command"]
-                command = command.replace('"${DOTFILES_DIR}/agents/shared/hooks/git_guard.py"', shlex.quote(str(repo / "agents/shared/hooks/git_guard.py")))
-                command = command.replace('"${HOME}/.agents/skills/shaping/shaping-ripple.sh"', shlex.quote(str(home / ".agents/skills/shaping/shaping-ripple.sh")))
-                hook["command"] = command
+                hook["command"] = resolve_hook_command(hook["command"], home, repo)
     return data
 
 

@@ -121,6 +121,8 @@ The Git guard uses a pinned shell parser through `uv`; it checks literal command
 and substitutions independently. It is a tripwire, not a sandbox for aliases or
 arbitrary interpreter code. The installer warms its environment before use.
 The shaping hook accepts both file edits and multi-file patch payloads.
+Claude/Grok keep the command unquoted so `${HOME}` expands to an absolute
+path; a wrapping quote makes Grok treat it as relative to `~/.claude/`.
 
 Run `uv run --script tests/test_agent_setup.py` for hook/config regression
 tests and shared skill validation; `bun tests/test_agent_hooks.mjs` checks the
