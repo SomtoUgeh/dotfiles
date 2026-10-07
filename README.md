@@ -38,9 +38,8 @@ The install script creates this folder layout:
 ```
 ~/
 ├── code/                    # All code projects (CDPATH enabled)
-│   ├── personal/            # Personal identity (SomtoUgeh)
-│   │   └── dotfiles/        # This repo
-│   └── work/                # Swissblock identity (somto-swissblock)
+│   └── personal/            # Personal identity (SomtoUgeh)
+│       └── dotfiles/        # This repo
 ├── bin/                     # Custom scripts (in PATH)
 ├── .config/                 # XDG config home
 └── .ssh/                    # Public keys only; private keys live in 1Password
@@ -99,7 +98,7 @@ dotfiles/
 ├── git/                    # Git configuration
 │   ├── .gitconfig
 │   ├── .gitignore_global
-│   └── SIGNING.md          # two-identity SSH signing setup
+│   └── SIGNING.md          # SSH commit-signing setup
 ├── config/
 │   ├── vscode/             # shared VS Code + Cursor settings/keybindings/extensions
 │   ├── zed/                # settings and keymap
@@ -128,16 +127,13 @@ dotfiles/
 │   └── defaults.sh         # macOS system preferences
 └── templates/              # Templates for sensitive / machine-local files
     ├── zshrc-private.template
-    ├── ssh-config.template              # Mac: 1Password agent, work default
+    ├── ssh-config.template              # Mac: 1Password agent, personal key
     ├── ssh-config-cloud.template        # cloud worker: file-based key
     ├── gitconfig-local.template         # name only, no email
     ├── gitconfig-personal.template      # SomtoUgeh
-    ├── gitconfig-work.template          # somto-swissblock
-    ├── 1password-agent.toml.template    # which vaults the SSH agent serves
+    ├── 1password-agent.toml.template    # Personal vault served by the SSH agent
     ├── gh-hosts-personal.yml.template   # gh active account: SomtoUgeh
-    ├── gh-hosts-work.yml.template       # gh active account: somto-swissblock
-    ├── envrc-personal.template          # -> ~/code/personal/.envrc
-    └── envrc-work.template              # -> ~/code/work/.envrc
+    └── envrc-personal.template          # -> ~/code/personal/.envrc
 ```
 
 ## Key Configurations
@@ -156,7 +152,7 @@ Shared across VS Code and Zed:
 - `cmd+q cmd+f` - Quick text search
 
 ### Git
-- Folder-driven identity via `includeIf` (`~/code/personal`, `~/code/work`, `~/code/TalentQL`)
+- Folder-driven identity via `includeIf` (`~/code/personal`, `~/code/TalentQL`)
 - `user.useConfigOnly` so folders without a match fail instead of inventing an email
 - Auto rebase on pull
 - Delta pager for diffs
@@ -165,31 +161,27 @@ Shared across VS Code and Zed:
 - GitHub HTTPS credentials through `gh` on PATH (`!gh auth git-credential`)
 - Cloud worker: personal SSH key at `~/.ssh/id_ed25519_personal`, `commit.gpgsign` in `~/.gitconfig-personal` so every includeIf checkout signs
 
-### GitHub CLI accounts
-Two GitHub accounts, one per code root. A Zsh directory hook picks the account
-by folder, the same way `includeIf` picks the git identity. It runs after
-`direnv`, so a repository's own `.envrc` cannot silently select the wrong
-account.
+### GitHub CLI account
+One GitHub account, `SomtoUgeh`. A Zsh directory hook points `~/code/personal`
+and `~/code/TalentQL` at `~/.config/gh-personal`. It runs after `direnv`, so a
+repository's own `.envrc` cannot silently select another account. Everywhere
+else, `gh` uses `~/.config/gh`, which is the same user.
 
 | Folder | gh account | `GH_CONFIG_DIR` |
 |---|---|---|
 | `~/code/personal` | `SomtoUgeh` | `~/.config/gh-personal` |
 | `~/code/TalentQL` | `SomtoUgeh` | `~/.config/gh-personal` |
-| `~/code/work` | `somto-swissblock` | `~/.config/gh-work` |
-| anywhere else | whatever `gh auth switch` last set | `~/.config/gh` |
+| anywhere else | `SomtoUgeh` | `~/.config/gh` |
 
-`gh` reads its whole config from `$GH_CONFIG_DIR`, so a separate dir per
-account is what makes "active account" a per-directory fact. Each dir holds a
-`hosts.yml` naming one active user, plus a symlink to the shared `config.yml`.
+`gh` reads its whole config from `$GH_CONFIG_DIR`. Each dir holds a `hosts.yml`
+naming the active user, plus a symlink to the shared `config.yml`.
 
-Tokens are not duplicated. They stay in the macOS keychain under service
-`gh:github.com`, keyed by username, and every config dir reads the same ones.
-So `gh auth login` once per account and both folders work.
+The token stays in the macOS keychain under service `gh:github.com`, keyed by
+username. `hosts.yml` holds no secret.
 
 Check it:
 ```bash
 cd ~/code/personal && gh api user --jq .login   # SomtoUgeh
-cd ~/code/work     && gh api user --jq .login   # somto-swissblock
 ```
 
 ## Manual Steps
@@ -201,29 +193,25 @@ cd ~/code/work     && gh api user --jq .login   # somto-swissblock
    ```bash
    ./scripts/setup_ssh_from_1password.sh          # --check to preview
    ```
-   It writes five public keys (four GitHub keys plus the AltSchool VM key),
+   It writes three public keys (two GitHub keys plus the AltSchool VM key),
    `~/.ssh/allowed_signers`, `~/.ssh/config`
-   and the gitconfig identity files. See [`git/SIGNING.md`](git/SIGNING.md).
+   and the gitconfig identity file. See [`git/SIGNING.md`](git/SIGNING.md).
 
 2. **Git Identity** - Folder-driven, not a global email. Copy the local files
    (included by `git/.gitconfig`):
    ```bash
    cp templates/gitconfig-local.template ~/.gitconfig.local
    cp templates/gitconfig-personal.template ~/.gitconfig-personal
-   cp templates/gitconfig-work.template ~/.gitconfig-work
    cp templates/ssh-config.template ~/.ssh/config
    mkdir -p ~/.config/1Password/ssh
    cp templates/1password-agent.toml.template ~/.config/1Password/ssh/agent.toml
-   # Mac work identity is ~/.gitconfig-work (not tracked). Add signing keys
-   # and SSH insteadOf rewrites only on machines that have those keys.
    ```
 
-3. **direnv** - `install.sh` creates `~/code/personal/.envrc` and
-   `~/code/work/.envrc` when they do not already exist. It preserves customized
-   files. Direnv will not load a new `.envrc` until you approve it:
+3. **direnv** - `install.sh` creates `~/code/personal/.envrc` when it does not
+   already exist. It preserves a customized file. Direnv will not load a new
+   `.envrc` until you approve it:
    ```bash
    direnv allow ~/code/personal
-   direnv allow ~/code/work
    ```
    Do not add a `whitelist` block to `~/.config/direnv/direnv.toml` for these
    roots. That would auto-run the `.envrc` of any repo you clone under them.
@@ -513,6 +501,5 @@ Claude's `installed_plugins.json` / `known_marketplaces.json` are machine-genera
 
 ## Commit signing
 
-SSH commit signing with two identities (personal / Swissblock), keys held in
-1Password. Setup, accepted policy deviations and rebuild steps:
-[`git/SIGNING.md`](git/SIGNING.md).
+SSH commit signing for the personal GitHub account, keys held in 1Password.
+Setup and rebuild steps: [`git/SIGNING.md`](git/SIGNING.md).

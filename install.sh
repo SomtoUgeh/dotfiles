@@ -602,18 +602,18 @@ mkdir -p "$HOME/.config/gh"
 create_symlink "$DOTFILES_DIR/config/gh/config.yml" "$HOME/.config/gh/config.yml"
 
 # --- Per-account gh config dirs (direnv-driven) --------------------------------
-# One gh account per code root. gh reads its ENTIRE config from $GH_CONFIG_DIR,
-# so a separate dir per account is the only way to make "active account" a
-# per-directory fact. direnv exports GH_CONFIG_DIR from ~/code/{personal,work}.
+# gh reads its ENTIRE config from $GH_CONFIG_DIR. ~/code/personal and
+# ~/code/TalentQL select the personal account through that variable. The shell
+# hook in shell/.zshrc is the authoritative selector; direnv exports the same
+# value for tools that do not load the hook.
 #
 # OAuth tokens are NOT copied: they stay in the macOS keychain under service
-# "gh:github.com", keyed by username, and every config dir reads the same ones.
-# So `gh auth login` once per account, then these dirs just pick which is active.
+# "gh:github.com", keyed by username. hosts.yml only names the active user.
 #
 # config.yml is symlinked so settings/aliases stay shared. hosts.yml is a real
 # file because gh rewrites it (e.g. `gh auth refresh`) — never symlink it into
 # the repo.
-for gh_account in personal work; do
+for gh_account in personal; do
     gh_dir="$HOME/.config/gh-$gh_account"
     mkdir -p "$gh_dir"
     create_symlink "$DOTFILES_DIR/config/gh/config.yml" "$gh_dir/config.yml"
@@ -635,7 +635,7 @@ done
 # are rendered, not symlinked. Existing files are never overwritten because
 # they may contain unrelated project configuration. The Zsh directory hook is
 # the authoritative account selector; these files support direnv-aware tools.
-for gh_account in personal work; do
+for gh_account in personal; do
     envrc_dir="$HOME/code/$gh_account"
     mkdir -p "$envrc_dir"
     envrc_src="$DOTFILES_DIR/templates/envrc-$gh_account.template"

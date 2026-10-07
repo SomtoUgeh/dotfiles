@@ -7,7 +7,7 @@
 # Mac's vault-held somto_auth_ed25519. It must be registered on GitHub in its
 # own right; the Mac's keys will not work here.
 #
-# Personal-only: the cloud worker does not carry the Swissblock key.
+# Personal account only.
 
 Host github.com github-personal
   HostName github.com

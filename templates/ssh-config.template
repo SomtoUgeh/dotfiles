@@ -8,22 +8,15 @@ Include ~/.orbstack/ssh/config
 # agent. Only PUBLIC keys exist in this directory; IdentityFile points at a
 # .pub so ssh knows which agent identity to offer per host.
 #
-# Work is the default for github.com. Personal repos go through the
-# github-personal alias, which the personal gitconfig rewrites URLs to
-# automatically, so you rarely type it.
+# github.com uses the personal account (SomtoUgeh). The personal gitconfig
+# rewrites GitHub URLs onto the github-personal alias; that alias offers the
+# same key.
 
 Host *
     IdentityAgent "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
 
-# Work account (default) - somto-swissblock
-Host github.com
-    HostName github.com
-    User git
-    IdentityFile ~/.ssh/swissblock_auth_ed25519.pub
-    IdentitiesOnly yes
-
 # Personal account - SomtoUgeh
-Host github-personal
+Host github.com github-personal
     HostName github.com
     User git
     IdentityFile ~/.ssh/somto_auth_ed25519.pub

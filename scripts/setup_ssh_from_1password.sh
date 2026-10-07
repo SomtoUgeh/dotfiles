@@ -8,10 +8,10 @@
 #   setup_ssh_from_1password.sh --force     also overwrite protected configs
 #
 # What it does:
-#   1. exports the five PUBLIC keys from 1Password to ~/.ssh/*.pub
-#   2. builds ~/.ssh/allowed_signers from the two SIGNING keys
+#   1. exports the three PUBLIC keys from 1Password to ~/.ssh/*.pub
+#   2. builds ~/.ssh/allowed_signers from the signing key
 #   3. installs ~/.ssh/config and ~/.config/1Password/ssh/agent.toml
-#   4. installs ~/.gitconfig{.local,-personal,-work} from templates
+#   4. installs ~/.gitconfig{.local,-personal} from templates
 #
 # It never touches private keys. Those stay in the vault and are served only by
 # the 1Password SSH agent. Nothing here can write private key material.
@@ -26,8 +26,6 @@ set -o pipefail
 KEYS=(
   "somto_auth_ed25519|Personal|smugeh@gmail.com|auth"
   "somto_sign_ed25519|Personal|smugeh@gmail.com|sign"
-  "swissblock_auth_ed25519|Swissblock|smedua@swissblock.net|auth"
-  "swissblock_sign_ed25519|Swissblock|smedua@swissblock.net|sign"
   "altschool_vm_rsa|Personal|altschool development host|auth|AltSchool VM SSH Key"
 )
 
@@ -102,15 +100,15 @@ for entry in "${KEYS[@]}"; do
 done
 
 hdr "allowed_signers"
-if [ "$(printf '%s' "$signers" | wc -l | tr -d ' ')" != 2 ]; then
-  red "  ✗ both signing keys are required; allowed_signers left unchanged"; fail=1
+if [ "$(printf '%s' "$signers" | wc -l | tr -d ' ')" != 1 ]; then
+  red "  ✗ the personal signing key is required; allowed_signers left unchanged"; fail=1
 elif [ -f "$HOME/.ssh/allowed_signers" ] && [ "$(cat "$HOME/.ssh/allowed_signers")" = "$(printf '%s' "$signers")" ]; then
   grn "  = allowed_signers (current)"
 elif [ "$MODE" = check ]; then
   ylw "  ~ allowed_signers would be written"; fail=1
 else
   if printf '%s' "$signers" > "$HOME/.ssh/allowed_signers" && chmod 644 "$HOME/.ssh/allowed_signers"; then
-    grn "  + allowed_signers written (2 principals)"
+    grn "  + allowed_signers written (1 principal)"
   else
     red "  ✗ could not write allowed_signers"; fail=1
   fi
@@ -138,9 +136,8 @@ install_tpl "$HOME/.ssh/config"                        ssh-config.template      
 install_tpl "$HOME/.config/1Password/ssh/agent.toml"   1password-agent.toml.template  protect
 install_tpl "$HOME/.gitconfig.local"                   gitconfig-local.template       protect
 install_tpl "$HOME/.gitconfig-personal"                gitconfig-personal.template    protect
-install_tpl "$HOME/.gitconfig-work"                    gitconfig-work.template        protect
 if [ "$MODE" != check ]; then
-  chmod 600 "$HOME/.ssh/config" "$HOME"/.gitconfig.local "$HOME"/.gitconfig-personal "$HOME"/.gitconfig-work || fail=1
+  chmod 600 "$HOME/.ssh/config" "$HOME"/.gitconfig.local "$HOME"/.gitconfig-personal || fail=1
 fi
 
 hdr "Verification"
@@ -159,15 +156,12 @@ fi
 
 hdr "Remaining manual steps"
 cat <<'EOF'
-  1. Upload the four public keys to GitHub — the Key type dropdown matters:
-       somto_auth_ed25519.pub       -> SomtoUgeh         Authentication key
-       somto_sign_ed25519.pub       -> SomtoUgeh         Signing key
-       swissblock_auth_ed25519.pub  -> somto-swissblock  Authentication key
-       swissblock_sign_ed25519.pub  -> somto-swissblock  Signing key
+  1. Upload the two public keys to GitHub — the Key type dropdown matters:
+       somto_auth_ed25519.pub  -> SomtoUgeh  Authentication key
+       somto_sign_ed25519.pub  -> SomtoUgeh  Signing key
      Copy with:  pbcopy < ~/.ssh/<name>.pub
-  2. Enable Vigilant mode on both GitHub accounts.
-  3. Sign a test commit under ~/code/work and ~/code/personal, approving the
-     1Password prompt once per key:
+  2. Enable Vigilant mode on the GitHub account.
+  3. Sign a test commit under ~/code/personal, approving the 1Password prompt:
        git commit --allow-empty -m "signing test" && git verify-commit HEAD
 EOF
 [ "$MODE" = check ] && { echo; ylw "(--check: nothing was changed)"; }

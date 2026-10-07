@@ -91,7 +91,6 @@ _set_gh_config_dir() {
   case "$PWD/" in
     "$HOME/code/personal/"*) export GH_CONFIG_DIR="$HOME/.config/gh-personal" ;;
     "$HOME/code/TalentQL/"*) export GH_CONFIG_DIR="$HOME/.config/gh-personal" ;;
-    "$HOME/code/work/"*) export GH_CONFIG_DIR="$HOME/.config/gh-work" ;;
     *) unset GH_CONFIG_DIR ;;
   esac
 }

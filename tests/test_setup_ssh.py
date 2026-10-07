@@ -81,7 +81,7 @@ esac
         self.assertEqual(self.run_setup().returncode, 0)
         allowed = self.home / ".ssh/allowed_signers"
         before = allowed.read_bytes()
-        self.env["MISSING_KEY"] = "swissblock_sign_ed25519"
+        self.env["MISSING_KEY"] = "somto_sign_ed25519"
         result = self.run_setup()
         self.assertEqual(result.returncode, 1)
         self.assertEqual(allowed.read_bytes(), before)
