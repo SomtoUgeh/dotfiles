@@ -247,7 +247,7 @@
 	"typescript.updateImportsOnFileMove.enabled": "always",
 	"window.clickThroughInactive": false,
 	"window.closeWhenEmpty": true,
-	"window.autoDetectColorScheme": true,
+	"window.autoDetectColorScheme": false,
 	"remote.SSH.remotePlatform": {
 		"altschool": "linux"
 	},
@@ -302,4 +302,7 @@
 		"https://biomejs.dev": true,
 	},
 	"todo-tree.ripgrep.ripgrep": "/opt/homebrew/bin/rg",
+	"update.releaseTrack": "dev",
+	"cursor.general.reduceTransparency": true,
+	"cursor.composer.shouldChimeAfterChatFinishes": true
 }
