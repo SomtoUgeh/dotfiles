@@ -11,11 +11,11 @@ The sliding highlight span first, one button per variant, a hairline divider, th
 ```html
 <nav class="proto-picker" aria-label="Prototype variants">
   <span class="proto-picker-highlight" aria-hidden="true"></span>
-  <button type="button" class="proto-picker-item" data-active aria-current="true">Quiet</button>
-  <button type="button" class="proto-picker-item">Editorial</button>
-  <button type="button" class="proto-picker-item">Playful</button>
+  <button class="proto-picker-item" data-active aria-current="true">Quiet</button>
+  <button class="proto-picker-item">Editorial</button>
+  <button class="proto-picker-item">Playful</button>
   <span class="proto-picker-divider" aria-hidden="true"></span>
-  <button type="button" class="proto-picker-item proto-picker-replay" aria-label="Replay animation (R)">↻</button>
+  <button class="proto-picker-item proto-picker-replay" aria-label="Replay animation (R)">↻</button>
 </nav>
 ```
 
@@ -33,8 +33,6 @@ In a framework, keep the class names and structure; only the rendering syntax ch
   display: flex;
   align-items: center;
   gap: 2px;
-  max-width: calc(100vw - 32px);
-  overflow-x: auto;
   padding: 4px;
   border-radius: 999px;
   background: rgba(10, 10, 10, 0.82);
@@ -71,7 +69,6 @@ In a framework, keep the class names and structure; only the rendering syntax ch
 
 @media (prefers-reduced-motion: reduce) {
   .proto-picker[data-ready] .proto-picker-highlight { transition: none; }
-  .proto-picker-item:active { transform: none; }
 }
 
 .proto-picker-item {
@@ -93,8 +90,8 @@ In a framework, keep the class names and structure; only the rendering syntax ch
   color: rgba(255, 255, 255, 0.85);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .proto-picker-item:active { transform: scale(0.97); }
+.proto-picker-item:active {
+  transform: scale(0.97);
 }
 
 .proto-picker-item:focus-visible {
@@ -127,7 +124,7 @@ In a framework, keep the class names and structure; only the rendering syntax ch
 ## Rules
 
 - **Verbatim.** These values are the spec. No project fonts, no brand colors, no theme switching, no extra shadows or borders.
-- **The highlight slides; the variant swap stays instant.** The active pill animates between buttons (250ms, strong ease-out) as spatial feedback on the picker itself — but the variant being previewed still switches with no transition. The `width` transition is a deliberate exception to the transform/opacity rule: the element is 28px tall, absolutely positioned, and has no layout dependents, so measure its cost with the actual labels and viewport instead of assuming it is negligible.
+- **The highlight slides; the variant swap stays instant.** The active pill animates between buttons (250ms, strong ease-out) as spatial feedback on the picker itself — but the variant being previewed still switches with no transition. The `width` transition is a deliberate exception to the transform/opacity rule: the element is 28px tall, absolutely positioned, and has no layout dependents, so the paint cost is negligible.
 - **One allowed modification:** if a variant occupies the bottom-center of the screen (a toast stack, a bottom sheet, a dock), set `data-position="top"` so the picker never covers the work. Nothing else about it may move or change.
 - **Replay is conditional.** Render the replay button and its divider only when at least one variant has an entrance or state animation worth re-triggering; a static comparison gets a shorter pill.
 
@@ -142,12 +139,10 @@ The contract is fixed regardless of how the harness renders:
 
 ## Reference wiring
 
-Verbatim for the standalone-HTML branch; in a framework, keep the same behavior but express it idiomatically (state instead of `innerHTML`, a keyed re-mount instead of DOM replacement, refs + a layout effect for the highlight measurement).
+Verbatim for the standalone-HTML branch; in a framework, keep the same behavior but express it idiomatically (state instead of `innerHTML`, a keyed re-mount instead of `requestAnimationFrame`, refs + a layout effect for the highlight measurement).
 
 ```js
-// `variants` is an array of functions returning fresh DOM elements with their
-// event handlers attached. One per picker item. Dispose external subscriptions
-// before remounting if a variant owns any.
+// `variants` is an array of render functions, one per variant, in picker order.
 const stage = document.getElementById('stage');
 const picker = document.querySelector('.proto-picker');
 const highlight = picker.querySelector('.proto-picker-highlight');
@@ -162,12 +157,13 @@ function moveHighlight() {
 }
 
 function mount(i) {
-  // Fresh nodes restart entrance animations and preserve attached handlers.
-  stage.replaceChildren(variants[i]());
+  stage.innerHTML = '';
+  // Clear first, render next frame, so entrance animations re-run.
+  requestAnimationFrame(() => { stage.innerHTML = variants[i](); });
 }
 
 function setActive(i) {
-  if (!Number.isInteger(i) || i < 0 || i >= variants.length) return;
+  if (i < 0 || i >= variants.length) return;
   current = i;
   items.forEach((el, j) => {
     el.toggleAttribute('data-active', j === i);
@@ -176,7 +172,7 @@ function setActive(i) {
   });
   moveHighlight();
   const url = new URL(location);
-  url.searchParams.set('v', String(i + 1));
+  url.searchParams.set('v', i + 1);
   history.replaceState(null, '', url);
   mount(i);
 }
@@ -187,17 +183,15 @@ window.addEventListener('resize', moveHighlight);
 
 document.addEventListener('keydown', (e) => {
   if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable) return;
-  if (e.defaultPrevented || e.isComposing || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
   const num = parseInt(e.key, 10);
-  if (num >= 1 && num <= variants.length) { e.preventDefault(); setActive(num - 1); }
-  else if (e.key === 'ArrowRight') { e.preventDefault(); setActive((current + 1) % variants.length); }
-  else if (e.key === 'ArrowLeft') { e.preventDefault(); setActive((current - 1 + variants.length) % variants.length); }
-  else if ((e.key === 'r' || e.key === 'R') && replay) { e.preventDefault(); mount(current); }
+  if (num >= 1 && num <= variants.length) setActive(num - 1);
+  else if (e.key === 'ArrowRight') setActive((current + 1) % variants.length);
+  else if (e.key === 'ArrowLeft') setActive((current - 1 + variants.length) % variants.length);
+  else if (e.key === 'r' || e.key === 'R') mount(current);
 });
 
-const initial = Number(new URLSearchParams(location.search).get('v'));
-setActive(Number.isInteger(initial) && initial >= 1 && initial <= variants.length ? initial - 1 : 0);
-document.fonts.ready.then(moveHighlight);
+setActive((parseInt(new URLSearchParams(location.search).get('v'), 10) || 1) - 1);
 // Enable the slide only after first paint, so load doesn't animate.
 requestAnimationFrame(() => requestAnimationFrame(() => picker.setAttribute('data-ready', '')));
 ```

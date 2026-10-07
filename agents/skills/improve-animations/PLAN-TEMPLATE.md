@@ -1,92 +1,73 @@
 # Plan Template
 
-Every requested plan should be executable without the audit conversation. Specify the proposed values and their rationale using the project's conventions and the canonical motion policy.
+Every plan written by `improve-animations` follows this structure. The executor may be a less capable model with zero context and zero taste — the plan must contain everything, exactly. No references to "the audit above" or "the easing we discussed."
 
-Rules for filling this in:
+```markdown
+# NNN — <Short imperative title>
 
-- Include exact proposed values or named existing tokens. Avoid references to values that appear only in the conversation.
-- Quote the current code. The executor should be able to find the site by matching the excerpt, not by trusting a line number.
-- Name an exemplar file in this repo that already does it right, so the executor copies the house style instead of inventing one.
-- Bound the scope explicitly. Say what must not be touched.
-- End with a feel-check, not just a build check. Code that compiles can still feel wrong.
-
----
-
-````markdown
-# NNN — <short imperative title>
-
-- **Commit:** <git rev-parse --short HEAD>
-- **Severity:** HIGH | MEDIUM | LOW
-- **Category:** <one of the eight audit categories>
-- **Estimated scope:** <n files, ~n lines>
+- **Status**: TODO
+- **Commit**: <output of `git rev-parse --short HEAD` when this plan was written>
+- **Severity**: HIGH | MEDIUM | LOW
+- **Category**: <audit category>
+- **Estimated scope**: <n files, rough size>
 
 ## Problem
 
-<State the observed behavior, affected interaction, and supporting code or
-runtime evidence. Explain the consequence and the relevant project convention
-or requirement. Identify what remains unverified.>
+What is wrong, where, and why it matters to how the product feels. Cite every
+location as `path/to/file.tsx:123` and include the current code verbatim:
 
-## Where
-
-| File | Lines | What's there |
-| --- | --- | --- |
-| `src/components/dropdown.tsx` | 41–48 | Enter transition on the content |
-
-### Current code
-
-```tsx
-// Paste the actual current component excerpt here.
-```
+​```css
+/* src/components/dropdown.css:14 — current */
+.dropdown { transition: all 400ms ease-in; }
+​```
 
 ## Target
 
-<The exact end state. Every value spelled out.>
+The exact end state. Every value spelled out — curves, durations, spring
+configs, media queries. Never "use a nicer easing":
 
-```css
-/* Include the exact target styles or component code, using the installed
-   primitive's documented lifecycle. Do not mix Radix variables with Base UI
-   attributes or assume an unmounting element will finish a transition. */
-```
+​```css
+/* target */
+.dropdown {
+  transition: transform 200ms var(--ease-out), opacity 200ms var(--ease-out);
+  transform-origin: var(--transform-origin);
+}
+​```
 
-**Why these values:** <Tie each proposed value to the interaction, project tokens, or observed problem. Defaults from a guide are not sufficient evidence.>
+## Repo conventions to follow
 
-## Conventions to follow
+How this codebase already does it, with one exemplar the executor should
+imitate (token names, file placement, prop patterns):
 
-- Easing tokens live in `<file>`. Use `<token>`; add a new one only if none fits, following the naming already there.
-- `<path/to/exemplar.tsx>` already does this correctly — match its structure.
-- <Anything else the repo does its own way.>
+- Easing tokens live in `src/styles/tokens.css`; add new curves there, e.g. `--ease-out: cubic-bezier(0.23, 1, 0.32, 1);`
+- <exemplar file:line that already does this correctly>
 
 ## Steps
 
-1. <One concrete action per step, in order.>
-2. <…>
-3. <…>
+1. <One concrete edit per step: file, what changes, resulting code.>
+2. …
 
-## Out of scope
+## Boundaries
 
-- <Files or behaviors the executor must not touch.>
-- Do not introduce a new animation library.
-- Do not change any other component's timing, even if it looks similar.
+- Do NOT touch <files/components out of scope>.
+- Do NOT change markup/structure — motion properties only (unless a step says otherwise).
+- Do NOT add new dependencies.
+- If a step doesn't match the code you find (drift since the commit stamp), STOP and report instead of improvising.
 
 ## Verification
 
-**Build**
-- [ ] Type-check and lint pass.
-- [ ] <Any test or story that covers this component.>
+- **Mechanical**: <exact commands — typecheck, lint, build — with expected outcome>.
+- **Feel check**: run the UI, trigger <interaction>, and confirm:
+  - <observable check, e.g. "the dropdown scales from its trigger, not from center">
+  - <e.g. "spamming the toggle never restarts the animation from zero">
+  - In DevTools, set playback to 10% (Animations panel) and confirm <detail>.
+  - Toggle `prefers-reduced-motion` (Rendering panel) and confirm movement is dropped but opacity feedback remains.
+- **Done when**: <machine- or eye-checkable completion criteria>.
+```
 
-**Behavior**
-- [ ] <Observable check — e.g. the panel scales from the trigger, not the center.>
-- [ ] Trigger it rapidly: the motion retargets from its current position instead of restarting.
-- [ ] With `prefers-reduced-motion: reduce`, spatial/decorative motion is reduced or removed and state meaning remains clear; an instant change is valid.
+## Notes for the plan author
 
-**Feel**
-- [ ] Observe or record the real interaction; check responsiveness, interruption, and continuity. Report unavailable device or browser checks as not assessed.
-- [ ] <For gestures and drawers:> test on a real device, not just the desktop browser.
-- [ ] Look at it again with fresh eyes before calling it done.
-
-## Notes
-
-<Anything the audit couldn't judge from code — whether the bounce fits the brand,
-whether the crossfade reads as one object. Say so plainly rather than guessing;
-these are decisions for a human.>
-````
+- One plan per finding. If two findings share every file and the same fix pattern (e.g. the same easing token swap across components), they may merge into one plan.
+- Pull every value from [AUDIT.md](AUDIT.md) — never approximate from memory.
+- The feel check is not optional. Motion can be mechanically correct and still feel wrong; give the executor (or the human reviewing the executor's diff) concrete things to watch for in slow motion.
+- After writing plans, create or update `plans/README.md` with: a table of plans (number, title, severity, status), the recommended execution order, and any dependencies between plans.
