@@ -8,7 +8,7 @@
 #   setup_ssh_from_1password.sh --force     also overwrite protected configs
 #
 # What it does:
-#   1. exports the three PUBLIC keys from 1Password to ~/.ssh/*.pub
+#   1. exports the two PUBLIC keys from 1Password to ~/.ssh/*.pub
 #   2. builds ~/.ssh/allowed_signers from the signing key
 #   3. installs ~/.ssh/config and ~/.config/1Password/ssh/agent.toml
 #   4. installs ~/.gitconfig{.local,-personal} from templates
@@ -26,7 +26,6 @@ set -o pipefail
 KEYS=(
   "somto_auth_ed25519|Personal|smugeh@gmail.com|auth"
   "somto_sign_ed25519|Personal|smugeh@gmail.com|sign"
-  "altschool_vm_rsa|Personal|altschool development host|auth|AltSchool VM SSH Key"
 )
 
 MODE=create

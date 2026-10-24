@@ -119,9 +119,7 @@ dotfiles/
 │   ├── scan_remote.sh                # inspect GitHub contents without cloning
 │   ├── apply_github_rulesets.sh      # push branch protection to repos
 │   ├── enable_touchid_sudo.sh
-│   ├── setup_altschool_cloud.sh
-│   ├── install_cloud_dotfiles.sh
-│   └── verify_altschool_cloud.sh
+│   └── install_cloud_dotfiles.sh
 ├── tests/                  # Scanner, installer and agent regression tests
 ├── macos/
 │   └── defaults.sh         # macOS system preferences
@@ -193,7 +191,7 @@ cd ~/code/personal && gh api user --jq .login   # SomtoUgeh
    ```bash
    ./scripts/setup_ssh_from_1password.sh          # --check to preview
    ```
-   It writes three public keys (two GitHub keys plus the AltSchool VM key),
+   It writes two public keys (the GitHub authentication and signing keys),
    `~/.ssh/allowed_signers`, `~/.ssh/config`
    and the gitconfig identity file. See [`git/SIGNING.md`](git/SIGNING.md).
 
@@ -437,40 +435,17 @@ git pull
 
 ## Cloud Development VM
 
-Private Ubuntu worker. No public inbound path. Cloudflare One routes a
-private `/32` through an outbound-only tunnel. The Mac is the infrastructure
-control plane. The VM is a replaceable worker with Git checkouts, ignored
-application environment files, Grok, and OpenCode.
+The cloud workspace is the boat.dev sandbox `julds`, reached from T3 Code
+through T3 Connect. `julds-up`, `julds-down` and `julds-tunnel` on the Mac
+resume it, stop it and forward the AltSchool ports. It stops itself after 30
+idle minutes.
 
-```mermaid
-flowchart LR
-  Mac["Mac or Termius"] -->|"Cloudflare One client"| Route["Private /32 route"]
-  Route -->|"outbound-only cloudflared"| VM["Ubuntu VM :22"]
-  VM --> Git["Git checkouts"]
-  VM --> Env["Ignored env files"]
-  VM --> Agents["Grok and OpenCode"]
-```
+[julds boat VM runbook](docs/boat-t3-workspace.md)
 
-**Daily path:** Cloudflare One shows Connected → `ssh altschool` →
-`tmux new -As development` → `talentql`. When local web ports are needed,
-start one separate `ssh altschool-tunnel` session; it forwards the application
-ports `5050` and `8000–8007` to the Mac. Bind development servers to
-`127.0.0.1`.
-
-The runbook is the source of truth (current host, security, rebuild,
-migration, cost, recovery):
-
-[Cloud Development Workspace Runbook](docs/cloud-development-workspace.md) ·
-[Daily](docs/cloud-development-workspace.md#daily-access) ·
-[Verify](docs/cloud-development-workspace.md#verification) ·
-[Rebuild](docs/cloud-development-workspace.md#build-or-rebuild-a-host) ·
-[Troubleshoot](docs/cloud-development-workspace.md#troubleshooting)
+On the VM, the Linux dotfiles installer is:
 
 ```bash
-./scripts/setup_altschool_cloud.sh
-./scripts/setup_altschool_cloud.sh --auth
-./scripts/setup_altschool_cloud.sh --update --auth --repo OWNER/REPO
-./scripts/verify_altschool_cloud.sh --require-auth --smoke
+~/code/personal/dotfiles/scripts/install_cloud_dotfiles.sh
 ```
 
 ## Troubleshooting

@@ -1,14 +1,12 @@
 # SSH identities and commit signing
 
-One GitHub identity uses two Ed25519 keys, and the AltSchool VM uses one RSA
-key. All three are held in 1Password. No private key material exists on this
+One GitHub identity uses two Ed25519 keys. Both are held in 1Password. No private key material exists on this
 machine as a file.
 
 | Key | Vault | Account | Role |
 |---|---|---|---|
 | `somto_auth_ed25519` | Personal | `SomtoUgeh` | authentication |
 | `somto_sign_ed25519` | Personal | `SomtoUgeh` | commit signing |
-| `AltSchool VM SSH Key` | Personal | `altschool` VM | authentication |
 
 Identity is folder-driven by `includeIf` in `git/.gitconfig`:
 `~/code/personal/`, `~/code/TalentQL/`, and the agent worktree dirs get the

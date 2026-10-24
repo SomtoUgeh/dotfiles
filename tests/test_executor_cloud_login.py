@@ -38,20 +38,6 @@ class LoginTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'OAuth discovery returned HTTP 403'):
                 discover_endpoint('https://executor.example/mcp')
 
-    def test_ssh_remains_available_when_executor_fails(self):
-        source = (Path(__file__).resolve().parent.parent / 'shell/.zshrc').read_text()
-        function = source[source.index('function altschool-up() {'):source.index('\n# ============================================================================', source.index('function altschool-up() {'))]
-        with tempfile.TemporaryDirectory() as directory:
-            for command in ['ssh', 'pgrep']:
-                path = Path(directory) / command
-                path.write_text('#!/bin/sh\nexit 0\n')
-                path.chmod(0o700)
-            for args, login_status, expected, entered in [('--ssh', 17, 23, True), ('', 17, 17, False), ('--ssh', 130, 130, False), ('--ssh', 0, 23, True)]:
-                script = function + f'\nfunction executor-cloud-login() {{ return {login_status}; }}\nfunction ssh() {{ print SHELL_ENTERED; return 23; }}\naltschool-up {args}\n'
-                result = subprocess.run(['/bin/zsh', '-c', script], env={**os.environ, 'PATH':directory+':/usr/bin:/bin'}, text=True, capture_output=True)
-                with self.subTest(args=args, status=login_status):
-                    self.assertEqual(result.returncode, expected)
-                    self.assertEqual('SHELL_ENTERED' in result.stdout, entered)
 
     def test_cached_login_never_opens_browser(self):
         process = MagicMock()

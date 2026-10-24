@@ -4,7 +4,7 @@ Use the existing Executor Cloud deployment for internet services. Install local
 Executor only for tools that need this computer's projects or apps. Joining a
 new computer does not require deploying Cloudflare again or restoring its backup.
 
-These instructions match the versions verified on macOS and the AltSchool Linux
+These instructions match the versions verified on macOS and the (since removed) AltSchool Linux
 VM on 12 September 2026. Windows service setup has not been verified here.
 
 ## 1. Prepare the computer
@@ -92,27 +92,16 @@ node "$HOME/.bun/install/global/node_modules/mcp-remote/dist/proxy.js" \
 ```
 
 Wait for successful connection, then stop this temporary process with Ctrl+C.
-For the AltSchool VM, load the current dotfiles shell once with `source ~/.zshrc`,
-then use this daily command on the Mac:
+For a remote VM without a local browser (such as the julds boat VM), run the
+first login with the callback port forwarded to the Mac (for boat:
+`boat forward <id> --remote <port> --local <port>`), then open the printed
+authorization URL in the Mac browser. For SSH-reachable hosts, the helper does
+this for you:
 
 ```sh
-altschool-up --ssh
-```
-
-This checks SSH reachability, keeps the existing development port forwards,
-starts/checks VM-local Executor, verifies a real cloud GitHub read, then enters
-SSH through the normal shell wrapper. It does not power on a stopped VM.
-With `--ssh`, an Executor failure prints a warning and still opens your shell;
-plain `altschool-up` returns failure. SSH/forwarding failures and Ctrl+C stop the
-sequence. Plain `ssh altschool` always opens a shell without Executor checks.
-Running a dev server in another session does not prevent additional SSH sessions.
-
-To renew/check only the VM cloud login:
-
-```sh
-executor-cloud-login altschool
+executor-cloud-login <ssh-host>
 # From a checkout without the shell function:
-uv run --script scripts/executor_cloud_login.py altschool
+uv run --script scripts/executor_cloud_login.py <ssh-host>
 ```
 
 Cached authentication needs no browser. Ordinary initialization and cloud reads
@@ -123,12 +112,12 @@ its temporary connection. Cancellation also closes it. A busy callback port
 stops login with an error; close the occupying process yourself and retry.
 
 Configure a stable callback port across all agents on each SSH-only device.
-AltSchool uses 17907 (the Mac's adapter uses its own port):
+The julds VM uses 17908 (the Mac's adapter uses its own port):
 
 ```sh
 uv run --script scripts/setup_executor.py --cloud-only \
   --cloud-url https://executor-cloudflare.somto.workers.dev/mcp \
-  --cloud-callback-port 17907
+  --cloud-callback-port 17908
 ```
 
 Run that setup command on the VM, using its installed executable paths if needed.

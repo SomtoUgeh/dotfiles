@@ -188,39 +188,12 @@ alias cat="bat"
 alias yolo="claude --dangerously-skip-permissions"
 alias yolo-tg="claude --dangerously-skip-permissions --channels plugin:telegram@claude-plugins-official"
 
-# AltSchool VM
-unalias altschool-up 2>/dev/null
+# Executor cloud login helper (SSH hosts)
 typeset -g _executor_login_script="${${(%):-%x}:A:h}/../scripts/executor_cloud_login.py"
 function executor-cloud-login() {
   command uv run --script "$_executor_login_script" "$@"
 }
 
-function altschool-up() {
-  if [[ $# -gt 1 || ( $# -eq 1 && "$1" != --ssh ) ]]; then
-    print -u2 'Usage: altschool-up [--ssh]'
-    return 2
-  fi
-  command ssh -o ConnectTimeout=15 -o ClearAllForwardings=yes altschool true || return
-  if ! pgrep -f '^ssh .*altschool-tunnel$' >/dev/null; then
-    command ssh -o ExitOnForwardFailure=yes -fN altschool-tunnel || return
-  fi
-  local executor_status=0
-  executor-cloud-login altschool --check-local || executor_status=$?
-  if (( executor_status == 130 )); then
-    return 130
-  elif (( executor_status != 0 )); then
-    print -u2 'Executor is not ready. Retry with: executor-cloud-login altschool'
-    [[ "$1" == --ssh ]] || return "$executor_status"
-    print -u2 'Opening SSH; Executor authentication is still pending.'
-  else
-    print 'AltSchool is ready.'
-  fi
-  if [[ "$1" == --ssh ]]; then
-    ssh altschool
-    return $?
-  fi
-  return 0
-}
 
 # ============================================================================
 # FUNCTIONS
@@ -251,23 +224,6 @@ npm-latest() { npm info "$1" | grep latest; }
 
 # Kill process on port
 killport() { lsof -i tcp:"$*" | awk 'NR!=1 {print $2}' | xargs kill -9; }
-
-# Wrap only the droplet SSH alias so OSC 52 clipboard copy works in Grok.
-# Other hosts (github.com, jump boxes, altschool-vm) stay plain ssh.
-unalias ssh 2>/dev/null
-ssh() {
-  local _grok_wrap=0 _arg
-  for _arg in "$@"; do
-    case "$_arg" in
-      altschool) _grok_wrap=1; break ;;
-    esac
-  done
-  if (( _grok_wrap )) && command -v grok >/dev/null; then
-    command grok wrap ssh "$@"
-  else
-    command ssh "$@"
-  fi
-}
 
 # Quit macOS app
 quit() {

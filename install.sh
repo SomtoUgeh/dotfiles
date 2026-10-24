@@ -403,8 +403,6 @@ create_symlink "$AGENTS_DIR/skills" "$HOME/.config/opencode/skills"
 # dangling link, fails, and `set -e` aborts the entire installer. create_symlink
 # clears a broken link and recreates it correctly on its own.
 create_symlink "$AGENTS_DIR/opencode/plugins" "$HOME/.config/opencode/plugins"
-create_symlink "$AGENTS_DIR/opencode/digitalocean-mcp.sh" "$HOME/.config/opencode/digitalocean-mcp.sh"
-chmod +x "$AGENTS_DIR/opencode/digitalocean-mcp.sh" 2>/dev/null || true
 
 # Claude plugins: declared once in the symlinked settings.json (enabledPlugins +
 # extraKnownMarketplaces) — the single source of truth. Claude also syncs these
@@ -668,8 +666,6 @@ PUBLIC_SCRIPTS=(
     setup_ssh_from_1password.sh
     apply_github_rulesets.sh
     enable_touchid_sudo.sh
-    setup_altschool_cloud.sh
-    verify_altschool_cloud.sh
     scan_repo.sh
     scan_remote.sh
 )

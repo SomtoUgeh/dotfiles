@@ -61,34 +61,6 @@ cp "$key.pub" "$fixture/upload/.ssh/id_ed25519_personal.pub"
 env HOME="$fixture/upload" bash "$fixture/upload.sh" "$root" "$fixture/functions.sh" upload > "$fixture/upload.log" 2>&1
 grep -q SETUP_COMPLETED "$fixture/upload.log"
 grep -q 'Could not upload the authentication key' "$fixture/upload.log"
-# Clone block: a fake gh records arguments, all app execution would fail.
-awk '/^repository="\$1"/{copy=1} copy && /^REMOTE$/{exit} copy{print}' "$root/scripts/setup_altschool_cloud.sh" > "$fixture/clone.sh"
-mkdir -p "$fixture/home/code/TalentQL"
-cat > "$fixture/clone-run.sh" <<'SH'
-set -eu
-export HOME="$1"
-log="$2"
-gh() { printf '%s\n' "$@" > "$log"; mkdir -p "$4/.git"; }
-bun() { exit 99; }
-bunx() { exit 99; }
-script="$3"
-set -- owner/repository
-. "$script"
-SH
-bash "$fixture/clone-run.sh" "$fixture/home" "$fixture/args" "$fixture/clone.sh"
-grep -qx -- --depth=1 "$fixture/args"
-rm "$fixture/args"
-bash "$fixture/clone-run.sh" "$fixture/home" "$fixture/args" "$fixture/clone.sh"
-[ ! -e "$fixture/args" ]
-# Missing Node must reach the toolchain summary rather than abort.
-{
-  printf '%s\n' 'set -euo pipefail' 'failures=0' 'TOOLCHAIN_ONLY=1' 'ok() { :; }' 'fail() { failures=$((failures+1)); }' 'node() { return 127; }' 'bun() { echo fixture; }' 'grok() { echo fixture; }' 'opencode2() { echo fixture; }'
-  sed -n '/^if node_version=/,/^if systemctl/{ /^if systemctl/!p; }' "$root/scripts/verify_altschool_cloud.sh"
-} > "$fixture/verify.sh"
-status=0
-bash "$fixture/verify.sh" > "$fixture/result" || status=$?
-[ "$status" = 1 ]
-grep -q 'Toolchain verification finished with 1 failure' "$fixture/result"
 # OpenCode 2 cloud links include hook plugins and agents; V1 npm leftovers are removed.
 opencode_home="$fixture/opencode-home"
 mkdir -p "$opencode_home/.config/opencode/node_modules/left" \

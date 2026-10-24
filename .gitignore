@@ -5,7 +5,7 @@ __pycache__/
 .DS_Store
 .ropeproject/
 !docs/
-!docs/cloud-development-workspace.md
+!docs/boat-t3-workspace.md
 
 # Generated per machine: Claude skill sync cache and boat-injected skill
 agents/skills/synced/

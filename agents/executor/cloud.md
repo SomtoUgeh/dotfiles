@@ -249,10 +249,6 @@ real read such as GitHub `get_me` through Executor's execute tool.
 | Cloudflare Bindings | D1 database listing passed |
 | Cloudflare Builds | Worker list and build list passed; the selected Worker had no builds |
 | Cloudflare Observability | Observability-key read passed |
-| DigitalOcean Accounts | Account information passed |
-| DigitalOcean Droplets | Droplet listing passed |
-| DigitalOcean Networking | VPC peering listing passed |
-| DigitalOcean Docs | Documentation-page read passed; hosted endpoint required the existing API token |
 | Figma REST API | `figma_api.user.personalFigma.users.getMe` and `files.getFile` returned HTTP 200 |
 | PlanetScale | 11 October 2026: `planetscale.org.personal` (DCR client `dcr-api-planetscale-com`, 26 tools); `list_organizations` and `list_databases` passed. `planetscale.*` approves; `execute_write_query`, `update_payment_method` and `get_payment_method_setup` require approval, and a write call paused as expected. The OAuth grant carries every advertised scope, including org/database delete and payment writes |
 | Canva | Original and fresh dynamic registrations echo the exact hosted callback, but authorization returns HTTP 400 `Invalid redirect URI` |

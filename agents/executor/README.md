@@ -9,7 +9,7 @@ device's sign-in.
 
 Skills, hooks, plugins, language servers, and app-specific tools retain their
 existing owners. Executor does not make every managed connector portable.
-The AltSchool VM also uses both gateways, with its own Linux-local tools.
+The julds boat VM uses both gateways; its `executor` entry reaches the Mac's local Executor through a boat reverse tunnel.
 All five Mac agents have an `executor_cloud` entry. See the
 [Cloudflare guide](cloud.md) for device setup, verified services and pending
 migration checks. All fourteen verified internet-service duplicates are removed
@@ -210,8 +210,6 @@ custom entries and permissions, and does not perform live health checks. The
 installer preserves the resulting host-local file. Fresh devices retain direct
 defaults until their gateways are configured and this explicit cleanup runs.
 
-DigitalOcean uses four hosted connections: `digitalocean-accounts`,
-`digitalocean-droplets`, `digitalocean-networking`, and `digitalocean-docs`.
 Account information, droplet listing, VPC peering listing and a docs-page read
 passed through Executor Cloud. The existing 1Password token was stored in the
 cloud encrypted credential provider. Even the docs endpoint required that token;

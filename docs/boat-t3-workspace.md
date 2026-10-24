@@ -79,7 +79,7 @@ git 2.56 (git-core PPA), gh 2.103, uv/uvx 0.13.5, node 24 (nvm), bun, pnpm, agen
 
 - `julds-up`: resume the VM if stopped and wait for T3 Connect.
 - `julds-down`: stop it now (between agent turns only).
-- `julds-tunnel`: forward AltSchool ports 5050 and 8000-8007 to the Mac (replaces `ssh altschool-tunnel`).
+- `julds-tunnel`: forward AltSchool ports 5050 and 8000-8007 to the Mac.
 
 ## Idle auto-stop
 
@@ -93,5 +93,5 @@ git 2.56 (git-core PPA), gh 2.103, uv/uvx 0.13.5, node 24 (nvm), bun, pnpm, agen
 
 - AltSchool repo cloned from GitHub, then all 26 local branches, the stash and the unpushed commit `c2f12615` restored from a `git bundle`.
 - Ignored files carried by checksum: four env files (`apps/core/.env.local`, `apps/home/.env.local`, `apps/student/.env.local`, `apps/student/.env.development.local`), per-app AGENTS.md/CLAUDE.md, `.cursor/`; plus `~/.altschool` (portal QA evidence). `bun install --frozen-lockfile`, `bun run check` and `check-types` pass on bun 1.4.2.
-- The droplet's uncommitted dotfiles edits were pushed as branch `droplet-wip`.
-- Agent histories on the droplet were not kept. Copies of the bundle and archives are in `~/migration/droplet` on the VM.
+- The droplet's uncommitted dotfiles edits were merged into main (`droplet-wip`).
+- Agent histories on the droplet were not kept. The temporary migration copies were deleted after verification.

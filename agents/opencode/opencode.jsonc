@@ -49,15 +49,6 @@
         "type": "remote",
         "url": "https://observability.mcp.cloudflare.com/mcp",
       },
-      // 1Password item: Personal / DigitalOcean API Token / token
-      "digitalocean": {
-        "type": "local",
-        "command": [
-          "bash",
-          "-c",
-          "exec \"$HOME/.config/opencode/digitalocean-mcp.sh\"",
-        ],
-      },
     },
   },
   "permissions": [
@@ -65,8 +56,6 @@
     { "action": "external_directory", "resource": "*", "effect": "allow" },
     { "action": "cloudflare*", "resource": "*", "effect": "ask" },
     { "action": "cloudflare-docs_*", "resource": "*", "effect": "allow" },
-    { "action": "digitalocean*", "resource": "*", "effect": "ask" },
-    { "action": "digitalocean-docs_*", "resource": "*", "effect": "allow" },
     { "action": "read", "resource": "*.env", "effect": "deny" },
     { "action": "read", "resource": "*.env.*", "effect": "deny" },
     { "action": "read", "resource": "*.env.example", "effect": "allow" },

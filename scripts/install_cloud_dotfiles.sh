@@ -90,7 +90,7 @@ setup_personal_github_ssh() {
   local key="$HOME/.ssh/id_ed25519_personal"
   local pub="$key.pub"
   local email="smugeh@gmail.com"
-  local title="altschool-dev"
+  local title="${CLOUD_HOST_TITLE:-$(hostname -s)}"
   local personal_config="$HOME/.gitconfig-personal"
   local ssh_config="$HOME/.ssh/config"
   local allowed="$HOME/.ssh/allowed_signers"
