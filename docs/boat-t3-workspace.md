@@ -86,7 +86,9 @@ find ~/.claude/skills -maxdepth 1 -xtype l -delete
 | `executor` | The Mac's local Executor: 1password, agentation, aside, canva, paper, playwright, shadcn | `~/.local/bin/executor-mac-mcp` -> mcp-remote -> `http://127.0.0.1:4789/mcp` on the VM, a boat reverse tunnel to the Mac's Executor. Bearer token in `~/.config/executor-mac/token` (0600) |
 | `computer` | boat's Linux desktop / Chrome tools | boat rewrites it into each harness config at every sandbox start |
 
-The Mac end of the tunnel is `~/Library/LaunchAgents/com.julds.boat-executor-bridge.plist` (`boat forward bx_gbx664fj --reverse --local 4789 --remote 4789`, KeepAlive). The `executor` entry works only while the Mac is awake. Rotating the Mac token (`executor server rotate-token`) means rewriting the VM token file.
+The Mac end of the tunnel is `~/.local/bin/julds-executor-bridge`, run by `~/Library/LaunchAgents/com.julds.boat-executor-bridge.plist` (KeepAlive). It keeps `boat forward bx_gbx664fj --reverse --local 4789 --remote 4789` running while the VM is up, stops it when the VM stops, and restarts it when a probe from the VM (every 2 minutes) fails; a bare `boat forward` goes stale after a VM stop/resume without exiting. Log: `~/Library/Logs/boat-executor-bridge.log`. Restart with `launchctl kickstart -k gui/$(id -u)/com.julds.boat-executor-bridge`. The `executor` entry works only while the Mac is awake. Rotating the Mac token (`executor server rotate-token`) means rewriting the VM token file.
+
+Approvals: the Mac Executor policies `1password.*` and `playwright.*` are `require_approval` (since 24 Oct 2026), so calls from the VM (and from Mac agents) pause until approved in the Mac's Executor UI. Paper, Aside, Canva, Agentation and shadcn keep their existing policies.
 
 ## 1Password
 
@@ -121,7 +123,8 @@ boat deletes a stopped sandbox's disk 14 days after the stop (email on day 11). 
 - Wrangler's OAuth callback listens on `[::1]:8976`; `boat forward` targets 127.0.0.1, so bridge with socat for logins.
 - Codex `exec` can answer before the cloud gateway finishes starting; interactive T3 sessions are fine.
 - Stop only between agent turns: a stop ends running processes (no hibernate). Enabled systemd services start again on resume.
-- Security: agents run with full access and can use claude.ai connectors (Gmail, Calendar, Docs), the Mac's desktop tools through `executor` (including 1Password and Playwright on the Mac browser), and boat's account-level CLI.
+- Security: agents run with full access and can use claude.ai connectors (Gmail, Calendar, Docs), the `gh` login, the 1Password service account, the Mac's desktop tools through `executor` (1Password and Playwright need approval), and boat's account-level CLI. Patterns to adopt later: credentials kept outside the sandbox (Cloudflare outbound Workers for Sandboxes, boat's secret proxy) and a repo-scoped GitHub token.
+- Scheduled or always-on work (T3 Scheduled Tasks on julds, proactive agents) does not run while the VM is stopped; run it from the Mac's T3, from Cloudflare (Agents SDK / Pi Durable), or pause the idle check during those windows.
 
 ## History
 
