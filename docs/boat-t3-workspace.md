@@ -88,7 +88,7 @@ find ~/.claude/skills -maxdepth 1 -xtype l -delete
 
 The Mac end of the tunnel is `~/.local/bin/julds-executor-bridge`, run by `~/Library/LaunchAgents/com.julds.boat-executor-bridge.plist` (KeepAlive). It keeps `boat forward bx_gbx664fj --reverse --local 4789 --remote 4789` running while the VM is up, stops it when the VM stops, and restarts it when a probe from the VM (every 2 minutes) fails; a bare `boat forward` goes stale after a VM stop/resume without exiting. Log: `~/Library/Logs/boat-executor-bridge.log`. Restart with `launchctl kickstart -k gui/$(id -u)/com.julds.boat-executor-bridge`. The `executor` entry works only while the Mac is awake. Rotating the Mac token (`executor server rotate-token`) means rewriting the VM token file.
 
-Approvals: the Mac Executor policies `1password.*` and `playwright.*` are `require_approval` (since 24 Oct 2026), so calls from the VM (and from Mac agents) pause until approved in the Mac's Executor UI. Paper, Aside, Canva, Agentation and shadcn keep their existing policies.
+Approvals: the Mac Executor policies `1password.*` and `playwright.*` are `require_approval` (since 24 Oct 2026), so those calls pause. Mac agents (stdio, `--elicitation-mode browser`) get a browser approval on the Mac. Calls from the VM go over HTTP, where Executor hands the approval back to the agent: it asks in the T3 thread and resumes after you reply, or you run `executor resume --execution-id <id> --action accept|cancel` on the Mac. On the VM this is a request, not a lock; set the policy to `block` for a hard stop. Paper, Aside, Canva, Agentation and shadcn keep their existing policies.
 
 ## 1Password
 

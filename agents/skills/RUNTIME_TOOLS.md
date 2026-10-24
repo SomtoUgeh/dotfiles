@@ -127,6 +127,7 @@ record setup evidence, not continuous health guarantees.
 | UI polish | Shared `emil-design-engineering`, including focused polish | Duplicate UI-polish checklists |
 | File todo schema, lifecycle, and triage | Shared `file-todos`, including triage mode | Separate triage schema/workflow |
 | Source-backed research and implementation documentation | Shared `research`; implementation checks are a reference | Separate docs-first research workflow |
+| Codebase security audits, pen tests, and vulnerability research | Shared `security-audit`; diff review stays with `code-review` and its `security-sentinel` lane | Built-in Claude `security-review` |
 
 These are ownership choices, not a request to install missing plugins. Resolve
 an overlapping recommendation from another workflow to its owner here. Keep
