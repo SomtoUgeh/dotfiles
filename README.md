@@ -89,7 +89,7 @@ dotfiles/
 ├── Brewfile                # Homebrew packages
 ├── README.md
 ├── docs/
-│   └── cloud-development-workspace.md
+│   └── boat-t3-workspace.md      # julds boat VM runbook
 ├── shell/                  # Shell configurations
 │   ├── .zshrc
 │   ├── .zshrc.cloud        # Ubuntu VM Zsh
