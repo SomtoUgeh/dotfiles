@@ -21,6 +21,7 @@ _add_to_path "$HOME/.bun/bin"
 _add_to_path "$HOME/.grok/bin"
 _add_to_path "$HOME/.opencode/bin"
 _add_to_path "$HOME/.cargo/bin"
+_add_to_path "$HOME/.ascii/bin"   # boat CLI (boat.dev sandboxes)
 
 unset -f _add_to_path
 

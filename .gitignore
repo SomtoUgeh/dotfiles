@@ -6,3 +6,7 @@ __pycache__/
 .ropeproject/
 !docs/
 !docs/cloud-development-workspace.md
+
+# Generated per machine: Claude skill sync cache and boat-injected skill
+agents/skills/synced/
+agents/skills/boat/
