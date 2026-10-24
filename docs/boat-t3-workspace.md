@@ -57,7 +57,7 @@ Change size: `julds-down`, then `boat resume bx_gbx664fj --type large` (or `--ty
 
 Agent CLIs resolve from `~/.local/bin`: Claude (native installer), Codex, Grok, Cursor (`cursor-agent`), OpenCode 2 (`@opencode/cli`), each linked from the nvm global bin where npm-installed. T3 providers: Codex, Claude, Cursor, Grok (`/home/user/.local/bin/grok`), OpenCode (`/home/user/.nvm/versions/node/v24.22.1/bin/opencode`).
 
-Also installed: git (git-core PPA), gh, uv/uvx, node 24 (nvm), bun 1.4.2, pnpm, agent-browser (with Chrome), wrangler, cf, `op`. Unattended security upgrades are on.
+Also installed: git (git-core PPA), gh, uv/uvx, node 24.22.1 (nvm default, `/usr/local/bin/node` links to it; system `/usr/bin/node` from NodeSource `node_24.x`), bun 1.4.4 (`/usr/local/bin/bun` links to `~/.bun/bin/bun`), pnpm, agent-browser (with Chrome), wrangler, cf, `op`. Unattended security upgrades are on.
 
 ## Dotfiles and skills
 
@@ -116,7 +116,7 @@ The VM cannot run iOS Simulators, so T3 on `julds` uses the Mac as an SSH **devi
 
 ## Idle auto-stop and waking
 
-**Stop.** `~/.local/bin/julds-idle-check` runs every 5 minutes (`julds-idle.timer`, user systemd). After 30 idle minutes it saves the named snapshot `julds-latest` and runs `boat stop self`. Active means any of: agent processes used CPU, an agent has an open TCP connection, system CPU >= 10%, an SSH login, or less than 20 minutes since boot. Log: `~/.local/state/julds-idle/log`. Pause with `touch ~/.local/state/julds-idle/disabled`.
+**Stop.** `~/.local/bin/julds-idle-check` runs every 5 minutes (`julds-idle.timer`, user systemd). After 30 idle minutes it saves the named snapshot `julds-latest` and runs `boat stop self`. The script exports `BOAT_ID=bx_gbx664fj`, because `boat ... self` needs it and the systemd timer does not inherit it (before 24 Oct 2026 every idle stop failed with "self can only be used inside a sandbox shell"). Active means any of: agent processes used CPU, an agent has an open TCP connection, system CPU >= 10%, an SSH login, or less than 20 minutes since boot. Log: `~/.local/state/julds-idle/log`. Pause with `touch ~/.local/state/julds-idle/disabled`.
 
 **Wake.** A stopped VM has no machine, so nothing wakes it by itself; T3 shows it offline until it is resumed.
 
@@ -148,3 +148,7 @@ boat deletes a stopped sandbox's disk 14 days after the stop (email on day 11). 
 - 24 Oct 2026: replaced the DigitalOcean droplet `altschool-dev`. The AltSchool repo (main and staging-* branches), its four env files (checksums matched), per-app AGENTS.md/CLAUDE.md, `.cursor/` and `~/.altschool` were carried over; other local branches were dropped by choice. The droplet, its firewall, API tokens and SSH key, the Cloudflare tunnel, private route and split-tunnel entry, the old GitHub keys, the Executor DigitalOcean integrations and the DigitalOcean tooling in these dotfiles were removed. The droplet's uncommitted dotfiles edits were merged (`droplet-wip`).
 - 24 Oct 2026: iOS Simulators for `julds` through the Mac as a T3 device host. Verified: Test connection "iOS available", and the Mac's iPhone 18 Pro (iOS 27.0) streamed in a `julds` thread on app.t3.codes.
 - Verified 24 Oct 2026: all five agents read GitHub through `executor_cloud` and listed the Mac integrations through `executor`; reboot and stop/resume keep T3 Connect without re-pairing; `bun run check` and `check-types` pass.
+
+## Security patches
+
+- 24 Oct 2026, CVE-2026-111497 (Brotli decoder out-of-bounds write, "Node2Shell"; fixed in Node 22.23.4 / 24.22.1 / 26.12.1 and Bun 1.4.4). julds: Bun 1.4.2 -> 1.4.4, `/usr/local/bin/bun` 1.3.14 replaced by a link, nvm v22.23.2 and v24.18.1 removed, NodeSource moved from `node_20.x` to `node_24.x`, then `julds-down` + `boat resume` onto a patched host. Already patched: T3 (Node 26.12.1 SEA), Claude Code and OpenCode (Bun 1.4.4), cursor-agent (bundled Node 24.22.1). Still open: Ubuntu `libbrotli1` 1.1.0 (Ubuntu status "needs evaluation"; unattended-upgrades will pick up the fix). AltSchool's `packageManager` still says `bun@1.4.2`.
