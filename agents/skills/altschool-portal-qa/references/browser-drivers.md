@@ -1,8 +1,8 @@
 # Browser drivers
 
-Two browser surfaces can drive Portal QA. Choose one per turn and record
-it. Do not mix them in the same login unless attaching agent-browser to
-an already-open in-app Chrome via CDP.
+Three browser surfaces can drive Portal QA. Record the driver for each
+check. Do not mix drivers in one login unless attaching agent-browser
+to an already-open in-app Chrome via CDP.
 
 Shared credential and evidence rules still apply:
 [credentials.md](credentials.md),
@@ -11,24 +11,131 @@ passwords, cookies, bearer tokens, session payloads, or complete HARs.
 
 ## Choose the driver
 
-| Driver | Use when | Do not use when |
-| --- | --- | --- |
-| **agent-browser** (default) | Production smoke, encrypted-profile login, network status capture, headed/headless automation on this VM | The user asked to watch the Codex Desktop in-app browser, or `agent-browser` is missing |
-| **Codex in-app browser** | Codex Desktop, the user asked for the in-app browser, local `*.localhost` preview they want to see, or visual pairing while you debug | Production login would require typing a password into the in-app form; the Browser plugin/`@Browser` tools are absent this turn |
+Pick by environment. A driver the user names wins.
 
-Default: **agent-browser** with encrypted profile
-`altschool-portal-diagnosis` via `scripts/login.sh`. That is the
-verified production-auth path.
+| Env | Origins | Driver |
+| --- | --- | --- |
+| **Production** | `portal.altschoolafrica.com`, `core.altschoolafrica.com` | **Aside** first; agent-browser fallback |
+| **Staging** | Vercel deployments of `staging-*` branches (see [Staging origins](#staging-origins)) | **Aside** first; agent-browser fallback |
+| **Dev** | `*-altschool.localhost`, `bun run dev:preview` URLs | **agent-browser** only |
+
+Fall back from Aside to agent-browser when:
+
+- the Aside host is offline or the CLI fails;
+- no single saved login matches the origin (see [Sign in](#sign-in));
+- the check needs video, network, console, or trace capture. Move only
+  that check; keep the rest of the walk on Aside.
+
+When you fall back, record which check moved and why.
+
+| Driver | Strengths | Limits |
+| --- | --- | --- |
+| **Aside** | The user's browser, saved passwords, existing sessions; screenshots; status-only session checks | No video, network, or console capture; cannot reach the VM |
+| **agent-browser** | Runs on the VM; encrypted-profile login; network/console capture; video; traces | Needs a saved encrypted profile per origin |
+| **Codex in-app browser** | The user can watch in Codex Desktop | Only when its tools exist this turn |
 
 Prefer **in-app browser** when the user says “in-app browser”, “show me
 in Codex”, “open it here”, or when ambient
 `<in-app-browser-context>` shows they already have a portal tab open.
+If its tools are not in this turn’s tool list, say so once, fall back,
+and still give the user the clickable origin URL.
 
-If the in-app browser is requested but its tools are not in this turn’s
-tool list, say so once, fall back to agent-browser, and still give the
-user the clickable origin URL.
+## Staging origins
+
+Staging is Vercel deployments of the `staging-student`, `staging-core`,
+and `staging-website` branches. Ask which branch when the user does not
+name one.
+
+The portal project has a stable branch alias. Both of these redirected
+to the app's `/auth/signin` on 2026-10-23:
+
+- `https://portal-git-staging-student-altschool-website-v2.vercel.app`
+- `https://portal-git-staging-core-altschool-website-v2.vercel.app`
+
+Other projects (Core, home) have names too long for that alias
+pattern. Read the URL of the branch head's deployment instead:
+
+```bash
+BRANCH=staging-core   # or staging-student, staging-website
+PROJECT=altschool-web-platforms-core   # or portal, altschool-web-platforms-home
+REPO="$HOME/code/TalentQL/altschool-web-platforms"
+git -C "$REPO" fetch origin "$BRANCH"
+SHA="$(git -C "$REPO" rev-parse "origin/$BRANCH")"
+ID="$(gh api "repos/TalentQL/altschool-web-platforms/deployments?sha=$SHA&environment=Preview%20%E2%80%93%20$PROJECT" --jq '.[0].id')"
+gh api "repos/TalentQL/altschool-web-platforms/deployments/$ID/statuses" --jq '.[0].environment_url'
+```
+
+Record the branch, SHA, and URL in the notes.
+
+## Aside
+
+Aside drives the user's own browser on the default Aside host (the
+MacBook; `aside host list`, set with `aside host use`). Load the
+`aside-browser` skill and run `aside guide` before first use. Its
+saved passwords and existing sessions are the default login.
+
+Verified limits on this VM (2026-10-23):
+
+- `*.localhost` resolves on the Aside host, not the VM. The Mac shows a
+  `portless` 404 for `portal-altschool.localhost`. Use agent-browser
+  for local targets.
+- `page.screenshot()` returns the viewport only; `fullPage` is ignored.
+  Files written in the REPL stay on the Aside host.
+- `page.on('response')` captured no responses. There is no
+  `waitForResponse`. Network and console capture stay on agent-browser.
+- No video recording. Record with agent-browser.
+- Cookie-bearing `fetch()` works for same-origin GETs, such as the
+  status-only `get-session` check.
+
+### Sign in
+
+1. Check the session first. Record only the status and field presence:
+
+   ```bash
+   aside repl "
+   const sTab = await openTab('https://portal.altschoolafrica.com/applications/programs');
+   const sRes = await fetch('https://portal.altschoolafrica.com/api/auth/get-session');
+   const sJson = await sRes.json().catch(() => null);
+   console.log(new URL(page.url()).pathname, sRes.status, 'user:', !!sJson?.user);
+   await closeTab(sTab);
+   "
+   ```
+
+2. If signed out, have Aside sign in with the saved login for that
+   origin:
+
+   ```bash
+   aside exec "Sign in to https://portal.altschoolafrica.com/auth/signin with the saved password for this site. Stop on the first authenticated page. Change nothing else. Report only the final URL path. Never print emails, names, or passwords."
+   ```
+
+3. Use exactly one saved login per origin. If none or several match,
+   stop and ask the user which account to use. Never try saved logins
+   one after another; that looks like credential stuffing and can lock
+   accounts.
+4. Confirm the URL left `/auth/signin` (student: `/applications/programs`,
+   Core: `/dashboard`).
+
+### Drive and capture
+
+Each one-shot `aside repl` call is a new REPL session with a 120 s
+limit. Cookies persist in the browser profile. Put a step's actions and
+its snapshot in one call. Use `aside exec` for longer walks.
+
+Save a screenshot on this host:
+
+```bash
+"$SKILL_DIR/scripts/aside-screenshot.sh" "$ORIGIN$ROUTE" "$OUT/screenshots/route.png"
+```
+
+The script prints the final origin and path, so a redirect to
+`/auth/signin` is visible. Screenshots show the signed-in account; keep
+them under `$OUT` and mask account names and emails before attaching
+them anywhere.
 
 ## agent-browser
+
+Fallback driver. Default login is the encrypted profile
+`altschool-portal-diagnosis` via `scripts/login.sh`.
 
 ```bash
 SKILL_DIR="$(readlink -f ~/.agents/skills/altschool-portal-qa)"
@@ -105,6 +212,6 @@ dump cookies from that session.
 
 ## Evidence
 
-Same for both drivers: origin, route, driver name, profile **name**
+Same for every driver: origin, route, driver name, profile **name**
 (if used), sanitized method/URL/status, screenshot path, pass/fail.
 No `Authorization` headers, cookies, or HAR files in the hub thread.

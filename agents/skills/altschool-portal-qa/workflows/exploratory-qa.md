@@ -5,8 +5,10 @@ Load `agent-browser skills get dogfood` for evidence format, but keep
 **this** skill's credential rules. Do not copy dogfood's example
 `fill` of a raw password.
 
-Default driver is agent-browser. For a Codex Desktop–visible tour, also
-follow [in-app-browser.md](in-app-browser.md).
+Driver: Aside for production and staging, agent-browser for dev. Use
+agent-browser for any video, console, or network capture. For a Codex
+Desktop–visible tour, also follow [in-app-browser.md](in-app-browser.md).
+See [../references/browser-drivers.md](../references/browser-drivers.md).
 
 ## Scope
 
@@ -32,10 +34,18 @@ DATE="$(date -u +%Y-%m-%d)"
 OUT="$HOME/.altschool/portal-qa/$DATE/explore"
 mkdir -p "$OUT/screenshots" "$OUT/videos"
 "$SKILL_DIR/scripts/preflight.sh"
-"$SKILL_DIR/scripts/login.sh" --app portal --target prod
 ```
 
-Optional video for a behavioral bug:
+Sign in with Aside's saved login
+([Aside sign-in](../references/browser-drivers.md#sign-in)). For dev,
+or on fallback:
+
+```bash
+"$SKILL_DIR/scripts/login.sh" --app portal --target local   # or --target prod
+```
+
+Optional video for a behavioral bug (agent-browser only; Aside cannot
+record):
 
 ```bash
 agent-browser --session portal-qa record start "$OUT/videos/repro.webm"
@@ -58,7 +68,8 @@ Visit and snapshot each authenticated nav item:
 9. Learning billing
 10. Records / academics
 
-At each page: snapshot, annotated screenshot, `errors`, `console`.
+At each page: snapshot and screenshot. With agent-browser, also an
+annotated screenshot, `errors`, and `console`.
 Document issues immediately with repro steps. Prefer one deep broken
 flow over a shallow tour.
 
@@ -68,7 +79,8 @@ return URLs, session drop on refresh.
 
 ## Report
 
-Write `$OUT/report.md`: environment, profile name, pages visited,
+Write `$OUT/report.md`: environment, driver, login (Aside origin or
+profile name), pages visited,
 pass/fail per item, issues with screenshot paths. Paste a redacted
 summary into the hub Codex task. No credentials, no `Authorization`
 headers, no `.env` values.

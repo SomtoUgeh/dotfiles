@@ -12,7 +12,7 @@ a reason to stop work when the fallback can complete it.
 | Launch a worker | `Agent` | `spawn_agent` / collaboration tools | `task` | `spawn_subagent` when exposed | Work locally; disclose when independence could not be provided |
 | Read a skill | `Skill` or `/skill-name` | `$skill-name` or skill loader | `skill` | `/skill-name` or skill loader | Read the discovered `SKILL.md` and resolve references from its real directory |
 | Read official web docs | `WebFetch` / search tools | Docs MCP / web tools | `webfetch` / search tools | Exposed web search/fetch | Use an available read-only HTTP client; report inaccessible sources |
-| Interact with a browser | Available browser tool/CLI | Native browser or installed browser tool | Available browser tool/CLI | Available browser tool/CLI | Use installed `agent-browser` if appropriate; otherwise report the specific unverified interaction |
+| Interact with a browser | Available browser tool/CLI | Native browser or installed browser tool | Available browser tool/CLI | Available browser tool/CLI | See [Browser verification](#browser-verification); otherwise report the specific unverified interaction |
 | Generate an image | Available image tool | Native image-generation tool | Available image tool | Available image tool | Provide a clearly labelled prompt/specification; do not claim an image was generated |
 
 ## Applying the mapping
@@ -37,6 +37,24 @@ a reason to stop work when the fallback can complete it.
 - Runtime permissions and model configuration belong in each app's config.
   Shared role guidance lives in `agents/shared/AGENTS.md`. Verify an actual
   distinct model before promising a cross-model review.
+
+## Browser verification
+
+The user's named browser tool wins. Otherwise pick by environment:
+
+- **Production and staging:** Aside (`aside-browser` skill) first. It
+  drives the user's browser on the default Aside host with its saved
+  logins and sessions. Use one saved login per origin; if none or
+  several match, ask. Never try saved logins one after another.
+- **Dev** (`*.localhost`, local ports, dev previews): `agent-browser`.
+  Aside runs on the user's MacBook and cannot reach this VM.
+- **Fallback:** use `agent-browser` when the Aside host is offline, no
+  single saved login matches, or a check needs video, network, console,
+  or trace capture. Aside has none of those; its screenshots are
+  viewport-only. Record which check fell back and why.
+
+Project QA skills (for example `altschool-portal-qa`) give the origins,
+accounts, and evidence rules.
 
 ## Executor routing
 
