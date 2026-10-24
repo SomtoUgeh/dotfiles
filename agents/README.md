@@ -48,6 +48,8 @@ Keep one default owner for overlapping skills:
   is disabled. Update the shared index, rule files, and compiled guide together.
 - Shared `frontend-design` replaces the standalone Claude frontend-design
   plugin, which is disabled in the tracked Claude and Codex settings.
+- Shared `shadcn` is the shadcn/ui skill, including the DESIGN.md workflow.
+  It owns component, registry, preset, and design-system work.
 - Shared `image-to-code` owns screenshot implementation; Product Design's
   other workflows and tools remain available.
 - Figma's native design-to-code skill owns its integration. Shared

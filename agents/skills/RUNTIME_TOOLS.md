@@ -99,6 +99,7 @@ record setup evidence, not continuous health guarantees.
 | --- | --- | --- |
 | React / Next.js performance | Shared `vercel-react-best-practices` | Build Web Apps `react-best-practices` |
 | General frontend design | Shared `frontend-design` | Claude frontend-design plugin |
+| shadcn/ui components, registries, presets, and DESIGN.md systems | Shared `shadcn` | Vercel plugin `shadcn` |
 | Screenshot / image implementation | Shared `image-to-code` | Product Design `image-to-code` |
 | Figma implementation | Native Figma `figma-design-to-code` when available; shared `implement-design` otherwise | Shared skill is only a fallback |
 | Stripe integration | Dedicated Stripe `stripe-best-practices` when available; current official Stripe docs otherwise | Build Web Apps `stripe-best-practices` |
