@@ -1,5 +1,12 @@
 # Cloud Development Workspace Runbook
 
+> **Decommissioned 24 Oct 2026.** The `altschool-dev` DigitalOcean droplet, its
+> firewall, the Cloudflare tunnel `altschool-dev`, the `10.106.0.2/32` private route
+> and split-tunnel entry, the `altschool-dev` GitHub keys and the `altschool` SSH
+> aliases were removed. Work moved to the boat.dev VM `julds`; see
+> [boat-t3-workspace.md](boat-t3-workspace.md). This page is kept for history.
+
+
 Last verified: 2026-09-03
 
 This runbook documents the private Ubuntu development workspace currently

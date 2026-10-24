@@ -22,26 +22,3 @@ Host github.com github-personal
     IdentityFile ~/.ssh/somto_auth_ed25519.pub
     IdentitiesOnly yes
 
-# Private AltSchool development VM through Cloudflare One. Use the plain alias
-# for shells and file copies; use the tunnel alias for local web ports.
-Host altschool altschool-tunnel
-    HostName 10.106.0.2
-    User altschool
-    IdentityFile ~/.ssh/altschool_vm_rsa.pub
-    IdentitiesOnly yes
-    ForwardAgent no
-    ServerAliveInterval 60
-    ServerAliveCountMax 3
-    SendEnv COLORTERM TERM_PROGRAM
-
-Host altschool-tunnel
-    ExitOnForwardFailure yes
-    LocalForward 127.0.0.1:5050 127.0.0.1:5050
-    LocalForward 127.0.0.1:8000 127.0.0.1:8000
-    LocalForward 127.0.0.1:8001 127.0.0.1:8001
-    LocalForward 127.0.0.1:8002 127.0.0.1:8002
-    LocalForward 127.0.0.1:8003 127.0.0.1:8003
-    LocalForward 127.0.0.1:8004 127.0.0.1:8004
-    LocalForward 127.0.0.1:8005 127.0.0.1:8005
-    LocalForward 127.0.0.1:8006 127.0.0.1:8006
-    LocalForward 127.0.0.1:8007 127.0.0.1:8007
