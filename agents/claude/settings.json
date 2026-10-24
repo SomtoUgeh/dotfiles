@@ -9,9 +9,9 @@
   },
   "includeCoAuthoredBy": false,
   "permissions": {
-    "defaultMode": "dontAsk"
+    "defaultMode": "auto"
   },
-  "model": "sonnet",
+  "model": "opus",
   "hooks": {
     "PreToolUse": [
       {
@@ -53,7 +53,9 @@
     "playground@claude-plugins-official": true,
     "pr-review-toolkit@claude-plugins-official": true,
     "typescript-lsp@claude-plugins-official": true,
-    "paper-desktop@paper": false
+    "paper-desktop@paper": false,
+    "cc-plugin-you-should-know@builtin": true,
+    "typesafe@typesafe-ai": true
   },
   "extraKnownMarketplaces": {
     "paper": {
@@ -61,10 +63,27 @@
         "source": "github",
         "repo": "paper-design/agent-plugins"
       }
+    },
+    "typesafe-ai": {
+      "source": {
+        "source": "github",
+        "repo": "typesafe-ai/skills"
+      }
+    },
+    "claude-plugins-official": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/claude-plugins-official"
+      }
     }
   },
   "outputStyle": "bro",
   "effortLevel": "high",
+  "modelSettings": {
+    "claude-opus-5-5": {
+      "effortLevel": "high"
+    }
+  },
   "awaySummaryEnabled": false,
   "tui": "fullscreen",
   "skipDangerousModePermissionPrompt": true,
