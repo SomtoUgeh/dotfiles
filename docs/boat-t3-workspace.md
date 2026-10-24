@@ -72,7 +72,8 @@ git 2.56 (git-core PPA), gh 2.103, uv/uvx 0.13.5, node 24 (nvm), bun, pnpm, agen
 - `pkill -f mcp-remote...` inside `boat ssh -- 'bash -lc "..."'` kills the SSH command itself; use a `[m]cp-remote` pattern.
 - Agent CLIs read stdin; give them `</dev/null` inside `bash -s` scripts.
 - Wrangler's OAuth callback listens on `[::1]:8976`; `boat forward` targets 127.0.0.1, so bridge with socat for logins.
-- Stop only between agent turns. Stopped disks are deleted after 14 days unless saved (`boat snapshot`).
+- Stop only between agent turns.
+- boat deletes a stopped sandbox's disk 14 days after the stop (email on day 11). The idle check and `julds-down` refresh the named snapshot `julds-latest` before every stop; named snapshots never expire and 10 are included in the plan. If the disk ever expires, recover with `boat new --from julds-latest --no-auto-stop`, then update the sandbox id in `julds-up`, `julds-down`, `julds-tunnel`, `julds-autowake` and the bridge plist.
 - Security: agents here run with full access and can use claude.ai connectors (Gmail, Calendar, Docs), the Mac's desktop tools through `executor` (including 1Password and Playwright on the Mac browser), and boat's account-level CLI.
 
 ## Daily commands on the Mac
