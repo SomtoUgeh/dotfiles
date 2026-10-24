@@ -31,7 +31,7 @@ Hub Codex task: `01a099f2-a024-7881-995e-f673f4b95007`
 | Production portal | `https://portal.altschoolafrica.com` |
 | Sign-in | `https://portal.altschoolafrica.com/auth/signin` |
 | Encrypted agent-browser profile | `altschool-portal-diagnosis` |
-| Credentials | 1Password items or the encrypted agent-browser vault only |
+| Credentials | Aside saved login (by origin), 1Password items, or the encrypted agent-browser vault only |
 | Assessment gateway | `https://api-gateway.altschoolafrica.com` |
 
 ## Evidence rules

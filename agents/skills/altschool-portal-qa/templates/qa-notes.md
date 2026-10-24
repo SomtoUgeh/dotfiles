@@ -3,10 +3,13 @@
 - Date (UTC):
 - Hub task: AltSchool Portal QA runbook (`01a099f2-a024-7881-995e-f673f4b95007`)
 - App: portal | core
-- Env: prod | local | preview
+- Env: prod | staging | dev (local | preview)
+- Staging branch + SHA (if staging):
 - Origin:
 - Route:
-- Browser driver: agent-browser | in-app | both
+- Browser driver: aside | agent-browser | in-app (per check if mixed)
+- Fallback from Aside (check + reason):
+- Aside saved login (origin only):
 - Auth profile (name only):
 - 1Password item (title only, if used):
 - Deployment / PR:

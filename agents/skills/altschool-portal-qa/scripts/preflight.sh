@@ -21,7 +21,20 @@ if command -v agent-browser >/dev/null 2>&1; then
 else
   err "agent-browser is not on PATH"
 fi
-warn_msg "Codex in-app browser is a Desktop session tool, not this CLI. Use it when @Browser / iab APIs exist this turn; production encrypted login still uses agent-browser."
+if command -v aside >/dev/null 2>&1; then
+  hosts="$(timeout 30 aside host list 2>/dev/null || true)"
+  default_host="$(printf '%s\n' "$hosts" | grep '^\*' || true)"
+  if [[ "$default_host" == *online* ]]; then
+    ok "aside default host online (prod/staging driver)"
+  elif [[ "$default_host" == *"this machine"* ]]; then
+    warn_msg "aside default host is this VM — run: aside host use <macbook host> (aside host list)"
+  else
+    warn_msg "aside default host is not online — prod/staging falls back to agent-browser"
+  fi
+else
+  warn_msg "aside is not on PATH — prod/staging falls back to agent-browser"
+fi
+warn_msg "Codex in-app browser is a Desktop session tool, not this CLI. Use it when @Browser / iab APIs exist this turn."
 
 if command -v op >/dev/null 2>&1; then
   if op whoami >/dev/null 2>&1; then

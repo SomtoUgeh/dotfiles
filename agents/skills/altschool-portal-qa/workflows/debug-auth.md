@@ -2,8 +2,11 @@
 
 Load [../references/debug-signals.md](../references/debug-signals.md)
 and [../references/browser-drivers.md](../references/browser-drivers.md).
-In-app browser is useful to watch the bounce; encrypted-profile login
-and status-only `get-session` still prefer agent-browser.
+In-app browser is useful to watch the bounce. Auth debugging needs
+network status codes, so use agent-browser for the request capture on
+every environment. For production or staging, first check with Aside
+whether the user's saved login works; that separates an account problem
+from an app regression.
 
 ## Confirm origin vs config names
 

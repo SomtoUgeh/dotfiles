@@ -15,15 +15,24 @@ operational hub is the Codex task `01a099f2-a024-7881-995e-f673f4b95007`
 (title it **AltSchool Portal QA runbook** and pin it). This skill is the
 durable procedure that later tasks should load.
 
-Related skills to load when they apply: `agent-browser` (CLI automation),
+Related skills to load when they apply: `aside-browser` (the user's
+browser and saved logins), `agent-browser` (CLI automation on this VM),
 Codex Desktop in-app Browser / `@Browser` (`agent.browsers.get("iab")`
 when that API exists), `diagnosing-bugs` (tight repro loop),
 `1password-environments` (env names and mounts only).
 
-Default driver is **agent-browser** with encrypted profiles. Use the
-**in-app browser** when the user asks to watch Codex Desktop, a portal
-tab is already open there, or a local/preview URL should be visible in
-the app. See [references/browser-drivers.md](references/browser-drivers.md).
+Pick the driver by environment:
+
+- **Production and staging:** **Aside** first, with its saved login for
+  the origin. Fall back to **agent-browser** when Aside is offline, no
+  single saved login matches, or a check needs video, network, or
+  console capture.
+- **Dev** (`*.localhost`, `dev:preview`): **agent-browser** only. Aside
+  runs on the MacBook and cannot reach the VM.
+
+Use the **in-app browser** when the user asks to watch Codex Desktop or
+a portal tab is already open there. See
+[references/browser-drivers.md](references/browser-drivers.md).
 
 ## Hard rules
 
@@ -32,9 +41,13 @@ the app. See [references/browser-drivers.md](references/browser-drivers.md).
   this skill.
 - Never `cat` `apps/*/.env.local`, `state` JSON, or
   `~/.agent-browser/.encryption-key`.
-- Reference secrets only as **1Password item titles** or **encrypted
-  agent-browser auth profile names**. `agent-browser auth show` and
-  `auth list` are allowed (metadata only).
+- Reference secrets only as **1Password item titles**, **encrypted
+  agent-browser auth profile names**, or the **origin** of an Aside saved
+  login. `agent-browser auth show` and `auth list` are allowed (metadata
+  only).
+- Let Aside autofill a saved login. Never read, print, or copy its
+  password values. Use one saved login per origin; if none or several
+  match, ask the user. Never try saved logins one after another.
 - If a password is pasted into chat, stop using it. Move it into 1Password
   or `agent-browser auth save … --password-stdin`, then continue from the
   named profile.
@@ -45,11 +58,14 @@ the app. See [references/browser-drivers.md](references/browser-drivers.md).
 
 ## Default targets
 
-| App | Production | Local HTTPS | Next port |
-| --- | --- | --- | --- |
-| Student portal | `https://portal.altschoolafrica.com` | `https://portal-altschool.localhost` | 8006 |
-| Core admin | *not in this repo — confirm before use* | `https://core-altschool.localhost` | 8007 |
-| Marketing home | `https://www.altschoolafrica.com` | `https://altschool.localhost` | 8000 |
+| App | Production | Staging branch | Local HTTPS | Next port |
+| --- | --- | --- | --- | --- |
+| Student portal | `https://portal.altschoolafrica.com` | `staging-student` | `https://portal-altschool.localhost` | 8006 |
+| Core admin | `https://core.altschoolafrica.com` | `staging-core` | `https://core-altschool.localhost` | 8007 |
+| Marketing home | `https://www.altschoolafrica.com` | `staging-website` | `https://altschool.localhost` | 8000 |
+
+Staging URLs are Vercel deployments of those branches. Resolve them with
+[Staging origins](references/browser-drivers.md#staging-origins).
 
 Actors API used by local portal/core: `https://actors.thealtschool.com/api/v1/`.
 Sign-in UI is `/auth/signin`. Successful student login lands on
@@ -67,7 +83,7 @@ Repo: `/home/altschool/code/TalentQL/altschool-web-platforms`.
 - **Need prior production results or regression cases** →
   [references/production-regressions.md](references/production-regressions.md)
 - **Production authenticated smoke** → [workflows/production-smoke.md](workflows/production-smoke.md)
-- **Need to pick agent-browser vs in-app** →
+- **Need to pick Aside, agent-browser, or in-app** →
   [references/browser-drivers.md](references/browser-drivers.md)
 - **Drive Codex Desktop in-app browser** → [workflows/in-app-browser.md](workflows/in-app-browser.md)
 
@@ -78,14 +94,28 @@ From any cwd, resolve this skill directory first. Then:
 ```bash
 SKILL_DIR="$(readlink -f ~/.agents/skills/altschool-portal-qa)"
 "$SKILL_DIR/scripts/preflight.sh"
-"$SKILL_DIR/scripts/login.sh" --app portal --target prod
 ```
 
-`preflight.sh` checks tools, encryption-at-rest, named profiles, and local
-ports. It never prints secret values.
+`preflight.sh` checks tools, the Aside host, encryption-at-rest, named
+profiles, and local ports. It never prints secret values.
+
+Production or staging (Aside): check the session, sign in with the saved
+login if needed, then capture screenshots:
+
+```bash
+"$SKILL_DIR/scripts/aside-screenshot.sh" "$ORIGIN/applications/programs" "$OUT/screenshots/programs.png"
+```
+
+See [Aside sign-in](references/browser-drivers.md#sign-in).
+
+Dev, or Aside fallback (agent-browser):
+
+```bash
+"$SKILL_DIR/scripts/login.sh" --app portal --target local
+```
 
 `login.sh` uses an encrypted agent-browser auth profile, never `--password`.
-After login, snapshot and confirm the URL left `/auth/signin`.
+After login, by either driver, confirm the URL left `/auth/signin`.
 
 If this turn should be visible in Codex Desktop, bind the in-app
 browser (`@Browser` / `agent.browsers.get("iab")` when available) and
@@ -107,10 +137,11 @@ the git worktree.
 
 A portal QA/debug turn is done when:
 
-- The target origin, app (portal vs core), env (prod vs local), and
-  browser driver (`agent-browser` or `in-app`) are named.
-- Login used a named encrypted profile or a 1Password stdin save — not a
-  password in chat or argv.
+- The target origin, app (portal vs core), env (prod, staging, or dev),
+  and browser driver (`aside`, `agent-browser`, or `in-app`) are named.
+  Any check that fell back from Aside says why.
+- Login used one Aside saved login, a named encrypted profile, or a
+  1Password stdin save — not a password in chat or argv.
 - The symptom is reproduced or the exact blocker is recorded (auth, env,
   1Password signed-out, origin down).
 - Evidence (screenshot path, console/network note, URL, route) is in the

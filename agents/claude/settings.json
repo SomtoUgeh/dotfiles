@@ -11,7 +11,6 @@
   "permissions": {
     "defaultMode": "dontAsk"
   },
-  "model": "sonnet",
   "hooks": {
     "PreToolUse": [
       {
@@ -71,5 +70,10 @@
   "theme": "dark",
   "agentPushNotifEnabled": true,
   "voiceEnabled": true,
-  "gitAttribution": false
+  "gitAttribution": false,
+  "modelSettings": {
+    "claude-opus-5-5": {
+      "effortLevel": "high"
+    }
+  }
 }

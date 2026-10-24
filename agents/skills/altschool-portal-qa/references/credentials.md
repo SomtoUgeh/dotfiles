@@ -1,7 +1,24 @@
 # Credential handles
 
-Store nothing but names here. Values live in 1Password or in encrypted
-agent-browser auth profiles under `~/.agent-browser/auth/`.
+Store nothing but names here. Values live in Aside's saved passwords,
+1Password, or encrypted agent-browser auth profiles under
+`~/.agent-browser/auth/`.
+
+## Aside saved logins (production and staging)
+
+Aside runs on the user's MacBook and autofills its saved passwords.
+Refer to a saved login only by its origin.
+
+- Have Aside autofill the login (`aside exec`, see
+  [Aside sign-in](browser-drivers.md#sign-in)). Never read, print, or
+  copy password values, and do not call password-manager functions that
+  return them.
+- Use one saved login per origin. If none or several match, stop and
+  ask the user which account to use. Never try saved logins one after
+  another.
+- The account is the user's choice and may not be a QA account. Do not
+  repeat its name or email; mask both in screenshots you share.
+- Leave the session signed in when done unless the user asks otherwise.
 
 ## Encrypted agent-browser profiles
 

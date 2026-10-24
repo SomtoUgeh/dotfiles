@@ -1,6 +1,6 @@
 ---
 name: agent-browser
-description: "Automate browsers or Electron with agent-browser when explicitly requested, already used by the repo, or needed for its session/cloud-browser features."
+description: "Automate browsers or Electron with agent-browser when explicitly requested, already used by the repo, needed for its session/cloud-browser features, or for dev (localhost) verification and Aside fallback."
 ---
 
 # agent-browser
