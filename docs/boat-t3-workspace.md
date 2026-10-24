@@ -95,3 +95,13 @@ git 2.56 (git-core PPA), gh 2.103, uv/uvx 0.13.5, node 24 (nvm), bun, pnpm, agen
 - Ignored files carried by checksum: four env files (`apps/core/.env.local`, `apps/home/.env.local`, `apps/student/.env.local`, `apps/student/.env.development.local`), per-app AGENTS.md/CLAUDE.md, `.cursor/`; plus `~/.altschool` (portal QA evidence). `bun install --frozen-lockfile`, `bun run check` and `check-types` pass on bun 1.4.2.
 - The droplet's uncommitted dotfiles edits were merged into main (`droplet-wip`).
 - Agent histories on the droplet were not kept. The temporary migration copies were deleted after verification.
+
+## Waking the VM
+
+A stopped VM does not wake on its own; T3 shows it offline until it is resumed.
+
+- **Mac:** `~/.local/bin/julds-autowake` runs every 20 s from `~/Library/LaunchAgents/com.julds.autowake.plist`. When T3 Code is the frontmost app and `julds` is stopped, it runs `boat resume` (at most once every 2 minutes). Log: `~/Library/Logs/julds-autowake.log`. Load once with `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.julds.autowake.plist`.
+- **iPhone:** Shortcut "Wake julds": Get Contents of URL, POST `https://boat.dev/api/v1/sandboxes/bx_gbx664fj/resume`, header `Authorization: Bearer <key>`. The key is the 1Password item "boat julds wake key" (Julds VM vault): boat API key `julds-wake-phone`, limited to this sandbox and to `sandbox.resume` + `sandbox.read`, expires Oct 2027.
+- **Anywhere:** boat.dev/dashboard, Sandboxes, Resume.
+
+Away from the Mac, everything on the VM works except the `executor` (Mac local) tools: Paper, Aside, Playwright, desktop 1Password and Canva need the Mac awake.
