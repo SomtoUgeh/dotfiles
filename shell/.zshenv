@@ -22,6 +22,9 @@ _add_to_path "$HOME/.grok/bin"
 _add_to_path "$HOME/.opencode/bin"
 _add_to_path "$HOME/.cargo/bin"
 _add_to_path "$HOME/.ascii/bin"   # boat CLI (boat.dev sandboxes)
+# fnm's default Node, so non-interactive SSH (e.g. T3 device hosts) finds node/npm.
+# Interactive shells still get fnm's per-directory version from .zshrc.
+_add_to_path "$HOME/.local/share/fnm/aliases/default/bin"
 
 unset -f _add_to_path
 

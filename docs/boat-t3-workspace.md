@@ -86,9 +86,25 @@ find ~/.claude/skills -maxdepth 1 -xtype l -delete
 | `executor` | The Mac's local Executor: 1password, agentation, aside, canva, paper, playwright, shadcn | `~/.local/bin/executor-mac-mcp` -> mcp-remote -> `http://127.0.0.1:4789/mcp` on the VM, a boat reverse tunnel to the Mac's Executor. Bearer token in `~/.config/executor-mac/token` (0600) |
 | `computer` | boat's Linux desktop / Chrome tools | boat rewrites it into each harness config at every sandbox start |
 
-The Mac end of the tunnel is `~/.local/bin/julds-executor-bridge`, run by `~/Library/LaunchAgents/com.julds.boat-executor-bridge.plist` (KeepAlive). It keeps `boat forward bx_gbx664fj --reverse --local 4789 --remote 4789` running while the VM is up, stops it when the VM stops, and restarts it when a probe from the VM (every 2 minutes) fails; a bare `boat forward` goes stale after a VM stop/resume without exiting. Log: `~/Library/Logs/boat-executor-bridge.log`. Restart with `launchctl kickstart -k gui/$(id -u)/com.julds.boat-executor-bridge`. The `executor` entry works only while the Mac is awake. Rotating the Mac token (`executor server rotate-token`) means rewriting the VM token file.
+The Mac end of the tunnel is `~/.local/bin/julds-executor-bridge`, run by `~/Library/LaunchAgents/com.julds.boat-executor-bridge.plist` (KeepAlive). It keeps `boat forward bx_gbx664fj --reverse --local 4789 --remote 4789` running while the VM is up (and, since 24 Oct 2026, a second tunnel for the Mac's SSH; see iOS Simulators below), stops it when the VM stops, and restarts it when a probe from the VM (every 2 minutes) fails; a bare `boat forward` goes stale after a VM stop/resume without exiting. Log: `~/Library/Logs/boat-executor-bridge.log`. Restart with `launchctl kickstart -k gui/$(id -u)/com.julds.boat-executor-bridge`. The `executor` entry works only while the Mac is awake. Rotating the Mac token (`executor server rotate-token`) means rewriting the VM token file.
 
 Approvals: the Mac Executor policies `1password.*` and `playwright.*` are `require_approval` (since 24 Oct 2026), so those calls pause. Mac agents (stdio, `--elicitation-mode browser`) get a browser approval on the Mac. Calls from the VM go over HTTP, where Executor hands the approval back to the agent: it asks in the T3 thread and resumes after you reply, or you run `executor resume --execution-id <id> --action accept|cancel` on the Mac. On the VM this is a request, not a lock; set the policy to `block` for a hard stop. Paper, Aside, Canva, Agentation and shadcn keep their existing policies.
+
+## iOS Simulators (T3 device host)
+
+The VM cannot run iOS Simulators, so T3 on `julds` uses the Mac as an SSH **device host**. Set up 24 Oct 2026.
+
+- **Where it shows.** In a `julds` thread, right panel → Device lists the Mac's simulators labelled "MacBook Pro". The stream and controls go through the environment server, so they work from the desktop app, app.t3.codes and the iPhone app (device button above the composer) over T3 Connect. Agents on `julds` drive the same devices through `agent-device` (installed on first use; restart a running agent session to give it access).
+- **T3 setting.** Settings → Integrations → Devices, scope `box-node-0b8a829898b3443e` → Device hosts: name "MacBook Pro", SSH target `mac-devices`. Test connection reports "iOS available" (Android unavailable, expected).
+- **VM side.** Key `~/.ssh/t3_device_host` (ed25519, no passphrase, used only for this) and a `Host mac-devices` block (127.0.0.1:2222, user `somto`) in `~/.ssh/config`; the block is in `templates/ssh-config-cloud.template`.
+- **Mac side.**
+  - Remote Login on (System Settings → General → Sharing → Remote Login, access limited to `somto`).
+  - The VM's public key in `~/.ssh/authorized_keys` as `from="127.0.0.1,::1",no-agent-forwarding,no-X11-forwarding ssh-ed25519 ... julds-vm t3 device host`, so it only works through the tunnel.
+  - `shell/.zshenv` puts fnm's default Node (`~/.local/share/fnm/aliases/default/bin`) on PATH, because T3 needs Node 22+ and npm in non-interactive SSH, and fnm otherwise loads only from `.zshrc`.
+  - `julds-executor-bridge` keeps `boat forward bx_gbx664fj --reverse --local 2222 --remote 22` up (Mac :22 → VM 127.0.0.1:2222) and restarts it when a probe from the VM does not get an SSH banner on 2222.
+- **Check from the Mac:** `boat ssh bx_gbx664fj -- 'ssh mac-devices "node -v; xcrun simctl list devices booted"'`.
+- **Limits.** The Mac must be awake with Remote Login and the bridge running. A simulator on the Mac cannot reach a dev server (Metro, Vite) on the VM's localhost; forward that port to the Mac separately, the way `julds-tunnel` does for the AltSchool ports. The Mac's own T3 environment uses its simulators directly and needs none of this.
+- **Undo.** Remove the host in T3, delete the `authorized_keys` line, turn Remote Login off, and drop the second forward from the bridge script.
 
 ## 1Password
 
@@ -120,6 +136,7 @@ boat deletes a stopped sandbox's disk 14 days after the stop (email on day 11). 
 - Files Aside writes on the Mac can carry `com.apple.quarantine`; launchd and Gatekeeper refuse them until `xattr -d com.apple.quarantine <file>`. Load LaunchAgents as yourself (`launchctl bootstrap gui/$(id -u) ...`), never with sudo; error 5 also means "already loaded".
 - `pkill -f mcp-remote...` inside `boat ssh -- 'bash -lc "..."'` kills the SSH command itself; use a `[m]cp-remote` pattern.
 - Agent CLIs and `op` read stdin; give them `</dev/null` inside `bash -s` scripts.
+- `boat forward --reverse` reads the ports opposite to its help text: `--local` is the port inside the VM and `--remote` is the Mac port (check the `localPort`/`sandboxPort` it prints). With equal ports (4789) it does not matter. Reversed, it fails with "remote port forwarding failed for listen port 22".
 - Wrangler's OAuth callback listens on `[::1]:8976`; `boat forward` targets 127.0.0.1, so bridge with socat for logins.
 - Codex `exec` can answer before the cloud gateway finishes starting; interactive T3 sessions are fine.
 - Stop only between agent turns: a stop ends running processes (no hibernate). Enabled systemd services start again on resume.
@@ -129,4 +146,5 @@ boat deletes a stopped sandbox's disk 14 days after the stop (email on day 11). 
 ## History
 
 - 24 Oct 2026: replaced the DigitalOcean droplet `altschool-dev`. The AltSchool repo (main and staging-* branches), its four env files (checksums matched), per-app AGENTS.md/CLAUDE.md, `.cursor/` and `~/.altschool` were carried over; other local branches were dropped by choice. The droplet, its firewall, API tokens and SSH key, the Cloudflare tunnel, private route and split-tunnel entry, the old GitHub keys, the Executor DigitalOcean integrations and the DigitalOcean tooling in these dotfiles were removed. The droplet's uncommitted dotfiles edits were merged (`droplet-wip`).
+- 24 Oct 2026: iOS Simulators for `julds` through the Mac as a T3 device host. Verified: Test connection "iOS available", and the Mac's iPhone 18 Pro (iOS 27.0) streamed in a `julds` thread on app.t3.codes.
 - Verified 24 Oct 2026: all five agents read GitHub through `executor_cloud` and listed the Mac integrations through `executor`; reboot and stop/resume keep T3 Connect without re-pairing; `bun run check` and `check-types` pass.

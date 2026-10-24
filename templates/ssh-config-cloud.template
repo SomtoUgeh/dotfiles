@@ -14,3 +14,17 @@ Host github.com github-personal
   User git
   IdentityFile ~/.ssh/id_ed25519_personal
   IdentitiesOnly yes
+
+# T3 device host: the Mac, through the boat reverse tunnel (Mac :22 -> VM 127.0.0.1:2222)
+# kept up by the Mac's julds-executor-bridge. Used by T3 Settings > Integrations >
+# Devices > Device hosts for iOS Simulators. Key: ssh-keygen -t ed25519 -N "" -f ~/.ssh/t3_device_host,
+# public half in the Mac's ~/.ssh/authorized_keys with from="127.0.0.1,::1".
+# See docs/boat-t3-workspace.md, "iOS Simulators".
+Host mac-devices
+  HostName 127.0.0.1
+  Port 2222
+  User somto
+  IdentityFile ~/.ssh/t3_device_host
+  IdentitiesOnly yes
+  StrictHostKeyChecking accept-new
+  ServerAliveInterval 30
