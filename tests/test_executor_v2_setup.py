@@ -54,6 +54,18 @@ class ExecutorV2Tests(unittest.TestCase):
         self.assertEqual(sorted(servers), ["executor_v2", "executor_v2_local", "other"])
         self.assertIs(tomlkit.parse(grok.read_text())["mcp_servers"]["executor_v2"]["enabled"], False)
 
+    def test_wrapper_commands_for_headless_hosts(self):
+        wrapper = self.home / "executor-v2-mcp"
+        wrapper.write_text("#!/bin/sh\n")
+        self.run_setup(cloud_command=str(wrapper), retire_v1=True)
+        claude = json.loads((self.home / ".claude.json").read_text())["mcpServers"]
+        self.assertEqual(claude["executor_v2"], {"type": "stdio", "command": str(wrapper), "args": []})
+        self.assertEqual(claude["executor_v2_local"]["type"], "http")
+        opencode = json5.loads((self.home / ".config/opencode/opencode.jsonc").read_text())
+        self.assertEqual(opencode["mcp"]["servers"]["executor_v2"], {"type": "local", "command": [str(wrapper)]})
+        with self.assertRaises(ValueError):
+            self.run_setup(cloud_command="relative/path")
+
     def test_rejects_unsafe_urls(self):
         for cloud, local in [("http://x/mcp", DEFAULT_LOCAL), (DEFAULT_CLOUD, "http://10.0.0.2/mcp"),
                              (DEFAULT_CLOUD + "?a=1", DEFAULT_LOCAL)]:

@@ -12,6 +12,8 @@ Every agent connects natively over streamable HTTP and signs in with OAuth on fi
 Claude Code and Grok via `/mcp`, Codex via `codex mcp login <name>`, Cursor via
 `cursor-agent mcp login <name>`, OpenCode via `opencode mcp auth <name>`. (mcp-remote 0.13.5
 cannot sign in: it drops the RFC 9207 `iss` parameter Executor 2 returns.)
+Headless hosts such as the julds VM pass --cloud-command/--local-command: stdio wrappers that
+call mcp-remote with a bearer token, so no browser sign-in is needed there.
 With --retire-v1 the Executor 1 entries (`executor`, `executor_cloud`) are removed; rerun
 setup_executor.py to restore them.
 """
@@ -52,7 +54,14 @@ def check_url(value: str, local: bool) -> str:
     return value
 
 
-def entry(kind: str, url: str) -> dict:
+def entry(kind: str, url: str, command: str | None = None) -> dict:
+    if command is not None:
+        # Headless hosts (the julds VM): a stdio wrapper that adds a bearer token.
+        if kind == "opencode":
+            return {"type": "local", "command": [command]}
+        if kind == "claude":
+            return {"type": "stdio", "command": command, "args": []}
+        return {"command": command, "args": []}
     full = url + QUERY
     if kind == "claude":
         return {"type": "http", "url": full}
@@ -65,9 +74,13 @@ def entry(kind: str, url: str) -> dict:
 
 
 def setup(home: Path, cloud_url: str, local_url: str,
-          retire_v1: bool = False, check: bool = False) -> list[Path]:
+          retire_v1: bool = False, check: bool = False,
+          cloud_command: str | None = None, local_command: str | None = None) -> list[Path]:
     check_url(cloud_url, local=False)
     check_url(local_url, local=True)
+    for command in (cloud_command, local_command):
+        if command is not None and not (Path(command).is_absolute() and Path(command).is_file()):
+            raise ValueError(f"Wrapper command must be an existing absolute path: {command}")
     outputs = {}
     for relative, key, is_toml, kind in AGENTS:
         path = home / relative
@@ -79,8 +92,9 @@ def setup(home: Path, cloud_url: str, local_url: str,
             servers = servers.setdefault("servers", {})
         if not isinstance(servers, MutableMapping):
             raise ValueError(f"Expected a server table in {path}")
-        for name, url in (("executor_v2", cloud_url), ("executor_v2_local", local_url)):
-            desired = entry(kind, url)
+        for name, url, command in (("executor_v2", cloud_url, cloud_command),
+                                   ("executor_v2_local", local_url, local_command)):
+            desired = entry(kind, url, command)
             prior = servers.get(name)
             if isinstance(prior, MutableMapping):
                 # Keep a deliberate on/off choice.
@@ -114,12 +128,14 @@ def main() -> None:
     parser.add_argument("--home", type=Path, default=Path.home())
     parser.add_argument("--cloud-url", default=DEFAULT_CLOUD)
     parser.add_argument("--local-url", default=DEFAULT_LOCAL)
+    parser.add_argument("--cloud-command", help="stdio wrapper for the cloud entry (headless hosts)")
+    parser.add_argument("--local-command", help="stdio wrapper for the Mac-local entry (headless hosts)")
     parser.add_argument("--retire-v1", action="store_true", help="remove the Executor 1 entries")
     parser.add_argument("--check", action="store_true", help="preview; exit 1 if changes are needed")
     args = parser.parse_args()
     try:
         changed = setup(args.home.expanduser().absolute(), args.cloud_url, args.local_url,
-                        args.retire_v1, args.check)
+                        args.retire_v1, args.check, args.cloud_command, args.local_command)
     except (ValueError, OSError, TypeError) as error:
         parser.exit(2, f"Executor 2 setup failed: {error}\n")
     for path in changed:
