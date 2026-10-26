@@ -58,12 +58,12 @@ accounts, and evidence rules.
 
 ## Executor routing
 
-On configured hosts, prefer `executor_cloud` for internet services and `executor`
-for tools that need the current host's filesystem, projects, browser, or desktop.
-Explicit user tool choices take precedence. Local Executor on the AltSchool VM
-means the Linux VM; it cannot access the Mac's Paper app or desktop 1Password.
-Canva currently remains on the Mac-local gateway by user choice. Discover the
-live catalog rather than assuming a service exists on both gateways.
+On the Mac, use `executor_v2` (Executor 2 in the cloud) for internet services and
+`executor_v2_local` for tools that need the Mac: Paper, Playwright, 1Password,
+Aside, Agentation, shadcn and Canva. On hosts that still have Executor 1 (the
+julds VM), the equivalents are `executor_cloud` and `executor`. Explicit user
+tool choices take precedence. Discover the live catalog rather than assuming a
+service exists on both gateways.
 
 ### Calling tools
 
@@ -71,7 +71,7 @@ live catalog rather than assuming a service exists on both gateways.
    in the active harness. Their prefixes differ between agents; do not invent
    names. Call that gateway's `skills({ name: "execute" })` before writing code.
    This is an MCP tool call, not a request to load a filesystem skill named
-   `executor` or `executor_cloud`.
+   `executor`, `executor_cloud`, `executor_v2` or `executor_v2_local`.
 2. Inside its `execute`, use `tools.search({ query, namespace, limit })`, then
    `tools.describe.tool({ path })`. Read the current input/output schemas and
    use the returned full path for the intended account/connection. Use

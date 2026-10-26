@@ -125,8 +125,8 @@ def sync(home: Path, repo: Path, check: bool = False) -> list[Path]:
     current_text = config.read_text() if config.exists() else ""
     current = tomlkit.parse(current_text)
     defaults = tomlkit.parse((repo / "agents/codex/config.toml").read_text())
-    gateway = current.get("mcp_servers", {}).get("executor")
-    if isinstance(gateway, MutableMapping) and gateway.get("enabled") is not False:
+    gateways = [current.get("mcp_servers", {}).get(name) for name in ("executor", "executor_v2_local")]
+    if any(isinstance(g, MutableMapping) and g.get("enabled") is not False for g in gateways):
         # An opted-in host gets these tools from Executor. Preserve existing
         # custom entries, but never recreate removed direct definitions.
         for name in EXECUTOR_DIRECT_DEFAULTS:

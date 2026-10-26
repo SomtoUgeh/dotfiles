@@ -4,6 +4,10 @@
   "model": "xai/grok-4.6",
   "mcp": {
     "servers": {
+      "executor_v2": {
+        "type": "remote",
+        "url": "https://executor-v2.julds.com/mcp?elicitation_mode=browser",
+      },
       "context7": {
         "type": "remote",
         "url": "https://mcp.context7.com/mcp",

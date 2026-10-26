@@ -12,6 +12,10 @@ memories = true
 multi_agent = true
 prevent_idle_sleep = true
 
+# Executor 2 (cloud). Sign in once: codex mcp login executor_v2
+[mcp_servers.executor_v2]
+url = "https://executor-v2.julds.com/mcp?elicitation_mode=browser"
+
 [mcp_servers.cloudflare]
 url = "https://mcp.cloudflare.com/mcp"
 

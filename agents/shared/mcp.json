@@ -1,14 +1,12 @@
 {
   "servers": {
-    "executor": {
-      "type": "stdio",
-      "command": "executor",
-      "args": [
-        "mcp",
-        "--elicitation-mode",
-        "browser",
-        "--no-artifacts"
-      ]
+    "executor_v2": {
+      "type": "http",
+      "url": "https://executor-v2.julds.com/mcp?elicitation_mode=browser"
+    },
+    "executor_v2_local": {
+      "type": "http",
+      "url": "http://127.0.0.1:4312/mcp?elicitation_mode=browser"
     },
     "figma-remote-mcp": {
       "type": "http",

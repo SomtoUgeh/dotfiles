@@ -1,5 +1,9 @@
 # Executor: shared MCP setup
 
+> **26 Oct 2026: the Mac agents moved to Executor 2** (`executor_v2` in the cloud,
+> `executor_v2_local` for desktop tools). See [v2.md](v2.md). The rest of this page
+> describes Executor 1, which the julds VM still uses.
+
 Executor owns the tool catalog, upstream authentication, and per-tool policies.
 Codex, Grok Build, Cursor, Claude Code, and OpenCode use `executor_cloud` for internet
 services and `executor` for desktop tools. The local stdio adapter discovers the
