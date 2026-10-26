@@ -80,15 +80,21 @@ find ~/.claude/skills -maxdepth 1 -xtype l -delete
 
 ## MCP gateways (all five agents)
 
+Since 26 Oct 2026 the VM uses Executor 2, the same as the Mac (see `agents/executor/v2.md`).
+Set up with `setup_executor_v2.py --cloud-command ~/.local/bin/executor-v2-mcp --local-command ~/.local/bin/executor-v2-mac-mcp --retire-v1`.
+The pre-change configs are in `~/.config/executor-v2/v1-agent-config-backup-*`.
+
 | Entry | What | How |
 | --- | --- | --- |
-| `executor_cloud` | Hosted Executor (GitHub, Google, Notion, PostHog, Postman, Cloudflare, Context7, Exa, ...) | `setup_executor.py --cloud-only --cloud-callback-port 17908`, mcp-remote 0.13.5 |
-| `executor` | The Mac's local Executor: 1password, agentation, aside, canva, paper, playwright, shadcn | `~/.local/bin/executor-mac-mcp` -> mcp-remote -> `http://127.0.0.1:4789/mcp` on the VM, a boat reverse tunnel to the Mac's Executor. Bearer token in `~/.config/executor-mac/token` (0600) |
+| `executor_v2` | Executor 2 in the cloud (`executor-v2.julds.com`): GitHub, Google, Notion, PostHog, Postman, Cloudflare, Figma, Granola, PlanetScale, Exa, Context7, ... | `~/.local/bin/executor-v2-mcp` -> mcp-remote (`--transport http-only`) with a bearer personal access token "julds-vm agents" (org Julds, expires 24 Jan 2027) in `~/.config/executor-v2/cloud.token` (0600). No browser sign-in. Renew the token in Executor (Account, Tokens) before it expires and rewrite the file |
+| `executor_v2_local` | The Mac's local Executor 2: 1password, agentation, aside, canva, paper, playwright, shadcn | `~/.local/bin/executor-v2-mac-mcp` -> mcp-remote -> `http://127.0.0.1:4312/mcp` on the VM, a boat reverse tunnel to the Mac. The Mac's installation key (`~/.local/share/executor-v2-lab/data/keys.json` `apiKey`) is in `~/.config/executor-v2/mac.token` (0600) |
 | `computer` | boat's Linux desktop / Chrome tools | boat rewrites it into each harness config at every sandbox start |
 
-The Mac end of the tunnel is `~/.local/bin/julds-executor-bridge`, run by `~/Library/LaunchAgents/com.julds.boat-executor-bridge.plist` (KeepAlive). It keeps `boat forward bx_gbx664fj --reverse --local 4789 --remote 4789` running while the VM is up (and, since 24 Oct 2026, a second tunnel for the Mac's SSH; see iOS Simulators below), stops it when the VM stops, and restarts it when a probe from the VM (every 2 minutes) fails; a bare `boat forward` goes stale after a VM stop/resume without exiting. Log: `~/Library/Logs/boat-executor-bridge.log`. Restart with `launchctl kickstart -k gui/$(id -u)/com.julds.boat-executor-bridge`. The `executor` entry works only while the Mac is awake. Rotating the Mac token (`executor server rotate-token`) means rewriting the VM token file.
+The Mac end of the tunnel is `~/.local/bin/julds-executor-bridge`, run by `~/Library/LaunchAgents/com.julds.boat-executor-bridge.plist` (KeepAlive). It keeps `boat forward bx_gbx664fj --reverse --local 4312 --remote 4312` (Executor 2), the older 4789 forward (Executor 1, unused by agents since 26 Oct 2026) and a tunnel for the Mac's SSH (see iOS Simulators below) running while the VM is up, stops them when the VM stops, and restarts each when its probe from the VM (every 2 minutes) fails; a bare `boat forward` goes stale after a VM stop/resume without exiting. Log: `~/Library/Logs/boat-executor-bridge.log`. Restart with `launchctl kickstart -k gui/$(id -u)/com.julds.boat-executor-bridge`. The `executor_v2_local` entry works only while the Mac is awake.
 
-Approvals: the Mac Executor policies `1password.*` and `playwright.*` are `require_approval` (since 24 Oct 2026), so those calls pause. Mac agents (stdio, `--elicitation-mode browser`) get a browser approval on the Mac. Calls from the VM go over HTTP, where Executor hands the approval back to the agent: it asks in the T3 thread and resumes after you reply, or you run `executor resume --execution-id <id> --action accept|cancel` on the Mac. On the VM this is a request, not a lock; set the policy to `block` for a hard stop. Paper, Aside, Canva, Agentation and shadcn keep their existing policies.
+boat self-updates on some commands (seen on `boat resume`). If that runs inside Aside's sandbox, macOS marks the new binary quarantined and kills it (exit 137), which also breaks the tunnel LaunchAgent. Fix: `xattr -d com.apple.quarantine ~/.ascii/bin/boat`.
+
+Approvals (Executor 1 notes; in Executor 2 1Password asks on every call and the other local apps ask only for destructive tools): the Mac Executor policies `1password.*` and `playwright.*` are `require_approval` (since 24 Oct 2026), so those calls pause. Mac agents (stdio, `--elicitation-mode browser`) get a browser approval on the Mac. Calls from the VM go over HTTP, where Executor hands the approval back to the agent: it asks in the T3 thread and resumes after you reply, or you run `executor resume --execution-id <id> --action accept|cancel` on the Mac. On the VM this is a request, not a lock; set the policy to `block` for a hard stop. Paper, Aside, Canva, Agentation and shadcn keep their existing policies.
 
 ## iOS Simulators (T3 device host)
 
