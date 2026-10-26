@@ -225,6 +225,34 @@ class ExecutorTests(unittest.TestCase):
         self.assertEqual(data['mcp_servers']['executor_cloud']['args'][2], '17907')
         self.assertEqual(self.run_setup(**options, cloud_callback_port=17907), [])
 
+    def test_missing_node_runtime_is_replaced_but_live_one_conflicts(self):
+        options = self.cloud_options()
+        self.run_setup(**options, cloud_callback_port=17907)
+        gone = str(self.home / 'node-versions/v1/bin/node')
+        codex = self.home / '.codex/config.toml'
+        opencode = self.home / '.config/opencode/opencode.jsonc'
+        data = tomlkit.parse(codex.read_text())
+        data['mcp_servers']['executor_cloud']['command'] = gone
+        codex.write_text(tomlkit.dumps(data))
+        oc = json.loads(opencode.read_text())
+        oc['mcp']['servers']['executor_cloud']['command'][0] = gone
+        opencode.write_text(json.dumps(oc))
+        self.assertEqual(len(self.run_setup(check=True, **options)), 2)
+        self.run_setup(**options)
+        cloud = tomlkit.parse(codex.read_text())['mcp_servers']['executor_cloud']
+        self.assertEqual(cloud['command'], options['node_path'])
+        self.assertEqual(cloud['args'][2], '17907')
+        oc = json.loads(opencode.read_text())['mcp']['servers']['executor_cloud']
+        self.assertEqual(oc['command'][0], options['node_path'])
+        self.assertEqual(self.run_setup(**options), [])
+        other = self.home / 'other-node'
+        other.write_text('#!/bin/sh\n'); other.chmod(0o700)
+        data = tomlkit.parse(codex.read_text())
+        data['mcp_servers']['executor_cloud']['command'] = str(other)
+        codex.write_text(tomlkit.dumps(data))
+        with self.assertRaises(ValueError):
+            self.run_setup(**options)
+
     def test_timeout_upgrade_preserves_other_fields(self):
         options = self.cloud_options()
         self.run_setup(**options)

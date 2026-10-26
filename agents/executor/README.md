@@ -60,6 +60,13 @@ so GUI clients do not need Node on their inherited PATH. It can migrate the
 matching shim entry without replacing custom flags or settings. After an
 Executor upgrade, rerun the script and the transport checks.
 
+The `executor_cloud` entry stores the resolved Node binary. Removing that Node
+version (as the 24 October 2026 CVE cleanup did to fnm's v26.8.1) breaks the
+cloud gateway in every agent. Rerun setup with `--cloud-url`; it replaces a
+configured Node that no longer exists, keeps the callback port and other
+settings, and still refuses a different Node that is installed. Pass
+`--node-path ~/.local/share/fnm/aliases/default/bin/node` to pick fnm's default.
+
 Every entry runs the resolved Executor executable with:
 
 ```text

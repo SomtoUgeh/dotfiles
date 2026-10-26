@@ -5,7 +5,7 @@ agents. The original fourteen internet services and eight additional OpenCode
 integrations passed real cloud reads. Figma REST profile and file reads also
 passed through the saved cloud connection. Canva remains local by user choice after
 its hosted callback was rejected. The local catalog contains Paper, Playwright,
-desktop 1Password, Canva, Agentation and shadcn. OpenCode now connects only through
+desktop 1Password, Canva, Agentation, shadcn and Aside. OpenCode now connects only through
 the two Executor gateways.
 
 ## Complete service audit, 12 September 2026
@@ -76,8 +76,9 @@ deploy kept the existing D1 database, `executor-blobs`, Access variables, and
 `EXECUTOR_SECRET_KEY`. Unauthenticated console and MCP requests still receive
 Cloudflare Access's OAuth 401 challenge. A hosted GitHub `get_me` through the
 cloud gateway returned `SomtoUgeh` after the deploy. The Mac and AltSchool VM
-local CLIs were not part of this deploy and remain on `v1.6.8` until each
-machine runs `bun add --global executor@1.6.10` and `executor install`.
+local CLIs were not part of this deploy. The Mac's local Executor has since been
+upgraded to `v1.6.10` (checked 26 October 2026); other machines upgrade with
+`bun add --global executor@1.6.10` and `executor install`.
 
 ## Reproduce or maintain
 

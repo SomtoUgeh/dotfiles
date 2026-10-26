@@ -163,6 +163,14 @@ def setup(home: Path, executable: str | None, check: bool = False,
                             if len(values) > offset and isinstance(values[offset], str) and values[offset].isdigit():
                                 values.pop(offset)
                             entry[arg_key] = values
+                # A Node upgrade can delete the configured runtime. Replace only a
+                # runtime that no longer exists; a different live Node stays a conflict.
+                stale = comparable.get("command")
+                if is_opencode and isinstance(stale, list) and stale and isinstance(stale[0], str):
+                    if not Path(stale[0]).exists():
+                        comparable["command"] = [expected["command"][0], *stale[1:]]
+                elif isinstance(stale, str) and not Path(stale).exists():
+                    comparable["command"] = expected["command"]
                 # An explicit --cloud-url may replace the same plain HTTP
                 # endpoint with the shared OAuth adapter; preserve custom auth.
                 if comparable not in (expected, {"url": cloud_url}):
