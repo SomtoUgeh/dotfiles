@@ -1,0 +1,17 @@
+{
+  // Phone wake button for the julds boat VM. Deploy from the julds VM:
+  //   set -a; . ~/.config/executor-v2-julds/env; set +a; npx wrangler@4 deploy
+  // Secret: BOAT_KEY (1Password "boat julds wake key", vault "Julds VM"; resume + read on bx_gbx664fj only).
+  "name": "julds-wake",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "routes": [{ "pattern": "wake.julds.com", "custom_domain": true }],
+  "vars": {
+    "SANDBOX_ID": "bx_gbx664fj",
+    "ACCESS_TEAM": "julds",
+    "ACCESS_AUD": "a58dcb77b7b1abccaa4abcb095aaa29c1b2d651e87a385fd27dc1bd0490d6e99",
+    "ALLOWED_EMAILS": "work@somtougeh.com,smugeh@gmail.com",
+    "T3_RELAY_URL": "https://prod-30d01c3c481664ad.t3coderelay.com/.well-known/t3/environment"
+  }
+}

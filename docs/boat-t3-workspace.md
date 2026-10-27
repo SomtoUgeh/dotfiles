@@ -126,9 +126,11 @@ The VM cannot run iOS Simulators, so T3 on `julds` uses the Mac as an SSH **devi
 
 **Wake.** A stopped VM has no machine, so nothing wakes it by itself; T3 shows it offline until it is resumed.
 
-- Mac: `~/.local/bin/julds-autowake` runs every 20 s (`~/Library/LaunchAgents/com.julds.autowake.plist`, loaded). When T3 Code is the frontmost app and `julds` is stopped, it runs `boat resume` (at most once every 2 minutes). Log: `~/Library/Logs/julds-autowake.log`.
+- Mac: `~/.local/bin/julds-autowake` runs every 20 s (`~/Library/LaunchAgents/com.julds.autowake.plist`, loaded). When T3 Code is the frontmost app and `julds` is stopped, it runs `boat resume` (at most once every 2 minutes). Log: `~/Library/Logs/julds-autowake.log`. Fixed 27 Oct 2026: `lsappinfo` prints the app name quoted (`"T3 Code (Nightly)"`) plus extra lines, and the old parsing kept the quote, so the match never fired in 13.5k runs. It now takes the first quoted string. `touch ~/Library/Caches/julds-autowake/probe` logs one `probe: ... matched` line on the next run to confirm detection. It only helps at the Mac (awake, T3 in front); away from it use the iPhone Shortcut or the dashboard.
 - iPhone: Shortcut "Wake julds": Get Contents of URL, POST `https://boat.dev/api/v1/sandboxes/bx_gbx664fj/resume`, header `Authorization: Bearer <key>`. The key is the 1Password item "boat julds wake key" (Julds VM vault): boat API key `julds-wake-phone`, limited to this sandbox with `sandbox.resume` and `sandbox.read`, expires Oct 2027.
 - Anywhere: boat.dev/dashboard, Sandboxes, Resume.
+- Phone/anywhere (27 Oct 2026): **https://wake.julds.com** (Worker `julds-wake`, source `services/julds-wake/`, deployed from the VM with the token in `~/.config/executor-v2-julds/env`). Opening the page resumes julds if it is stopped (`?peek` only shows status) and shows when T3 is ready. Gated by Cloudflare Access app "julds wake" (policies: Executor Owner = work@somtougeh.com, and "julds wake - personal (WARP)" = smugeh@gmail.com; 1-month session) and the Worker re-checks the Access JWT (AUD + ALLOWED_EMAILS) and fails closed. Secret `BOAT_KEY` = the `julds-wake-phone` key (resume + read only). boat's API reports a stopped VM as `archived`, not `stopped`.
+- WARP: the Mac's WARP was re-registered as smugeh@gmail.com on 27 Oct (Default profile, full tunnel), so wake.julds.com signs in through WARP with no code. WARP sign-in was turned off on the three Executor apps so they keep the work@somtougeh.com login. The iPhone/iPads are still registered as work@somtougeh.com; they get the email-code login until re-registered.
 
 Away from the Mac, everything on the VM works except the `executor` (Mac local) tools: Paper, Aside, Playwright, desktop 1Password and Canva need the Mac awake.
 
@@ -138,6 +140,7 @@ boat deletes a stopped sandbox's disk 14 days after the stop (email on day 11). 
 
 ## Gotchas
 
+- T3 self-updates prune old runtime versions, but `t3code.service` pins one exact version in ExecStart. On 27 Oct 2026 the pinned 20261024.3630 was gone, so after a resume the service failed with 203/EXEC and T3 showed julds offline. Fix: the drop-in `~/.config/systemd/user/t3code.service.d/julds-stable-launcher.conf` runs `~/.local/bin/t3-service-launcher`, which starts the `activeVersion` from `~/.t3/runtime/service-state.json` (or the newest version present) and relinks `~/.local/bin/t3`. If T3 is offline after a resume, check `systemctl --user status t3code.service`; `t3 service install` repairs it.
 - Revoking the GitHub CLI OAuth app (github.com/settings/applications) signs out every `gh` and also deletes SSH keys that were uploaded through `gh`. Re-add with `gh ssh-key add ~/.ssh/id_ed25519_personal.pub --title julds-boat --type authentication`.
 - Files Aside writes on the Mac can carry `com.apple.quarantine`; launchd and Gatekeeper refuse them until `xattr -d com.apple.quarantine <file>`. Load LaunchAgents as yourself (`launchctl bootstrap gui/$(id -u) ...`), never with sudo; error 5 also means "already loaded".
 - `pkill -f mcp-remote...` inside `boat ssh -- 'bash -lc "..."'` kills the SSH command itself; use a `[m]cp-remote` pattern.
