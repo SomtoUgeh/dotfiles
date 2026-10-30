@@ -102,8 +102,67 @@ async function wake(){woke=true;$("wake").disabled=true;$("label").textContent="
 $("wake").onclick=wake;poll();setInterval(poll,4000);
 </script></body></html>`;
 
+
+// Weekly dated saved snapshot (cron), keeping the newest KEEP_WEEKLY. Uses BOAT_SNAPSHOT_KEY:
+// snapshot.read + snapshot.write + sandbox.read on bx_gbx664fj only. Works while the VM is stopped.
+async function weeklySnapshot(env) {
+  const h = { authorization: `Bearer ${env.BOAT_SNAPSHOT_KEY}`, "content-type": "application/json", "user-agent": "julds-wake/1" };
+  const prefix = "julds-weekly-";
+  const name = prefix + new Date().toISOString().slice(0, 10);
+  const save = await fetch("https://boat.dev/api/v1/saved-snapshots", { method: "POST", headers: h, body: JSON.stringify({ sandboxId: env.SANDBOX_ID, name }) });
+  console.log(JSON.stringify({ weeklySnapshot: name, status: save.status }));
+  if (save.status >= 300) { await sendAlert(env, "weekly snapshot failed", `Saving ${name} returned ${save.status}: ${await save.text()}`); return; }
+  const list = await (await fetch("https://boat.dev/api/v1/saved-snapshots", { headers: h })).json().catch(() => ({}));
+  const items = (list.named || list.savedSnapshots || list.snapshots || []).map((x) => x.name).filter((n) => n && n.startsWith(prefix) && n !== name).sort();
+  const keep = Number(env.KEEP_WEEKLY || 4) - 1;
+  for (const old of items.slice(0, Math.max(0, items.length - keep))) {
+    const d = await fetch(`https://boat.dev/api/v1/saved-snapshots/${encodeURIComponent(old)}`, { method: "DELETE", headers: h });
+    console.log(JSON.stringify({ pruned: old, status: d.status }));
+  }
+}
+
+// ---- Alerts: boat webhooks (and our own failures) -> email to smugeh@gmail.com via alerts.julds.com ----
+const ALERT_EVENTS = ["sandbox.error", "sandbox.degraded", "sandbox.recovered"];
+async function sendAlert(env, subject, text) {
+  try {
+    await env.EMAIL.send({ to: env.ALERT_TO, from: { email: env.ALERT_FROM, name: "julds alerts" }, subject: `[julds] ${subject}`, text });
+  } catch (e) { console.log(JSON.stringify({ alertSendFailed: e.code || String(e), subject })); }
+}
+const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+async function handleBoatWebhook(req, env) {
+  const raw = await req.text();
+  const id = req.headers.get("x-ascii-delivery") || "";
+  const ts = req.headers.get("x-ascii-timestamp") || "";
+  const sig = (req.headers.get("x-ascii-signature") || "").replace(/^v1=/, "");
+  if (!env.BOAT_WEBHOOK_SECRET || !/^[a-f0-9]{64}$/i.test(sig) || Math.abs(Date.now() / 1000 - Number(ts)) > 300) return new Response("bad signature", { status: 401 });
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(env.BOAT_WEBHOOK_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const expected = hex(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${id}.${ts}.${raw}`)));
+  let diff = expected.length ^ sig.length;
+  for (let i = 0; i < Math.min(expected.length, sig.length); i++) diff |= expected.charCodeAt(i) ^ sig.toLowerCase().charCodeAt(i);
+  if (diff !== 0) return new Response("bad signature", { status: 401 });
+  const evt = JSON.parse(raw);
+  const sb = evt.data?.sandbox || {};
+  console.log(JSON.stringify({ webhook: evt.type, sandbox: sb.id, delivery: id }));
+  if (ALERT_EVENTS.includes(evt.type) && (!sb.id || sb.id === env.SANDBOX_ID)) {
+    const what = { "sandbox.error": "VM is in error", "sandbox.degraded": "VM is not fully reachable", "sandbox.recovered": "VM recovered" }[evt.type];
+    await sendAlert(env, what, [
+      `${what} (${evt.type}) at ${evt.createdAt}.`,
+      evt.data?.state ? `State: ${evt.data.previousState || "?"} -> ${evt.data.state}` : "",
+      evt.data?.reason ? `Reason: ${evt.data.reason}` : "",
+      "", "Check: boat info bx_gbx664fj  |  Recover: boat recover bx_gbx664fj  |  Status page: https://wake.julds.com/?peek",
+      `Event id: ${evt.id}`,
+    ].filter(Boolean).join("\n"));
+  }
+  return new Response("ok");
+}
+
 export default {
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(weeklySnapshot(env));
+  },
   async fetch(req, env) {
+    const u0 = new URL(req.url);
+    if (req.method === "POST" && u0.pathname === "/hooks/boat") return handleBoatWebhook(req, env);
     const auth = await verifyAccess(req, env);
     if (!auth.ok) return new Response(`Forbidden: ${auth.why}`, { status: 403 });
     const url = new URL(req.url);
@@ -116,7 +175,7 @@ export default {
       if (!WAKEABLE.includes(before.state)) return json(before);
       const r = await boat(env, "/resume", { method: "POST", body: "{}" });
       console.log(JSON.stringify({ wake: true, by: auth.email, boatStatus: r.status }));
-      if (r.status >= 300) return json({ ...before, error: r.body.message || `resume failed (${r.status})` }, 502);
+      if (r.status >= 300) { await sendAlert(env, "wake failed", `Resume returned ${r.status}: ${r.body.message || ""}`); return json({ ...before, error: r.body.message || `resume failed (${r.status})` }, 502); }
       return json({ ...(await status(env)), state: "starting" });
     }
     return new Response("Not found", { status: 404 });
