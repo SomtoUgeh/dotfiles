@@ -1,5 +1,7 @@
 # Executor on a new computer
 
+> **Retired 31 Oct 2026.** The Executor 1 cloud gateway (`executor-cloudflare.somto.workers.dev`: Worker, D1 `executor`, R2 `executor-blobs`, Access app "Executor MCP") was deleted after it had no traffic since 26 Oct. All agents use Executor 2 (`executor-v2.julds.com` and the Mac local gateway on 127.0.0.1:4312); see `agents/executor/v2.md`. An export of its D1 (SQL) and R2 files is in `~/.executor/retired-v1-cloud-20261031/` on the Mac. This page is kept for history only.
+
 Use the existing Executor Cloud deployment for internet services. Install local
 Executor only for tools that need this computer's projects or apps. Joining a
 new computer does not require deploying Cloudflare again or restoring its backup.
