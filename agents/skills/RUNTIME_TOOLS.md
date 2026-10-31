@@ -60,7 +60,8 @@ accounts, and evidence rules.
 
 On the Mac, use `executor_v2` (Executor 2 in the cloud) for internet services and
 `executor_v2_local` for tools that need the Mac: Paper, Playwright, 1Password,
-Aside, Agentation, shadcn and Canva. On hosts that still have Executor 1 (the
+Aside, Agentation, shadcn, agent-desktop (desktop computer use; see the
+`agent-desktop` skill) and Canva. On hosts that still have Executor 1 (the
 julds VM), the equivalents are `executor_cloud` and `executor`. Explicit user
 tool choices take precedence. Discover the live catalog rather than assuming a
 service exists on both gateways.
