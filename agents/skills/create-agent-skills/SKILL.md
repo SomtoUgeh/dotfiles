@@ -1,6 +1,6 @@
 ---
 name: create-agent-skills
-description: Create, audit, verify, and repair shared agent skills and their scripts, templates, and references across Codex, Claude Code, OpenCode, and Grok. Use when authoring or maintaining SKILL.md resources.
+description: Create, audit, verify, and repair shared agent skills and their scripts, templates, and references across Codex, Claude Code, and OpenCode. Use when authoring or maintaining SKILL.md resources.
 ---
 
 # Create and Maintain Agent Skills

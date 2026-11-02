@@ -1,6 +1,6 @@
 # Agent Instructions
 
-Shared behavior for Codex, Claude Code, OpenCode, and Grok. Each harness loads
+Shared behavior for Codex, Claude Code, and OpenCode. Each harness loads
 this file through its native instruction path. `ETHOS.md` is a reference, not
 an additional runtime prerequisite. Tool configuration belongs to each harness.
 
@@ -64,6 +64,9 @@ This codebase outlives the task. Patterns get copied. Fight entropy.
   overlapping skill ownership when needed. Shared roles describe responsibilities;
   do not invent tool, agent, or model identifiers. Verify the actual model before
   promising an independent cross-model opinion; disclose unavailable independence.
+- Use only Claude Sonnet and Claude Opus for agents and subagents: Sonnet for
+  implementation, Opus for hard work, reviews, and user-facing UI or copy. Use
+  no other model.
 - Use `code-review` closeout for ordinary ship gates, its axes mode for standards
   and spec checks, and `workflows-review` when exhaustive review is requested.
   Verify and repair in-scope blockers; plan review's outside opinion is opt-in.

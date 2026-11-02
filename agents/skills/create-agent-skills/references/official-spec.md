@@ -18,7 +18,7 @@ Claude Code uses `.claude/skills` and `~/.claude/skills`; it can load relevant s
 
 Consult [RUNTIME_TOOLS.md](../../RUNTIME_TOOLS.md) and the active catalog. Verify the resolved skill path in each supported harness before claiming installation works.
 
-Sources: [Claude Code](https://code.claude.com/docs/en/skills), [OpenCode](https://opencode.ai/docs/skills/), [Grok](https://docs.x.ai/build/features/skills-plugins-marketplaces).
+Sources: [Claude Code](https://code.claude.com/docs/en/skills), [OpenCode](https://opencode.ai/docs/skills/).
 
 ## Body and resources
 

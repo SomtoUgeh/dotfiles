@@ -69,7 +69,7 @@ component was added; it does not prove that annotations reach the agent.
      HTTP service (default port 4747) and the agent-facing MCP service.
    - Claude example, only when Claude is the selected runtime:
      `claude mcp add agentation -- npx -y agentation-mcp server`.
-   - Codex, OpenCode, and Grok: use that runtime's supported MCP registration
+   - Codex and OpenCode: use that runtime's supported MCP registration
      mechanism. Do not run Claude's setup wizard or an all-agent installer as
      a fallback. If MCP is unsupported, report that limit with copy/export as
      the available workflow; do not silently switch providers.

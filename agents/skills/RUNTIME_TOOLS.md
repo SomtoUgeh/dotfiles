@@ -5,15 +5,15 @@ permissions to select the implementation; the names below are examples, not a
 promise that a particular version exposes them. A missing example tool is not
 a reason to stop work when the fallback can complete it.
 
-| Capability | Claude Code | Codex | OpenCode | Grok | Fallback |
-| --- | --- | --- | --- | --- | --- |
-| Ask a necessary question | `AskUserQuestion` | `request_user_input_async`, or `request_user_input` in its supported mode | `question` | Exposed question tool | Ask concisely in chat; continue independent work |
-| Track progress | `TodoWrite` | `update_plan` when exposed | `todowrite` / `todoread` | Exposed todo/plan tool | Maintain a short in-context checklist; no unsolicited file |
-| Launch a worker | `Agent` | `spawn_agent` / collaboration tools | `task` | `spawn_subagent` when exposed | Work locally; disclose when independence could not be provided |
-| Read a skill | `Skill` or `/skill-name` | `$skill-name` or skill loader | `skill` | `/skill-name` or skill loader | Read the discovered `SKILL.md` and resolve references from its real directory |
-| Read official web docs | `WebFetch` / search tools | Docs MCP / web tools | `webfetch` / search tools | Exposed web search/fetch | Use an available read-only HTTP client; report inaccessible sources |
-| Interact with a browser | Available browser tool/CLI | Native browser or installed browser tool | Available browser tool/CLI | Available browser tool/CLI | See [Browser verification](#browser-verification); otherwise report the specific unverified interaction |
-| Generate an image | Available image tool | Native image-generation tool | Available image tool | Available image tool | Provide a clearly labelled prompt/specification; do not claim an image was generated |
+| Capability | Claude Code | Codex | OpenCode | Fallback |
+| --- | --- | --- | --- | --- |
+| Ask a necessary question | `AskUserQuestion` | `request_user_input_async`, or `request_user_input` in its supported mode | `question` | Ask concisely in chat; continue independent work |
+| Track progress | `TodoWrite` | `update_plan` when exposed | `todowrite` / `todoread` | Maintain a short in-context checklist; no unsolicited file |
+| Launch a worker | `Agent` | `spawn_agent` / collaboration tools | `task` | Work locally; disclose when independence could not be provided |
+| Read a skill | `Skill` or `/skill-name` | `$skill-name` or skill loader | `skill` | Read the discovered `SKILL.md` and resolve references from its real directory |
+| Read official web docs | `WebFetch` / search tools | Docs MCP / web tools | `webfetch` / search tools | Use an available read-only HTTP client; report inaccessible sources |
+| Interact with a browser | Available browser tool/CLI | Native browser or installed browser tool | Available browser tool/CLI | See [Browser verification](#browser-verification); otherwise report the specific unverified interaction |
+| Generate an image | Available image tool | Native image-generation tool | Available image tool | Provide a clearly labelled prompt/specification; do not claim an image was generated |
 
 ## Applying the mapping
 
@@ -153,11 +153,6 @@ packaging or tool-schema requirements.
 ## Discovery
 
 The installer exposes the canonical library through `~/.agents/skills` and the
-tools' native paths. Codex and Grok both support the neutral path; Grok also
-supports Claude compatibility. Use `grok inspect --json` to verify its loaded
-instructions, skills, and agents. Its global instruction path is
-`~/.grok/AGENTS.md`; keep that linked on hosts without Claude configuration.
+tools' native paths. Codex supports the neutral path.
 
-Sources: [Codex skills](https://learn.chatgpt.com/docs/build-skills),
-[Grok skills](https://docs.x.ai/build/features/skills-plugins-marketplaces),
-[Grok instructions](https://docs.x.ai/build/features/project-rules).
+Sources: [Codex skills](https://learn.chatgpt.com/docs/build-skills).
