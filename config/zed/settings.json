@@ -11,16 +11,14 @@
   // ~/.config/zed/settings.json.local (not tracked in dotfiles)
   "ssh_connections": [
     {
-      "host": "altschool",
+      "host": "julds",
       "args": [],
       "projects": [
-        {
-          "paths": [
-            "/home/altschool/code/TalentQL/altschool-web-platforms/./"
-          ]
-        }
+        { "paths": ["/home/user/code/personal/jtp"] },
+        { "paths": ["/home/user/code/personal/coworkers"] },
+        { "paths": ["/home/user/code/erivault/erivault_website"] }
       ],
-      "nickname": "altschool"
+      "nickname": "julds"
     }
   ],
   "agent_buffer_font_size": 14.0,
