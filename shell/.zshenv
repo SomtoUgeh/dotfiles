@@ -45,3 +45,6 @@ unset _op_agent
 
 # Machine-local secrets; never committed.
 [ -f "$HOME/.config/agent-secrets/context7.zsh" ] && . "$HOME/.config/agent-secrets/context7.zsh"
+
+# Linux (julds VM): Postgres 17 from apt for repos whose db scripts read PG_BIN.
+[ -d /usr/lib/postgresql/17/bin ] && export PG_BIN=/usr/lib/postgresql/17/bin

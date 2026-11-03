@@ -45,6 +45,22 @@ This codebase outlives the task. Patterns get copied. Fight entropy.
 - Preserve unrelated work and the user's latest corrections. Answer side
   questions without losing the original task unless the user replaces it.
 
+## Machine limits on julds
+
+Applies only when `hostname` is `julds` (the boat VM: 8 CPUs, 16 GB RAM, about
+11 GB left for work after boat's own services).
+
+- Run at most one browser-testing lane at a time across all threads and
+  worktrees: one dev server (Vite, workerd, `alchemy dev`, Metro) plus one
+  Playwright or E2E run. Before starting one, check
+  `pgrep -fa "alchemy dev|vite|workerd|playwright|metro"`. If another lane holds
+  it, wait for that lane or ask the lead thread; do not start a second.
+- Code-only work (edits, typecheck, lint, unit tests) may run in parallel.
+- Stop any dev server you started once your step is done.
+- If tests slow down or a process dies, check `free -h` and
+  `sudo dmesg | grep -i oom` before blaming the code, and report memory
+  pressure as the cause when it is.
+
 ## Working with the repository
 
 - State your understanding before broad investigation. Read project instructions
