@@ -8,7 +8,7 @@ machines started from a per-project saved snapshot through `boat-check`.
 | `boat-check` | project VM (`/usr/local/bin/boat-check`) | Runs a command on a throwaway machine from `<project>-base` and prints output, time and cost |
 | `base-common.sh` + `base-<project>.sh` | a new build machine | Installs the toolchain, clones the repo from a git bundle, installs deps |
 | `devvm-setup.sh` | a new project VM | Hostname, Tailscale, T3 service, keepalive timer, `~/.boatignore`, git identity and key, `/etc/boat-check.env` |
-| `devvm-tools.sh` | project VM | CLIs the skills call, pinned to julds versions: shellcheck, fd, bat, agent-browser (+ Chrome), wrangler, cf, Aside CLI. Then `aside login` (confirm in Aside on the Mac) |
+| `devvm-tools.sh` | project VM | CLIs the skills call, pinned to julds versions: shellcheck, fd, bat, agent-browser (+ Chrome), wrangler, cf, op, Aside CLI. Then `aside login` (confirm in Aside on the Mac); op token as an environment secret file |
 | `link-agent-config.sh` | project VM (`~/.local/bin/link-agent-config`) | Clones dotfiles and p3-stack, links skills, Claude and Codex config like `install.sh`, adds `~/.claude/rules/boat-project-vm.md`, installs `agent-config-sync.timer` (after boot and hourly) |
 
 ## Agent config on a project VM
