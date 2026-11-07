@@ -123,7 +123,7 @@ sort -u -o ~/.ssh/known_hosts ~/.ssh/known_hosts
 
 echo "== boat-check config"
 printf 'BOAT_CHECK_PROJECT=%q\nBOAT_CHECK_SNAPSHOT=%q\nBOAT_CHECK_ENVIRONMENT=%q\nBOAT_CHECK_REPO_PATH=%q\nBOAT_CHECK_INSTALL=%q\n' \
-  "$P" "$P-base" "$P" "$REPO_PATH" "$INSTALL" | sudo tee /etc/boat-check.env >/dev/null
+  "$P" "$P-base" "$P-check" "$REPO_PATH" "$INSTALL" | sudo tee /etc/boat-check.env >/dev/null
 cat /etc/boat-check.env
 
 # Next, once this VM's key is on GitHub: install link-agent-config.sh as

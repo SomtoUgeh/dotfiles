@@ -43,7 +43,15 @@ Add a secret file only after the base is saved.
 
 ## boat-check
 
+- Check machines use the `<p>-check` environment, not `<p>`. It has the app
+  secret files (for example coworkers' `.env`) but not the personal tokens
+  (`.config/op/`, `.config/executor-v2/`), because the checks run branch code.
+  Create it with `boat env new <p>-check`, then
+  `boat env set <p>-check --github false --agents-credentials false`, then copy
+  each app secret file with `boat env set-file`.
 - Config: `/etc/boat-check.env`. Key: `~/.config/boat-check/key`, a `ci`-preset
-  key scoped to the project's environment (`boat api-key create <p>-ci --preset ci --ttl 90d --env <environment id>`).
+  key scoped to both environments: `<p>` because boat links the base snapshot to
+  the environment of the machine it was saved from, and `<p>-check` for the check
+  machines (`boat api-key create <p>-check-ci --preset ci --ttl 90d --env <p id> --env <p-check id>`).
 - The CLI reads `BOAT_API_KEY`, so the VM's own boat login stays untouched.
 - When boat refuses the start (`rate_limited`, `no_ready_machine`), the command runs locally.

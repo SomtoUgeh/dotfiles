@@ -12,7 +12,7 @@
 # deleted. The exit code is the command's exit code.
 #
 # Config: /etc/boat-check.env (project, snapshot, environment, repo path, install cmd).
-# Key:    ~/.config/boat-check/key (a ci-preset boat API key scoped to the environment).
+# Key:    ~/.config/boat-check/key (a ci-preset boat API key scoped to <p> and <p>-check).
 # If boat refuses the start (rate limit, no machine), the command runs here instead,
 # unless BOAT_CHECK_NO_FALLBACK=1.
 set -euo pipefail
