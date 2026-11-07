@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # CLIs that Somto's skills call, at the versions julds uses (7 Nov 2026).
 # Runs as `user` on a project VM. Idempotent. Sign-ins are separate:
-#   aside login            (confirm the code in Aside on the Mac: Settings > Account > Devices)
+#   aside login --email <account>   (confirm the code in Aside on the Mac: Settings > Account > Devices)
+#   aside host use <Mac host from `aside host list`>   (send browser tasks to the Mac, as on julds)
 #   op                     (needs the 1Password service account token; not installed here)
 set -euo pipefail
 export PATH=$HOME/.local/bin:$PATH
