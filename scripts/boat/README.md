@@ -8,6 +8,21 @@ machines started from a per-project saved snapshot through `boat-check`.
 | `boat-check` | project VM (`/usr/local/bin/boat-check`) | Runs a command on a throwaway machine from `<project>-base` and prints output, time and cost |
 | `base-common.sh` + `base-<project>.sh` | a new build machine | Installs the toolchain, clones the repo from a git bundle, installs deps |
 | `devvm-setup.sh` | a new project VM | Hostname, Tailscale, T3 service, keepalive timer, `~/.boatignore`, git identity and key, `/etc/boat-check.env` |
+| `link-agent-config.sh` | project VM (`~/.local/bin/link-agent-config`) | Clones dotfiles and p3-stack, links skills, Claude and Codex config like `install.sh`, adds `~/.claude/rules/boat-project-vm.md`, installs `agent-config-sync.timer` (after boot and hourly) |
+
+## Agent config on a project VM
+
+After `devvm-setup.sh`, and after the VM's key is on GitHub:
+
+```sh
+boat ssh <id> -- 'mkdir -p ~/.local/bin && cat > ~/.local/bin/link-agent-config && chmod 755 ~/.local/bin/link-agent-config && ~/.local/bin/link-agent-config' < link-agent-config.sh
+```
+
+It keeps boat's own `boat` and `synced` folders in `~/.claude/skills` and adds
+one link per shared skill. The timer pulls dotfiles and relinks, so skills
+pushed from the Mac reach the VM within an hour. It skips the parts of
+`install_cloud_dotfiles.sh` that add GitHub keys or change the login shell.
+Executor needs its own sign-in.
 
 ## Rebuild a base
 

@@ -72,6 +72,7 @@ U="runuser -u user -- env XDG_RUNTIME_DIR=/run/user/1000 systemctl --user"
 if ! \$U is-active --quiet t3code.service; then
   \$U daemon-reload
   \$U start t3code.service
+  \$U start agent-config-sync.timer 2>/dev/null
   logger -t $P-keepalive "started t3code after it was found inactive"
 fi
 K
@@ -124,6 +125,9 @@ echo "== boat-check config"
 printf 'BOAT_CHECK_PROJECT=%q\nBOAT_CHECK_SNAPSHOT=%q\nBOAT_CHECK_ENVIRONMENT=%q\nBOAT_CHECK_REPO_PATH=%q\nBOAT_CHECK_INSTALL=%q\n' \
   "$P" "$P-base" "$P" "$REPO_PATH" "$INSTALL" | sudo tee /etc/boat-check.env >/dev/null
 cat /etc/boat-check.env
+
+# Next, once this VM's key is on GitHub: install link-agent-config.sh as
+# ~/.local/bin/link-agent-config and run it (see README).
 
 echo "== boat docs MCP for Claude"
 claude mcp add --transport http boat-docs --scope user https://docs.boat.dev/mcp 2>&1 | tail -1 || true
