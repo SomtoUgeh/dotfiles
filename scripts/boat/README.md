@@ -9,6 +9,8 @@ machines started from a per-project saved snapshot through `boat-check`.
 | `base-common.sh` + `base-<project>.sh` | a new build machine | Installs the toolchain, clones the repo from a git bundle, installs deps |
 | `devvm-setup.sh` | a new project VM | Hostname, Tailscale, T3 service, keepalive timer, `~/.boatignore`, git identity and key, `/etc/boat-check.env` |
 | `devvm-tools.sh` | project VM | CLIs the skills call, pinned to julds versions: shellcheck, fd, bat, agent-browser (+ Chrome), wrangler, cf, op, Aside CLI. Then `aside login` (confirm in Aside on the Mac); op token as an environment secret file |
+| `devvm-shell.sh` | project VM | zsh, oh-my-zsh plugins and starship at julds pins, links `.zshenv`, `.zshrc` and `starship.toml`; Playwright path in `.zshrc.private` and `environment.d` (for T3 agents), op token in `.zprofile`; makes zsh the login shell. No git config changes |
+| `devvm-executor.sh` | project VM | `executor_v2` (cloud) and `executor_v2_local` (the Mac) for Claude through mcp-remote; tokens are environment secret files under `.config/executor-v2/`. The Mac end is `~/.local/bin/julds-executor-bridge <sandbox id> no`, one LaunchAgent `com.julds.boat-executor-bridge.<project>` per VM |
 | `link-agent-config.sh` | project VM (`~/.local/bin/link-agent-config`) | Clones dotfiles and p3-stack, links skills, Claude and Codex config like `install.sh`, adds `~/.claude/rules/boat-project-vm.md`, installs `agent-config-sync.timer` (after boot and hourly) |
 
 ## Agent config on a project VM
