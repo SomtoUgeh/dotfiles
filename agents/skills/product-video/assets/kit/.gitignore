@@ -1,0 +1,7 @@
+node_modules
+.DS_Store
+.env
+
+# Recorded frames and assembled clips. They are large and can be made again.
+out
+test-results

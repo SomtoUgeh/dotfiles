@@ -1,0 +1,19 @@
+{
+  "name": "product-video-capture",
+  "version": "1.0.0",
+  "description": "Records product walkthroughs with Playwright for the product video edit",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "@types/node": "24.13.3"
+  },
+  "scripts": {
+    "record": "playwright test",
+    "assemble": "node assemble.mjs"
+  }
+}
