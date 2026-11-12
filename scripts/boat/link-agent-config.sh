@@ -67,7 +67,7 @@ mkdir -p "$HOME/.claude/rules"
 cat >"$HOME/.claude/rules/boat-project-vm.md" <<'R'
 # This machine
 
-This is a boat project VM for one project. Several agents share it (4 vCPU, 8 GB).
+This is a boat project VM for one project. Several agents share it (8 vCPU, 16 GB).
 
 - Read the repository's `AGENTS.md` before you work, and follow it.
 - Run e2e runs, production builds and any check that takes more than about a
