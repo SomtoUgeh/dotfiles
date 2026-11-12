@@ -73,14 +73,17 @@ create_symlink() {
     ln -sf "$source" "$target"
 }
 
-# Link a tool's skill folder to the shared skills, unless the folder is a real
-# folder. `skillhub adopt` makes it one: the tool then holds only the active
-# skills of the Skillhub library and loads the others through Executor. A
-# machine with no Skillhub gets the link, so its tools still see every skill.
+# Link a tool's skill folder to the shared skills, unless Skillhub manages this
+# machine and the folder is a real folder. Skillhub writes its ledger at the
+# first sync, and `skillhub adopt` makes a linked folder a real one: the tool
+# then holds only the active skills of the Skillhub library and loads the
+# others through Executor. A machine with no Skillhub gets the link, so its
+# tools still see every skill, also when a tool made the folder first.
 link_skill_folder() {
     local target="$1"
+    local ledger="${SKILLHUB_HOME:-$HOME/.skillhub}/managed.json"
 
-    if [ -d "$target" ] && [ ! -L "$target" ]; then
+    if [ -f "$ledger" ] && [ -d "$target" ] && [ ! -L "$target" ]; then
         echo -e "✓ Skill folder kept as it is (Skillhub): $target"
         return
     fi

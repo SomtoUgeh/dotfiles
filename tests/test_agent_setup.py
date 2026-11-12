@@ -222,18 +222,35 @@ class SkillTests(unittest.TestCase):
 
 
 class ConfigTests(unittest.TestCase):
-    def test_shaping_hook_command_is_absolute_after_home_expansion(self):
+    def test_shaping_hook_commands_do_not_run_from_a_skill_folder(self):
         settings = json.loads((REPO / "agents/claude/settings.json").read_text())
         command = settings["hooks"]["PostToolUse"][0]["hooks"][0]["command"]
         self.assertEqual(command, "${HOME}/.claude/hooks/shaping/shaping-ripple.sh")
-        home = Path("/tmp/agent-home")
-        rendered = setup.render_hooks(home, REPO)
-        expected = str(home / ".agents/skills/shaping/shaping-ripple.sh")
-        self.assertEqual(rendered["hooks"]["PostToolUse"][0]["hooks"][0]["command"], expected)
-        self.assertEqual(
-            setup.resolve_hook_command('"${HOME}/.agents/skills/shaping/shaping-ripple.sh"', home, REPO),
-            expected,
-        )
+        repo = Path("/tmp/agent home/dotfiles")
+        expected = "'/tmp/agent home/dotfiles/agents/skills/shaping/shaping-ripple.sh'"
+        template = json.loads((REPO / "agents/codex/hooks.json").read_text())
+        codex = template["hooks"]["PostToolUse"][0]["hooks"][0]["command"]
+        self.assertEqual(setup.resolve_hook_command(codex, repo), expected)
+        self.assertEqual(setup.resolve_hook_command("${DOTFILES_DIR}/agents/skills/shaping/shaping-ripple.sh", repo), expected)
+        rendered = json.dumps(setup.render_hooks(REPO))
+        self.assertNotIn("${", rendered)
+        self.assertNotIn(".agents/skills", rendered)
+
+    def test_server_with_another_transport_gets_nothing_from_the_defaults(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            config = home / ".codex/config.toml"
+            config.parent.mkdir()
+            config.write_text('[mcp_servers.executor_v2]\ncommand = "/usr/local/bin/wrapper"\nargs = []\n\n'
+                              '[mcp_servers.context7]\ncommand = "/usr/local/bin/context7"\n\n'
+                              '[mcp_servers.playwright]\nurl = "http://127.0.0.1:1/mcp"\n')
+            setup.sync(home, REPO)
+            servers = tomlkit.parse(config.read_text())["mcp_servers"]
+            self.assertEqual(dict(servers["executor_v2"]), {"command": "/usr/local/bin/wrapper", "args": []})
+            # The default has `env_http_headers` beside `url`. Codex refuses both in a stdio server.
+            self.assertEqual(dict(servers["context7"]), {"command": "/usr/local/bin/context7"})
+            self.assertEqual(dict(servers["playwright"]), {"url": "http://127.0.0.1:1/mcp"})
+            self.assertIn("url", servers["cloudflare"])
 
     def test_duplicate_plugin_skills_are_disabled_by_path_after_upgrade(self):
         with tempfile.TemporaryDirectory() as directory:
