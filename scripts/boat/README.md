@@ -9,7 +9,7 @@ machines started from a per-project saved snapshot through `boat-check`.
 | `base-common.sh` + `base-<project>.sh` | a new build machine | Installs the toolchain, clones the repo from a git bundle, installs deps |
 | `clean-base.sh` | a throwaway copy of a project VM | Removes the Tailscale node, T3 server, keepalive and sign-ins so the copy can be saved as `<project>-base` |
 | `devvm-setup.sh` | a new project VM | Hostname, Tailscale, T3 service, keepalive timer, `~/.boatignore`, git identity and key, `/etc/boat-check.env` |
-| `link-agent-config.sh` | project VM (`~/.local/bin/link-agent-config`) | Clones dotfiles and p3-stack, links skills, Claude and Codex config like `install.sh`, adds `~/.claude/rules/boat-project-vm.md`, installs `agent-config-sync.timer` (after boot and hourly) |
+| `link-agent-config.sh` | project VM (`~/.local/bin/link-agent-config`) | Clones dotfiles and p3-stack, links skills (or leaves them to Skillhub), Claude and Codex config like `install.sh`, adds `~/.claude/rules/boat-project-vm.md`, installs `agent-config-sync.timer` (after boot and hourly) |
 
 ## Agent config on a project VM
 
@@ -24,6 +24,33 @@ one link per shared skill. The timer pulls dotfiles and relinks, so skills
 pushed from the Mac reach the VM within an hour. It skips the parts of
 `install_cloud_dotfiles.sh` that add GitHub keys or change the login shell.
 Executor needs its own sign-in.
+
+## Skillhub on a project VM
+
+A VM with no Skillhub gets one link per shared skill, as above. To make its
+tools load skills from the Skillhub library through Executor instead:
+
+```sh
+git clone git@github.com:SomtoUgeh/skillhub.git ~/code/personal/skillhub
+cd ~/code/personal/skillhub
+bun install --frozen-lockfile --production   # bun 1.4.4: the image's 1.3.14 cannot read this bun.lock
+bun link                                     # puts skillhub into ~/.bun/bin
+skillhub login                               # confirm the code in a browser on any machine
+skillhub sync                                # writes ~/.skillhub/managed.json
+link-agent-config                            # removes the per-skill links
+```
+
+While `~/.skillhub/managed.json` exists, each run of `link-agent-config`
+leaves the skill folders to Skillhub. It removes only the links that it made
+itself, keeps the links that Skillhub owns and boat's `boat` and `synced`
+folders, leaves an adopted `~/.agents/skills` as it is, and runs
+`skillhub sync`, so a change of the active set reaches the VM within an hour.
+A sync that fails does not stop the run.
+
+Do not run a plain `skillhub adopt` on a project VM: it moves `boat` and
+`synced` out of `~/.claude/skills`. The script already clears that folder.
+`skillhub adopt ~/.agents/skills` is safe. `skillhub uninstall --yes` removes
+the ledger, and the next run links every skill again.
 
 ## Rebuild a base
 
