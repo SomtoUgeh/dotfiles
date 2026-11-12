@@ -40,11 +40,10 @@ is_link_to "$home/.agents/skills" "$dotfiles/agents/skills"
 grep -q '2 skills linked, dotfiles abc1234' "$fixture/out"
 [ ! -e "$home/skillhub.calls" ]
 
-# Skillhub manages the VM and adopted ~/.agents/skills: the links of this
-# script go, the link that Skillhub owns and a link of the user stay, and
-# Skillhub syncs.
-rm "$home/.agents/skills"
-mkdir "$home/.agents/skills"
+# Skillhub manages the VM: the links of this script go, the link that
+# Skillhub owns and a link of the user stay, and Skillhub adopts the neutral
+# path, which is still one link to every skill. A sync follows in each case:
+# an adopt that changes nothing does not sync.
 write_ledger "$owns_beta"
 ln -s "$fixture/skillhub" "$stubs/skillhub"
 ln -s "$home/elsewhere/gamma" "$claude/gamma"
@@ -53,9 +52,32 @@ run
 is_link_to "$claude/beta" "$dotfiles/agents/skills/beta"
 is_link_to "$claude/gamma" "$home/elsewhere/gamma"
 [ -d "$claude/boat" ] && [ -d "$claude/synced" ]
+grep -q 'skills left to Skillhub (1 links of this script removed)' "$fixture/out"
+[ "$(cat "$home/skillhub.calls")" = "adopt $home/.agents/skills --yes
+sync" ]
+
+# An adopt and a sync that fail do not stop the script.
+echo 1 >"$home/skillhub.exit"
+run
+grep -q 'skillhub adopt of ~/.agents/skills did not complete' "$fixture/err"
+grep -q 'skillhub sync failed' "$fixture/err"
+[ -x "$home/.local/bin/link-agent-config" ]
+
+# A link to another place becomes the shared link again before the adopt.
+rm "$home/.agents/skills" "$home/skillhub.calls"
+ln -s "$home/elsewhere" "$home/.agents/skills"
+run
+is_link_to "$home/.agents/skills" "$dotfiles/agents/skills"
+[ "$(sed -n 1p "$home/skillhub.calls")" = "adopt $home/.agents/skills --yes" ]
+rm "$home"/.agents/skills.backup.*
+
+# After the adopt the neutral path is a real folder: it stays, and Skillhub syncs.
+rm "$home/.agents/skills" "$home/skillhub.calls" "$home/skillhub.exit"
+mkdir "$home/.agents/skills"
+run
 [ -d "$home/.agents/skills" ] && [ ! -L "$home/.agents/skills" ]
 ! ls "$home/.agents" | grep -q backup
-grep -q 'skills left to Skillhub (1 links of this script removed)' "$fixture/out"
+grep -q '(0 links of this script removed)' "$fixture/out"
 [ "$(cat "$home/skillhub.calls")" = sync ]
 
 # A second run changes nothing, and a failed sync does not stop the script.

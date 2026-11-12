@@ -53,11 +53,9 @@ link_every_skill() {
 # links that an earlier run of this script made, keep the links that Skillhub
 # owns and boat's own folders, then let Skillhub put the active set in place.
 leave_skills_to_skillhub() {
-  local owned t name removed=0
-  # `skillhub adopt ~/.agents/skills` makes that path a real folder. Keep it.
-  if [ ! -d "$HOME/.agents/skills" ] || [ -L "$HOME/.agents/skills" ]; then
-    link "$A/skills" "$HOME/.agents/skills"
-  fi
+  local owned t name removed=0 neutral=$HOME/.agents/skills
+  # A real folder there is an adopted one. Keep it.
+  if [ ! -d "$neutral" ] || [ -L "$neutral" ]; then link "$A/skills" "$neutral"; fi
   skills="skills left as they are"
   # Skillhub does not guess what it owns when the ledger is damaged. Nor does this script.
   if ! owned=$(jq -r --arg f "$HOME/.claude/skills" '.folders[$f].entries // {} | keys[]' "$ledger" 2>/dev/null); then
@@ -75,7 +73,16 @@ leave_skills_to_skillhub() {
   skills="skills left to Skillhub ($removed links of this script removed)"
   if ! command -v skillhub >/dev/null; then
     echo "link-agent-config: the skillhub command is not on the path; the active skills were not synced" >&2
-  elif ! skillhub sync; then
+    return
+  fi
+  # Codex reads the neutral path. As one link to the shared folder it shows
+  # every skill. The adopt makes it a real folder with only the active skills.
+  # `skillhub uninstall --yes` puts the link back.
+  if [ -L "$neutral" ] && ! skillhub adopt "$neutral" --yes; then
+    echo "link-agent-config: skillhub adopt of ~/.agents/skills did not complete" >&2
+  fi
+  # An adopt that changes nothing does not sync, so the sync always runs.
+  if ! skillhub sync; then
     echo "link-agent-config: skillhub sync failed; the active skills are as the last sync left them" >&2
   fi
 }
