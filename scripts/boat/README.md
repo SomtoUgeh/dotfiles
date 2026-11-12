@@ -7,6 +7,7 @@ machines started from a per-project saved snapshot through `boat-check`.
 | - | - | - |
 | `boat-check` | project VM (`/usr/local/bin/boat-check`) | Runs a command on a throwaway machine from `<project>-base` and prints output, time and cost |
 | `base-common.sh` + `base-<project>.sh` | a new build machine | Installs the toolchain, clones the repo from a git bundle, installs deps |
+| `clean-base.sh` | a throwaway copy of a project VM | Removes the Tailscale node, T3 server, keepalive and sign-ins so the copy can be saved as `<project>-base` |
 | `devvm-setup.sh` | a new project VM | Hostname, Tailscale, T3 service, keepalive timer, `~/.boatignore`, git identity and key, `/etc/boat-check.env` |
 | `link-agent-config.sh` | project VM (`~/.local/bin/link-agent-config`) | Clones dotfiles and p3-stack, links skills, Claude and Codex config like `install.sh`, adds `~/.claude/rules/boat-project-vm.md`, installs `agent-config-sync.timer` (after boot and hourly) |
 
@@ -30,6 +31,14 @@ Executor needs its own sign-in.
 2. `boat new --type default --environment <p> --name <p>-base-build --ttl 7200`, `boat scp` the bundle to `/home/user/`.
 3. `cat base-common.sh base-<p>.sh | boat ssh <id> -- bash -s`, run the project's checks once.
 4. `boat snapshot <id> <p>-base` (same name replaces it), then `boat delete <id> --yes`.
+
+Never save a live project VM straight to `<project>-base`. The snapshot keeps the VM's
+Tailscale node key, T3 service and keepalive, so every boat-check machine joins the tailnet
+as that VM and runs a second T3 server: T3 times out and the VM looks offline (erivault,
+12 Nov 2026). Build bases on a fresh machine as above, or start a throwaway copy, run
+`clean-base.sh <project>` on it, then snapshot that copy. Never run `tailscale logout` on a
+copy: the node key is shared with the live VM. boat-check also stops Tailscale and T3 on a
+check machine and prints a warning when a base still carries them.
 
 Keep repo `.boatignore` patterns anchored (`/apps/*/dist/`, not `dist/`). An
 unanchored `dist/` also matches package folders inside `node_modules`, and the

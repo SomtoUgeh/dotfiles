@@ -61,6 +61,13 @@ remote=$(cat <<EOF
 set -uo pipefail
 export LC_ALL=C.UTF-8
 echo "boat-check: started on \$(boat info self --json 2>/dev/null | jq -r .sandbox.id) (${BOAT_CHECK_SNAPSHOT}, ${size})" >&2
+# A base copied from the live VM carries its Tailscale node and T3 server. Take this
+# throwaway machine off the tailnet before anything else so it cannot pose as the VM.
+if sudo -n test -s /var/lib/tailscale/tailscaled.state 2>/dev/null || systemctl --user is-enabled --quiet t3code.service 2>/dev/null; then
+  echo "boat-check: WARNING ${BOAT_CHECK_SNAPSHOT} carries the VM's Tailscale/T3 identity; stopping it here. Rebuild the base with scripts/boat/clean-base.sh." >&2
+  sudo -n systemctl stop ${BOAT_CHECK_PROJECT}-keepalive.timer tailscaled 2>/dev/null || true
+  systemctl --user stop t3code.service 2>/dev/null || true
+fi
 boat rename self "${BOAT_CHECK_PROJECT}-check-${branch}" >/dev/null 2>&1 || true
 src=\$HOME/$(basename "$root") dst=\$HOME/${BOAT_CHECK_REPO_PATH}
 t0=\$(date +%s)
