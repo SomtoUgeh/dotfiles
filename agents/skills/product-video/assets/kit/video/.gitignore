@@ -1,0 +1,11 @@
+node_modules
+dist
+.DS_Store
+.env
+
+# Rendered videos and check output.
+out
+
+# Recorded footage and generated audio. They are large and can be made again.
+public/clips
+public/voiceover

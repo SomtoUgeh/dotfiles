@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Create your workspace</title>
+    <style>
+      :root { color-scheme: light; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+      body { margin: 0; background: #fbfaf8; color: #1c1b19; }
+      header { padding: 22px 40px; font-weight: 600; font-size: 20px; border-bottom: 1px solid #e6e3dc; }
+      main { max-width: 520px; margin: 72px auto; padding: 0 24px; }
+      h1 { font-size: 40px; letter-spacing: -0.03em; margin: 0 0 8px; }
+      p { color: #6f6c66; font-size: 18px; margin: 0 0 36px; }
+      label { display: block; font-size: 15px; font-weight: 500; margin: 0 0 8px; }
+      input, select { width: 100%; box-sizing: border-box; font: inherit; font-size: 18px; padding: 14px 16px;
+        border: 1px solid #cfcbc2; border-radius: 10px; background: #fff; margin: 0 0 24px; }
+      input:focus, select:focus { outline: 3px solid #b9c3d8; border-color: #14213d; }
+      button { font: inherit; font-size: 18px; font-weight: 600; color: #fbfaf8; background: #14213d; border: 0;
+        border-radius: 10px; padding: 15px 22px; width: 100%; cursor: pointer; }
+      #busy { display: none; text-align: center; margin-top: 96px; font-size: 22px; color: #6f6c66; }
+      .busy main form, .busy main h1, .busy main p { display: none; }
+      .busy #busy { display: block; }
+    </style>
+  </head>
+  <body>
+    <header>Your Product</header>
+    <main>
+      <h1>Create your workspace</h1>
+      <p>Three fields. No card needed.</p>
+      <form id="signup">
+        <label for="name">Full name</label>
+        <input id="name" name="name" autocomplete="off" required />
+        <label for="email">Work email</label>
+        <input id="email" name="email" type="email" autocomplete="off" required />
+        <label for="plan">Plan</label>
+        <select id="plan" name="plan">
+          <option>Solo</option>
+          <option>Team</option>
+          <option>Company</option>
+        </select>
+        <button type="submit">Create workspace</button>
+      </form>
+      <div id="busy" role="status">Setting up your workspace…</div>
+    </main>
+    <script>
+      document.getElementById("signup").addEventListener("submit", (event) => {
+        event.preventDefault();
+        const name = document.getElementById("name").value;
+        document.body.classList.add("busy");
+        // A slow step on purpose: the example tour cuts this wait with offAir().
+        setTimeout(() => {
+          location.href = "/welcome?name=" + encodeURIComponent(name);
+        }, 3000);
+      });
+    </script>
+  </body>
+</html>
