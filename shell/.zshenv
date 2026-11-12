@@ -43,5 +43,13 @@ _op_agent="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
 [ -S "$_op_agent" ] && export SSH_AUTH_SOCK="$_op_agent"
 unset _op_agent
 
+# ============================================================================
+# Agent skills
+# ============================================================================
+# Skills come from the Skillhub library through Executor. OpenCode also reads
+# ~/.claude/skills, where the Claude app syncs the skills of the Claude
+# account. Those are for Claude only, so OpenCode does not load that folder.
+export OPENCODE_DISABLE_CLAUDE_CODE_SKILLS=1
+
 # Machine-local secrets; never committed.
 [ -f "$HOME/.config/agent-secrets/context7.zsh" ] && . "$HOME/.config/agent-secrets/context7.zsh"
