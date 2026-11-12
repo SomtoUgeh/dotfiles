@@ -73,6 +73,20 @@ create_symlink() {
     ln -sf "$source" "$target"
 }
 
+# Link a tool's skill folder to the shared skills, unless the folder is a real
+# folder. `skillhub adopt` makes it one: the tool then holds only the active
+# skills of the Skillhub library and loads the others through Executor. A
+# machine with no Skillhub gets the link, so its tools still see every skill.
+link_skill_folder() {
+    local target="$1"
+
+    if [ -d "$target" ] && [ ! -L "$target" ]; then
+        echo -e "✓ Skill folder kept as it is (Skillhub): $target"
+        return
+    fi
+    create_symlink "$AGENTS_DIR/skills" "$target"
+}
+
 # =============================================================================
 # Homebrew (bootstrap — everything below may depend on it)
 # =============================================================================
@@ -344,7 +358,7 @@ AGENTS_DIR="$DOTFILES_DIR/agents"
 # tool-specific installers write through to the shared tree.
 # Do not replace ~/.codex/skills: Codex may keep local-only skills there.
 mkdir -p "$HOME/.agents"
-create_symlink "$AGENTS_DIR/skills" "$HOME/.agents/skills"
+link_skill_folder "$HOME/.agents/skills"
 
 # Grok reads the same shared instructions directly, including on hosts without
 # Claude compatibility configuration. The neutral skill path is sufficient.
@@ -369,8 +383,10 @@ rm -f "$HOME/.claude/mcp.json"
 create_symlink "$AGENTS_DIR/claude/commands" "$HOME/.claude/commands"
 create_symlink "$AGENTS_DIR/claude/agents" "$HOME/.claude/agents"
 create_symlink "$AGENTS_DIR/claude/output-styles" "$HOME/.claude/output-styles"
-create_symlink "$AGENTS_DIR/skills" "$HOME/.claude/skills"
+link_skill_folder "$HOME/.claude/skills"
 create_symlink "$AGENTS_DIR/shared/hooks/git_guard.py" "$HOME/.claude/hooks/git_guard.py"
+# The shaping hook runs from here, so it does not depend on a tool's skill folder.
+create_symlink "$AGENTS_DIR/skills/shaping" "$HOME/.claude/hooks/shaping"
 create_symlink "$AGENTS_DIR/claude/statusline.sh" "$HOME/.claude/statusline.sh"
 create_symlink "$AGENTS_DIR/claude/file-suggestion.sh" "$HOME/.claude/file-suggestion.sh"
 chmod +x "$HOME/.claude/hooks/git_guard.py" "$HOME/.claude/statusline.sh" "$HOME/.claude/file-suggestion.sh" 2>/dev/null || true
@@ -397,7 +413,7 @@ else
 fi
 create_symlink "$AGENTS_DIR/opencode/agents" "$HOME/.config/opencode/agents"
 create_symlink "$AGENTS_DIR/opencode/commands" "$HOME/.config/opencode/commands"
-create_symlink "$AGENTS_DIR/skills" "$HOME/.config/opencode/skills"
+link_skill_folder "$HOME/.config/opencode/skills"
 # Symlink the whole plugins dir. Do NOT `mkdir -p` this path first: if it is
 # already a stale/broken symlink (e.g. dotfiles repo moved), mkdir follows the
 # dangling link, fails, and `set -e` aborts the entire installer. create_symlink

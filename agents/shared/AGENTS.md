@@ -11,6 +11,10 @@ tools. Before using a migrated service, follow the
 [Executor routing workflow](../skills/RUNTIME_TOOLS.md#executor-routing) for
 discovery, account selection, approvals, and native-tool exceptions.
 
+When no loaded skill fits a task, search the Skillhub library through Executor
+Cloud (`tools.skillhub.search`, then `tools.skillhub.read`) before working
+without one.
+
 ## Ethos
 
 This codebase outlives the task. Patterns get copied. Fight entropy.

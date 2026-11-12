@@ -31,8 +31,41 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${HOME}/.agents/skills/shaping/shaping-ripple.sh",
+            "command": "${HOME}/.claude/hooks/shaping/shaping-ripple.sh",
             "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "skillhub use --hook >/dev/null 2>&1 || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptExpansion": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "skillhub use --hook >/dev/null 2>&1 || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "skillhub index --hook 2>/dev/null || true",
+            "timeout": 10
           }
         ]
       }

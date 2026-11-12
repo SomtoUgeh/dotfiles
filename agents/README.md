@@ -72,7 +72,10 @@ save-and-handoff wrapper. Specialized motion skills and planning stages keep
 their separate jobs. The Claude and OpenCode `/triage` commands invoke file-todos triage
 mode; it does not define another lifecycle.
 
-The installer links it to:
+The installer links it to the paths below. A path that is a real folder is
+left as it is: `skillhub adopt` makes a tool's skill folder one, and the tool
+then loads skills from the Skillhub library through Executor. `skillhub
+uninstall --yes` puts the links back.
 
 - `~/.agents/skills` for Codex discovery (and as a shared agent-compatible path)
 - `~/.claude/skills` for Claude Code's native skill path

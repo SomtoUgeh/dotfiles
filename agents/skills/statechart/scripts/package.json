@@ -1,0 +1,5 @@
+{
+  "name": "statechart-skill",
+  "private": true,
+  "type": "module"
+}
