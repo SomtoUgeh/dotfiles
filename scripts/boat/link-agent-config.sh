@@ -52,6 +52,7 @@ link "$A/claude/commands" "$HOME/.claude/commands"
 link "$A/claude/agents" "$HOME/.claude/agents"
 link "$A/claude/output-styles" "$HOME/.claude/output-styles"
 link "$A/shared/hooks/git_guard.py" "$HOME/.claude/hooks/git_guard.py"
+link "$A/skills/shaping" "$HOME/.claude/hooks/shaping"
 link "$A/claude/statusline.sh" "$HOME/.claude/statusline.sh"
 link "$A/claude/file-suggestion.sh" "$HOME/.claude/file-suggestion.sh"
 
