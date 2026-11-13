@@ -53,3 +53,11 @@ export OPENCODE_DISABLE_CLAUDE_CODE_SKILLS=1
 
 # Machine-local secrets; never committed.
 [ -f "$HOME/.config/agent-secrets/context7.zsh" ] && . "$HOME/.config/agent-secrets/context7.zsh"
+
+# ASCII BOAT SHELL INTEGRATION START boat
+case ":$PATH:" in
+  *":/Users/somto/.ascii/bin:"*) ;;
+  *) PATH="/Users/somto/.ascii/bin:$PATH" ;;
+esac
+export PATH
+# ASCII BOAT SHELL INTEGRATION END boat

@@ -16,7 +16,8 @@
       "projects": [
         { "paths": ["/home/user/code/personal/jtp"] },
         { "paths": ["/home/user/code/personal/coworkers"] },
-        { "paths": ["/home/user/code/erivault/erivault_website"] }
+        { "paths": ["/home/user/code/erivault/erivault_website"] },
+        { "paths": ["/home/user/code/lami"] }
       ],
       "nickname": "julds"
     }
