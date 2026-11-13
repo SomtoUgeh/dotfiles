@@ -43,14 +43,31 @@ link-agent-config                            # removes the per-skill links
 While `~/.skillhub/managed.json` exists, each run of `link-agent-config`
 leaves the skill folders to Skillhub. It removes only the links that it made
 itself, keeps the links that Skillhub owns and boat's `boat` and `synced`
-folders, leaves an adopted `~/.agents/skills` as it is, and runs
-`skillhub sync`, so a change of the active set reaches the VM within an hour.
-A sync that fails does not stop the run.
+folders, and runs `skillhub sync`, so a change of the active set reaches the
+VM within an hour. A sync that fails does not stop the run.
+
+Codex reads `~/.agents/skills`. While that path is one link to the shared
+folder, the script runs `skillhub adopt ~/.agents/skills --yes` before the
+sync. The path then is a real folder with only the active skills, and
+Codex loads the others through Executor, as Claude Code does. After the
+adopt, a skill that is not active is not at `~/.agents/skills/<name>`: a
+script that a skill names by that path runs only while the skill is active.
+The Codex hooks run from the dotfiles repository, not from that path.
+
+Codex needs two more steps on each VM, one time:
+
+```sh
+# The Executor entry: the bearer wrapper of the VM, no browser sign-in.
+codex mcp remove executor_v2
+codex mcp add executor_v2 -- "$HOME/.local/bin/executor-v2-mcp"
+# The hooks: start Codex, open /hooks, approve the Skillhub hook and the
+# shaping hook. Codex does not run a new or changed hook before that.
+```
 
 Do not run a plain `skillhub adopt` on a project VM: it moves `boat` and
 `synced` out of `~/.claude/skills`. The script already clears that folder.
-`skillhub adopt ~/.agents/skills` is safe. `skillhub uninstall --yes` removes
-the ledger, and the next run links every skill again.
+`skillhub uninstall --yes` removes the ledger, and the next run links every
+skill again.
 
 ## Rebuild a base
 

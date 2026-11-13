@@ -57,25 +57,48 @@ def seed_skill_choices(current, home: Path) -> None:
             overrides.append(entry)
 
 
-def resolve_hook_command(command: str, home: Path, repo: Path) -> str:
+MANAGED_HOOK_FILES = ("agents/shared/hooks/git_guard.py", "agents/skills/shaping/shaping-ripple.sh")
+
+
+def resolve_hook_command(command: str, repo: Path) -> str:
     """Resolve path placeholders. Quoted forms are replaced first so a leftover
     wrapping quote cannot make Grok treat the path as relative to ~/.claude/.
+
+    The hooks run from the repository. A tool's skill folder such as
+    ~/.agents/skills holds only the active skills on a machine that Skillhub
+    manages, so a hook must not run from there.
     """
-    command = command.replace('"${DOTFILES_DIR}/agents/shared/hooks/git_guard.py"', shlex.quote(str(repo / "agents/shared/hooks/git_guard.py")))
-    command = command.replace("${DOTFILES_DIR}/agents/shared/hooks/git_guard.py", shlex.quote(str(repo / "agents/shared/hooks/git_guard.py")))
-    ripple = shlex.quote(str(home / ".agents/skills/shaping/shaping-ripple.sh"))
-    command = command.replace('"${HOME}/.agents/skills/shaping/shaping-ripple.sh"', ripple)
-    command = command.replace("${HOME}/.agents/skills/shaping/shaping-ripple.sh", ripple)
+    for relative in MANAGED_HOOK_FILES:
+        placeholder = "${DOTFILES_DIR}/" + relative
+        path = shlex.quote(str(repo / relative))
+        command = command.replace(f'"{placeholder}"', path).replace(placeholder, path)
     return command
 
 
-def render_hooks(home: Path, repo: Path) -> dict:
+def render_hooks(repo: Path) -> dict:
     data = json.loads((repo / "agents/codex/hooks.json").read_text())
     for groups in data["hooks"].values():
         for group in groups:
             for hook in group["hooks"]:
-                hook["command"] = resolve_hook_command(hook["command"], home, repo)
+                hook["command"] = resolve_hook_command(hook["command"], repo)
     return data
+
+
+def keep_transports(current, defaults) -> None:
+    """Seed nothing into an MCP server that has another transport than its default.
+
+    A headless host replaces a `url` entry with a stdio wrapper. Codex refuses
+    a stdio server that has `url` or another key of an HTTP server, and then
+    loads no configuration at all.
+    """
+    servers = current.get("mcp_servers", {})
+    default_servers = defaults.get("mcp_servers", {})
+    for name in list(default_servers):
+        server, default = servers.get(name), default_servers[name]
+        if not isinstance(server, MutableMapping) or not isinstance(default, MutableMapping):
+            continue
+        if ("command" in server and "url" in default) or ("url" in server and "command" in default):
+            del default_servers[name]
 
 
 def merge_hooks(current: dict, defaults: dict) -> dict:
@@ -131,6 +154,7 @@ def sync(home: Path, repo: Path, check: bool = False) -> list[Path]:
         # custom entries, but never recreate removed direct definitions.
         for name in EXECUTOR_DIRECT_DEFAULTS:
             defaults.get("mcp_servers", {}).pop(name, None)
+    keep_transports(current, defaults)
     seed_defaults(current, defaults)
     seed_skill_choices(current, home)
     # Only retire the obsolete bundled notifier when its executable is missing.
@@ -140,7 +164,7 @@ def sync(home: Path, repo: Path, check: bool = False) -> list[Path]:
         if not Path(executable).exists():
             del current["notify"]
     current_hooks = json.loads(hooks.read_text()) if hooks.exists() else {}
-    outputs = {config: tomlkit.dumps(current), hooks: json.dumps(merge_hooks(current_hooks, render_hooks(home, repo)), indent=2) + "\n"}
+    outputs = {config: tomlkit.dumps(current), hooks: json.dumps(merge_hooks(current_hooks, render_hooks(repo)), indent=2) + "\n"}
     # Parse both inputs before writing either. Never modify hook trust records.
     changed = []
     for path, content in outputs.items():
