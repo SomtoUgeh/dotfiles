@@ -97,3 +97,40 @@ Add a secret file only after the base is saved.
   key scoped to the project's environment (`boat api-key create <p>-ci --preset ci --ttl 90d --env <environment id>`).
 - The CLI reads `BOAT_API_KEY`, so the VM's own boat login stays untouched.
 - When boat refuses the start (`rate_limited`, `no_ready_machine`), the command runs locally.
+
+## New project VM checklist
+
+A VM is not done until every line holds (investor-os, 14 Nov 2026, followed this list):
+
+1. `boat env new <p>`, then `boat env set <p> --agents-credentials false --github false --secrets true --boat-credentials true`, and copy the shared secret files (`.config/op/service-account-token`, `.config/executor-v2/{cloud,mac}.token`) from another project environment. `boat env new` prints every environment with its secrets: do not paste its output anywhere.
+2. `boat new --environment <p> --type large --name <p>-dev --no-auto-stop`.
+3. Base tools: zsh (and `chsh`), fzf, jq, ripgrep, starship in `~/.local/bin`, `npm config set prefix ~/.local` then `mcp-remote cf wrangler portless`, bun 1.4.4.
+4. `T3CODE_VERSION=<desktop version> devvm-setup.sh <p> <repo path> <install>`.
+5. `sudo tailscale up --hostname=<p> --accept-dns=true --operator=user`, sign in as smugeh@gmail.com.
+6. T3: `t3 pair --tailscale --ttl 1h` once per client. Add it in T3 web and the desktop app (Settings > Environments > Add environment), and link it from the Mac and from julds with `t3 environment link https://<p>.taildbdfb2.ts.net --pairing-code <code> --access full-access`. The julds link is how Executor and Dev's T3 watch reach it. Links last 30 days.
+7. Repo, then `t3 project add <path>`. The VM key goes on GitHub as an authentication and a signing key (github.com/settings/ssh/new, passkey); a Cursor Origin repo also needs `origin ssh-key add`.
+8. Agents: `claude auth login --claudeai`, `link-agent-config`, Skillhub (above), Executor wrappers from another VM plus `claude mcp add --scope user executor_v2 / executor_v2_local` and `codex mcp add executor_v2`.
+9. Mac: copy `~/Library/LaunchAgents/com.julds.boat-executor-bridge.<other>.plist` with the new sandbox id, and Somto runs `launchctl bootstrap gui/$(id -u) <plist>` in his Terminal (Aside cannot).
+10. Aside CLI: install, `aside login --email smugeh@gmail.com`, approve the device, then `aside host use remote:266a3611-e171-4cec-b729-57b5dcfbb28c`.
+11. Coworkers: tell Dev (job text) about the VM, its environment id and project id.
+
+## Sleep when idle, wake on demand
+
+Project VMs (not julds) stop themselves after 45 quiet minutes and keep their disk; boat's own
+auto-stop is a timer from start and cannot see T3, so the check is ours (14 Nov 2026).
+
+| File | Runs on | Does |
+| - | - | - |
+| `boat-idle-stop` | project VM (`/usr/local/sbin`, `boat-idle-stop.timer` every 5 min) | Stops the VM after `IDLE_MIN` (45) quiet minutes. Busy: an unfinished T3 run, new T3 activity, a pts terminal used in the last 30 min, user CPU over 40%, or a hold. A 15-minute gap between checks means it was resumed and starts a fresh window. Log: `journalctl -t boat-idle` |
+| `vm-stay` | project VM | `vm-stay 8` keeps it awake 8 hours; `vm-stay 0` clears it |
+| `idle-stop-install.sh` | project VM | `bash idle-stop-install.sh <sandbox id> 45 0` writes `/etc/boat-idle.env` (last arg 1 = dry run) and enables the timer |
+
+Waking: the Mac's `com.julds.autowake` (`~/.local/bin/julds-autowake`) resumes every stopped VM in
+`~/.config/boat-vms` when T3 Code comes to the front, and wakes any VM stopped 10+ days so boat's
+14-day disk retention never runs out. `vm` on the Mac shows and wakes them. Agents use the Executor
+app `boat-vms` (`vms.list`, `vms.status`, `vms.wake`) with a key limited to `sandbox.read` and
+`sandbox.resume` on the project VMs; julds has `vm-wake` with its own such key. boat sends
+error/degraded/recovered events to Dev's Coworkers webhook.
+
+A new project VM also needs: its line in `~/.config/boat-vms`, its id in the `boat-vms` Executor app
+and in julds's `vm-wake`, and new wake keys that include it (boat keys cannot gain sandboxes).
