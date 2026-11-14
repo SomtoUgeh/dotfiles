@@ -78,6 +78,8 @@ echo "== agent CLIs owned by user (T3 provider updates run npm -g --prefix /usr/
 # and an interrupted root install leaves a hidden temp folder that blocks every later update (13 Nov 2026).
 N=/usr/local/lib/node_modules
 sudo find $N/@anthropic-ai $N/@openai -maxdepth 1 -mindepth 1 -name '.*' -user root -exec rm -rf {} + 2>/dev/null || true
+# The scope folders too: npm -g moves the old package to a hidden sibling inside them during an update.
+for d in $N/@anthropic-ai $N/@openai; do if [ -d $d ]; then sudo chown user:user $d; fi; done
 for d in $N/@anthropic-ai/claude-code $N/@openai/codex; do if [ -d $d ]; then sudo chown -R user:user $d; fi; done
 for l in /usr/local/bin/claude /usr/local/bin/codex; do if [ -L $l ]; then case "$(readlink $l)" in ../lib/node_modules/*) sudo chown -h user:user $l;; esac; fi; done
 
