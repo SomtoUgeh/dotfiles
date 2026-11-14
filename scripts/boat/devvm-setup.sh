@@ -29,11 +29,18 @@ sudo systemctl enable --now tailscaled
 # Lets `user` run `tailscale serve` (t3 pair --tailscale) without root, as on julds.
 sudo tailscale set --operator=user
 tailscale version | head -1
-# After this script: `sudo tailscale up --hostname=<project>` (Somto opens the login link),
+# After this script: `sudo tailscale up --hostname=<project> --accept-dns=true --operator=user`
+# (Somto opens the login link). accept-dns matters: without it *.taildbdfb2.ts.net names do not
+# resolve and `t3 environment link` fails with "Nothing ... answered" (julds, 11 Nov 2026).
 # then `t3 pair --tailscale --ttl 1h` and paste the pairing link into the T3 app.
 
 echo "== T3 (nightly train, same as julds)"
-command -v t3 >/dev/null || curl -fsSL https://t3.codes/install.sh | T3CODE_CHANNEL=nightly sh 2>&1 | tail -3
+# Pin T3 to the desktop app's exact version (T3CODE_VERSION=<version> in the environment):
+# a newer desktop speaks a newer launcher protocol and cannot reach an older VM (11 Nov 2026).
+if ! command -v t3 >/dev/null; then
+  if [ -n "${T3CODE_VERSION:-}" ]; then curl -fsSL https://t3.codes/install.sh | T3CODE_VERSION=$T3CODE_VERSION sh 2>&1 | tail -3
+  else curl -fsSL https://t3.codes/install.sh | T3CODE_CHANNEL=nightly sh 2>&1 | tail -3; fi
+fi
 t3 --version
 sudo loginctl enable-linger user
 XDG_RUNTIME_DIR=/run/user/$(id -u); export XDG_RUNTIME_DIR
@@ -61,11 +68,26 @@ systemctl --user restart t3code.service
 t3 service protect --yes 2>&1 | tail -3 || true
 sleep 3; systemctl --user is-active t3code.service
 
+echo "== T3 Labs: linked environments on (julds and the Mac link to this VM; Dev's T3 watch reads it through julds)"
+mkdir -p ~/.t3/userdata; [ -f ~/.t3/userdata/settings.json ] || echo '{}' > ~/.t3/userdata/settings.json
+python3 -c 'import json,os;p=os.path.expanduser("~/.t3/userdata/settings.json");d=json.load(open(p));d["linkedEnvironmentsEnabled"]=True;json.dump(d,open(p,"w"),indent=2)'
+systemctl --user restart t3code.service
+
+echo "== agent CLIs owned by user (T3 provider updates run npm -g --prefix /usr/local as user)"
+# The boat image installs claude and codex as root; T3's update then fails with EACCES (exit 243),
+# and an interrupted root install leaves a hidden temp folder that blocks every later update (13 Nov 2026).
+N=/usr/local/lib/node_modules
+sudo find $N/@anthropic-ai $N/@openai -maxdepth 1 -mindepth 1 -name '.*' -user root -exec rm -rf {} + 2>/dev/null || true
+for d in $N/@anthropic-ai/claude-code $N/@openai/codex; do if [ -d $d ]; then sudo chown -R user:user $d; fi; done
+for l in /usr/local/bin/claude /usr/local/bin/codex; do if [ -L $l ]; then case "$(readlink $l)" in ../lib/node_modules/*) sudo chown -h user:user $l;; esac; fi; done
+
 echo "== keepalive timer (julds pattern, no portless)"
 sudo tee /usr/local/sbin/$P-keepalive >/dev/null <<K
 #!/bin/sh
 # Keeps $P reachable after a boat resume: /home/user is hydrated lazily, so the
 # user systemd manager can start before its unit files exist and never start T3.
+# boat resets the hostname after boot, and T3 names the environment after it (julds, 11 Nov 2026).
+[ "\$(hostname)" = $P ] || hostnamectl set-hostname $P
 systemctl is-active --quiet tailscaled || systemctl start tailscaled
 U="runuser -u user -- env XDG_RUNTIME_DIR=/run/user/1000 systemctl --user"
 [ -f /home/user/.config/systemd/user/t3code.service ] || exit 0
@@ -119,6 +141,8 @@ git config --global commit.gpgsign true
 git config --global tag.gpgSign true
 git config --global core.sshCommand "ssh -i ~/.ssh/id_ed25519_$P -o IdentitiesOnly=yes"
 ssh-keyscan -t ed25519 github.com 2>/dev/null >> ~/.ssh/known_hosts
+grep -q '^Host github.com' ~/.ssh/config 2>/dev/null || printf 'Host github.com\n  User git\n  IdentityFile ~/.ssh/id_ed25519_%s\n  IdentitiesOnly yes\n' "$P" >> ~/.ssh/config
+chmod 600 ~/.ssh/config
 sort -u -o ~/.ssh/known_hosts ~/.ssh/known_hosts
 
 echo "== boat-check config"
