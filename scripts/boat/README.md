@@ -113,3 +113,24 @@ A VM is not done until every line holds (investor-os, 14 Nov 2026, followed this
 9. Mac: copy `~/Library/LaunchAgents/com.julds.boat-executor-bridge.<other>.plist` with the new sandbox id, and Somto runs `launchctl bootstrap gui/$(id -u) <plist>` in his Terminal (Aside cannot).
 10. Aside CLI: install, `aside login --email smugeh@gmail.com`, approve the device, then `aside host use remote:266a3611-e171-4cec-b729-57b5dcfbb28c`.
 11. Coworkers: tell Dev (job text) about the VM, its environment id and project id.
+
+## Sleep when idle, wake on demand
+
+Project VMs (not julds) stop themselves after 45 quiet minutes and keep their disk; boat's own
+auto-stop is a timer from start and cannot see T3, so the check is ours (14 Nov 2026).
+
+| File | Runs on | Does |
+| - | - | - |
+| `boat-idle-stop` | project VM (`/usr/local/sbin`, `boat-idle-stop.timer` every 5 min) | Stops the VM after `IDLE_MIN` (45) quiet minutes. Busy: an unfinished T3 run, new T3 activity, a pts terminal used in the last 30 min, user CPU over 40%, or a hold. A 15-minute gap between checks means it was resumed and starts a fresh window. Log: `journalctl -t boat-idle` |
+| `vm-stay` | project VM | `vm-stay 8` keeps it awake 8 hours; `vm-stay 0` clears it |
+| `idle-stop-install.sh` | project VM | `bash idle-stop-install.sh <sandbox id> 45 0` writes `/etc/boat-idle.env` (last arg 1 = dry run) and enables the timer |
+
+Waking: the Mac's `com.julds.autowake` (`~/.local/bin/julds-autowake`) resumes every stopped VM in
+`~/.config/boat-vms` when T3 Code comes to the front, and wakes any VM stopped 10+ days so boat's
+14-day disk retention never runs out. `vm` on the Mac shows and wakes them. Agents use the Executor
+app `boat-vms` (`vms.list`, `vms.status`, `vms.wake`) with a key limited to `sandbox.read` and
+`sandbox.resume` on the project VMs; julds has `vm-wake` with its own such key. boat sends
+error/degraded/recovered events to Dev's Coworkers webhook.
+
+A new project VM also needs: its line in `~/.config/boat-vms`, its id in the `boat-vms` Executor app
+and in julds's `vm-wake`, and new wake keys that include it (boat keys cannot gain sandboxes).

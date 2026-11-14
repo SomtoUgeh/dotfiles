@@ -1,0 +1,5 @@
+#!/bin/sh
+# Keep this VM awake for N hours (default 4): vm-stay 8. `vm-stay 0` clears the hold.
+h=${1:-4}; until=$(( $(date +%s) + h*3600 )); [ "$h" = 0 ] && until=0
+echo "$until" | sudo tee /var/lib/boat-idle/hold-until >/dev/null
+[ "$h" = 0 ] && echo "hold cleared" || echo "awake until $(date -d @$until '+%a %H:%M %Z')"
