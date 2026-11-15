@@ -384,3 +384,7 @@ boat() {
   return "$boat_status"
 }
 # ASCII BOAT SHELL INTEGRATION END boat
+
+# Android / Java toolchain for ICB (added 2026-11-15)
+export JAVA_HOME=/opt/homebrew/opt/openjdk@25
+export ANDROID_HOME="$HOME/Library/Android/sdk"
