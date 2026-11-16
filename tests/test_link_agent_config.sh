@@ -22,7 +22,9 @@ cp "$root/scripts/boat/link-agent-config.sh" "$dotfiles/scripts/boat/"
 printf '%s\n' '#!/bin/sh' 'case "$*" in *rev-parse*) echo abc1234 ;; esac' >"$stubs/git"
 printf '%s\n' '#!/bin/sh' 'exit 0' >"$stubs/uv"
 cp "$stubs/uv" "$stubs/systemctl"
-printf '%s\n' '#!/bin/sh' 'echo "$*" >>"$HOME/skillhub.calls"' 'exit "$(cat "$HOME/skillhub.exit" 2>/dev/null || echo 0)"' >"$fixture/skillhub"
+# skillhub.exit.<subcommand> makes one subcommand fail.
+printf '%s\n' '#!/bin/sh' 'echo "$*" >>"$HOME/skillhub.calls"' 'exit "$(cat "$HOME/skillhub.exit.$1" 2>/dev/null || echo 0)"' >"$fixture/skillhub"
+printf '%s\n' '#!/bin/sh' 'echo "$PWD $*" >>"$HOME/bun.calls"' 'exit "$(cat "$HOME/bun.exit" 2>/dev/null || echo 0)"' >"$stubs/bun"
 chmod +x "$stubs"/* "$fixture/skillhub"
 ln -s "$(command -v jq)" "$stubs/jq"
 
@@ -53,11 +55,15 @@ is_link_to "$claude/beta" "$dotfiles/agents/skills/beta"
 is_link_to "$claude/gamma" "$home/elsewhere/gamma"
 [ -d "$claude/boat" ] && [ -d "$claude/synced" ]
 grep -q 'skills left to Skillhub (1 links of this script removed)' "$fixture/out"
-[ "$(cat "$home/skillhub.calls")" = "adopt $home/.agents/skills --yes
+[ "$(cat "$home/skillhub.calls")" = "mode download
+adopt $home/.agents/skills --yes
 sync" ]
+# No skillhub checkout: nothing is installed.
+[ ! -e "$home/bun.calls" ]
 
 # An adopt and a sync that fail do not stop the script.
-echo 1 >"$home/skillhub.exit"
+echo 1 >"$home/skillhub.exit.adopt"
+echo 1 >"$home/skillhub.exit.sync"
 run
 grep -q 'skillhub adopt of ~/.agents/skills did not complete' "$fixture/err"
 grep -q 'skillhub sync failed' "$fixture/err"
@@ -68,28 +74,49 @@ rm "$home/.agents/skills" "$home/skillhub.calls"
 ln -s "$home/elsewhere" "$home/.agents/skills"
 run
 is_link_to "$home/.agents/skills" "$dotfiles/agents/skills"
-[ "$(sed -n 1p "$home/skillhub.calls")" = "adopt $home/.agents/skills --yes" ]
+[ "$(sed -n 2p "$home/skillhub.calls")" = "adopt $home/.agents/skills --yes" ]
 rm "$home"/.agents/skills.backup.*
 
 # After the adopt the neutral path is a real folder: it stays, and Skillhub syncs.
-rm "$home/.agents/skills" "$home/skillhub.calls" "$home/skillhub.exit"
+rm "$home/.agents/skills" "$home/skillhub.calls" "$home/skillhub.exit.adopt" "$home/skillhub.exit.sync"
 mkdir "$home/.agents/skills"
 run
 [ -d "$home/.agents/skills" ] && [ ! -L "$home/.agents/skills" ]
 ! ls "$home/.agents" | grep -q backup
 grep -q '(0 links of this script removed)' "$fixture/out"
-[ "$(cat "$home/skillhub.calls")" = sync ]
+[ "$(cat "$home/skillhub.calls")" = "mode download
+sync" ]
 
 # A second run changes nothing, and a failed sync does not stop the script.
-echo 1 >"$home/skillhub.exit"
+echo 1 >"$home/skillhub.exit.sync"
 run
 is_link_to "$claude/beta" "$dotfiles/agents/skills/beta"
 grep -q '(0 links of this script removed)' "$fixture/out"
 grep -q 'skillhub sync failed' "$fixture/err"
 [ -x "$home/.local/bin/link-agent-config" ]
 
+# A machine that cannot be put in download mode is not synced: a sync in
+# link mode would link the tools to the dotfiles copy of the skills.
+rm "$home/skillhub.calls" "$home/skillhub.exit.sync"
+echo 1 >"$home/skillhub.exit.mode"
+run
+grep -q 'skillhub mode download failed' "$fixture/err"
+[ "$(cat "$home/skillhub.calls")" = "mode download" ]
+rm "$home/skillhub.exit.mode" "$home/skillhub.calls"
+
+# A skillhub checkout is pulled and installed before the sync. A failed
+# install is named, and the sync still runs with the command that is there.
+mkdir -p "$home/code/personal/skillhub/.git"
+run
+grep -q "^$home/code/personal/skillhub install --silent --frozen-lockfile --production$" "$home/bun.calls"
+echo 1 >"$home/bun.exit"
+run
+grep -q 'bun install in ~/code/personal/skillhub failed' "$fixture/err"
+[ "$(tail -n 1 "$home/skillhub.calls")" = sync ]
+rm -r "$home/code/personal/skillhub" "$home/bun.exit" "$home/bun.calls" "$home/skillhub.calls"
+
 # No skillhub command: the links still go, and the output names the gap.
-rm "$stubs/skillhub" "$home/skillhub.calls"
+rm "$stubs/skillhub"
 ln -s "$dotfiles/agents/skills/alpha" "$claude/alpha"
 run
 [ ! -L "$claude/alpha" ]

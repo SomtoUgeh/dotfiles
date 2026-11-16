@@ -71,8 +71,23 @@ leave_skills_to_skillhub() {
     removed=$((removed + 1))
   done
   skills="skills left to Skillhub ($removed links of this script removed)"
+  # The command follows the main branch of its checkout, so every VM runs the
+  # same version. A pull that does not fast-forward keeps the version that is there.
+  if [ -d "$P/skillhub/.git" ]; then
+    clone_or_pull skillhub "$P/skillhub"
+    if ! (cd "$P/skillhub" && bun install --silent --frozen-lockfile --production >/dev/null); then
+      echo "link-agent-config: bun install in ~/code/personal/skillhub failed; the skillhub command may be out of date" >&2
+    fi
+  fi
   if ! command -v skillhub >/dev/null; then
     echo "link-agent-config: the skillhub command is not on the path; the active skills were not synced" >&2
+    return
+  fi
+  # The dotfiles clone holds a copy of the skills folder. In link mode a sync
+  # links the tools to that copy, so the VM would keep its own version. In
+  # download mode every skill comes from the library. Without it, no sync.
+  if ! skillhub mode download >/dev/null; then
+    echo "link-agent-config: skillhub mode download failed; the active skills were not synced" >&2
     return
   fi
   # Codex reads the neutral path. As one link to the shared folder it shows

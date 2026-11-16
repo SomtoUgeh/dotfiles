@@ -65,18 +65,17 @@ Clone at `~/code/personal/dotfiles` (origin `git@github.com:SomtoUgeh/dotfiles.g
 
 - `scripts/install_cloud_dotfiles.sh` set up zsh, starship, git config, signing, Grok and OpenCode links. It titles the GitHub key from `CLOUD_HOST_TITLE` or the hostname.
 - Claude and Codex are linked the way `install.sh` does on the Mac: CLAUDE.md, ETHOS.md, settings.json, commands, agents, output-styles, git_guard hook, statusline; Codex AGENTS.md, agents and `sync_agent_config.py`.
-- Skills: `agents/skills` is the shared library (180 skills, identical on the Mac and the VM as of 24 Oct). `~/.claude/skills` holds one link per shared skill plus boat's own `boat` and `synced`. `agents/skills/synced/` (Claude's skill sync cache) and `agents/skills/boat/` (boat-injected) are git-ignored.
+- Skills come from the Skillhub library (`~/code/personal/skillhub`, in download mode), not from this clone. `~/.claude/skills`, `~/.agents/skills`, `~/.config/opencode/skills` and `~/.grok/skills` hold only the active skills, as links into `~/.skillhub/store`; the agents load every other skill through Executor. boat's own `boat` and `synced` stay in `~/.claude/skills`. `agents/skills/synced/` (Claude's skill sync cache) and `agents/skills/boat/` (boat-injected) are git-ignored.
 - OpenCode config is host-local (`~/.config/opencode/opencode.jsonc`, copied from `opencode.cloud.jsonc`) because Executor setup writes into it. boat's `opencode.json` (computer tool) sits alongside.
 - Codex direct MCP entries that cannot work on the VM are `enabled = false`: paper, playwright, cloudflare, granola, posthog, postman (reachable through the gateways instead).
 
-To sync after changing skills or agent config on the Mac: commit and push, then on the VM:
+To sync agent config after a change on the Mac: commit and push, then on the VM:
 
 ```sh
 cd ~/code/personal/dotfiles && git pull --ff-only
-git -C ~/code/personal/p3-stack pull --ff-only
-for s in ~/code/personal/dotfiles/agents/skills/*/; do b=$(basename "$s"); [ "$b" = synced ] || [ "$b" = boat ] || [ -e ~/.claude/skills/$b -a ! -L ~/.claude/skills/$b ] || ln -sfn "${s%/}" ~/.claude/skills/$b; done
-find ~/.claude/skills -maxdepth 1 -xtype l -delete
 ```
+
+Skills need no step here. `skillhub-sync.timer` (user systemd, 3 minutes after boot and every hour) pulls `~/code/personal/skillhub`, runs `bun install`, and runs `skillhub sync`, so the command follows its main branch and a change of the active set in the Skillhub dashboard reaches the VM within an hour. Run `skillhub sync` to apply a change at once. `skillhub uninstall --yes` removes the Skillhub links and puts the adopted folders back.
 
 ## MCP gateways (all five agents)
 
