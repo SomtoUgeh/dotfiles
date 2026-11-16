@@ -36,6 +36,7 @@ cd ~/code/personal/skillhub
 bun install --frozen-lockfile --production   # bun 1.4.4: the image's 1.3.14 cannot read this bun.lock
 bun link                                     # puts skillhub into ~/.bun/bin
 skillhub login                               # confirm the code in a browser on any machine
+skillhub mode download                       # take every skill from the library, never from this dotfiles clone
 skillhub sync                                # writes ~/.skillhub/managed.json
 link-agent-config                            # removes the per-skill links
 ```
@@ -45,6 +46,13 @@ leaves the skill folders to Skillhub. It removes only the links that it made
 itself, keeps the links that Skillhub owns and boat's `boat` and `synced`
 folders, and runs `skillhub sync`, so a change of the active set reaches the
 VM within an hour. A sync that fails does not stop the run.
+
+Before the sync, each run pulls `~/code/personal/skillhub` and runs
+`bun install`, so every VM has the `skillhub` command of the main branch.
+Then it runs `skillhub mode download`: this dotfiles clone holds a copy of the
+skills folder, and in link mode a sync links the tools to that copy, so the
+VM would keep its own version of the library. When the mode cannot be set,
+the run does not sync.
 
 Codex reads `~/.agents/skills`. While that path is one link to the shared
 folder, the script runs `skillhub adopt ~/.agents/skills --yes` before the
