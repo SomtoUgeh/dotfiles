@@ -9,8 +9,8 @@ Runbook for the cloud dev workspace. Set up, migrated and audited 24 Oct 2026. N
 | `julds-up` | Resume the VM if stopped and wait until T3 Connect reaches it |
 | `julds-down` | Stop it now (between agent turns only) and refresh the named snapshot `julds-latest` |
 | `julds-tunnel` | Forward AltSchool ports 5050 and 8000-8007 to the Mac (Ctrl-C to stop) |
-| `boat ssh bx_gbx664fj` | Shell on the VM |
-| `boat usage bx_gbx664fj` / `boat limits` | Cost so far / plan time left |
+| `boat ssh bx_2jd5dd8b` | Shell on the VM |
+| `boat usage bx_2jd5dd8b` / `boat limits` | Cost so far / plan time left |
 
 T3 Code (desktop, web at app.t3.codes, iPhone) shows the VM as **julds** through T3 Connect.
 
@@ -20,7 +20,7 @@ T3 Code (desktop, web at app.t3.codes, iPhone) shows the VM as **julds** through
 | --- | --- |
 | Provider | boat.dev, $20/mo plan (Julds Limited, GB VAT, Julds Amex), renews monthly from 24 Nov 2026, auto-refill off |
 | Account | smugeh@gmail.com, signed in through GitHub (SomtoUgeh) |
-| Sandbox | `bx_gbx664fj`, boat name `julds`, hostname `julds` (cloud-init `preserve_hostname: true`), `default` size (4 vCPU Ryzen 9 9950X, 8 GB, 50 GB data disk), Ubuntu 24.04 x86_64 |
+| Sandbox | `bx_2jd5dd8b`, boat name `julds`, hostname `julds` (cloud-init `preserve_hostname: true`), `default` size (4 vCPU Ryzen 9 9950X, 8 GB, 50 GB data disk), Ubuntu 24.04 x86_64 |
 | Stopping | boat's own auto-stop is off (`--no-auto-stop`); our idle check stops it after 30 idle minutes (below) |
 | boat env `base` | GitHub injection off (`boat env set base --github false`); boat CLI credentials still injected (lets the VM stop and snapshot itself) |
 | T3 | `t3` nightly (keep it on the same build as the Mac), user systemd service `t3code`, linger on, T3 Connect as admin@julds.com |
@@ -36,7 +36,7 @@ The plan price comes back as machine time: $20 = 555 h of `default`. With the id
 | `large` | 8 / 16 GB / 125 GB | 0.072 | ~$13 | ~$53 |
 | `xlarge` (needs $100 plan) | 16 / 32 GB / 251 GB | 0.200 | ~$35 | ~$146 |
 
-Change size: `julds-down`, then `boat resume bx_gbx664fj --type large` (or `--type default` to go back). The disk and setup stay.
+Change size: `julds-down`, then `boat resume bx_2jd5dd8b --type large` (or `--type default` to go back). The disk and setup stay.
 
 ## Accounts on the VM (fresh sign-ins, nothing copied from other machines)
 
@@ -89,7 +89,7 @@ The pre-change configs are in `~/.config/executor-v2/v1-agent-config-backup-*`.
 | `executor_v2_local` | The Mac's local Executor 2: 1password, agentation, aside, canva, paper, playwright, shadcn | `~/.local/bin/executor-v2-mac-mcp` -> mcp-remote -> `http://127.0.0.1:4312/mcp` on the VM, a boat reverse tunnel to the Mac. The Mac's installation key (`~/.local/share/executor-v2-lab/data/keys.json` `apiKey`) is in `~/.config/executor-v2/mac.token` (0600) |
 | `computer` | boat's Linux desktop / Chrome tools | boat rewrites it into each harness config at every sandbox start |
 
-The Mac end of the tunnel is `~/.local/bin/julds-executor-bridge`, run by `~/Library/LaunchAgents/com.julds.boat-executor-bridge.plist` (KeepAlive). It keeps `boat forward bx_gbx664fj --reverse --local 4312 --remote 4312` (Executor 2) and a tunnel for the Mac's SSH (see iOS Simulators below) running while the VM is up, stops them when the VM stops, and restarts each when its probe from the VM (every 2 minutes) fails (the Executor 1 tunnel on 4789 was removed on 26 Oct 2026); a bare `boat forward` goes stale after a VM stop/resume without exiting. Log: `~/Library/Logs/boat-executor-bridge.log`. Restart with `launchctl kickstart -k gui/$(id -u)/com.julds.boat-executor-bridge`. The `executor_v2_local` entry works only while the Mac is awake.
+The Mac end of the tunnel is `~/.local/bin/julds-executor-bridge`, run by `~/Library/LaunchAgents/com.julds.boat-executor-bridge.plist` (KeepAlive). It keeps `boat forward bx_2jd5dd8b --reverse --local 4312 --remote 4312` (Executor 2) and a tunnel for the Mac's SSH (see iOS Simulators below) running while the VM is up, stops them when the VM stops, and restarts each when its probe from the VM (every 2 minutes) fails (the Executor 1 tunnel on 4789 was removed on 26 Oct 2026); a bare `boat forward` goes stale after a VM stop/resume without exiting. Log: `~/Library/Logs/boat-executor-bridge.log`. Restart with `launchctl kickstart -k gui/$(id -u)/com.julds.boat-executor-bridge`. The `executor_v2_local` entry works only while the Mac is awake.
 
 boat self-updates on some commands (seen on `boat resume`). If that runs inside Aside's sandbox, macOS marks the new binary quarantined and kills it (exit 137), which also breaks the tunnel LaunchAgent. Fix: `xattr -d com.apple.quarantine ~/.ascii/bin/boat`.
 
@@ -106,8 +106,8 @@ The VM cannot run iOS Simulators, so T3 on `julds` uses the Mac as an SSH **devi
   - Remote Login on (System Settings → General → Sharing → Remote Login, access limited to `somto`).
   - The VM's public key in `~/.ssh/authorized_keys` as `from="127.0.0.1,::1",no-agent-forwarding,no-X11-forwarding ssh-ed25519 ... julds-vm t3 device host`, so it only works through the tunnel.
   - `shell/.zshenv` puts fnm's default Node (`~/.local/share/fnm/aliases/default/bin`) on PATH, because T3 needs Node 22+ and npm in non-interactive SSH, and fnm otherwise loads only from `.zshrc`.
-  - `julds-executor-bridge` keeps `boat forward bx_gbx664fj --reverse --local 2222 --remote 22` up (Mac :22 → VM 127.0.0.1:2222) and restarts it when a probe from the VM does not get an SSH banner on 2222.
-- **Check from the Mac:** `boat ssh bx_gbx664fj -- 'ssh mac-devices "node -v; xcrun simctl list devices booted"'`.
+  - `julds-executor-bridge` keeps `boat forward bx_2jd5dd8b --reverse --local 2222 --remote 22` up (Mac :22 → VM 127.0.0.1:2222) and restarts it when a probe from the VM does not get an SSH banner on 2222.
+- **Check from the Mac:** `boat ssh bx_2jd5dd8b -- 'ssh mac-devices "node -v; xcrun simctl list devices booted"'`.
 - **Limits.** The Mac must be awake with Remote Login and the bridge running. A simulator on the Mac cannot reach a dev server (Metro, Vite) on the VM's localhost; forward that port to the Mac separately, the way `julds-tunnel` does for the AltSchool ports. The Mac's own T3 environment uses its simulators directly and needs none of this.
 - **Undo.** Remove the host in T3, delete the `authorized_keys` line, turn Remote Login off, and drop the second forward from the bridge script.
 
@@ -121,12 +121,12 @@ The VM cannot run iOS Simulators, so T3 on `julds` uses the Mac as an SSH **devi
 
 ## Idle auto-stop and waking
 
-**Stop.** `~/.local/bin/julds-idle-check` runs every 5 minutes (`julds-idle.timer`, user systemd). After 30 idle minutes it saves the named snapshot `julds-latest` and runs `boat stop self`. The script exports `BOAT_ID=bx_gbx664fj`, because `boat ... self` needs it and the systemd timer does not inherit it (before 24 Oct 2026 every idle stop failed with "self can only be used inside a sandbox shell"). Active means any of: agent processes used CPU, an agent has an open TCP connection, system CPU >= 10%, an SSH login, or less than 20 minutes since boot. Log: `~/.local/state/julds-idle/log`. Pause with `touch ~/.local/state/julds-idle/disabled`.
+**Stop.** `~/.local/bin/julds-idle-check` runs every 5 minutes (`julds-idle.timer`, user systemd). After 30 idle minutes it saves the named snapshot `julds-latest` and runs `boat stop self`. The script exports `BOAT_ID=bx_2jd5dd8b`, because `boat ... self` needs it and the systemd timer does not inherit it (before 24 Oct 2026 every idle stop failed with "self can only be used inside a sandbox shell"). Active means any of: agent processes used CPU, an agent has an open TCP connection, system CPU >= 10%, an SSH login, or less than 20 minutes since boot. Log: `~/.local/state/julds-idle/log`. Pause with `touch ~/.local/state/julds-idle/disabled`.
 
 **Wake.** A stopped VM has no machine, so nothing wakes it by itself; T3 shows it offline until it is resumed.
 
 - Mac: `~/.local/bin/julds-autowake` runs every 20 s (`~/Library/LaunchAgents/com.julds.autowake.plist`, loaded). When T3 Code is the frontmost app and `julds` is stopped, it runs `boat resume` (at most once every 2 minutes). Log: `~/Library/Logs/julds-autowake.log`. Fixed 27 Oct 2026: `lsappinfo` prints the app name quoted (`"T3 Code (Nightly)"`) plus extra lines, and the old parsing kept the quote, so the match never fired in 13.5k runs. It now takes the first quoted string. `touch ~/Library/Caches/julds-autowake/probe` logs one `probe: ... matched` line on the next run to confirm detection. It only helps at the Mac (awake, T3 in front); away from it use the iPhone Shortcut or the dashboard.
-- iPhone: Shortcut "Wake julds": Get Contents of URL, POST `https://boat.dev/api/v1/sandboxes/bx_gbx664fj/resume`, header `Authorization: Bearer <key>`. The key is the 1Password item "boat julds wake key" (Julds VM vault): boat API key `julds-wake-phone`, limited to this sandbox with `sandbox.resume` and `sandbox.read`, expires Oct 2027.
+- iPhone: Shortcut "Wake julds": Get Contents of URL, POST `https://boat.dev/api/v1/sandboxes/bx_2jd5dd8b/resume`, header `Authorization: Bearer <key>`. The key is the 1Password item "boat julds wake key" (Julds VM vault): boat API key `julds-wake-phone`, limited to this sandbox with `sandbox.resume` and `sandbox.read`, expires Oct 2027.
 - Anywhere: boat.dev/dashboard, Sandboxes, Resume.
 - Phone/anywhere (27 Oct 2026): **https://wake.julds.com** (Worker `julds-wake`, source `services/julds-wake/`, deployed from the VM with the token in `~/.config/executor-v2-julds/env`). Opening the page resumes julds if it is stopped (`?peek` only shows status) and shows when T3 is ready. Gated by Cloudflare Access app "julds wake" (policies: Executor Owner = work@somtougeh.com, and "julds wake - personal (WARP)" = smugeh@gmail.com; 1-month session) and the Worker re-checks the Access JWT (AUD + ALLOWED_EMAILS) and fails closed. Secret `BOAT_KEY` = the `julds-wake-phone` key (resume + read only). boat's API reports a stopped VM as `archived`, not `stopped`.
 - WARP: dropped on 30 Oct 2026 (Somto uses Tailscale instead). With WARP off, wake.julds.com uses its one-month email-code login. The smugeh WARP policy on the "julds wake" Access app is harmless and can stay.
@@ -145,7 +145,7 @@ The VM cannot run iOS Simulators, so T3 on `julds` uses the Mac as an SSH **devi
 - `~/.boatignore` leaves `.npm/` and `.bun/install/cache/` (~9.7 GB) out of snapshots. Unused Docker images were pruned (they are not restored anyway).
 - T3 channel: nightly. The Mac app pushes server updates to the VM ("Server update prepared"), so client and server stay on the same version; the activeVersion launcher drop-in keeps an update from stranding the service. Moving to stable would need the stable Mac app and may be refused by the DB.
 - Mac autowake notifies "julds is ready" only when T3 Connect answers for julds (state file `~/Library/Caches/julds-autowake/pending`), or warns after 10 min.
-- Weekly snapshots: the julds-wake Worker cron (Sundays 03:00 UTC) saves `julds-weekly-YYYY-MM-DD` and keeps 4, alongside `julds-latest` (up to 5 of 10 free). Key: boat `julds-weekly-snapshot` (snapshot.read/write + sandbox.read on bx_gbx664fj, expires Oct 2027; 1Password "boat julds weekly snapshot key"), Worker secret `BOAT_SNAPSHOT_KEY`.
+- Weekly snapshots: the julds-wake Worker cron (Sundays 03:00 UTC) saves `julds-weekly-YYYY-MM-DD` and keeps 4, alongside `julds-latest` (up to 5 of 10 free). Key: boat `julds-weekly-snapshot` (snapshot.read/write + sandbox.read on bx_2jd5dd8b, expires Oct 2027; 1Password "boat julds weekly snapshot key"), Worker secret `BOAT_SNAPSHOT_KEY`.
 - Alerts: boat webhook `julds-alerts` (wh_1a1dd916cb1d795dbd978f7b; error, degraded, recovered) -> `https://wake.julds.com/hooks/boat` (Access bypass app "julds wake - boat webhooks (bypass)"; the Worker checks the boat HMAC signature and rejects anything else) -> email to smugeh@gmail.com from julds@alerts.julds.com. Cloudflare Email Sending is onboarded on the `alerts.julds.com` subdomain only, so julds.com iCloud MX/SPF/DMARC are untouched. Wake failures and weekly-snapshot failures also email. Secrets: Worker `BOAT_WEBHOOK_SECRET`, 1Password "boat julds alerts webhook secret". boat itself still emails for refused stops, unresponsive VMs, disk 85/95% and the 14-day expiry.
 
 Away from the Mac, everything on the VM works except the `executor` (Mac local) tools: Paper, Aside, Playwright, desktop 1Password and Canva need the Mac awake.
@@ -165,7 +165,7 @@ boat deletes a stopped sandbox's disk 14 days after the stop (email on day 11). 
 - Wrangler's OAuth callback listens on `[::1]:8976`; `boat forward` targets 127.0.0.1, so bridge with socat for logins.
 - Codex `exec` can answer before the cloud gateway finishes starting; interactive T3 sessions are fine.
 - T3's self-update can leave `~/.local/bin/t3` pointing at a removed runtime (24 Oct 2026: `.3604` after the service moved to `.3630`). The service keeps running, but `t3` is "command not found" and `julds-up` never sees T3 Connect. The active version is in `~/.t3/runtime/service-state.json`; `julds-up` now repoints the link to it before each check. By hand: `ln -sfn ~/.t3/runtime/versions/<activeVersion>/t3 ~/.local/bin/t3`.
-- The VM's `executor_cloud` token can go missing (26 Oct 2026: no `*_tokens.json` under `~/.mcp-auth/mcp-remote-v1`). The adapter then waits for a browser login and agents time out. Re-authorize: start the configured adapter on the VM, run `boat forward bx_gbx664fj --local 17908 --remote 17908` on the Mac, open the printed Cloudflare Access URL in the Mac browser, approve "MCP CLI Proxy http://localhost:17908", then stop the forward. `executor-cloud-login` needs plain SSH and does not reach julds.
+- The VM's `executor_cloud` token can go missing (26 Oct 2026: no `*_tokens.json` under `~/.mcp-auth/mcp-remote-v1`). The adapter then waits for a browser login and agents time out. Re-authorize: start the configured adapter on the VM, run `boat forward bx_2jd5dd8b --local 17908 --remote 17908` on the Mac, open the printed Cloudflare Access URL in the Mac browser, approve "MCP CLI Proxy http://localhost:17908", then stop the forward. `executor-cloud-login` needs plain SSH and does not reach julds.
 - `boat ssh <id> -- cmd < file` hangs because stdin never closes; pass small files as inline base64. Use `python3 -u` under `timeout`, or the output is lost.
 - Stop only between agent turns: a stop ends running processes (no hibernate). Enabled systemd services start again on resume.
 - Security: agents run with full access and can use claude.ai connectors (Gmail, Calendar, Docs), the `gh` login, the 1Password service account, the Mac's desktop tools through `executor` (1Password and Playwright need approval), and boat's account-level CLI. Patterns to adopt later: credentials kept outside the sandbox (Cloudflare outbound Workers for Sandboxes, boat's secret proxy) and a repo-scoped GitHub token.

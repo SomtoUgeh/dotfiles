@@ -79,7 +79,7 @@ main{width:min(360px,88vw);text-align:center}h1{font-size:22px;margin:0 0 4px}p{
 button{margin-top:22px;width:100%;padding:16px;border:0;border-radius:14px;font-size:18px;font-weight:600;background:#3b6cf6;color:#fff}
 button:disabled{opacity:.45}small{display:block;margin-top:18px;color:#666}
 </style></head><body><main>
-<h1>julds VM</h1><p>boat sandbox bx_gbx664fj</p>
+<h1>julds VM</h1><p>boat sandbox bx_2jd5dd8b</p>
 <div id="state"><span class="dot" id="dot"></span><span id="label">Checking…</span></div>
 <p id="detail"></p>
 <button id="wake" disabled>Wake julds</button>
@@ -104,7 +104,7 @@ $("wake").onclick=wake;poll();setInterval(poll,4000);
 
 
 // Weekly dated saved snapshot (cron), keeping the newest KEEP_WEEKLY. Uses BOAT_SNAPSHOT_KEY:
-// snapshot.read + snapshot.write + sandbox.read on bx_gbx664fj only. Works while the VM is stopped.
+// snapshot.read + snapshot.write + sandbox.read on bx_2jd5dd8b only. Works while the VM is stopped.
 async function weeklySnapshot(env) {
   const h = { authorization: `Bearer ${env.BOAT_SNAPSHOT_KEY}`, "content-type": "application/json", "user-agent": "julds-wake/1" };
   const prefix = "julds-weekly-";
@@ -149,7 +149,7 @@ async function handleBoatWebhook(req, env) {
       `${what} (${evt.type}) at ${evt.createdAt}.`,
       evt.data?.state ? `State: ${evt.data.previousState || "?"} -> ${evt.data.state}` : "",
       evt.data?.reason ? `Reason: ${evt.data.reason}` : "",
-      "", "Check: boat info bx_gbx664fj  |  Recover: boat recover bx_gbx664fj  |  Status page: https://wake.julds.com/?peek",
+      "", "Check: boat info bx_2jd5dd8b  |  Recover: boat recover bx_2jd5dd8b  |  Status page: https://wake.julds.com/?peek",
       `Event id: ${evt.id}`,
     ].filter(Boolean).join("\n"));
   }
