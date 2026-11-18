@@ -87,7 +87,12 @@ fi
 # Only the real VM may take back the Tailscale identity: a fork or a check copy runs on another
 # machine. `boat info self` needs BOAT_ID in the shell, which not every VM has, so compare the
 # public IPv6 boat reports for $BOAT_ID with the addresses on this machine.
+SELF=""
 self_ok() {
+  [ -n "$SELF" ] && { [ "$SELF" = yes ]; return; }
+  SELF=no; self_check && SELF=yes; [ "$SELF" = yes ]
+}
+self_check() {
   local ip; ip=$(boat info "$BOAT_ID" --json 2>/dev/null | python3 -c 'import json,sys;print(json.load(sys.stdin)["sandbox"]["ip"] or "")' 2>/dev/null)
   [ -n "$ip" ] && ip -6 -o addr show scope global 2>/dev/null | awk '{print $4}' | grep -qix "$ip/128"
 }
@@ -112,7 +117,8 @@ if command -v tailscaled >/dev/null && ! $S test -s /var/lib/tailscale/tailscale
 fi
 if command -v tailscaled >/dev/null; then
   systemctl is-enabled --quiet tailscaled 2>/dev/null || $S systemctl enable tailscaled >/dev/null 2>&1
-  systemctl is-active --quiet tailscaled || { $S systemctl start tailscaled && say "started tailscaled (was stopped)"; }
+  # Never on a copy: it would join the tailnet as this VM (erivault-check, 12 Nov 2026).
+  systemctl is-active --quiet tailscaled || { self_ok && $S systemctl start tailscaled && say "started tailscaled (was stopped)"; }
 fi
 
 # 3. Our system timers: systemd read its units before boat restored them, so reload and start.
@@ -121,6 +127,7 @@ if { [ -e /etc/systemd/system/$P-keepalive.timer ] && ! systemctl is-active --qu
   $S systemctl daemon-reload
   for u in $P-hostname.service $P-keepalive.timer boat-idle-stop.timer; do
     [ -e /etc/systemd/system/$u ] || continue
+    self_ok || continue   # the keepalive starts tailscaled and idle-stop stops "self": real VM only
     systemctl is-active --quiet $u || { $S systemctl enable --now $u >/dev/null 2>&1 && say "started $u"; }
   done
 fi
