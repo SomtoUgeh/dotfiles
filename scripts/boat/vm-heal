@@ -120,7 +120,12 @@ if ! command -v tailscaled >/dev/null; then
   hash -r
   command -v tailscaled >/dev/null && say "reinstalled Tailscale $(tailscale version | head -1)" || say "Tailscale missing and reinstall failed"
 fi
-if command -v tailscaled >/dev/null && ! $S test -s /var/lib/tailscale/tailscaled.state && [ -s "$D/tailscaled.state" ] && self_ok; then
+ts_state() { tailscale status --json 2>/dev/null | python3 -c 'import json,sys;print(json.load(sys.stdin).get("BackendState",""))' 2>/dev/null; }
+ts_in() { [ "$(ts_state)" = Running ]; }
+# Restore the identity when the state file is gone, or when a fresh install made a new logged-out one.
+if command -v tailscaled >/dev/null && [ -s "$D/tailscaled.state" ] \
+   && { ! $S test -s /var/lib/tailscale/tailscaled.state || { systemctl is-active --quiet tailscaled && [ "$(ts_state)" = NeedsLogin ]; }; } \
+   && ! $S cmp -s /var/lib/tailscale/tailscaled.state "$D/tailscaled.state" && self_ok; then
   $S systemctl stop tailscaled 2>/dev/null
   $S install -D -m 600 -o root -g root "$D/tailscaled.state" /var/lib/tailscale/tailscaled.state && say "restored the Tailscale identity (node key) from the copy in /home"
 fi
@@ -163,7 +168,8 @@ healthy=1; for f in "${WANT[@]}"; do [ -e "$f" ] || healthy=0; done
 if [ $healthy = 1 ]; then
   need_tgz=0; need_state=0
   { [ ! -s "$D/system.tgz" ] || [ -n "$(find "$D/system.tgz" -mmin +360 2>/dev/null)" ]; } && need_tgz=1
-  $S test -s /var/lib/tailscale/tailscaled.state && ! $S cmp -s /var/lib/tailscale/tailscaled.state "$D/tailscaled.state" 2>/dev/null && need_state=1
+  # Only ever back up a signed-in node: a fresh install's logged-out state once overwrote the good copy.
+  ts_in && $S test -s /var/lib/tailscale/tailscaled.state && ! $S cmp -s /var/lib/tailscale/tailscaled.state "$D/tailscaled.state" 2>/dev/null && need_state=1
   if [ $need_tgz = 1 ] || [ $need_state = 1 ]; then
     if self_ok; then
       [ $need_tgz = 1 ] && files | $S tar -czpf "$D/system.tgz.new" -T - 2>/dev/null && $S chown "$(id -u):$(id -g)" "$D/system.tgz.new" && chmod 600 "$D/system.tgz.new" && mv "$D/system.tgz.new" "$D/system.tgz"
