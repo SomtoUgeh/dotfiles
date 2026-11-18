@@ -51,6 +51,14 @@ fi
 
 exec 9>/tmp/vm-heal.lock; flock -n 9 || exit 0
 
+# 0. /etc/passwd itself can come back missing (investor-os, 18 Nov 2026 20:30): then sudo, cron jobs
+# for `user` and boat ssh all fail. `user` is in the docker group, so put it back through docker.
+if ! getent passwd "$(id -u)" >/dev/null 2>&1 && [ -s "$D/passwd" ]; then
+  if docker run --rm -v /etc:/h -v "$D":/b:ro alpine sh -c 'cp /b/passwd /h/passwd && chown 0:0 /h/passwd && chmod 644 /h/passwd' >/dev/null 2>&1; then
+    say "restored /etc/passwd from the copy in /home (it was missing)"
+  else say "/etc/passwd is missing and the docker restore failed"; fi
+fi
+
 # Files we own outside /home. Kept in $D/system.tgz while they are all present.
 files() {
   local f
@@ -107,8 +115,9 @@ fi
 
 # 2. Tailscale installed, its identity in place, running.
 if ! command -v tailscaled >/dev/null; then
-  if [ -e /etc/apt/sources.list.d/tailscale.list ]; then $S apt-get update -qq >/dev/null 2>&1; $S env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq tailscale >/dev/null 2>&1
-  else curl -fsSL https://tailscale.com/install.sh | $S sh >/dev/null 2>&1; fi
+  if [ -e /etc/apt/sources.list.d/tailscale.list ]; then $S apt-get update -qq >/dev/null 2>&1; $S env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq tailscale >/dev/null 2>&1; fi
+  command -v tailscaled >/dev/null || curl -fsSL https://tailscale.com/install.sh | $S sh >/dev/null 2>&1
+  hash -r
   command -v tailscaled >/dev/null && say "reinstalled Tailscale $(tailscale version | head -1)" || say "Tailscale missing and reinstall failed"
 fi
 if command -v tailscaled >/dev/null && ! $S test -s /var/lib/tailscale/tailscaled.state && [ -s "$D/tailscaled.state" ] && self_ok; then
@@ -160,6 +169,9 @@ if [ $healthy = 1 ]; then
       [ $need_tgz = 1 ] && files | $S tar -czpf "$D/system.tgz.new" -T - 2>/dev/null && $S chown "$(id -u):$(id -g)" "$D/system.tgz.new" && chmod 600 "$D/system.tgz.new" && mv "$D/system.tgz.new" "$D/system.tgz"
       [ $need_state = 1 ] && $S install -m 600 -o "$(id -u)" -g "$(id -g)" /var/lib/tailscale/tailscaled.state "$D/tailscaled.state"
     fi
+  fi
+  if getent passwd user >/dev/null && ! cmp -s /etc/passwd "$D/passwd" 2>/dev/null; then
+    cp /etc/passwd "$D/passwd.new" && chmod 600 "$D/passwd.new" && mv "$D/passwd.new" "$D/passwd"
   fi
 fi
 exit 0
