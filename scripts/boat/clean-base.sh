@@ -16,5 +16,9 @@ sudo rm -rf /var/lib/tailscale/tailscaled.state /var/lib/tailscale/certs /var/li
 systemctl --user disable --now t3code.service agent-config-sync.timer 2>/dev/null || true
 rm -f ~/.aside/cli/auth.json ~/.claude/.credentials.json ~/.ssh/id_ed25519_"$P" ~/.ssh/id_ed25519_"$P".pub
 sudo systemctl disable "$P-hostname.service" 2>/dev/null || true
+# vm-heal keeps a copy of the node key and system files in /home and puts them back after a
+# resume (18 Nov 2026); a check copy must not have them, or it could take the VM's identity.
+rm -rf ~/.local/share/vm-heal ~/.config/autostart/vm-heal.desktop ~/.local/bin/vm-heal
+sudo rm -f /etc/cron.d/vm-heal
 sudo hostnamectl set-hostname "$P-check"
 echo "clean-base: tailscaled $(systemctl is-enabled tailscaled 2>&1), t3code $(systemctl --user is-enabled t3code.service 2>&1), hostname $(hostname)"
