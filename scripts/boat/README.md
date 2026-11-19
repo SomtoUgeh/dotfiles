@@ -114,6 +114,7 @@ A VM is not done until every line holds (investor-os, 14 Nov 2026, followed this
 2. `boat new --environment <p> --type large --name <p>-dev --no-auto-stop`.
 3. Base tools: zsh (and `chsh`), fzf, jq, ripgrep, starship in `~/.local/bin`, `npm config set prefix ~/.local` then `mcp-remote cf wrangler portless`, bun 1.4.4.
 4. `T3CODE_VERSION=<desktop version> devvm-setup.sh <p> <repo path> <install>`.
+   Then `idle-stop-install.sh <id> 45 0` and vm-heal: `boat scp scripts/boat/vm-heal <id>:/tmp/vm-heal`, `boat ssh <id> -- 'install -m 755 /tmp/vm-heal ~/.local/bin/vm-heal && ~/.local/bin/vm-heal --setup <p> <id>'` (after step 5, so its copy includes the Tailscale node key).
 5. `sudo tailscale up --hostname=<p> --accept-dns=true --operator=user`, sign in as smugeh@gmail.com.
 6. T3: `t3 pair --tailscale --ttl 1h` once per client. Add it in T3 web and the desktop app (Settings > Environments > Add environment), and link it from the Mac and from julds with `t3 environment link https://<p>.taildbdfb2.ts.net --pairing-code <code> --access full-access`. The julds link is how Executor and Dev's T3 watch reach it. Links last 30 days.
 7. Repo, then `t3 project add <path>`. The VM key goes on GitHub as an authentication and a signing key (github.com/settings/ssh/new, passkey).
@@ -132,6 +133,7 @@ auto-stop is a timer from start and cannot see T3, so the check is ours (14 Nov 
 | `boat-idle-stop` | project VM (`/usr/local/sbin`, `boat-idle-stop.timer` every 5 min) | Stops the VM after `IDLE_MIN` (45) quiet minutes. Busy: an unfinished T3 run, new T3 activity, a pts terminal used in the last 30 min, user CPU over 40%, or a hold. A 15-minute gap between checks means it was resumed and starts a fresh window. Log: `journalctl -t boat-idle` |
 | `vm-stay` | project VM | `vm-stay 8` keeps it awake 8 hours; `vm-stay 0` clears it |
 | `idle-stop-install.sh` | project VM | `bash idle-stop-install.sh <sandbox id> 45 0` writes `/etc/boat-idle.env` (last arg 1 = dry run) and enables the timer |
+| `vm-heal` | project VM (`~/.local/bin`) | Puts the VM back together after a resume: see "Repair after resume" below |
 
 Waking: the Mac's `com.julds.autowake` (`~/.local/bin/julds-autowake`) resumes every stopped VM in
 `~/.config/boat-vms` when T3 Code comes to the front, and wakes any VM stopped 10+ days so boat's
@@ -142,3 +144,35 @@ error/degraded/recovered events to Dev's Coworkers webhook.
 
 A new project VM also needs: its line in `~/.config/boat-vms`, its id in the `boat-vms` Executor app
 and in julds's `vm-wake`, and new wake keys that include it (boat keys cannot gain sandboxes).
+
+## Repair after resume (vm-heal)
+
+What happened on 18 Nov 2026: on a resume boat boots the machine from its base image and only then
+restores the saved disk, lazily (`ascii-agents-server ... [restore] STEP 1: ... lazyfs staging` in
+the journal, after systemd has already started). systemd never sees our units, so `tailscaled`,
+`<p>-keepalive.timer`, `boat-idle-stop.timer` and `agent-config-sync.timer` stay down: coworkers was
+running for four hours with T3 up but unreachable and no idle-stop. On erivault the restore went
+further wrong: `/etc`, `/usr` and `/var` came back as the base image (Tailscale uninstalled, node key
+gone, our timers and scripts gone, `/var/log/dpkg.log` starting 31 Jul) while `/home/user` was intact.
+Separately, resuming five VMs at once got investor-os `Resume failed: Failed to restore snapshot:
+Please reduce your request rate`, and a later stop was refused because the final snapshot failed.
+
+`vm-heal` lives in `/home` (the part that always survives) and fixes this:
+
+- Keeps `~/.local/share/vm-heal/system.tgz` (our units, scripts, `/etc/boat-idle.env`,
+  `/etc/boat-check.env`, the apt sources for Tailscale and 1Password, the memory-protection drop-ins)
+  and a copy of `/var/lib/tailscale/tailscaled.state`, refreshed every 6 h while all is healthy.
+- Each run: restores missing files, reinstalls Tailscale or the 1Password CLI if gone, restores the
+  node key if missing, starts `tailscaled`, reloads systemd and starts our timers, resets the
+  hostname, starts `t3code` and `agent-config-sync.timer`, re-adds `tailscale serve` for T3.
+- Only the real VM takes the identity back: it compares the IPv6 boat reports for its sandbox id with
+  the machine's own (a fork or check copy has another). `clean-base.sh` deletes the copies.
+- Triggers: `~/.config/autostart/vm-heal.desktop` (boat restarts the desktop session after the
+  restore), `/etc/cron.d/vm-heal` every minute (cron rescans, systemd does not), and the Mac:
+  `vm up` heals a VM that is running but silent after 45 s, and `julds-autowake` after 60 s.
+- `vm-heal --status` shows what it checks; log `~/.local/state/vm-heal.log`.
+
+Mac side (not in this repo, backups `*.bak-20261118` next to them): `vm up all` resumes one VM every
+4 s, retries once when boat marks the resume as error and gives up after 3 minutes; new `vm heal
+<name|all>` and `vm snapshot <name|all>` (saved snapshot `<name>-weekly`, replaced each week).
+`julds-autowake` spaces resumes 4 s apart and runs `vm snapshot all` once a week.
