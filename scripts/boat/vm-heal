@@ -97,8 +97,9 @@ fi
 # public IPv6 boat reports for $BOAT_ID with the addresses on this machine.
 SELF=""
 self_ok() {
-  [ -n "$SELF" ] && { [ "$SELF" = yes ]; return; }
-  SELF=no; self_check && SELF=yes; [ "$SELF" = yes ]
+  # Cache only a pass: a miss (network still coming up) is checked again on the next call.
+  [ "$SELF" = yes ] && return 0
+  self_check && SELF=yes; [ "$SELF" = yes ]
 }
 self_check() {
   local ip; ip=$(boat info "$BOAT_ID" --json 2>/dev/null | python3 -c 'import json,sys;print(json.load(sys.stdin)["sandbox"]["ip"] or "")' 2>/dev/null)
