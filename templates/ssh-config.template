@@ -22,3 +22,29 @@ Host github.com github-personal
     IdentityFile ~/.ssh/somto_auth_ed25519.pub
     IdentitiesOnly yes
 
+
+# boat project VMs over Tailscale (tailnet taildbdfb2). Each VM has this Mac key in
+# ~/.ssh/authorized_keys. Zed's ssh_connections use these names (config/zed/settings.json).
+Host julds altschool icb investor-os coworkers erivault
+    HostName %h.taildbdfb2.ts.net
+    User user
+    IdentityFile ~/.ssh/somto_auth_ed25519.pub
+    IdentitiesOnly yes
+    ServerAliveInterval 30
+
+# Fallback when a VM's Tailscale is broken after a boat restore: boat's own SSH endpoint,
+# looked up on each connect (it changes on every resume). Needs scripts/boat/boat-ssh-proxy
+# in ~/.local/bin. Example: ssh coworkers-boat
+Host coworkers-boat
+    ProxyCommand ~/.local/bin/boat-ssh-proxy bx_9kqsfscv
+    HostKeyAlias boat-coworkers
+    User user
+    IdentityFile ~/.ssh/somto_auth_ed25519.pub
+    IdentitiesOnly yes
+
+Host erivault-boat
+    ProxyCommand ~/.local/bin/boat-ssh-proxy bx_4yh2ns5a
+    HostKeyAlias boat-erivault
+    User user
+    IdentityFile ~/.ssh/somto_auth_ed25519.pub
+    IdentitiesOnly yes

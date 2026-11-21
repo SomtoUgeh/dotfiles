@@ -15,11 +15,53 @@
       "args": [],
       "projects": [
         { "paths": ["/home/user/code/personal/jtp"] },
-        { "paths": ["/home/user/code/personal/coworkers"] },
-        { "paths": ["/home/user/code/erivault/erivault_website"] },
-        { "paths": ["/home/user/code/lami"] }
+        { "paths": ["/home/user/code/personal/morning-brief"] },
+        { "paths": ["/home/user/code/lami"] },
+        { "paths": ["/home/user/code/oss/executor-v2"] }
       ],
       "nickname": "julds"
+    },
+    {
+      "host": "altschool",
+      "args": [],
+      "projects": [
+        { "paths": ["/home/user/code/TalentQL/altschool-web-platforms"] },
+        { "paths": ["/home/user/code/TalentQL/altschool-analytics"] }
+      ],
+      "nickname": "altschool"
+    },
+    {
+      "host": "icb",
+      "args": [],
+      "projects": [
+        { "paths": ["/home/user/code/personal/icb"] }
+      ],
+      "nickname": "icb"
+    },
+    {
+      "host": "investor-os",
+      "args": [],
+      "projects": [
+        { "paths": ["/home/user/code/personal/julds-investor-os"] }
+      ],
+      "nickname": "investor-os"
+    },
+    {
+      "host": "coworkers",
+      "args": [],
+      "projects": [
+        { "paths": ["/home/user/code/personal/coworkers"] }
+      ],
+      "nickname": "coworkers"
+    },
+    {
+      "host": "erivault",
+      "args": [],
+      "projects": [
+        { "paths": ["/home/user/code/erivault/erivault_app"] },
+        { "paths": ["/home/user/code/erivault/erivault_website"] }
+      ],
+      "nickname": "erivault"
     }
   ],
   "agent_buffer_font_size": 14.0,
