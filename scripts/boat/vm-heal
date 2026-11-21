@@ -9,6 +9,13 @@
 # our timers gone) while /home/user was intact. This script lives in /home, which always
 # survives, keeps a copy of our system files there, and puts back whatever is missing.
 #
+# 21 Nov 2026: /home does not always survive either. coworkers, erivault and investor-os came back
+# without ~/.gitconfig, the per-VM GitHub key, gh login, T3's unit and runtime state, half of this
+# folder, /etc/group and gshadow, ubuntu.sources and zsh, and repos without .git/HEAD. So this
+# script now also keeps: a root-owned mirror of this folder in /var/lib/vm-heal-mirror, the group
+# files, the first SSH host keys (a fresh boot makes new ones and the Mac then refuses the VM with
+# "Host key verification failed"), and a bundle of the home files above. Damaged repos are logged.
+#
 # Triggers (all safe to overlap, a lock keeps one run at a time):
 #   ~/.config/autostart/vm-heal.desktop   boat restarts the desktop session after the restore
 #   /etc/cron.d/vm-heal                   every minute; cron rescans cron.d, systemd does not
@@ -42,6 +49,14 @@ A
   set -- ""
 fi
 
+# Fill anything missing in $D from the root-owned mirror (no overwrite).
+M=/var/lib/vm-heal-mirror
+if sudo -n test -d $M 2>/dev/null; then
+  before=$(ls -A "$D" | wc -l)
+  sudo -n cp -an $M/. "$D"/ 2>/dev/null && sudo -n chown -R "$(id -u):$(id -g)" "$D" 2>/dev/null
+  [ "$(ls -A "$D" | wc -l)" -gt "$before" ] && say "put back missing files in $D from $M"
+fi
+
 [ -r "$D/conf" ] || { echo "vm-heal: not set up (vm-heal --setup <project> <sandbox id>)"; exit 0; }
 . "$D/conf"
 
@@ -57,6 +72,17 @@ if ! getent passwd "$(id -u)" >/dev/null 2>&1 && [ -s "$D/passwd" ]; then
   if docker run --rm -v /etc:/h -v "$D":/b:ro alpine sh -c 'cp /b/passwd /h/passwd && chown 0:0 /h/passwd && chmod 644 /h/passwd' >/dev/null 2>&1; then
     say "restored /etc/passwd from the copy in /home (it was missing)"
   else say "/etc/passwd is missing and the docker restore failed"; fi
+fi
+# 0b. /etc/group and /etc/gshadow came back missing on erivault (21 Nov 2026): apt then fails on
+# packages with system-group overrides, so Tailscale could not be reinstalled.
+if [ ! -s /etc/group ] && [ -s "$D/group" ]; then
+  if $S install -m 644 -o 0 -g 0 "$D/group" /etc/group 2>/dev/null \
+     || docker run --rm -v /etc:/h -v "$D":/b:ro alpine sh -c 'cp /b/group /h/group && chown 0:0 /h/group && chmod 644 /h/group' >/dev/null 2>&1; then
+    say "restored /etc/group from the copy in /home (it was missing)"
+  else say "/etc/group is missing and the restore failed"; fi
+fi
+if ! $S test -e /etc/gshadow && [ -s "$D/gshadow" ] && [ -s /etc/group ]; then
+  $S install -m 640 -o 0 -g shadow "$D/gshadow" /etc/gshadow 2>/dev/null && say "restored /etc/gshadow from the copy in /home"
 fi
 
 # Files we own outside /home. Kept in $D/system.tgz while they are all present.
@@ -74,13 +100,25 @@ files() {
     /etc/boat-check.env /etc/cron.d/vm-heal /var/lib/systemd/linger/user \
     /etc/apt/sources.list.d/tailscale.list /usr/share/keyrings/tailscale-archive-keyring.gpg \
     /etc/apt/sources.list.d/1password.list /usr/share/keyrings/1password-archive-keyring.gpg \
+    /etc/apt/sources.list.d/ubuntu.sources \
     /etc/systemd/system/*.d/90-t3code-protect.conf; do
     [ -e "$f" ] || [ -L "$f" ] && echo "$f"
   done
 }
 WANT=(/usr/local/sbin/$P-keepalive /etc/systemd/system/$P-keepalive.timer /usr/local/sbin/boat-idle-stop
       /etc/systemd/system/boat-idle-stop.timer /etc/boat-idle.env /etc/systemd/system/$P-hostname.service
-      /etc/cron.d/vm-heal)
+      /etc/cron.d/vm-heal /etc/apt/sources.list.d/ubuntu.sources)
+# Home files a restore has lost (21 Nov 2026). Kept in $D/home.tgz; put back if a key one is missing.
+home_files() {
+  local f; cd "$HOME" || return
+  for f in .gitconfig .gitconfig.local .gitconfig-personal .ssh/id_ed25519_* .ssh/allowed_signers .ssh/config \
+    .ssh/authorized_keys .config/gh .config/systemd/user .config/executor-v2 .local/bin/t3 .local/bin/t3-service-launcher \
+    .t3/runtime/service-state.json .t3/runtime/launchers .t3/userdata/environment-id .t3/userdata/anonymous-id \
+    .t3/userdata/settings.json .t3/userdata/server-runtime.json .t3/userdata/secrets; do
+    [ -e "$f" ] || [ -L "$f" ] && echo "$f"
+  done
+}
+HOME_WANT=(.gitconfig .config/systemd/user/t3code.service .t3/userdata/environment-id .t3/runtime/service-state.json)
 
 if [ "${1:-}" = --status ]; then
   echo "project $P, sandbox $BOAT_ID, host $(hostname)"
@@ -89,6 +127,9 @@ if [ "${1:-}" = --status ]; then
   printf '%-50s %s\n' "t3code (user)" "$(systemctl --user is-active t3code.service)"
   printf '%-50s %s\n' "tailscale" "$(tailscale status --self --peers=false 2>&1 | head -1)"
   printf '%-50s %s\n' "backup" "$(ls -l --time-style=+%F\ %R "$D/system.tgz" 2>/dev/null | awk '{print $6, $7}')"
+  for f in group gshadow sshhost.tgz home.tgz; do printf '%-50s %s\n' "copy: $f" "$([ -s "$D/$f" ] && echo ok || echo MISSING)"; done
+  for f in "${HOME_WANT[@]}"; do printf '%-50s %s\n' "~/$f" "$([ -e "$HOME/$f" ] && echo ok || echo MISSING)"; done
+  printf '%-50s %s\n' "mirror $M" "$(sudo -n test -r $M/conf && echo ok || echo MISSING)"
   tail -5 "$LOG" 2>/dev/null; exit 0
 fi
 
@@ -114,6 +155,22 @@ if [ $missing = 1 ] && [ -s "$D/system.tgz" ]; then
   else say "system files missing but this is not $BOAT_ID; not restoring"; fi
 fi
 
+# 1b. The login shell (zsh) vanished on investor-os (21 Nov 2026): sshd then refuses every login
+# ("shell /usr/bin/zsh does not exist"), so Zed and ssh from the Mac fail.
+sh=$(getent passwd "$(id -u)" | cut -d: -f7)
+if [ -n "$sh" ] && [ ! -x "$sh" ]; then
+  $S apt-get update -qq >/dev/null 2>&1
+  $S env DEBIAN_FRONTEND=noninteractive apt-get install --reinstall -y -qq "$(basename "$sh")" >/dev/null 2>&1
+  [ -x "$sh" ] && say "reinstalled the login shell $sh (it was missing)" || say "login shell $sh missing and reinstall failed"
+fi
+
+# 1c. Home files: put back the bundle if a key file is gone (never overwrites).
+missing_home=0; for f in "${HOME_WANT[@]}"; do [ -e "$HOME/$f" ] || missing_home=1; done
+if [ $missing_home = 1 ] && [ -s "$D/home.tgz" ] && self_ok; then
+  tar -xzpf "$D/home.tgz" -C "$HOME" --skip-old-files 2>/dev/null && say "restored missing home files (git, GitHub key, T3) from $D/home.tgz"
+  chmod 700 "$HOME/.ssh" 2>/dev/null; systemctl --user daemon-reload 2>/dev/null
+fi
+
 # 2. Tailscale installed, its identity in place, running.
 if ! command -v tailscaled >/dev/null; then
   if [ -e /etc/apt/sources.list.d/tailscale.list ]; then $S apt-get update -qq >/dev/null 2>&1; $S env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq tailscale >/dev/null 2>&1; fi
@@ -134,6 +191,13 @@ if command -v tailscaled >/dev/null; then
   systemctl is-enabled --quiet tailscaled 2>/dev/null || $S systemctl enable tailscaled >/dev/null 2>&1
   # Never on a copy: it would join the tailnet as this VM (erivault-check, 12 Nov 2026).
   systemctl is-active --quiet tailscaled || { self_ok && $S systemctl start tailscaled && say "started tailscaled (was stopped)"; }
+fi
+
+# 2b. SSH host keys: keep the first ones, so the Mac keeps trusting the VM after a fresh boot.
+if [ -s "$D/sshhost.tgz" ] && $S test -e /etc/ssh/ssh_host_ed25519_key.pub \
+   && ! tar -xzOf "$D/sshhost.tgz" etc/ssh/ssh_host_ed25519_key.pub 2>/dev/null | cmp -s - /etc/ssh/ssh_host_ed25519_key.pub \
+   && self_ok; then
+  $S tar -xzpf "$D/sshhost.tgz" -C / && { $S systemctl restart ssh 2>/dev/null; say "put back the saved SSH host keys (boot had made new ones)"; }
 fi
 
 # 3. Our system timers: systemd read its units before boat restored them, so reload and start.
@@ -180,5 +244,34 @@ if [ $healthy = 1 ]; then
   if getent passwd user >/dev/null && ! cmp -s /etc/passwd "$D/passwd" 2>/dev/null; then
     cp /etc/passwd "$D/passwd.new" && chmod 600 "$D/passwd.new" && mv "$D/passwd.new" "$D/passwd"
   fi
+  if getent group docker >/dev/null && ! cmp -s /etc/group "$D/group" 2>/dev/null; then
+    cp /etc/group "$D/group.new" && chmod 600 "$D/group.new" && mv "$D/group.new" "$D/group"
+  fi
+  if $S test -s /etc/gshadow && ! $S cmp -s /etc/gshadow "$D/gshadow" 2>/dev/null; then
+    $S cat /etc/gshadow > "$D/gshadow.new" && chmod 600 "$D/gshadow.new" && mv "$D/gshadow.new" "$D/gshadow"
+  fi
+  # First SSH host keys only: later boots get them put back by step 2b.
+  if [ ! -s "$D/sshhost.tgz" ] && self_ok; then
+    (cd / && $S tar -czpf "$D/sshhost.tgz" etc/ssh/ssh_host_*) 2>/dev/null && $S chown "$(id -u):$(id -g)" "$D/sshhost.tgz" && chmod 600 "$D/sshhost.tgz"
+  fi
+fi
+# Home bundle: refresh every 6 h while the key files are all there.
+home_ok=1; for f in "${HOME_WANT[@]}"; do [ -e "$HOME/$f" ] || home_ok=0; done
+if [ $home_ok = 1 ] && { [ ! -s "$D/home.tgz" ] || [ -n "$(find "$D/home.tgz" -mmin +360 2>/dev/null)" ]; } && self_ok; then
+  home_files | tar -czpf "$D/home.tgz.new" -C "$HOME" -T - 2>/dev/null && chmod 600 "$D/home.tgz.new" && mv "$D/home.tgz.new" "$D/home.tgz"
+fi
+# Mirror this folder outside /home (root only), so one lost folder does not lose both copies.
+if [ -s "$D/conf" ] && self_ok && { ! $S test -d $M || [ -n "$(find "$D" -newer "$D/.mirrored" -type f 2>/dev/null | head -1)" ] || [ ! -e "$D/.mirrored" ]; }; then
+  $S mkdir -p -m 700 $M && $S cp -a "$D"/. $M/ && touch "$D/.mirrored"
+fi
+
+# 8. Repos: a restore once left repos with no .git/HEAD (21 Nov 2026). Rebuilding needs GitHub,
+# so only say so, at most once an hour.
+if [ -z "$(find "$D/.repo-check" -mmin -60 2>/dev/null)" ]; then
+  touch "$D/.repo-check"
+  for g in "$HOME"/code/*/*/.git; do
+    case "$g" in *broken*) continue;; esac
+    [ -d "$g" ] && [ ! -e "$g/HEAD" ] && say "repo damaged: ${g%/.git} has no .git/HEAD (rebuild it from GitHub)"
+  done
 fi
 exit 0

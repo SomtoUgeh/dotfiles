@@ -142,7 +142,8 @@ app `boat-vms` (`vms.list`, `vms.status`, `vms.wake`) with a key limited to `san
 `sandbox.resume` on the project VMs; julds has `vm-wake` with its own such key. boat sends
 error/degraded/recovered events to Dev's Coworkers webhook.
 
-A new project VM also needs: its line in `~/.config/boat-vms`, its id in the `boat-vms` Executor app
+A new project VM also needs: this Mac's key in its `~/.ssh/authorized_keys` and a Host entry
+(templates/ssh-config.template, used by Zed), its line in `~/.config/boat-vms`, its id in the `boat-vms` Executor app
 and in julds's `vm-wake`, and new wake keys that include it (boat keys cannot gain sandboxes).
 
 ## Repair after resume (vm-heal)
@@ -171,6 +172,33 @@ Please reduce your request rate`, and a later stop was refused because the final
   restore), `/etc/cron.d/vm-heal` every minute (cron rescans, systemd does not), and the Mac:
   `vm up` heals a VM that is running but silent after 45 s, and `julds-autowake` after 60 s.
 - `vm-heal --status` shows what it checks; log `~/.local/state/vm-heal.log`.
+
+What happened on 19 to 21 Nov 2026 (found 21 Nov): later restores also lost files under `/home`.
+coworkers, erivault and investor-os came back without `~/.gitconfig`, the per-VM GitHub key, the
+`gh` login, T3's unit and `~/.t3/runtime/service-state.json`, the npm tools in `~/.local/lib`, half of
+`~/.local/share/vm-heal`, and every repo's `.git/HEAD` and `config` (plus hundreds of tracked files).
+Outside `/home`: `/etc/group` and `/etc/gshadow` (erivault, so apt failed), `ubuntu.sources`
+(coworkers, so Tailscale could not be reinstalled), and zsh (investor-os, so sshd refused every
+login). T3 had been down on coworkers and erivault since about 19 Nov.
+
+How it was fixed: files were copied back from each VM's last good boat snapshot with
+`GET https://boat.dev/api/v1/snapshots/<id>/files?path=<abs path>` (a folder comes back as a .tar;
+`boat snapshots <sandbox> --all --json` lists them, and a big drop in `fileCount` marks the bad
+restore). Damaged repos got fresh history from GitHub, were put on the branch their surviving files
+matched exactly, and the missing tracked files were checked out; the old folder is kept as
+`.git.broken-20261121`.
+
+vm-heal now also:
+- keeps `/etc/group` and `/etc/gshadow` copies and puts them back if missing;
+- reinstalls the login shell if it is missing;
+- keeps the first SSH host keys (`sshhost.tgz`) and puts them back after a fresh boot, so the Mac
+  does not refuse the VM with "Host key verification failed";
+- keeps `home.tgz` (git config, GitHub key, `gh`, user units, Executor tokens, T3 launcher, runtime
+  state and identity files) and restores it if `~/.gitconfig`, the T3 unit, the T3 environment id or
+  T3's runtime state is missing;
+- adds `ubuntu.sources` to `system.tgz`;
+- mirrors `~/.local/share/vm-heal` to `/var/lib/vm-heal-mirror` (root only) and fills gaps from it;
+- logs repos that lost `.git/HEAD` (rebuilding needs GitHub, so it only reports).
 
 Mac side (not in this repo, backups `*.bak-20261118` next to them): `vm up all` resumes one VM every
 4 s, retries once when boat marks the resume as error and gives up after 3 minutes; new `vm heal
