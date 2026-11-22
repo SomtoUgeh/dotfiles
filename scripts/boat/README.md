@@ -8,22 +8,18 @@ machines started from a per-project saved snapshot through `boat-check`.
 | `boat-check` | project VM (`/usr/local/bin/boat-check`) | Runs a command on a throwaway machine from `<project>-base` and prints output, time and cost |
 | `base-common.sh` + `base-<project>.sh` | a new build machine | Installs the toolchain, clones the repo from a git bundle, installs deps |
 | `clean-base.sh` | a throwaway copy of a project VM | Removes the Tailscale node, T3 server, keepalive and sign-ins so the copy can be saved as `<project>-base` |
-| `devvm-setup.sh` | a new project VM | Hostname, Tailscale, T3 service, keepalive timer, `~/.boatignore`, git identity and key, `/etc/boat-check.env` |
-| `link-agent-config.sh` | project VM (`~/.local/bin/link-agent-config`) | Clones dotfiles and p3-stack, links skills (or leaves them to Skillhub), Claude and Codex config like `install.sh`, adds `~/.claude/rules/boat-project-vm.md`, installs `agent-config-sync.timer` (after boot and hourly) |
+| `vm-new` | the Mac | One command for a new project VM or a replica: creates the sandbox, runs `vm-setup`, GitHub key, Tailscale, T3 links, Mac ssh config, VM list and Executor bridge. See "New project VM" |
+| `vm-setup` | project VM (`~/.local/bin/vm-setup`, linked to this clone) | The one setup every project VM shares: base tools, zsh and prompt, T3, keepalive, git key, dotfiles, agent config, Executor, repos, boat-check, vm-heal, idle stop, hourly `vm-setup sync` timer. Safe to re-run. `vm-setup <p> status` shows what is done |
+| `projects/<p>.env` (+ `<p>.sh`) | read by `vm-setup` and `vm-new` | The only per-project part: VM name, boat environment, repos and install commands, extra `~/.zshenv.local` lines, and optional `project_setup` (icb: Java, Android SDK, emulators) |
+| `link-agent-config.sh` | run by `vm-setup` (agents stage) | Clones dotfiles and p3-stack, links skills (or leaves them to Skillhub), Claude and Codex config like `install.sh`, adds `~/.claude/rules/boat-project-vm.md` |
 
 ## Agent config on a project VM
 
-After `devvm-setup.sh`, and after the VM's key is on GitHub:
-
-```sh
-boat ssh <id> -- 'mkdir -p ~/.local/bin && cat > ~/.local/bin/link-agent-config && chmod 755 ~/.local/bin/link-agent-config && ~/.local/bin/link-agent-config' < link-agent-config.sh
-```
-
-It keeps boat's own `boat` and `synced` folders in `~/.claude/skills` and adds
-one link per shared skill. The timer pulls dotfiles and relinks, so skills
-pushed from the Mac reach the VM within an hour. It skips the parts of
-`install_cloud_dotfiles.sh` that add GitHub keys or change the login shell.
-Executor needs its own sign-in.
+`vm-setup` runs `link-agent-config.sh` in its agents stage, and `vm-setup sync` runs it
+again after each boot and every hour, so skills pushed from the Mac reach every VM within an
+hour. It keeps boat's own `boat` and `synced` folders in `~/.claude/skills` and adds one link
+per shared skill. The same stage writes the Executor bridges and registers `executor_v2` and
+`executor_v2_local` for Claude and `executor_v2` for Codex.
 
 ## Skillhub on a project VM
 
@@ -106,22 +102,37 @@ Add a secret file only after the base is saved.
 - The CLI reads `BOAT_API_KEY`, so the VM's own boat login stays untouched.
 - When boat refuses the start (`rate_limited`, `no_ready_machine`), the command runs locally.
 
-## New project VM checklist
+## New project VM (or a replica)
 
-A VM is not done until every line holds (investor-os, 14 Nov 2026, followed this list):
+From the Mac, in the dotfiles clone:
 
-1. `boat env new <p>`, then `boat env set <p> --agents-credentials false --github false --secrets true --boat-credentials true`, and copy the shared secret files (`.config/op/service-account-token`, `.config/executor-v2/{cloud,mac}.token`) from another project environment. `boat env new` prints every environment with its secrets: do not paste its output anywhere.
-2. `boat new --environment <p> --type large --name <p>-dev --no-auto-stop`.
-3. Base tools: zsh (and `chsh`), fzf, jq, ripgrep, starship in `~/.local/bin`, `npm config set prefix ~/.local` then `mcp-remote cf wrangler portless`, bun 1.4.4.
-4. `T3CODE_VERSION=<desktop version> devvm-setup.sh <p> <repo path> <install>`.
-   Then `idle-stop-install.sh <id> 45 0` and vm-heal: `boat scp scripts/boat/vm-heal <id>:/tmp/vm-heal`, `boat ssh <id> -- 'install -m 755 /tmp/vm-heal ~/.local/bin/vm-heal && ~/.local/bin/vm-heal --setup <p> <id>'` (after step 5, so its copy includes the Tailscale node key).
-5. `sudo tailscale up --hostname=<p> --accept-dns=true --operator=user`, sign in as smugeh@gmail.com.
-6. T3: `t3 pair --tailscale --ttl 1h` once per client. Add it in T3 web and the desktop app (Settings > Environments > Add environment), and link it from the Mac and from julds with `t3 environment link https://<p>.taildbdfb2.ts.net --pairing-code <code> --access full-access`. The julds link is how Executor and Dev's T3 watch reach it. Links last 30 days.
-7. Repo, then `t3 project add <path>`. The VM key goes on GitHub as an authentication and a signing key (github.com/settings/ssh/new, passkey).
-8. Agents: `claude auth login --claudeai`, `link-agent-config`, Skillhub (above), Executor wrappers from another VM plus `claude mcp add --scope user executor_v2 / executor_v2_local` and `codex mcp add executor_v2`.
-9. Mac: copy `~/Library/LaunchAgents/com.julds.boat-executor-bridge.<other>.plist` with the new sandbox id, and Somto runs `launchctl bootstrap gui/$(id -u) <plist>` in his Terminal (Aside cannot).
-10. Aside CLI: install, `aside login --email smugeh@gmail.com`, approve the device, then `aside host use remote:266a3611-e171-4cec-b729-57b5dcfbb28c`.
-11. Coworkers: tell Dev (job text) about the VM, its environment id and project id.
+```sh
+scripts/boat/vm-new icb                 # a new VM for a project that has projects/icb.env
+scripts/boat/vm-new icb --name icb2     # a replica: same project and secrets, its own name
+scripts/boat/vm-new icb --dry-run       # print the plan only
+scripts/boat/vm-new icb --resume bx_... # carry on after a stop (every step is safe to repeat)
+```
+
+It runs every step of the old checklist. You only: open the Tailscale sign-in link it prints
+(or set `TS_AUTHKEY`), add the VM in the T3 desktop app (Settings > Environments, select it on
+the map, Add), sign Claude in on the VM (`claude auth login --claudeai`), and do the follow-ups it
+lists at the end (julds wake list and key, the Executor "Boat VMs" app, telling Dev, the Aside CLI).
+
+### A new project
+
+1. `projects/<p>.env`: copy another one. Repos are `"<path under ~>|<git url>|<install command>"`.
+   Anything special (toolchains, emulators) goes in `projects/<p>.sh` as `project_setup`.
+2. The boat environment holds the project's secret files, so a replica needs no copying:
+   `boat env new <p>`, then `boat env set <p> --agents-credentials false --github false --secrets true --boat-credentials true`,
+   and add the shared secret files (`.config/op/service-account-token`, `.config/executor-v2/{cloud,mac}.token`)
+   and the project's `.env` files with `boat env set-file`. `boat env new` and `boat env list` print every
+   environment with its secrets: never paste their output anywhere.
+3. `scripts/boat/vm-new <p>`.
+
+### Existing VMs
+
+`vm-setup <p>` on the VM brings it in line with the current setup and only restarts T3 when its
+unit changed. `vm-setup <p> status` lists anything still missing.
 
 ## Sleep when idle, wake on demand
 
@@ -132,7 +143,6 @@ auto-stop is a timer from start and cannot see T3, so the check is ours (14 Nov 
 | - | - | - |
 | `boat-idle-stop` | project VM (`/usr/local/sbin`, `boat-idle-stop.timer` every 5 min) | Stops the VM after `IDLE_MIN` (45) quiet minutes. Busy: an unfinished T3 run, new T3 activity, a pts terminal used in the last 30 min, user CPU over 40%, or a hold. A 15-minute gap between checks means it was resumed and starts a fresh window. Log: `journalctl -t boat-idle` |
 | `vm-stay` | project VM | `vm-stay 8` keeps it awake 8 hours; `vm-stay 0` clears it |
-| `idle-stop-install.sh` | project VM | `bash idle-stop-install.sh <sandbox id> 45 0` writes `/etc/boat-idle.env` (last arg 1 = dry run) and enables the timer |
 | `vm-heal` | project VM (`~/.local/bin`) | Puts the VM back together after a resume: see "Repair after resume" below |
 
 Waking: the Mac's `com.julds.autowake` (`~/.local/bin/julds-autowake`) resumes every stopped VM in
@@ -165,7 +175,7 @@ Please reduce your request rate`, and a later stop was refused because the final
   and a copy of `/var/lib/tailscale/tailscaled.state`, refreshed every 6 h while all is healthy.
 - Each run: restores missing files, reinstalls Tailscale or the 1Password CLI if gone, restores the
   node key if missing, starts `tailscaled`, reloads systemd and starts our timers, resets the
-  hostname, starts `t3code` and `agent-config-sync.timer`, re-adds `tailscale serve` for T3.
+  hostname, starts `t3code` and `vm-setup-sync.timer`, re-adds `tailscale serve` for T3.
 - Only the real VM takes the identity back: it compares the IPv6 boat reports for its sandbox id with
   the machine's own (a fork or check copy has another). `clean-base.sh` deletes the copies.
 - Triggers: `~/.config/autostart/vm-heal.desktop` (boat restarts the desktop session after the

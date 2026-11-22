@@ -147,7 +147,12 @@ This is a boat project VM for one project. Several agents share it (8 vCPU, 16 G
   `boat-check` prints.
 R
 
-# Keep a copy outside the clone (the timer runs it) and refresh it from dotfiles.
+# vm-setup runs this as its "agents" stage and owns the hourly timer (vm-setup sync).
+if [ "${VM_SETUP:-}" = 1 ]; then
+  echo "link-agent-config: $skills, dotfiles $(git -C "$D" rev-parse --short HEAD)"
+  exit 0
+fi
+# Run by hand on a VM without vm-setup: keep a copy outside the clone (the timer runs it).
 mkdir -p "$HOME/.local/bin"
 self=$D/scripts/boat/link-agent-config.sh
 if [ -f "$self" ]; then install -m 755 "$self" "$HOME/.local/bin/link-agent-config"; fi
