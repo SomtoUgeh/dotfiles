@@ -112,6 +112,16 @@ vm "tailscale status >/dev/null" || { echo "vm-new: Tailscale is not signed in y
 say "vm-setup: dotfiles, shell, agents, Executor, repos, project extras, boat-check, vm-heal, idle stop, timer"
 vm "$RUN all"
 
+say "Aside CLI sign-in (browser tasks from the VM run in Aside on the Mac)"
+if ! vm "python3 -c 'import json,os;json.load(open(os.path.expanduser(\"~/.aside/cli/auth.json\")))[\"refreshToken\"]'" >/dev/null 2>&1; then
+  vm "rm -f /tmp/aside-login.log; nohup script -qfc 'ASIDE_CLI_AUTH_PATH=\$HOME/.aside/cli/auth.json \$HOME/.local/bin/aside login --email smugeh@gmail.com' /tmp/aside-login.log >/dev/null 2>&1 &"
+  code=""
+  for _ in $(seq 1 30); do code=$(vm "grep -o '[A-Z0-9]\{4\}-[A-Z0-9]\{4\}' /tmp/aside-login.log" 2>/dev/null | head -1 || true); [ -n "$code" ] && break; sleep 2; done
+  echo "In Aside: Settings > Account > Devices, find $NAME, select Confirm and enter: ${code:-see /tmp/aside-login.log on the VM}"
+  for _ in $(seq 1 120); do vm "grep -q 'Signed in' /tmp/aside-login.log" 2>/dev/null && break; sleep 5; done
+  vm "bash ~/code/personal/dotfiles/scripts/boat/vm-setup $P aside" || true
+fi
+
 say "Mac: ssh access, VM list, Executor bridge"
 [ -f "$MAC_KEY" ] && vm "grep -qF '$(cut -d' ' -f2 "$MAC_KEY")' ~/.ssh/authorized_keys 2>/dev/null || echo '$(cat "$MAC_KEY")' >> ~/.ssh/authorized_keys"
 if ! grep -q "^Host $NAME\$" "$HOME/.ssh/config"; then

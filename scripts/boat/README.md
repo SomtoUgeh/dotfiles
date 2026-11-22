@@ -9,7 +9,7 @@ machines started from a per-project saved snapshot through `boat-check`.
 | `base-common.sh` + `base-<project>.sh` | a new build machine | Installs the toolchain, clones the repo from a git bundle, installs deps |
 | `clean-base.sh` | a throwaway copy of a project VM | Removes the Tailscale node, T3 server, keepalive and sign-ins so the copy can be saved as `<project>-base` |
 | `vm-new` | the Mac | One command for a new project VM or a replica: creates the sandbox, runs `vm-setup`, GitHub key, Tailscale, T3 links, Mac ssh config, VM list and Executor bridge. See "New project VM" |
-| `vm-setup` | project VM (`~/.local/bin/vm-setup`, linked to this clone) | The one setup every project VM shares: base tools, zsh and prompt, T3, keepalive, git key, dotfiles, agent config, Executor, repos, boat-check, vm-heal, idle stop, hourly `vm-setup sync` timer. Safe to re-run. `vm-setup <p> status` shows what is done |
+| `vm-setup` | project VM (`~/.local/bin/vm-setup`, linked to this clone) | The one setup every project VM shares: base tools, zsh and prompt, T3, keepalive, git key, dotfiles, agent config, Executor, the Aside CLI (pointed at the Mac, updated daily), repos, boat-check, vm-heal, idle stop, hourly `vm-setup sync` timer. Safe to re-run. `vm-setup <p> status` shows what is done |
 | `projects/<p>.env` (+ `<p>.sh`) | read by `vm-setup` and `vm-new` | The only per-project part: VM name, boat environment, repos and install commands, extra `~/.zshenv.local` lines, and optional `project_setup` (icb: Java, Android SDK, emulators) |
 | `link-agent-config.sh` | run by `vm-setup` (agents stage) | Clones dotfiles and p3-stack, links skills (or leaves them to Skillhub), Claude and Codex config like `install.sh`, adds `~/.claude/rules/boat-project-vm.md` |
 
@@ -116,7 +116,8 @@ scripts/boat/vm-new icb --resume bx_... # carry on after a stop (every step is s
 It runs every step of the old checklist. You only: open the Tailscale sign-in link it prints
 (or set `TS_AUTHKEY`), add the VM in the T3 desktop app (Settings > Environments, select it on
 the map, Add), sign Claude in on the VM (`claude auth login --claudeai`), and do the follow-ups it
-lists at the end (julds wake list and key, the Executor "Boat VMs" app, telling Dev, the Aside CLI).
+lists at the end (julds wake list and key, the Executor "Boat VMs" app, telling Dev). It also signs the
+Aside CLI in: confirm the VM in Aside > Settings > Account > Devices with the code it prints.
 
 ### A new project
 
