@@ -3,7 +3,7 @@
 #
 #   vm-setup <project>              everything (same as `all`)
 #   vm-setup <project> <stage>...   only these stages, in the order given
-#   vm-setup <project> sync         quick refresh the hourly timer runs: dotfiles, shell, agents, vm-heal copy
+#   vm-setup <project> sync         quick refresh the hourly timer runs: dotfiles, shell, agents, Aside CLI, vm-heal copy
 #   vm-setup <project> status       what is done and what still needs a person
 #
 # Everything shared lives here. Everything about one project lives in projects/<project>.env
@@ -11,7 +11,7 @@
 # with a project_setup function (icb: Java, Android SDK, emulators).
 #
 # From the Mac, `vm-new <project>` makes a new VM (or a replica) and runs this for you.
-# Stages: base tailscale t3 keepalive git dotfiles shell agents project check heal idle timer
+# Stages: base tailscale t3 keepalive git dotfiles shell agents aside project check heal idle timer
 set -euo pipefail
 
 P=${1:?usage: vm-setup <project> [stage...|all|sync|status]}; shift || true
@@ -78,6 +78,8 @@ forget_copied_identity() {
     sudo rm -rf /var/lib/vm-heal-mirror; rm -rf "$HOME/.local/share/vm-heal"
     sudo systemctl disable --now -q boat-idle-stop.timer 2>/dev/null || true
     sudo rm -f /etc/boat-idle.env
+    # The Aside sign-in is the original VM's device; this VM signs in as itself.
+    rm -f "$HOME/.aside/cli/auth.json"
   else
     say "vm-heal knows this VM as $old_p: moving it to the name $NAME"
     # Its saved system files hold the old unit names; let it save new ones.
@@ -406,6 +408,28 @@ W
   claude mcp get boat-docs >/dev/null 2>&1 || claude mcp add --transport http boat-docs --scope user https://docs.boat.dev/mcp >/dev/null 2>&1 || true
 }
 
+# The Mac's Aside host: browser tasks started on a VM (aside exec) run in Aside on the Mac.
+ASIDE_MAC_HOST=${ASIDE_MAC_HOST:-remote:266a3611-e171-4cec-b729-57b5dcfbb28c}
+aside_signed_in() { python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));sys.exit(0 if d.get("refreshToken") else 1)' "$HOME/.aside/cli/auth.json" 2>/dev/null; }
+
+stage_aside() {
+  say "Aside CLI (browser tasks run in Aside on the Mac)"
+  local a=$HOME/.local/bin/aside
+  if [ ! -x "$a" ]; then
+    curl -fsSL https://releases.aside.com/install.sh | bash >/dev/null 2>&1 || { warn "Aside CLI: install failed"; return 0; }
+  elif [ -z "$(find "$HOME/.aside/cli/.vm-setup-updated" -mmin -1440 2>/dev/null)" ]; then
+    # At most once a day, so every VM stays on the current release.
+    "$a" update >/dev/null 2>&1 && touch "$HOME/.aside/cli/.vm-setup-updated"
+  fi
+  if ! aside_signed_in; then
+    todo "Aside CLI sign-in: ASIDE_CLI_AUTH_PATH=\$HOME/.aside/cli/auth.json aside login --email smugeh@gmail.com, then confirm $(hostname) in Aside > Settings > Account > Devices (vm-new does this)"
+    return 0
+  fi
+  # A fresh sign-in defaults to the "local" host, which cannot work on a VM without a browser (11 Nov 2026).
+  "$a" host status 2>/dev/null | grep -q "^$ASIDE_MAC_HOST" || "$a" host use "$ASIDE_MAC_HOST" >/dev/null 2>&1 ||
+    todo "Aside CLI: aside host use $ASIDE_MAC_HOST failed"
+}
+
 stage_project() {
   local line path url install
   for line in "${REPOS[@]}"; do
@@ -505,6 +529,7 @@ stage_status() {
   chk "dotfiles cloned" '[ -d "$D/.git" ]'
   chk "Claude signed in" '[ -s "$HOME/.claude/.credentials.json" ]'
   chk "Executor for Claude" 'claude mcp get executor_v2 | grep -q Connected'
+  chk "Aside CLI signed in, using the Mac" 'aside_signed_in && "$HOME/.local/bin/aside" host status | grep -q "^$ASIDE_MAC_HOST"'
   chk "repos cloned" 'for l in "${REPOS[@]}"; do [ -d "$HOME/${l%%|*}/.git" ] || exit 1; done'
   chk "keepalive timer" 'systemctl is-active --quiet $NAME-keepalive.timer'
   chk "idle-stop timer" 'systemctl is-active --quiet boat-idle-stop.timer'
@@ -525,8 +550,8 @@ if [ $IDENTITY_FIXED = 1 ]; then
 fi
 
 case "${1:-all}" in
-  all) run base tailscale t3 keepalive git dotfiles shell agents project check heal idle timer status ;;
-  sync) run dotfiles shell agents
+  all) run base tailscale t3 keepalive git dotfiles shell agents aside project check heal idle timer status ;;
+  sync) run dotfiles shell agents aside
         cmp -s "$BOAT_DIR/vm-heal" "$HOME/.local/bin/vm-heal" || install -m 755 "$BOAT_DIR/vm-heal" "$HOME/.local/bin/vm-heal" ;;
   status) stage_status ;;
   *) run "$@" ;;
