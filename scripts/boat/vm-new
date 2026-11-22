@@ -91,9 +91,9 @@ add() { out=\$(gh ssh-key add \$f --title 'boat $NAME-dev ($ID)' --type \$1 2>&1
 add authentication && add signing; rc=\$?; rm -f \$f; exit \$rc" ||
   { echo "vm-new: could not add the VM's key to GitHub (see above). Fix it, then: vm-new $P${NAME_ARG:+ --name $NAME} --resume $ID" >&2; exit 1; }
 for _ in $(seq 1 12); do
-  vm "(ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -T git@github.com 2>&1 || true) | grep -q 'successfully authenticated'" && break; sleep 5
+  vm "(ssh -i ~/.ssh/id_ed25519_$NAME -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -T git@github.com 2>&1 || true) | grep -q 'successfully authenticated'" && break; sleep 5
 done || true
-vm "(ssh -o BatchMode=yes -T git@github.com 2>&1 || true) | grep -q 'successfully authenticated'" ||
+vm "(ssh -i ~/.ssh/id_ed25519_$NAME -o IdentitiesOnly=yes -o BatchMode=yes -T git@github.com 2>&1 || true) | grep -q 'successfully authenticated'" ||
   { echo "vm-new: GitHub does not accept the VM's key yet. Carry on later with: vm-new $P${NAME_ARG:+ --name $NAME} --resume $ID" >&2; exit 1; }
 
 say "Tailscale sign-in as $NAME"
