@@ -418,8 +418,10 @@ stage_aside() {
   if [ ! -x "$a" ]; then
     curl -fsSL https://releases.aside.com/install.sh | bash >/dev/null 2>&1 || { warn "Aside CLI: install failed"; return 0; }
   elif [ -z "$(find "$HOME/.aside/cli/.vm-setup-updated" -mmin -1440 2>/dev/null)" ]; then
-    # At most once a day, so every VM stays on the current release.
-    "$a" update >/dev/null 2>&1 && touch "$HOME/.aside/cli/.vm-setup-updated"
+    # At most once a day, so every VM stays on the current release (`aside update`; `--update` is its shortcut).
+    # The stamp is written either way, so a failing update is retried daily, not on every hourly sync.
+    "$a" update >/dev/null 2>&1 || warn "Aside CLI: aside update failed; trying again tomorrow"
+    mkdir -p "$HOME/.aside/cli" && touch "$HOME/.aside/cli/.vm-setup-updated" || true
   fi
   if ! aside_signed_in; then
     todo "Aside CLI sign-in: ASIDE_CLI_AUTH_PATH=\$HOME/.aside/cli/auth.json aside login --email smugeh@gmail.com, then confirm $(hostname) in Aside > Settings > Account > Devices (vm-new does this)"
