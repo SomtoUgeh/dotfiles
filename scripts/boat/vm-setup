@@ -47,6 +47,31 @@ if [ -z "${BOAT_ID:-}" ]; then
   BOAT_ID=$(sed -n 's/^BOAT_ID=//p' /etc/boat-idle.env "$HOME/.local/share/vm-heal/conf" 2>/dev/null | head -1)
 fi
 NAME=${VM_NAME:-$NAME}
+
+# A VM made from a snapshot of another VM (vm-new --from) carries that VM's saved identity: vm-heal's
+# copies (system files, SSH host keys, Tailscale node key) and conf, the idle-stop sandbox id, and the
+# old name's hostname and keepalive units, which rename the copy back every minute. Clear them first;
+# the stages below then set this VM up as itself (PR 19 review, 22 Nov 2026).
+forget_copied_identity() {
+  [ -n "${BOAT_ID:-}" ] || return 0
+  local hc=$HOME/.local/share/vm-heal/conf old_p="" old_id="" idle_id=""
+  if [ -f "$hc" ]; then old_p=$(sed -n 's/^P=//p' "$hc"); old_id=$(sed -n 's/^BOAT_ID=//p' "$hc"); fi
+  idle_id=$(sed -n 's/^BOAT_ID=//p' /etc/boat-idle.env 2>/dev/null || true)
+  if { [ -n "$old_id" ] && [ "$old_id" != "$BOAT_ID" ]; } || { [ -n "$old_p" ] && [ "$old_p" != "$NAME" ]; } ||
+     { [ -n "$idle_id" ] && [ "$idle_id" != "$BOAT_ID" ]; }; then
+    say "this VM is a copy of ${old_p:-another VM} (${old_id:-$idle_id}): clearing its saved identity"
+    sudo rm -f /etc/cron.d/vm-heal; rm -f "$HOME/.config/autostart/vm-heal.desktop"
+    sudo rm -rf /var/lib/vm-heal-mirror; rm -rf "$HOME/.local/share/vm-heal"
+    sudo systemctl disable --now -q boat-idle-stop.timer 2>/dev/null || true
+    sudo rm -f /etc/boat-idle.env
+    if [ -n "$old_p" ] && [ "$old_p" != "$NAME" ]; then
+      sudo systemctl disable --now -q "$old_p-keepalive.timer" "$old_p-hostname.service" 2>/dev/null || true
+      sudo rm -f "/etc/systemd/system/$old_p-keepalive."{service,timer} "/etc/systemd/system/$old_p-hostname.service" "/usr/local/sbin/$old_p-keepalive"
+      sudo systemctl daemon-reload
+    fi
+  fi
+}
+forget_copied_identity
 mkdir -p "$(dirname "$VM_CONF")"
 printf 'VM_NAME=%s\nBOAT_ID=%s\n' "$NAME" "${BOAT_ID:-}" >"$VM_CONF"
 
@@ -329,8 +354,10 @@ T=$(cat "$HOME/.config/executor-v2/mac.token")
 exec "$(command -v node || echo /usr/local/bin/node)" "$HOME/.local/lib/node_modules/mcp-remote/dist/proxy.js" http://127.0.0.1:4312/mcp --transport http-only --allow-http --header "Authorization: Bearer $T"
 W
     chmod 755 "$HOME/.local/bin/executor-v2-mcp" "$HOME/.local/bin/executor-v2-mac-mcp"
-    claude mcp get executor_v2 >/dev/null 2>&1 || claude mcp add --scope user executor_v2 "$HOME/.local/bin/executor-v2-mcp" >/dev/null
-    claude mcp get executor_v2_local >/dev/null 2>&1 || claude mcp add --scope user executor_v2_local "$HOME/.local/bin/executor-v2-mac-mcp" >/dev/null
+    claude mcp get executor_v2 >/dev/null 2>&1 || claude mcp add --scope user executor_v2 "$HOME/.local/bin/executor-v2-mcp" >/dev/null 2>&1 ||
+      todo "Executor: claude mcp add executor_v2 failed (is Claude installed?); run vm-setup $P agents again"
+    claude mcp get executor_v2_local >/dev/null 2>&1 || claude mcp add --scope user executor_v2_local "$HOME/.local/bin/executor-v2-mac-mcp" >/dev/null 2>&1 ||
+      todo "Executor: claude mcp add executor_v2_local failed; run vm-setup $P agents again"
     grep -q 'mcp_servers.executor_v2' "$HOME/.codex/config.toml" 2>/dev/null ||
       codex mcp add executor_v2 --url 'https://executor-v2.julds.com/mcp?elicitation_mode=browser' >/dev/null 2>&1 || true
   else
@@ -368,7 +395,11 @@ stage_heal() {
   say "vm-heal (puts the VM back together after a boat resume)"
   [ -n "$BOAT_ID" ] || { warn "vm-heal: no sandbox id (pass BOAT_ID=bx_...)"; return 0; }
   cmp -s "$BOAT_DIR/vm-heal" "$HOME/.local/bin/vm-heal" || install -m 755 "$BOAT_DIR/vm-heal" "$HOME/.local/bin/vm-heal"
-  [ -f "$HOME/.local/share/vm-heal/conf" ] || "$HOME/.local/bin/vm-heal" --setup "$P" "$BOAT_ID" | tail -2
+  # vm-heal's "project" is the machine name: it names the hostname and keepalive units after it.
+  local hc=$HOME/.local/share/vm-heal/conf
+  if ! { grep -qx "P=$NAME" "$hc" && grep -qx "BOAT_ID=$BOAT_ID" "$hc"; } 2>/dev/null; then
+    "$HOME/.local/bin/vm-heal" --setup "$NAME" "$BOAT_ID" | tail -2
+  fi
 }
 
 stage_idle() {
@@ -380,6 +411,9 @@ stage_idle() {
   if [ ! -f /etc/boat-idle.env ]; then
     printf 'BOAT_ID=%s\nIDLE_MIN=45\nCPU_MAX=40\nENABLED=1\nDRY_RUN=0\n' "$BOAT_ID" | sudo tee /etc/boat-idle.env >/dev/null
     date +%s | sudo tee /var/lib/boat-idle/last-active /var/lib/boat-idle/last-check >/dev/null
+  elif ! grep -qx "BOAT_ID=$BOAT_ID" /etc/boat-idle.env; then
+    # Never leave another sandbox's id here: idle stop would stop that sandbox.
+    sudo sed -i "s/^BOAT_ID=.*/BOAT_ID=$BOAT_ID/" /etc/boat-idle.env
   fi
   local changed=0
   put /etc/systemd/system/boat-idle-stop.service sudo <<U && changed=1
@@ -420,7 +454,7 @@ stage_timer() {
 
 stage_status() {
   local ok=() bad=()
-  chk() { if eval "$2" >/dev/null 2>&1; then ok+=("$1"); else bad+=("$1"); fi; }
+  chk() { if (eval "$2") >/dev/null 2>&1; then ok+=("$1"); else bad+=("$1"); fi; }
   chk "hostname $NAME" '[ "$(hostname)" = "$NAME" ]'
   chk "login shell zsh" '[ "$(getent passwd "$USER" | cut -d: -f7)" = "$(command -v zsh)" ]'
   chk "zsh config linked" '[ "$(readlink "$HOME/.zshrc")" = "$D/shell/.zshrc.cloud" ]'
