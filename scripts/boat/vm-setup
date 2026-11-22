@@ -50,33 +50,45 @@ NAME=${VM_NAME:-$NAME}
 
 # A VM made from a snapshot of another VM (vm-new --from) carries that VM's saved identity: vm-heal's
 # copies (system files, SSH host keys, Tailscale node key) and conf, the idle-stop sandbox id, and the
-# old name's hostname and keepalive units, which rename the copy back every minute. Clear them first;
-# the stages below then set this VM up as itself (PR 19 review, 22 Nov 2026).
+# old name's hostname and keepalive units, which rename the copy back every minute.
+# Only a different sandbox id means "copy": then all of that is cleared. The same sandbox under a new
+# name (a replica first set up with the project name) only moves the units and vm-heal to the new name.
+# Either way the cleared parts are set up again right away, whatever the mode, so the hourly sync
+# never leaves a VM without vm-heal or idle stop (PR 19 and 20 reviews, 22 Nov 2026).
+IDENTITY_FIXED=0
 forget_copied_identity() {
   [ -n "${BOAT_ID:-}" ] || return 0
-  local hc=$HOME/.local/share/vm-heal/conf old_p="" old_id="" idle_id=""
+  local hc=$HOME/.local/share/vm-heal/conf old_p="" old_id="" idle_id="" copy=0 renamed=0
   if [ -f "$hc" ]; then old_p=$(sed -n 's/^P=//p' "$hc"); old_id=$(sed -n 's/^BOAT_ID=//p' "$hc"); fi
   idle_id=$(sed -n 's/^BOAT_ID=//p' /etc/boat-idle.env 2>/dev/null || true)
-  if { [ -n "$old_id" ] && [ "$old_id" != "$BOAT_ID" ]; } || { [ -n "$old_p" ] && [ "$old_p" != "$NAME" ]; } ||
-     { [ -n "$idle_id" ] && [ "$idle_id" != "$BOAT_ID" ]; }; then
+  { [ -n "$old_id" ] && [ "$old_id" != "$BOAT_ID" ]; } || { [ -n "$idle_id" ] && [ "$idle_id" != "$BOAT_ID" ]; } && copy=1
+  [ -n "$old_p" ] && [ "$old_p" != "$NAME" ] && renamed=1
+  [ $copy = 1 ] || [ $renamed = 1 ] || return 0
+  if [ $copy = 1 ]; then
     say "this VM is a copy of ${old_p:-another VM} (${old_id:-$idle_id}): clearing its saved identity"
     sudo rm -f /etc/cron.d/vm-heal; rm -f "$HOME/.config/autostart/vm-heal.desktop"
     sudo rm -rf /var/lib/vm-heal-mirror; rm -rf "$HOME/.local/share/vm-heal"
     sudo systemctl disable --now -q boat-idle-stop.timer 2>/dev/null || true
     sudo rm -f /etc/boat-idle.env
-    if [ -n "$old_p" ] && [ "$old_p" != "$NAME" ]; then
-      sudo systemctl disable --now -q "$old_p-keepalive.timer" "$old_p-hostname.service" 2>/dev/null || true
-      sudo rm -f "/etc/systemd/system/$old_p-keepalive."{service,timer} "/etc/systemd/system/$old_p-hostname.service" "/usr/local/sbin/$old_p-keepalive"
-      sudo systemctl daemon-reload
-    fi
+  else
+    say "vm-heal knows this VM as $old_p: moving it to the name $NAME"
+    # Its saved system files hold the old unit names; let it save new ones.
+    rm -f "$HOME/.local/share/vm-heal/system.tgz"; sudo rm -f /var/lib/vm-heal-mirror/system.tgz
   fi
+  if [ $renamed = 1 ]; then
+    sudo systemctl disable --now -q "$old_p-keepalive.timer" "$old_p-hostname.service" 2>/dev/null || true
+    sudo rm -f "/etc/systemd/system/$old_p-keepalive."{service,timer} "/etc/systemd/system/$old_p-hostname.service" "/usr/local/sbin/$old_p-keepalive"
+    sudo systemctl daemon-reload
+  fi
+  IDENTITY_FIXED=1
 }
 forget_copied_identity
 mkdir -p "$(dirname "$VM_CONF")"
 printf 'VM_NAME=%s\nBOAT_ID=%s\n' "$NAME" "${BOAT_ID:-}" >"$VM_CONF"
 
 # GitHub always ends this test with exit 1, so only its greeting counts.
-github_ok() { (timeout 15 ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -T git@github.com 2>&1 || true) | grep -q 'successfully authenticated'; }
+# Always with this VM's own key: a copy's ~/.ssh/config can still name the original VM's key.
+github_ok() { (timeout 15 ssh -i "$HOME/.ssh/id_ed25519_$NAME" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -T git@github.com 2>&1 || true) | grep -q 'successfully authenticated'; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
 # Write a file only when its content changes. Returns 0 when it changed.
@@ -99,7 +111,7 @@ lnk() {
 APT_PACKAGES=(zsh:zsh unzip:unzip jq:jq ripgrep:rg bat:batcat direnv:direnv fd-find:fdfind fzf:fzf
   git-delta:delta git-lfs:git-lfs tree:tree eza:eza)
 
-stage_base() {
+ensure_hostname() {
   say "hostname $NAME (boat does not keep /etc/hostname)"
   if put /etc/systemd/system/$NAME-hostname.service sudo <<U
 [Unit]
@@ -114,6 +126,10 @@ WantedBy=multi-user.target
 U
   then sudo systemctl daemon-reload; fi
   sudo systemctl enable --now -q $NAME-hostname.service
+}
+
+stage_base() {
+  ensure_hostname
   say "base tools"
   local missing=() lost=() p
   for p in "${APT_PACKAGES[@]}"; do
@@ -276,8 +292,23 @@ stage_git() {
   git config --global tag.gpgSign true
   git config --global core.sshCommand "ssh -i $key -o IdentitiesOnly=yes"
   grep -q '^github.com ssh-ed25519' "$HOME/.ssh/known_hosts" 2>/dev/null || ssh-keyscan -t ed25519 github.com 2>/dev/null >>"$HOME/.ssh/known_hosts"
-  grep -q '^Host github.com' "$HOME/.ssh/config" 2>/dev/null ||
+  if ! grep -q '^Host github.com' "$HOME/.ssh/config" 2>/dev/null; then
     printf 'Host github.com\n  User git\n  IdentityFile %s\n  IdentitiesOnly yes\n' "$key" >>"$HOME/.ssh/config"
+  else
+    # A copy keeps the original VM's block: point its IdentityFile at this VM's key.
+    python3 - "$HOME/.ssh/config" "$key" <<'PY'
+import re, sys
+p, key = sys.argv[1], sys.argv[2]
+s = open(p).read()
+def fix(m):
+    b = m.group(0)
+    if re.search(r"(?m)^\s*IdentityFile\s", b):
+        return re.sub(r"(?m)^(\s*IdentityFile\s+).*$", lambda x: x.group(1) + key, b)
+    return b.rstrip("\n") + "\n  IdentityFile " + key + "\n"
+n = re.sub(r"(?ms)^Host github\.com\b.*?(?=^Host |\Z)", fix, s, count=1)
+if n != s: open(p, "w").write(n)
+PY
+  fi
   chmod 600 "$HOME/.ssh/config"
   github_ok || todo "GitHub key: add $key.pub as an authentication and a signing key (vm-new does this through julds gh)"
 }
@@ -478,6 +509,11 @@ run() {
   local s
   for s in "$@"; do "stage_$s"; done
 }
+
+if [ $IDENTITY_FIXED = 1 ]; then
+  say "setting this VM up as $NAME ($BOAT_ID)"
+  ensure_hostname; stage_keepalive; stage_heal; stage_idle
+fi
 
 case "${1:-all}" in
   all) run base tailscale t3 keepalive git dotfiles shell agents project check heal idle timer status ;;
