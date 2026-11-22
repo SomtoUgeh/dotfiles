@@ -85,8 +85,16 @@ vm "$RUN base tailscale t3 keepalive git"
 
 say "GitHub: add the VM's key (authentication and signing) through julds gh"
 vm "cat ~/.ssh/id_ed25519_$NAME.pub" | ssh julds "f=\$(mktemp); cat > \$f
-gh ssh-key add \$f --title 'boat $NAME-dev ($ID)' --type authentication
-gh ssh-key add \$f --title 'boat $NAME-dev ($ID)' --type signing; rm -f \$f"
+add() { out=\$(gh ssh-key add \$f --title 'boat $NAME-dev ($ID)' --type \$1 2>&1) && return 0
+  case \$out in *already*) echo \"\$1 key already on GitHub\"; return 0 ;; esac
+  echo \"gh ssh-key add --type \$1: \$out\" >&2; return 1; }
+add authentication && add signing; rc=\$?; rm -f \$f; exit \$rc" ||
+  { echo "vm-new: could not add the VM's key to GitHub (see above). Fix it, then: vm-new $P${NAME_ARG:+ --name $NAME} --resume $ID" >&2; exit 1; }
+for _ in $(seq 1 12); do
+  vm "(ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -T git@github.com 2>&1 || true) | grep -q 'successfully authenticated'" && break; sleep 5
+done || true
+vm "(ssh -o BatchMode=yes -T git@github.com 2>&1 || true) | grep -q 'successfully authenticated'" ||
+  { echo "vm-new: GitHub does not accept the VM's key yet. Carry on later with: vm-new $P${NAME_ARG:+ --name $NAME} --resume $ID" >&2; exit 1; }
 
 say "Tailscale sign-in as $NAME"
 if [ -n "${TS_AUTHKEY:-}" ]; then
