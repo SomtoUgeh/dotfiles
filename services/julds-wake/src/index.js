@@ -1,4 +1,5 @@
-// julds-wake: one-tap resume for the julds boat VM, gated by Cloudflare Access.
+// julds-wake: one-tap resume for the boat VMs (julds and the project VMs), gated by Cloudflare Access.
+// Opening the page wakes julds (or ?vm=<name>); ?peek only shows state. Each VM has its own Wake button.
 // The Worker re-verifies the Access JWT itself and fails closed if ACCESS_AUD is unset.
 const BOAT = "https://boat.dev/api/v1/sandboxes";
 // boat's API reports a stopped VM as "archived" (the CLI shows "stopped"); treat all of these as wakeable.
@@ -44,62 +45,85 @@ async function verifyAccess(req, env) {
   return { ok: true, email: payload.email };
 }
 
-async function boat(env, path = "", init = {}) {
-  const r = await fetch(`${BOAT}/${env.SANDBOX_ID}${path}`, {
+// VMS: "name:sandbox id" pairs. julds uses BOAT_KEY (julds only); the project VMs use BOAT_KEY_VMS
+// (resume + read on those five sandboxes only, key "julds-wake-page-vms").
+const vmList = (env) => (env.VMS || `julds:${env.SANDBOX_ID}`).split(",").map((x) => { const [name, id] = x.trim().split(":"); return { name, id }; });
+const keyFor = (env, id) => (id === env.SANDBOX_ID ? env.BOAT_KEY : env.BOAT_KEY_VMS);
+
+async function boat(env, id, path = "", init = {}) {
+  const r = await fetch(`${BOAT}/${id}${path}`, {
     ...init,
-    headers: { authorization: `Bearer ${env.BOAT_KEY}`, "content-type": "application/json", "user-agent": "julds-wake/1" },
+    headers: { authorization: `Bearer ${keyFor(env, id)}`, "content-type": "application/json", "user-agent": "julds-wake/2" },
   });
   const body = await r.json().catch(() => ({}));
   return { status: r.status, body };
 }
 
-async function status(env) {
-  const { status: code, body } = await boat(env);
+async function status(env, vm) {
+  const { status: code, body } = await boat(env, vm.id);
   const sb = body.sandbox || {};
   let t3 = null;
-  if (sb.state === "idle" || sb.state === "running") {
+  // Only julds is reachable from here (T3 Connect); project VMs are on the tailnet only.
+  if (vm.id === env.SANDBOX_ID && (sb.state === "idle" || sb.state === "running")) {
     try {
-      const r = await fetch(env.T3_RELAY_URL, { headers: { "user-agent": "julds-wake/1" }, signal: AbortSignal.timeout(4000) });
+      const r = await fetch(env.T3_RELAY_URL, { headers: { "user-agent": "julds-wake/2" }, signal: AbortSignal.timeout(4000) });
       t3 = r.ok;
     } catch { t3 = false; }
   }
-  return { ok: code === 200, state: sb.state || "unknown", health: sb.health || null, t3, error: code === 200 ? null : body.message || `boat ${code}` };
+  return { name: vm.name, id: vm.id, ok: code === 200, state: sb.state || "unknown", health: sb.health || null, t3, error: code === 200 ? null : body.message || `boat ${code}` };
+}
+const allStatus = (env) => Promise.all(vmList(env).map((vm) => status(env, vm)));
+
+async function wakeOne(env, vm, email) {
+  const before = await status(env, vm);
+  if (!WAKEABLE.includes(before.state)) return before;
+  const r = await boat(env, vm.id, "/resume", { method: "POST", body: "{}" });
+  console.log(JSON.stringify({ wake: vm.name, by: email, boatStatus: r.status }));
+  if (r.status >= 300) {
+    await sendAlert(env, `wake failed: ${vm.name}`, `Resume of ${vm.name} (${vm.id}) returned ${r.status}: ${r.body.message || ""}`);
+    return { ...before, error: r.body.message || `resume failed (${r.status})` };
+  }
+  return { ...before, state: "starting" };
 }
 
 const PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Wake julds">
-<meta name="theme-color" content="#0b0b0c"><title>Wake julds</title>
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Wake VMs">
+<meta name="theme-color" content="#0b0b0c"><title>Wake VMs</title>
 <style>
 :root{color-scheme:dark}body{margin:0;min-height:100dvh;display:grid;place-items:center;background:#0b0b0c;color:#eee;font:16px/1.4 -apple-system,system-ui,sans-serif}
-main{width:min(360px,88vw);text-align:center}h1{font-size:22px;margin:0 0 4px}p{margin:6px 0;color:#aaa}
-.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;background:#666;vertical-align:middle}
+main{width:min(380px,90vw)}h1{font-size:22px;margin:0 0 14px;text-align:center}
+.row{display:flex;align-items:center;gap:10px;padding:12px 4px;border-bottom:1px solid #222}
+.name{font-weight:600;min-width:92px}.label{flex:1;color:#aaa;font-size:14px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#666;flex:none}
 .on{background:#3ecf6e}.mid{background:#e8b339}.off{background:#e5534b}
-#state{font-size:20px;color:#eee;margin:22px 0 6px}
-button{margin-top:22px;width:100%;padding:16px;border:0;border-radius:14px;font-size:18px;font-weight:600;background:#3b6cf6;color:#fff}
-button:disabled{opacity:.45}small{display:block;margin-top:18px;color:#666}
+button{border:0;border-radius:10px;font-size:15px;font-weight:600;background:#3b6cf6;color:#fff;padding:9px 14px}
+button:disabled{opacity:.35}#all{width:100%;margin-top:18px;padding:15px;font-size:17px;border-radius:14px}
+small{display:block;margin-top:16px;color:#666;text-align:center}
 </style></head><body><main>
-<h1>julds VM</h1><p>boat sandbox bx_2jd5dd8b</p>
-<div id="state"><span class="dot" id="dot"></span><span id="label">Checking…</span></div>
-<p id="detail"></p>
-<button id="wake" disabled>Wake julds</button>
-<small id="who"></small>
+<h1>Boat VMs</h1><div id="list"></div>
+<button id="all" disabled>Wake all</button>
+<small>Project VMs sleep after 45 quiet minutes. T3 on your phone needs Tailscale on.</small>
 </main><script>
-const $=id=>document.getElementById(id);let woke=false;const WAKEABLE=${JSON.stringify(WAKEABLE)};
-const peek=new URLSearchParams(location.search).has("peek");
-function show(s){const st=s.state;let cls="mid",label=st,detail="";
- if(WAKEABLE.includes(st)){cls="off";label="Stopped";detail="Tap Wake to start it."}
- else if(["idle","running","ready"].includes(st)){cls=s.t3?"on":"mid";label=s.t3?"Running · T3 ready":"Running · T3 starting";detail=s.t3?"Open T3 Code.":"Give T3 about a minute."}
- else if(["starting","resuming","provisioned","cloning"].includes(st)){label="Starting…";detail="Usually under 2 minutes."}
- else if(st==="stopping"){label="Stopping…";detail="Wait, then wake it again."}
- if(s.error)detail=s.error;
- $("dot").className="dot "+cls;$("label").textContent=label;$("detail").textContent=detail;
- $("wake").disabled=!WAKEABLE.includes(st);return st}
-async function poll(){try{const r=await fetch("status",{cache:"no-store"});const s=await r.json();const st=show(s);
- if(WAKEABLE.includes(st)&&!woke&&!peek){wake()}}catch(e){$("detail").textContent="Could not reach status"}}
-async function wake(){woke=true;$("wake").disabled=true;$("label").textContent="Waking…";
- const r=await fetch("wake",{method:"POST"});const s=await r.json();show(s)}
-$("wake").onclick=wake;poll();setInterval(poll,4000);
+const WAKEABLE=${JSON.stringify(WAKEABLE)};const peek=new URLSearchParams(location.search).has("peek");
+const want=new URLSearchParams(location.search).get("vm");let autoDone=false;
+function view(s){let cls="mid",label=s.state;
+ if(WAKEABLE.includes(s.state)){cls="off";label="Asleep"}
+ else if(["idle","running","ready"].includes(s.state)){cls=s.t3===false?"mid":"on";label=s.t3===null?"Running":(s.t3?"Running · T3 ready":"Running · T3 starting")}
+ else if(["starting","resuming","provisioned","cloning"].includes(s.state)){label="Waking…"}
+ else if(s.state==="stopping"){label="Going to sleep…"}
+ if(s.error)label=s.error;return{cls,label}}
+function render(list){const el=document.getElementById("list");el.innerHTML="";let any=false;
+ for(const s of list){const v=view(s);const can=WAKEABLE.includes(s.state);any=any||can;
+  const row=document.createElement("div");row.className="row";
+  row.innerHTML='<span class="dot '+v.cls+'"></span><span class="name"></span><span class="label"></span><button>Wake</button>';
+  row.querySelector(".name").textContent=s.name;row.querySelector(".label").textContent=v.label;
+  const b=row.querySelector("button");b.disabled=!can;b.onclick=()=>wake(s.name);el.appendChild(row)}
+ document.getElementById("all").disabled=!any;return list}
+async function poll(){try{const list=render(await (await fetch("status",{cache:"no-store"})).json());
+ if(!autoDone&&!peek){autoDone=true;const t=list.find(s=>s.name===(want||"julds"));if(t&&WAKEABLE.includes(t.state))wake(t.name)}}catch(e){}}
+async function wake(name){await fetch("wake"+(name?"?vm="+encodeURIComponent(name):""),{method:"POST"});poll()}
+document.getElementById("all").onclick=()=>wake("");poll();setInterval(poll,4000);
 </script></body></html>`;
 
 
@@ -167,16 +191,20 @@ export default {
     if (!auth.ok) return new Response(`Forbidden: ${auth.why}`, { status: 403 });
     const url = new URL(req.url);
     if (req.method === "GET" && url.pathname === "/") return new Response(PAGE, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
-    if (req.method === "GET" && url.pathname === "/status") return json(await status(env));
+    if (req.method === "GET" && url.pathname === "/status") return json(await allStatus(env));
     if (req.method === "POST" && url.pathname === "/wake") {
       const origin = req.headers.get("origin");
       if (origin && origin !== url.origin) return json({ error: "bad origin" }, 403);
-      const before = await status(env);
-      if (!WAKEABLE.includes(before.state)) return json(before);
-      const r = await boat(env, "/resume", { method: "POST", body: "{}" });
-      console.log(JSON.stringify({ wake: true, by: auth.email, boatStatus: r.status }));
-      if (r.status >= 300) { await sendAlert(env, "wake failed", `Resume returned ${r.status}: ${r.body.message || ""}`); return json({ ...before, error: r.body.message || `resume failed (${r.status})` }, 502); }
-      return json({ ...(await status(env)), state: "starting" });
+      // ?vm=<name> wakes one VM; no name wakes every VM that is asleep (spaced out: boat throttles restores).
+      const name = url.searchParams.get("vm");
+      const targets = vmList(env).filter((vm) => !name || vm.name === name);
+      if (!targets.length) return json({ error: "unknown VM" }, 404);
+      const out = [];
+      for (const vm of targets) {
+        out.push(await wakeOne(env, vm, auth.email));
+        if (targets.length > 1) await new Promise((r) => setTimeout(r, 1500));
+      }
+      return json(out, out.some((x) => x.error) ? 502 : 200);
     }
     return new Response("Not found", { status: 404 });
   },

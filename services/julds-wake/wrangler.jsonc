@@ -1,7 +1,8 @@
 {
   // Phone wake button for the julds boat VM. Deploy from the julds VM:
   //   set -a; . ~/.config/executor-v2-julds/env; set +a; npx wrangler@4 deploy
-  // Secret: BOAT_KEY (1Password "boat julds wake key", vault "Julds VM"; resume + read on bx_2jd5dd8b only).
+  // Secrets: BOAT_KEY (1Password "boat julds wake key", vault "Julds VM"; resume + read on bx_2jd5dd8b only)
+  // and BOAT_KEY_VMS (boat key "julds-wake-page-vms"; resume + read on the five project VMs only).
   "name": "julds-wake",
   "main": "src/index.js",
   "compatibility_date": "2026-10-01",
@@ -13,6 +14,7 @@
     "ALERT_TO": "smugeh@gmail.com",
     "ALERT_FROM": "julds@alerts.julds.com",
     "SANDBOX_ID": "bx_2jd5dd8b",
+    "VMS": "julds:bx_2jd5dd8b,icb:bx_f6weypz2,investor-os:bx_v995m7qg,coworkers:bx_9kqsfscv,erivault:bx_4yh2ns5a,altschool:bx_daewc545",
     "KEEP_WEEKLY": "4",
     "ACCESS_TEAM": "julds",
     "ACCESS_AUD": "a58dcb77b7b1abccaa4abcb095aaa29c1b2d651e87a385fd27dc1bd0490d6e99",
