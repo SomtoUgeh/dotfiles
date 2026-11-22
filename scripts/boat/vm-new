@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+# vm-new: make a boat project VM, or a replica of one, from the Mac in one go.
+#
+#   vm-new <project>                    a new VM named after the project (projects/<project>.env)
+#   vm-new <project> --name icb2        a replica with its own name (hostname, Tailscale, T3)
+#   vm-new <project> --from <snapshot>  start from a saved snapshot, e.g. <project>-base (clean-base.sh)
+#   vm-new <project> --type xlarge      another machine size
+#   vm-new <project> --dry-run          print the plan and stop
+#   vm-new <project> --resume <id>      carry on with a sandbox an earlier run created (every step is safe to repeat)
+#
+# It creates the sandbox in the project's boat environment (which holds the project's secret
+# files), runs vm-setup on it, puts the VM's key on GitHub through julds, signs Tailscale in
+# (you open one link, or set TS_AUTHKEY), links T3 from the Mac and julds, adds the VM to the
+# Mac's ssh config, VM list and Executor bridge, and ends with the few steps only you can do.
+set -euo pipefail
+
+BOAT_DIR=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)
+DOTFILES=$(cd "$BOAT_DIR/../.." && pwd)
+BOAT=${BOAT:-$HOME/.ascii/bin/boat}
+TAILNET=taildbdfb2.ts.net
+MAC_KEY=$HOME/.ssh/somto_auth_ed25519.pub
+export BOAT_NO_UPDATE=1
+
+P=${1:?usage: vm-new <project> [--name NAME] [--from SNAPSHOT] [--type TYPE] [--dry-run]}; shift
+NAME_ARG="" FROM="" TYPE_ARG="" DRY=0 ID=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --name) NAME_ARG=$2; shift 2 ;;
+    --from) FROM=$2; shift 2 ;;
+    --type) TYPE_ARG=$2; shift 2 ;;
+    --dry-run) DRY=1; shift ;;
+    --resume) ID=$2; shift 2 ;;
+    *) echo "vm-new: unknown option $1" >&2; exit 2 ;;
+  esac
+done
+
+ENV_FILE=$BOAT_DIR/projects/$P.env
+[ -f "$ENV_FILE" ] || { echo "vm-new: no $ENV_FILE. Add the project first (copy another projects/*.env)." >&2; exit 1; }
+NAME=$P BOAT_ENV=$P TYPE=large
+# shellcheck disable=SC1090
+. "$ENV_FILE"
+NAME=${NAME_ARG:-$NAME} TYPE=${TYPE_ARG:-$TYPE}
+T3=$(command -v t3 || echo "$HOME/.t3/bin/t3")
+T3V=$("$T3" --version 2>/dev/null | grep -o '[0-9][0-9.]*-nightly[.0-9]*\|[0-9][0-9.]*$' | head -1 || true)
+
+say() { printf '\n== %s\n' "$*"; }
+LATER=()
+later() { LATER+=("$*"); }
+
+cat <<PLAN
+vm-new: project $P, VM name $NAME, machine $TYPE, boat environment $BOAT_ENV${FROM:+, from snapshot $FROM}
+  T3 pinned to the Mac's version: ${T3V:-unknown (nightly)}
+  Steps: create sandbox, copy dotfiles, vm-setup (base, T3, git key), GitHub key through julds,
+  Tailscale sign-in, vm-setup (everything else), Mac ssh/VM list/Executor bridge, T3 links (Mac and julds).
+PLAN
+if [ -z "$ID" ] && grep -q "^${NAME}[[:space:]]" "$HOME/.config/boat-vms" 2>/dev/null; then
+  echo "!! $NAME is already in ~/.config/boat-vms. For a second copy use --name (for example --name ${NAME}2)." >&2
+  [ $DRY = 1 ] || exit 1
+fi
+[ $DRY = 1 ] && exit 0
+
+"$BOAT" env info "$BOAT_ENV" --json >/dev/null 2>&1 ||
+  { echo "vm-new: boat environment $BOAT_ENV does not exist. See README (New project) to create it." >&2; exit 1; }
+
+if [ -z "$ID" ]; then
+say "create the sandbox"
+ID=$("$BOAT" new --environment "$BOAT_ENV" --type "$TYPE" --name "$NAME-dev" --no-auto-stop ${FROM:+--from "$FROM"} --json |
+  python3 -c 'import json,sys
+t=sys.stdin.read(); i=t.find("{"); d=json.loads(t[i:])
+print(d.get("id") or d.get("sandbox",{}).get("id"))')
+fi
+echo "sandbox $ID (if this run stops, carry on with: vm-new $P${NAME_ARG:+ --name $NAME} --resume $ID)"
+
+vm() { "$BOAT" ssh "$ID" -- "$@"; }
+for _ in $(seq 1 60); do "$BOAT" exec "$ID" -- true >/dev/null 2>&1 && break; sleep 5; done
+# Right after a start, boat ssh/scp/push can refuse the key for a few minutes while exec works (21 Nov 2026).
+for _ in $(seq 1 36); do vm true >/dev/null 2>&1 && break; sleep 10; done
+
+say "copy dotfiles (vm-setup turns it into a git clone once GitHub knows the VM's key)"
+"$BOAT" push "$ID" "$DOTFILES" --to /home/user/code/personal/dotfiles >/dev/null
+
+RUN="BOAT_ID=$ID VM_NAME=$NAME T3CODE_VERSION=$T3V bash ~/code/personal/dotfiles/scripts/boat/vm-setup $P"
+say "vm-setup: base, Tailscale install, T3, keepalive, git key"
+vm "$RUN base tailscale t3 keepalive git"
+
+say "GitHub: add the VM's key (authentication and signing) through julds gh"
+vm "cat ~/.ssh/id_ed25519_$NAME.pub" | ssh julds "f=\$(mktemp); cat > \$f
+gh ssh-key add \$f --title 'boat $NAME-dev ($ID)' --type authentication
+gh ssh-key add \$f --title 'boat $NAME-dev ($ID)' --type signing; rm -f \$f"
+
+say "Tailscale sign-in as $NAME"
+if [ -n "${TS_AUTHKEY:-}" ]; then
+  vm "sudo tailscale up --hostname=$NAME --accept-dns=true --operator=user --auth-key=$TS_AUTHKEY"
+else
+  vm "sudo nohup tailscale up --hostname=$NAME --accept-dns=true --operator=user >/tmp/ts-up.log 2>&1 &"
+  url=""
+  for _ in $(seq 1 30); do url=$(vm "grep -o 'https://login.tailscale.com/[^ ]*' /tmp/ts-up.log" 2>/dev/null | head -1 || true); [ -n "$url" ] && break; sleep 2; done
+  echo "Open this link and sign in as smugeh@gmail.com: ${url:-see /tmp/ts-up.log on the VM}"
+  command -v open >/dev/null && [ -n "$url" ] && open "$url" || true
+  for _ in $(seq 1 120); do vm "tailscale status >/dev/null 2>&1" && break; sleep 5; done
+fi
+vm "tailscale status >/dev/null" || { echo "vm-new: Tailscale is not signed in yet. Carry on with: vm-new $P${NAME_ARG:+ --name $NAME} --resume $ID" >&2; exit 1; }
+
+say "vm-setup: dotfiles, shell, agents, Executor, repos, project extras, boat-check, vm-heal, idle stop, timer"
+vm "$RUN all"
+
+say "Mac: ssh access, VM list, Executor bridge"
+[ -f "$MAC_KEY" ] && vm "grep -qF '$(cut -d' ' -f2 "$MAC_KEY")' ~/.ssh/authorized_keys 2>/dev/null || echo '$(cat "$MAC_KEY")' >> ~/.ssh/authorized_keys"
+if ! grep -q "^Host $NAME\$" "$HOME/.ssh/config"; then
+  printf '\nHost %s\n    HostName %s.%s\n    User user\n    IdentityFile %s\n    IdentitiesOnly yes\n    ServerAliveInterval 30\n' \
+    "$NAME" "$NAME" "$TAILNET" "${MAC_KEY/#$HOME/~}" >>"$HOME/.ssh/config"
+fi
+ssh-keygen -R "$NAME.$TAILNET" >/dev/null 2>&1 || true
+ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes "$NAME" true || later "ssh $NAME does not work yet: check Tailscale on the Mac"
+grep -q "^${NAME}[[:space:]]" "$HOME/.config/boat-vms" || printf '%-12s %-12s %-36s yes\n' "$NAME" "$ID" "$NAME.$TAILNET" >>"$HOME/.config/boat-vms"
+PL=$HOME/Library/LaunchAgents/com.julds.boat-executor-bridge.$NAME.plist
+if [ ! -f "$PL" ]; then
+  cat >"$PL" <<X
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.julds.boat-executor-bridge.$NAME</string>
+  <key>ProgramArguments</key>
+  <array><string>$HOME/.local/bin/julds-executor-bridge</string><string>$ID</string><string>no</string></array>
+  <key>EnvironmentVariables</key><dict><key>BOAT_NO_UPDATE</key><string>1</string></dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>15</integer>
+  <key>StandardOutPath</key><string>$HOME/Library/Logs/boat-executor-bridge-$NAME.log</string>
+  <key>StandardErrorPath</key><string>$HOME/Library/Logs/boat-executor-bridge-$NAME.log</string>
+</dict>
+</plist>
+X
+fi
+launchctl bootstrap "gui/$(id -u)" "$PL" 2>/dev/null || later "Start the Mac Executor bridge: launchctl bootstrap gui/\$(id -u) $PL"
+
+say "T3: link the VM from the Mac and from julds (full access, 30 days)"
+code() { vm "t3 pair --tailscale --ttl 1h 2>/dev/null" | sed -n 's/^Token: *//p' | head -1; }
+c=$(code); "$T3" environment link "https://$NAME.$TAILNET" --pairing-code "$c" --access full-access >/dev/null 2>&1 || later "Link T3 from the Mac: t3 environment link https://$NAME.$TAILNET (new code: ssh $NAME t3 pair --tailscale)"
+c=$(code); ssh julds "t3 environment link https://$NAME.$TAILNET --pairing-code $c --access full-access" >/dev/null 2>&1 || later "Link T3 from julds (Executor and Dev's T3 watch reach the VM through it)"
+
+later "T3 desktop app: Settings > Environments, select $NAME on the map, Add"
+vm "test -s ~/.claude/.credentials.json" || later "Claude sign-in: ssh $NAME, then claude auth login --claudeai"
+later "Wake list on julds: add [$NAME]=$ID to ~/.local/bin/vm-wake and make a new wake key that covers it (README: Sleep when idle)"
+later "Executor 'Boat VMs' app: add $NAME ($ID), then tell Dev in Coworkers about the VM"
+
+say "done: $NAME ($ID)"
+vm "bash ~/code/personal/dotfiles/scripts/boat/vm-setup $P status" || true
+echo; echo "Only you can do these:"; printf '  - %s\n' "${LATER[@]}"

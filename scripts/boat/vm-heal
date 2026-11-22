@@ -4,7 +4,7 @@
 # Why (18 Nov 2026): on resume boat boots the machine from its base image, then restores the
 # saved disk lazily (ascii-agents-server "[restore] ... lazyfs staging"). systemd has already
 # read its units by then, so our enabled units (tailscaled, <p>-keepalive.timer,
-# boat-idle-stop.timer, agent-config-sync.timer) never start. On erivault the restore even came
+# boat-idle-stop.timer, vm-setup-sync.timer) never start. On erivault the restore even came
 # back with the base image's /etc, /usr and /var (Tailscale uninstalled, its node key gone,
 # our timers gone) while /home/user was intact. This script lives in /home, which always
 # survives, keeps a copy of our system files there, and puts back whatever is missing.
@@ -214,8 +214,8 @@ fi
 
 # 4. User services: T3 and the hourly agent-config sync.
 systemctl --user is-active --quiet t3code.service || { systemctl --user daemon-reload; systemctl --user start t3code.service && say "started t3code"; }
-if [ -e "$HOME/.config/systemd/user/agent-config-sync.timer" ] && ! systemctl --user is-active --quiet agent-config-sync.timer; then
-  systemctl --user daemon-reload; systemctl --user start agent-config-sync.timer && say "started agent-config-sync.timer"
+if [ -e "$HOME/.config/systemd/user/vm-setup-sync.timer" ] && ! systemctl --user is-active --quiet vm-setup-sync.timer; then
+  systemctl --user daemon-reload; systemctl --user start vm-setup-sync.timer && say "started vm-setup-sync.timer"
 fi
 
 # 5. Tailscale serve for T3 (lives in the node state; only needed if the state was new).

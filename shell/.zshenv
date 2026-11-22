@@ -61,3 +61,6 @@ case ":$PATH:" in
 esac
 export PATH
 # ASCII BOAT SHELL INTEGRATION END boat
+
+# Machine-only lines (a boat VM's project tools, written by vm-setup from projects/<p>.env).
+[ -r "$HOME/.zshenv.local" ] && . "$HOME/.zshenv.local"

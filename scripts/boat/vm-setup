@@ -1,0 +1,457 @@
+#!/usr/bin/env bash
+# vm-setup: the one setup for a boat project VM. Runs on the VM as `user`. Safe to re-run.
+#
+#   vm-setup <project>              everything (same as `all`)
+#   vm-setup <project> <stage>...   only these stages, in the order given
+#   vm-setup <project> sync         quick refresh the hourly timer runs: dotfiles, shell, agents, vm-heal copy
+#   vm-setup <project> status       what is done and what still needs a person
+#
+# Everything shared lives here. Everything about one project lives in projects/<project>.env
+# (name, boat environment, repos, install commands) and, if it needs more, projects/<project>.sh
+# with a project_setup function (icb: Java, Android SDK, emulators).
+#
+# From the Mac, `vm-new <project>` makes a new VM (or a replica) and runs this for you.
+# Stages: base tailscale t3 keepalive git dotfiles shell agents project check heal idle timer
+set -euo pipefail
+
+P=${1:?usage: vm-setup <project> [stage...|all|sync|status]}; shift || true
+SELF=$(readlink -f "${BASH_SOURCE[0]}")
+BOAT_DIR=$(dirname "$SELF")
+D=$HOME/code/personal/dotfiles
+export PATH=$HOME/.local/bin:$HOME/.bun/bin:$PATH
+export XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
+
+say() { printf '== %s\n' "$*"; }
+warn() { printf '!! %s\n' "$*" >&2; }
+TODO=()
+todo() { TODO+=("$*"); }
+
+ENV_FILE=$BOAT_DIR/projects/$P.env
+[ -f "$ENV_FILE" ] || { echo "vm-setup: no $ENV_FILE (add one, see projects/README in this folder)" >&2; exit 1; }
+# shellcheck disable=SC2034 # TYPE and BOAT_ENV are read by vm-new
+NAME=$P BOAT_ENV=$P TYPE=large REPOS=() CHECK_ENV=$P BUN_VERSION="" ZSHENV_LOCAL=""
+# shellcheck disable=SC1090
+. "$ENV_FILE"
+project_setup() { :; }
+# shellcheck disable=SC1090
+[ -f "$BOAT_DIR/projects/$P.sh" ] && . "$BOAT_DIR/projects/$P.sh"
+
+# This VM's own settings, saved on the first run so later runs (and the hourly timer) reuse them:
+# VM_NAME (a replica's own name, e.g. icb2; default the project name) and BOAT_ID (the sandbox id).
+VM_CONF=$HOME/.config/vm-setup.env
+_vn=${VM_NAME:-} _bi=${BOAT_ID:-}
+# shellcheck disable=SC1090
+[ -f "$VM_CONF" ] && . "$VM_CONF"
+VM_NAME=${_vn:-${VM_NAME:-}} BOAT_ID=${_bi:-${BOAT_ID:-}}
+if [ -z "${BOAT_ID:-}" ]; then
+  BOAT_ID=$(sed -n 's/^BOAT_ID=//p' /etc/boat-idle.env "$HOME/.local/share/vm-heal/conf" 2>/dev/null | head -1)
+fi
+NAME=${VM_NAME:-$NAME}
+mkdir -p "$(dirname "$VM_CONF")"
+printf 'VM_NAME=%s\nBOAT_ID=%s\n' "$NAME" "${BOAT_ID:-}" >"$VM_CONF"
+
+# GitHub always ends this test with exit 1, so only its greeting counts.
+github_ok() { (timeout 15 ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -T git@github.com 2>&1 || true) | grep -q 'successfully authenticated'; }
+have() { command -v "$1" >/dev/null 2>&1; }
+
+# Write a file only when its content changes. Returns 0 when it changed.
+put() { # <path> [sudo]
+  local new; new=$(cat)
+  if [ -f "$1" ] && [ "$(cat "$1")" = "$new" ]; then return 1; fi
+  if [ "${2:-}" = sudo ]; then printf '%s\n' "$new" | sudo tee "$1" >/dev/null; else mkdir -p "$(dirname "$1")"; printf '%s\n' "$new" >"$1"; fi
+}
+
+# Link <target> to <source>, moving a real file aside once.
+lnk() {
+  if [ -L "$2" ] && [ "$(readlink "$2")" = "$1" ]; then return; fi
+  mkdir -p "$(dirname "$2")"
+  if [ -e "$2" ] || [ -L "$2" ]; then mv "$2" "$2.backup.$(date +%Y%m%d_%H%M%S)"; fi
+  ln -s "$1" "$2"
+}
+
+# package:program. A boat restore can delete a program while dpkg still lists it (investor-os fzf,
+# 22 Nov 2026), so the program is what counts, and a lost one is reinstalled.
+APT_PACKAGES=(zsh:zsh unzip:unzip jq:jq ripgrep:rg bat:batcat direnv:direnv fd-find:fdfind fzf:fzf
+  git-delta:delta git-lfs:git-lfs tree:tree eza:eza)
+
+stage_base() {
+  say "hostname $NAME (boat does not keep /etc/hostname)"
+  if put /etc/systemd/system/$NAME-hostname.service sudo <<U
+[Unit]
+Description=Keep the hostname "$NAME" (boat does not snapshot /etc/hostname)
+Before=network-pre.target
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/hostnamectl set-hostname $NAME
+ExecStart=/bin/sh -c 'grep -q "[[:space:]]$NAME\$" /etc/hosts || echo "127.0.1.1 $NAME" >> /etc/hosts'
+[Install]
+WantedBy=multi-user.target
+U
+  then sudo systemctl daemon-reload; fi
+  sudo systemctl enable --now -q $NAME-hostname.service
+  say "base tools"
+  local missing=() lost=() p
+  for p in "${APT_PACKAGES[@]}"; do
+    [ -x "/usr/bin/${p#*:}" ] && continue
+    if dpkg -s "${p%%:*}" >/dev/null 2>&1; then lost+=("${p%%:*}"); else missing+=("${p%%:*}"); fi
+  done
+  if [ $(( ${#missing[@]} + ${#lost[@]} )) -gt 0 ]; then
+    # A new boat VM's apt update fails on a PPA label change without this flag (21 Nov 2026).
+    sudo apt-get update -qq --allow-releaseinfo-change >/dev/null 2>&1 || sudo apt-get update -qq >/dev/null
+    [ ${#missing[@]} -gt 0 ] && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${missing[@]}" >/dev/null
+    [ ${#lost[@]} -gt 0 ] && { say "reinstalling lost programs: ${lost[*]}"; sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --reinstall "${lost[@]}" >/dev/null; }
+  fi
+  mkdir -p "$HOME/.local/bin" "$HOME/code/personal"
+  ln -sfn /usr/bin/batcat "$HOME/.local/bin/bat"
+  ln -sfn /usr/bin/fdfind "$HOME/.local/bin/fd"
+  if [ -n "$BUN_VERSION" ] && [ "$("$HOME/.bun/bin/bun" --version 2>/dev/null)" != "$BUN_VERSION" ]; then
+    say "bun $BUN_VERSION"
+    curl -fsSL https://bun.sh/install | bash -s "bun-v$BUN_VERSION" >/dev/null 2>&1
+  fi
+  if ! have mcp-remote || ! have wrangler || ! have portless; then
+    say "npm tools in ~/.local (mcp-remote cf wrangler portless)"
+    npm config set prefix "$HOME/.local"
+    npm install -g -s mcp-remote cf wrangler portless >/dev/null 2>&1 || warn "npm tools: install failed"
+  fi
+  if [ "$(getent passwd "$USER" | cut -d: -f7)" != "$(command -v zsh)" ]; then
+    say "login shell zsh"
+    sudo chsh -s "$(command -v zsh)" "$USER"
+  fi
+}
+
+stage_tailscale() {
+  say "tailscale"
+  have tailscale || curl -fsSL https://tailscale.com/install.sh | sh >/dev/null 2>&1
+  sudo systemctl enable --now -q tailscaled
+  # Lets `user` run `tailscale serve` (t3 pair --tailscale) without root, as on julds.
+  sudo tailscale set --operator="$USER" 2>/dev/null || true
+  if ! tailscale status >/dev/null 2>&1; then
+    todo "Tailscale sign-in: sudo tailscale up --hostname=$NAME --accept-dns=true --operator=$USER (vm-new does this)"
+  fi
+}
+
+stage_t3() {
+  say "T3"
+  # Pin to the desktop app's version (T3CODE_VERSION): a newer desktop cannot reach an older VM (11 Nov 2026).
+  if ! have t3; then
+    if [ -n "${T3CODE_VERSION:-}" ]; then curl -fsSL https://t3.codes/install.sh | T3CODE_VERSION=$T3CODE_VERSION sh 2>&1 | tail -2
+    else curl -fsSL https://t3.codes/install.sh | T3CODE_CHANNEL=nightly sh 2>&1 | tail -2; fi
+  fi
+  sudo loginctl enable-linger "$USER"
+  local changed=0
+  [ -f "$HOME/.config/systemd/user/t3code.service" ] || { t3 service install 2>&1 | tail -3; changed=1; }
+  # Start T3 from its activeVersion, so self-updates that prune old versions never leave the
+  # unit pointing at a deleted binary (julds, 27 Oct 2026).
+  if put "$HOME/.local/bin/t3-service-launcher" <<'L'
+#!/usr/bin/env bash
+# Start the T3 service launcher from T3's current activeVersion, not a pinned version.
+R="$HOME/.t3/runtime"
+v=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["activeVersion"])' "$R/service-state.json" 2>/dev/null)
+bin="$R/versions/$v/t3"
+if [ -z "$v" ] || [ ! -x "$bin" ]; then
+  bin=$(ls -1d "$R"/versions/*/t3 2>/dev/null | sort -V | tail -1)
+fi
+[ -x "$bin" ] || { echo "t3-service-launcher: no T3 runtime found under $R/versions" >&2; exit 1; }
+ln -sfn "$bin" "$HOME/.local/bin/t3"
+exec "$bin" __service-launcher "$@"
+L
+  then changed=1; fi
+  chmod +x "$HOME/.local/bin/t3-service-launcher"
+  printf '[Service]\nExecStart=\nExecStart=%%h/.local/bin/t3-service-launcher\n' |
+    put "$HOME/.config/systemd/user/t3code.service.d/stable-launcher.conf" && changed=1
+  # Labs: linked environments on (julds and the Mac link to this VM; Dev's T3 watch reads it through julds).
+  mkdir -p "$HOME/.t3/userdata"; [ -f "$HOME/.t3/userdata/settings.json" ] || echo '{}' >"$HOME/.t3/userdata/settings.json"
+  python3 - "$HOME/.t3/userdata/settings.json" <<'PY' && changed=1 || true
+import json, sys
+p = sys.argv[1]; d = json.load(open(p))
+if d.get("linkedEnvironmentsEnabled") is True: sys.exit(1)
+d["linkedEnvironmentsEnabled"] = True; json.dump(d, open(p, "w"), indent=2)
+PY
+  systemctl --user daemon-reload
+  # Restart only when something changed or T3 is down: a restart stops running agent turns.
+  if [ $changed = 1 ] || ! systemctl --user is-active --quiet t3code.service; then
+    say "T3: (re)starting the service"
+    systemctl --user restart t3code.service
+    t3 service protect --yes >/dev/null 2>&1 || true
+  fi
+  systemctl --user is-active --quiet t3code.service || warn "T3 service is not active"
+  # The boat image installs claude and codex as root; T3's provider updates then fail with EACCES
+  # and an interrupted root install leaves a hidden temp folder that blocks later updates (13 Nov 2026).
+  local N=/usr/local/lib/node_modules d l
+  sudo find $N/@anthropic-ai $N/@openai -maxdepth 1 -mindepth 1 -name '.*' -user root -exec rm -rf {} + 2>/dev/null || true
+  for d in $N/@anthropic-ai $N/@openai; do [ -d $d ] && sudo chown "$USER:$USER" $d; done
+  for d in $N/@anthropic-ai/claude-code $N/@openai/codex; do [ -d $d ] && sudo chown -R "$USER:$USER" $d; done
+  for l in /usr/local/bin/claude /usr/local/bin/codex; do
+    [ -L $l ] && case "$(readlink $l)" in ../lib/node_modules/*) sudo chown -h "$USER:$USER" $l ;; esac
+  done
+  return 0
+}
+
+stage_keepalive() {
+  say "keepalive timer (Tailscale and T3 back up after a resume)"
+  local changed=0
+  put /usr/local/sbin/$NAME-keepalive sudo <<K && changed=1
+#!/bin/sh
+# Keeps $NAME reachable after a boat resume: /home/user is hydrated lazily, so the
+# user systemd manager can start before its unit files exist and never start T3.
+# boat resets the hostname after boot, and T3 names the environment after it (julds, 11 Nov 2026).
+[ "\$(hostname)" = $NAME ] || hostnamectl set-hostname $NAME
+systemctl is-active --quiet tailscaled || systemctl start tailscaled
+U="runuser -u user -- env XDG_RUNTIME_DIR=/run/user/1000 systemctl --user"
+[ -f /home/user/.config/systemd/user/t3code.service ] || exit 0
+if ! \$U is-active --quiet t3code.service; then
+  \$U daemon-reload
+  \$U start t3code.service
+  \$U start vm-setup-sync.timer 2>/dev/null
+  logger -t $NAME-keepalive "started t3code after it was found inactive"
+fi
+K
+  sudo chmod 755 /usr/local/sbin/$NAME-keepalive
+  put /etc/systemd/system/$NAME-keepalive.service sudo <<K && changed=1
+[Unit]
+Description=Keep Tailscale and T3 running on $NAME
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/$NAME-keepalive
+K
+  put /etc/systemd/system/$NAME-keepalive.timer sudo <<K && changed=1
+[Unit]
+Description=Check Tailscale and T3 every minute
+[Timer]
+OnBootSec=30
+OnUnitActiveSec=60
+[Install]
+WantedBy=timers.target
+K
+  [ $changed = 1 ] && sudo systemctl daemon-reload
+  sudo systemctl enable --now -q $NAME-keepalive.timer
+  say "\$HOME/.boatignore (worktree deps and build output stay out of snapshots)"
+  {
+    echo '# Rebuildable caches and worktree output: left out of snapshots (7 Nov 2026).'
+    echo '.npm/'
+    echo '.bun/install/cache/'
+    for d in node_modules dist .turbo .next .wrangler .output coverage playwright-report test-results; do
+      echo "/.t3/worktrees/**/$d/"
+    done
+  } | put "$HOME/.boatignore" || true
+}
+
+stage_git() {
+  say "git identity and this VM's own SSH key (GitHub access and commit signing)"
+  local key=$HOME/.ssh/id_ed25519_$NAME
+  mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
+  [ -f "$key" ] || ssh-keygen -q -t ed25519 -N '' -C "somto@$NAME.boat" -f "$key"
+  echo "smugeh@gmail.com $(cat "$key.pub")" | put "$HOME/.ssh/allowed_signers" || true
+  git config --global user.name "Somto Odera"
+  git config --global user.email smugeh@gmail.com
+  git config --global gpg.format ssh
+  git config --global user.signingkey "$key"
+  git config --global gpg.ssh.allowedSignersFile "$HOME/.ssh/allowed_signers"
+  git config --global commit.gpgsign true
+  git config --global tag.gpgSign true
+  git config --global core.sshCommand "ssh -i $key -o IdentitiesOnly=yes"
+  grep -q '^github.com ssh-ed25519' "$HOME/.ssh/known_hosts" 2>/dev/null || ssh-keyscan -t ed25519 github.com 2>/dev/null >>"$HOME/.ssh/known_hosts"
+  grep -q '^Host github.com' "$HOME/.ssh/config" 2>/dev/null ||
+    printf 'Host github.com\n  User git\n  IdentityFile %s\n  IdentitiesOnly yes\n' "$key" >>"$HOME/.ssh/config"
+  chmod 600 "$HOME/.ssh/config"
+  github_ok || todo "GitHub key: add $key.pub as an authentication and a signing key (vm-new does this through julds gh)"
+}
+
+stage_dotfiles() {
+  github_ok || { warn "dotfiles: GitHub does not accept this VM's key yet; skipped"; return 0; }
+  if [ -d "$D/.git" ]; then
+    git -C "$D" fetch -q origin
+    # A VM put on a branch to try a change goes back to main once that branch is merged.
+    local b; b=$(git -C "$D" rev-parse --abbrev-ref HEAD)
+    if [ "$b" != main ] && git -C "$D" merge-base --is-ancestor HEAD origin/main; then
+      git -C "$D" checkout -q main
+    fi
+    git -C "$D" pull -q --ff-only || warn "dotfiles did not fast-forward; left as is"
+  elif [ -d "$D" ]; then
+    # vm-new pushes a plain copy before the VM can reach GitHub: turn it into a clone.
+    say "dotfiles: turning the pushed copy into a git clone"
+    mv "$D" "$D.pushed.$(date +%s)"
+    git clone -q git@github.com:SomtoUgeh/dotfiles.git "$D"
+  else
+    say "dotfiles: clone"
+    git clone -q git@github.com:SomtoUgeh/dotfiles.git "$D"
+  fi
+  ln -sfn "$D/scripts/boat/vm-setup" "$HOME/.local/bin/vm-setup"
+}
+
+stage_shell() {
+  [ -d "$D" ] || { warn "shell: no dotfiles at $D yet; skipped"; return 0; }
+  say "shell: oh-my-zsh, plugins, starship, dotfiles zsh config"
+  pin() { # <repo> <dir> <commit>
+    [ -d "$2/.git" ] || git clone -q --filter=blob:none "$1" "$2"
+    [ "$(git -C "$2" rev-parse HEAD)" = "$3" ] && return
+    git -C "$2" fetch -q --depth=1 origin "$3" && git -C "$2" checkout -q --detach "$3"
+  }
+  pin https://github.com/ohmyzsh/ohmyzsh.git "$HOME/.oh-my-zsh" a5ecff7560b2e26f612032c632a12c75a3048bd0
+  local c=$HOME/.oh-my-zsh/custom/plugins
+  pin https://github.com/Aloxaf/fzf-tab.git "$c/fzf-tab" 24105b15714bfec37989ed5c5b6e60f572253019
+  pin https://github.com/zsh-users/zsh-autosuggestions.git "$c/zsh-autosuggestions" 85919cd1ffa7d2d5412f6d3fe437ebdbeeec4fc5
+  pin https://github.com/zdharma-continuum/fast-syntax-highlighting.git "$c/fast-syntax-highlighting" 4672ad5dd9ad68a7effc1476d65afb7c584ce2b3
+  if ! have starship; then
+    local t; t=$(mktemp -d)
+    curl -fsSL https://github.com/starship/starship/releases/download/v1.26.0/starship-x86_64-unknown-linux-gnu.tar.gz -o "$t/s.tgz"
+    echo "321f0dd7af8340a5f2e6a8fec6538a04f617486f9ec70d878f91c09cd8deef22  $t/s.tgz" | sha256sum --check --status
+    tar -xzf "$t/s.tgz" -C "$t" && install -m 755 "$t/starship" "$HOME/.local/bin/starship" && rm -rf "$t"
+  fi
+  # Project lines (icb: Java and Android) go in ~/.zshenv.local, which the shared .zshenv reads.
+  if [ -f "$HOME/.zshenv" ] && [ ! -L "$HOME/.zshenv" ] && [ -z "$ZSHENV_LOCAL" ] && [ ! -f "$HOME/.zshenv.local" ]; then
+    warn "\$HOME/.zshenv is a local file; it moves aside as .zshenv.backup.* (put project lines in ZSHENV_LOCAL)"
+  fi
+  lnk "$D/shell/.zshenv" "$HOME/.zshenv"
+  lnk "$D/shell/.zshrc.cloud" "$HOME/.zshrc"
+  lnk "$D/config/starship/starship.toml" "$HOME/.config/starship.toml"
+  if [ -n "$ZSHENV_LOCAL" ]; then
+    printf '# Written by vm-setup from projects/%s.env (ZSHENV_LOCAL). Edit it there.\n%s\n' "$P" "$ZSHENV_LOCAL" | put "$HOME/.zshenv.local" || true
+  fi
+}
+
+stage_agents() {
+  [ -d "$D/.git" ] || { warn "agents: dotfiles not cloned yet; skipped"; return 0; }
+  say "agent config (skills, Claude and Codex settings)"
+  VM_SETUP=1 bash "$D/scripts/boat/link-agent-config.sh" | tail -1
+  say "Executor for Claude and Codex (all agent tools go through Executor)"
+  if [ -s "$HOME/.config/executor-v2/cloud.token" ]; then
+    put "$HOME/.local/bin/executor-v2-mcp" <<'W' || true
+#!/bin/sh
+# Stdio bridge to Executor 2 at https://executor-v2.julds.com/mcp. Written by vm-setup.
+T=$(cat "$HOME/.config/executor-v2/cloud.token")
+exec "$(command -v node || echo /usr/local/bin/node)" "$HOME/.local/lib/node_modules/mcp-remote/dist/proxy.js" https://executor-v2.julds.com/mcp --transport http-only --header "Authorization: Bearer $T"
+W
+    put "$HOME/.local/bin/executor-v2-mac-mcp" <<'W' || true
+#!/bin/sh
+# Stdio bridge to the Mac's Executor 2 (port 4312, forwarded by the Mac's boat-executor-bridge). Written by vm-setup.
+T=$(cat "$HOME/.config/executor-v2/mac.token")
+exec "$(command -v node || echo /usr/local/bin/node)" "$HOME/.local/lib/node_modules/mcp-remote/dist/proxy.js" http://127.0.0.1:4312/mcp --transport http-only --allow-http --header "Authorization: Bearer $T"
+W
+    chmod 755 "$HOME/.local/bin/executor-v2-mcp" "$HOME/.local/bin/executor-v2-mac-mcp"
+    claude mcp get executor_v2 >/dev/null 2>&1 || claude mcp add --scope user executor_v2 "$HOME/.local/bin/executor-v2-mcp" >/dev/null
+    claude mcp get executor_v2_local >/dev/null 2>&1 || claude mcp add --scope user executor_v2_local "$HOME/.local/bin/executor-v2-mac-mcp" >/dev/null
+    grep -q 'mcp_servers.executor_v2' "$HOME/.codex/config.toml" 2>/dev/null ||
+      codex mcp add executor_v2 --url 'https://executor-v2.julds.com/mcp?elicitation_mode=browser' >/dev/null 2>&1 || true
+  else
+    todo "Executor: no ~/.config/executor-v2/cloud.token (add the shared secret files to boat environment $BOAT_ENV)"
+  fi
+  claude mcp get boat-docs >/dev/null 2>&1 || claude mcp add --transport http boat-docs --scope user https://docs.boat.dev/mcp >/dev/null 2>&1 || true
+}
+
+stage_project() {
+  local line path url install
+  for line in "${REPOS[@]}"; do
+    IFS='|' read -r path url install <<<"$line"
+    if [ ! -d "$HOME/$path/.git" ]; then
+      github_ok || { warn "repo $path: GitHub does not accept this VM's key yet; skipped"; continue; }
+      say "repo $path: clone"
+      mkdir -p "$(dirname "$HOME/$path")"
+      git clone -q "$url" "$HOME/$path"
+      if [ -n "$install" ]; then say "repo $path: $install"; (cd "$HOME/$path" && bash -lc "$install" 2>&1 | tail -3); fi
+      t3 project add "$HOME/$path" >/dev/null 2>&1 || todo "T3: add the project $HOME/$path (t3 project add)"
+    fi
+  done
+  project_setup
+}
+
+stage_check() {
+  say "boat-check (heavy checks on a throwaway machine)"
+  local first; first=${REPOS[0]%%|*}
+  local install; install=$(cut -d'|' -f3 <<<"${REPOS[0]}"); [ -n "$install" ] || install=true
+  printf 'BOAT_CHECK_PROJECT=%q\nBOAT_CHECK_SNAPSHOT=%q\nBOAT_CHECK_ENVIRONMENT=%q\nBOAT_CHECK_REPO_PATH=%q\nBOAT_CHECK_INSTALL=%q\n' \
+    "$P" "$P-base" "$CHECK_ENV" "$first" "$install" | put /etc/boat-check.env sudo || true
+  if ! cmp -s "$BOAT_DIR/boat-check" /usr/local/bin/boat-check; then sudo install -m 755 "$BOAT_DIR/boat-check" /usr/local/bin/boat-check; fi
+}
+
+stage_heal() {
+  say "vm-heal (puts the VM back together after a boat resume)"
+  [ -n "$BOAT_ID" ] || { warn "vm-heal: no sandbox id (pass BOAT_ID=bx_...)"; return 0; }
+  cmp -s "$BOAT_DIR/vm-heal" "$HOME/.local/bin/vm-heal" || install -m 755 "$BOAT_DIR/vm-heal" "$HOME/.local/bin/vm-heal"
+  [ -f "$HOME/.local/share/vm-heal/conf" ] || "$HOME/.local/bin/vm-heal" --setup "$P" "$BOAT_ID" | tail -2
+}
+
+stage_idle() {
+  say "sleep when idle (45 quiet minutes)"
+  [ -n "$BOAT_ID" ] || { warn "idle stop: no sandbox id (pass BOAT_ID=bx_...)"; return 0; }
+  cmp -s "$BOAT_DIR/boat-idle-stop" /usr/local/sbin/boat-idle-stop || sudo install -m 755 "$BOAT_DIR/boat-idle-stop" /usr/local/sbin/boat-idle-stop
+  cmp -s "$BOAT_DIR/vm-stay" /usr/local/bin/vm-stay || sudo install -m 755 "$BOAT_DIR/vm-stay" /usr/local/bin/vm-stay
+  sudo mkdir -p /var/lib/boat-idle
+  if [ ! -f /etc/boat-idle.env ]; then
+    printf 'BOAT_ID=%s\nIDLE_MIN=45\nCPU_MAX=40\nENABLED=1\nDRY_RUN=0\n' "$BOAT_ID" | sudo tee /etc/boat-idle.env >/dev/null
+    date +%s | sudo tee /var/lib/boat-idle/last-active /var/lib/boat-idle/last-check >/dev/null
+  fi
+  local changed=0
+  put /etc/systemd/system/boat-idle-stop.service sudo <<U && changed=1
+[Unit]
+Description=Stop this boat VM when it has been idle (see /etc/boat-idle.env)
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/boat-idle-stop
+U
+  put /etc/systemd/system/boat-idle-stop.timer sudo <<U && changed=1
+[Unit]
+Description=Check every 5 minutes whether this boat VM is idle
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=5min
+[Install]
+WantedBy=timers.target
+U
+  [ $changed = 1 ] && sudo systemctl daemon-reload
+  sudo systemctl enable --now -q boat-idle-stop.timer
+}
+
+stage_timer() {
+  say "hourly sync timer (vm-setup sync after boot and every hour)"
+  local u=$HOME/.config/systemd/user changed=0
+  printf '[Unit]\nDescription=Pull dotfiles and refresh the shared VM setup (vm-setup sync)\n[Service]\nType=oneshot\nExecStart=%%h/.local/bin/vm-setup %s sync\n' "$P" | put "$u/vm-setup-sync.service" && changed=1
+  printf '[Unit]\nDescription=vm-setup sync after boot and every hour\n[Timer]\nOnBootSec=3min\nOnUnitActiveSec=1h\n[Install]\nWantedBy=timers.target\n' | put "$u/vm-setup-sync.timer" && changed=1
+  # The older agent-config-sync timer did a part of this; vm-setup sync replaces it.
+  if [ -f "$u/agent-config-sync.timer" ]; then
+    systemctl --user disable --now agent-config-sync.timer >/dev/null 2>&1 || true
+    rm -f "$u/agent-config-sync.timer" "$u/agent-config-sync.service" "$HOME/.local/bin/link-agent-config"
+    changed=1
+  fi
+  [ $changed = 1 ] && systemctl --user daemon-reload
+  [ -L "$HOME/.local/bin/vm-setup" ] || ln -sfn "$D/scripts/boat/vm-setup" "$HOME/.local/bin/vm-setup"
+  systemctl --user enable --now -q vm-setup-sync.timer
+}
+
+stage_status() {
+  local ok=() bad=()
+  chk() { if eval "$2" >/dev/null 2>&1; then ok+=("$1"); else bad+=("$1"); fi; }
+  chk "hostname $NAME" '[ "$(hostname)" = "$NAME" ]'
+  chk "login shell zsh" '[ "$(getent passwd "$USER" | cut -d: -f7)" = "$(command -v zsh)" ]'
+  chk "zsh config linked" '[ "$(readlink "$HOME/.zshrc")" = "$D/shell/.zshrc.cloud" ]'
+  chk "prompt and tools" 'have starship && have eza && have bat && have fd && have delta && have direnv && have fzf && [ -d "$HOME/.oh-my-zsh" ]'
+  chk "Tailscale signed in" 'tailscale status'
+  chk "T3 running" 'systemctl --user is-active --quiet t3code.service'
+  chk "GitHub accepts this VM's key" 'github_ok'
+  chk "dotfiles cloned" '[ -d "$D/.git" ]'
+  chk "Claude signed in" '[ -s "$HOME/.claude/.credentials.json" ]'
+  chk "Executor for Claude" 'claude mcp get executor_v2 | grep -q Connected'
+  chk "repos cloned" 'for l in "${REPOS[@]}"; do [ -d "$HOME/${l%%|*}/.git" ] || exit 1; done'
+  chk "keepalive timer" 'systemctl is-active --quiet $NAME-keepalive.timer'
+  chk "idle-stop timer" 'systemctl is-active --quiet boat-idle-stop.timer'
+  chk "vm-heal set up" '[ -f "$HOME/.local/share/vm-heal/conf" ]'
+  chk "hourly sync timer" 'systemctl --user is-active --quiet vm-setup-sync.timer'
+  printf 'vm-setup %s on %s: %d ok' "$P" "$(hostname)" "${#ok[@]}"
+  [ ${#bad[@]} -eq 0 ] && echo || { echo ", not yet:"; printf '  - %s\n' "${bad[@]}"; }
+}
+
+run() {
+  local s
+  for s in "$@"; do "stage_$s"; done
+}
+
+case "${1:-all}" in
+  all) run base tailscale t3 keepalive git dotfiles shell agents project check heal idle timer status ;;
+  sync) run dotfiles shell agents
+        cmp -s "$BOAT_DIR/vm-heal" "$HOME/.local/bin/vm-heal" || install -m 755 "$BOAT_DIR/vm-heal" "$HOME/.local/bin/vm-heal" ;;
+  status) stage_status ;;
+  *) run "$@" ;;
+esac
+if [ ${#TODO[@]} -gt 0 ]; then
+  echo "Still needs a person:"; printf '  - %s\n' "${TODO[@]}"
+fi

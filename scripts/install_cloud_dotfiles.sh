@@ -267,8 +267,6 @@ seed_git_identity_file \
 setup_personal_github_ssh
 
 link_path "$DOTFILES_DIR/agents/skills" "$HOME/.agents/skills"
-link_path "$DOTFILES_DIR/agents/skills" "$HOME/.grok/skills"
-link_path "$DOTFILES_DIR/agents/shared/AGENTS.md" "$HOME/.grok/AGENTS.md"
 link_path "$DOTFILES_DIR/agents/opencode/AGENTS.md" "$HOME/.config/opencode/AGENTS.md"
 link_path "$DOTFILES_DIR/agents/shared/ETHOS.md" "$HOME/.config/opencode/ETHOS.md"
 link_path "$DOTFILES_DIR/agents/opencode/opencode.cloud.jsonc" "$HOME/.config/opencode/opencode.jsonc"
@@ -296,14 +294,7 @@ for plugin in "$DOTFILES_DIR/agents/opencode/plugins/"*.js; do
   link_path "$plugin" "$HOME/.config/opencode/plugins/$(basename "$plugin")"
 done
 
-export PATH="$HOME/.local/bin:$HOME/.bun/bin:$HOME/.grok/bin:$HOME/.opencode/bin:$PATH"
-
-for name in plan context7 cloudflare-docs agentation shadcn; do
-  grok mcp remove "$name" >/dev/null 2>&1 || true
-done
-grok mcp add --transport http context7 https://mcp.context7.com/mcp
-grok mcp add --transport http cloudflare-docs https://docs.mcp.cloudflare.com/mcp
-grok mcp add shadcn -- npx -y shadcn@4.19.1 mcp
+export PATH="$HOME/.local/bin:$HOME/.bun/bin:$HOME/.opencode/bin:$PATH"
 
 sudo chsh -s "$(command -v zsh)" "$USER"
 
