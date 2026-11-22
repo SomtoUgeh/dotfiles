@@ -50,7 +50,8 @@ NAME=${VM_NAME:-$NAME}
 mkdir -p "$(dirname "$VM_CONF")"
 printf 'VM_NAME=%s\nBOAT_ID=%s\n' "$NAME" "${BOAT_ID:-}" >"$VM_CONF"
 
-github_ok() { timeout 15 ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -T git@github.com 2>&1 | grep -q 'successfully authenticated'; }
+# GitHub always ends this test with exit 1, so only its greeting counts.
+github_ok() { (timeout 15 ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -T git@github.com 2>&1 || true) | grep -q 'successfully authenticated'; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
 # Write a file only when its content changes. Returns 0 when it changed.
