@@ -69,7 +69,10 @@ lnk() {
   ln -s "$1" "$2"
 }
 
-APT_PACKAGES=(zsh unzip jq ripgrep bat direnv fd-find fzf git-delta git-lfs tree eza)
+# package:program. A boat restore can delete a program while dpkg still lists it (investor-os fzf,
+# 22 Nov 2026), so the program is what counts, and a lost one is reinstalled.
+APT_PACKAGES=(zsh:zsh unzip:unzip jq:jq ripgrep:rg bat:batcat direnv:direnv fd-find:fdfind fzf:fzf
+  git-delta:delta git-lfs:git-lfs tree:tree eza:eza)
 
 stage_base() {
   say "hostname $NAME (boat does not keep /etc/hostname)"
@@ -87,12 +90,16 @@ U
   then sudo systemctl daemon-reload; fi
   sudo systemctl enable --now -q $NAME-hostname.service
   say "base tools"
-  local missing=() p
-  for p in "${APT_PACKAGES[@]}"; do dpkg -s "$p" >/dev/null 2>&1 || missing+=("$p"); done
-  if [ ${#missing[@]} -gt 0 ]; then
+  local missing=() lost=() p
+  for p in "${APT_PACKAGES[@]}"; do
+    [ -x "/usr/bin/${p#*:}" ] && continue
+    if dpkg -s "${p%%:*}" >/dev/null 2>&1; then lost+=("${p%%:*}"); else missing+=("${p%%:*}"); fi
+  done
+  if [ $(( ${#missing[@]} + ${#lost[@]} )) -gt 0 ]; then
     # A new boat VM's apt update fails on a PPA label change without this flag (21 Nov 2026).
     sudo apt-get update -qq --allow-releaseinfo-change >/dev/null 2>&1 || sudo apt-get update -qq >/dev/null
-    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${missing[@]}" >/dev/null
+    [ ${#missing[@]} -gt 0 ] && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${missing[@]}" >/dev/null
+    [ ${#lost[@]} -gt 0 ] && { say "reinstalling lost programs: ${lost[*]}"; sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --reinstall "${lost[@]}" >/dev/null; }
   fi
   mkdir -p "$HOME/.local/bin" "$HOME/code/personal"
   ln -sfn /usr/bin/batcat "$HOME/.local/bin/bat"
@@ -417,7 +424,7 @@ stage_status() {
   chk "hostname $NAME" '[ "$(hostname)" = "$NAME" ]'
   chk "login shell zsh" '[ "$(getent passwd "$USER" | cut -d: -f7)" = "$(command -v zsh)" ]'
   chk "zsh config linked" '[ "$(readlink "$HOME/.zshrc")" = "$D/shell/.zshrc.cloud" ]'
-  chk "prompt and tools" 'have starship && have eza && have bat && have fd && have delta && have direnv && [ -d "$HOME/.oh-my-zsh" ]'
+  chk "prompt and tools" 'have starship && have eza && have bat && have fd && have delta && have direnv && have fzf && [ -d "$HOME/.oh-my-zsh" ]'
   chk "Tailscale signed in" 'tailscale status'
   chk "T3 running" 'systemctl --user is-active --quiet t3code.service'
   chk "GitHub accepts this VM's key" 'github_ok'
