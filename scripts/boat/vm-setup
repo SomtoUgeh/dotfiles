@@ -69,7 +69,7 @@ lnk() {
   ln -s "$1" "$2"
 }
 
-APT_PACKAGES=(zsh unzip jq ripgrep bat direnv fd-find fzf git-delta git-lfs tree)
+APT_PACKAGES=(zsh unzip jq ripgrep bat direnv fd-find fzf git-delta git-lfs tree eza)
 
 stage_base() {
   say "hostname $NAME (boat does not keep /etc/hostname)"
@@ -89,7 +89,6 @@ U
   say "base tools"
   local missing=() p
   for p in "${APT_PACKAGES[@]}"; do dpkg -s "$p" >/dev/null 2>&1 || missing+=("$p"); done
-  apt-cache show eza >/dev/null 2>&1 && ! dpkg -s eza >/dev/null 2>&1 && missing+=(eza)
   if [ ${#missing[@]} -gt 0 ]; then
     # A new boat VM's apt update fails on a PPA label change without this flag (21 Nov 2026).
     sudo apt-get update -qq --allow-releaseinfo-change >/dev/null 2>&1 || sudo apt-get update -qq >/dev/null
