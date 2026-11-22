@@ -6,8 +6,10 @@ an additional runtime prerequisite. Tool configuration belongs to each harness.
 
 ## Shared MCP access
 
-Prefer Executor Cloud for internet services and local Executor for host-bound
-tools. Before using a migrated service, follow the
+Always use Executor for MCP tools and services: Executor Cloud for internet
+services and local Executor for host-bound tools. Use a native connector or MCP
+tool only when Executor has no verified equivalent, and say so. Before using a
+migrated service, follow the
 [Executor routing workflow](../skills/RUNTIME_TOOLS.md#executor-routing) for
 discovery, account selection, approvals, and native-tool exceptions.
 
