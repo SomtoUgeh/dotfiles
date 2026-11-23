@@ -29,7 +29,7 @@ todo() { TODO+=("$*"); }
 ENV_FILE=$BOAT_DIR/projects/$P.env
 [ -f "$ENV_FILE" ] || { echo "vm-setup: no $ENV_FILE (add one, see projects/README in this folder)" >&2; exit 1; }
 # shellcheck disable=SC2034 # TYPE and BOAT_ENV are read by vm-new
-NAME=$P BOAT_ENV=$P TYPE=large REPOS=() CHECK_ENV=$P BUN_VERSION="" ZSHENV_LOCAL=""
+NAME=$P BOAT_ENV=$P TYPE=large REPOS=() CHECK_ENV=$P CHECK_KEY_ENVS="" BOAT_CHECK=1 BUN_VERSION="" ZSHENV_LOCAL=""
 # shellcheck disable=SC1090
 . "$ENV_FILE"
 project_setup() { :; }
@@ -455,6 +455,10 @@ stage_check() {
   printf 'BOAT_CHECK_PROJECT=%q\nBOAT_CHECK_SNAPSHOT=%q\nBOAT_CHECK_ENVIRONMENT=%q\nBOAT_CHECK_REPO_PATH=%q\nBOAT_CHECK_INSTALL=%q\n' \
     "$P" "$P-base" "$CHECK_ENV" "$first" "$install" | put /etc/boat-check.env sudo || true
   if ! cmp -s "$BOAT_DIR/boat-check" /usr/local/bin/boat-check; then sudo install -m 755 "$BOAT_DIR/boat-check" /usr/local/bin/boat-check; fi
+  if [ "$BOAT_CHECK" = 1 ] && [ ! -s "$HOME/.config/boat-check/key" ]; then
+    # Without it agents skip production builds and e2e runs (coworkers, 22 Nov 2026). vm-new makes it.
+    todo "boat-check key: boat api-key create $NAME-check-ci --preset ci --ttl 90d with --env for each of: ${CHECK_KEY_ENVS:-$BOAT_ENV $CHECK_ENV}; save the secret in ~/.config/boat-check/key (chmod 600)"
+  fi
 }
 
 stage_heal() {
@@ -533,6 +537,7 @@ stage_status() {
   chk "Executor for Claude" 'claude mcp get executor_v2 | grep -q Connected'
   chk "Aside CLI signed in, using the Mac" 'aside_signed_in && "$HOME/.local/bin/aside" host status | grep -q "^$ASIDE_MAC_HOST"'
   chk "repos cloned" 'for l in "${REPOS[@]}"; do [ -d "$HOME/${l%%|*}/.git" ] || exit 1; done'
+  chk "boat-check key" '[ "$BOAT_CHECK" = 0 ] || [ -s "$HOME/.config/boat-check/key" ]'
   chk "keepalive timer" 'systemctl is-active --quiet $NAME-keepalive.timer'
   chk "idle-stop timer" 'systemctl is-active --quiet boat-idle-stop.timer'
   chk "vm-heal set up" '[ -f "$HOME/.local/share/vm-heal/conf" ]'

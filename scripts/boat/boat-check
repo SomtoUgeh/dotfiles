@@ -71,10 +71,26 @@ fi
 boat rename self "${BOAT_CHECK_PROJECT}-check-${branch}" >/dev/null 2>&1 || true
 src=\$HOME/$(basename "$root") dst=\$HOME/${BOAT_CHECK_REPO_PATH}
 t0=\$(date +%s)
-cd "\$dst"
-git ls-files -z | xargs -0 rm -f --
-cp -a "\$src"/. "\$dst"/
-rm -rf "\$src"
+if [ -d "\$dst/.git" ]; then
+  cd "\$dst"
+  git ls-files -z | xargs -0 rm -f --
+  cp -a "\$src"/. "\$dst"/
+  rm -rf "\$src"
+else
+  # A snapshot saved for GitHub CI (e.g. icb-base) has no clone: use the pushed tree as it is.
+  # The check must see exactly the pushed tree. A folder already there (not a clone) is set aside;
+  # only its installed packages are kept, so the install stays quick. Any failure stops the check.
+  if [ -e "\$dst" ]; then
+    old=\$dst.snapshot.\$\$
+    mv "\$dst" "\$old" || exit 1
+    mv "\$src" "\$dst" || exit 1
+    if [ -d "\$old/node_modules" ] && [ ! -e "\$dst/node_modules" ]; then mv "\$old/node_modules" "\$dst/"; fi
+    rm -rf "\$old"
+  else
+    mkdir -p "\$(dirname "\$dst")" && mv "\$src" "\$dst" || exit 1
+  fi
+  cd "\$dst" || exit 1
+fi
 t1=\$(date +%s)
 ${BOAT_CHECK_INSTALL} >/tmp/boat-check-install.log 2>&1 || { cat /tmp/boat-check-install.log; exit 1; }
 t2=\$(date +%s)
