@@ -71,10 +71,15 @@ fi
 boat rename self "${BOAT_CHECK_PROJECT}-check-${branch}" >/dev/null 2>&1 || true
 src=\$HOME/$(basename "$root") dst=\$HOME/${BOAT_CHECK_REPO_PATH}
 t0=\$(date +%s)
-cd "\$dst"
-git ls-files -z | xargs -0 rm -f --
-cp -a "\$src"/. "\$dst"/
-rm -rf "\$src"
+if [ -d "\$dst/.git" ]; then
+  cd "\$dst"
+  git ls-files -z | xargs -0 rm -f --
+  cp -a "\$src"/. "\$dst"/
+  rm -rf "\$src"
+else
+  # A snapshot saved for GitHub CI (e.g. icb-base) has no clone: use the pushed tree as it is.
+  mkdir -p "\$(dirname "\$dst")" && mv "\$src" "\$dst" && cd "\$dst"
+fi
 t1=\$(date +%s)
 ${BOAT_CHECK_INSTALL} >/tmp/boat-check-install.log 2>&1 || { cat /tmp/boat-check-install.log; exit 1; }
 t2=\$(date +%s)

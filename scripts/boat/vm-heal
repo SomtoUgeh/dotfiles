@@ -112,7 +112,7 @@ WANT=(/usr/local/sbin/$P-keepalive /etc/systemd/system/$P-keepalive.timer /usr/l
 home_files() {
   local f; cd "$HOME" || return
   for f in .gitconfig .gitconfig.local .gitconfig-personal .ssh/id_ed25519_* .ssh/allowed_signers .ssh/config \
-    .ssh/authorized_keys .config/gh .config/systemd/user .config/executor-v2 .local/bin/t3 .local/bin/t3-service-launcher \
+    .ssh/authorized_keys .config/gh .config/systemd/user .config/executor-v2 .config/boat-check .local/bin/t3 .local/bin/t3-service-launcher \
     .t3/runtime/service-state.json .t3/runtime/launchers .t3/userdata/environment-id .t3/userdata/anonymous-id \
     .t3/userdata/settings.json .t3/userdata/server-runtime.json .t3/userdata/secrets; do
     [ -e "$f" ] || [ -L "$f" ] && echo "$f"

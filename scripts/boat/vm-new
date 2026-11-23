@@ -36,7 +36,7 @@ done
 
 ENV_FILE=$BOAT_DIR/projects/$P.env
 [ -f "$ENV_FILE" ] || { echo "vm-new: no $ENV_FILE. Add the project first (copy another projects/*.env)." >&2; exit 1; }
-NAME=$P BOAT_ENV=$P TYPE=large
+NAME=$P BOAT_ENV=$P TYPE=large CHECK_ENV=$P CHECK_KEY_ENVS="" BOAT_CHECK=1
 # shellcheck disable=SC1090
 . "$ENV_FILE"
 NAME=${NAME_ARG:-$NAME} TYPE=${TYPE_ARG:-$TYPE}
@@ -111,6 +111,19 @@ vm "tailscale status >/dev/null" || { echo "vm-new: Tailscale is not signed in y
 
 say "vm-setup: dotfiles, shell, agents, Executor, repos, project extras, boat-check, vm-heal, idle stop, timer"
 vm "$RUN all"
+
+if [ "$BOAT_CHECK" = 1 ] && ! vm "test -s ~/.config/boat-check/key" 2>/dev/null; then
+  say "boat-check key (heavy checks on throwaway machines)"
+  envids=()
+  for e in ${CHECK_KEY_ENVS:-$BOAT_ENV $CHECK_ENV}; do
+    i=$("$BOAT" env info "$e" --json 2>/dev/null | python3 -c 'import json,sys;t=sys.stdin.read();d=json.loads(t[t.find("{"):]);print(d.get("environment",d)["id"])' 2>/dev/null) || true
+    [ -n "$i" ] && [[ " ${envids[*]} " != *" --env $i "* ]] && envids+=(--env "$i")
+  done
+  "$BOAT" api-key create "$NAME-check-ci" --preset ci --ttl 90d "${envids[@]}" --json |
+    python3 -c 'import json,sys;t=sys.stdin.read();print(json.loads(t[t.find("{"):])["secret"],end="")' |
+    vm "umask 077; mkdir -p ~/.config/boat-check; cat > ~/.config/boat-check/key" ||
+    later "boat-check key: vm-setup $P status explains how to make it"
+fi
 
 say "Aside CLI sign-in (browser tasks from the VM run in Aside on the Mac)"
 if ! vm "python3 -c 'import json,os;json.load(open(os.path.expanduser(\"~/.aside/cli/auth.json\")))[\"refreshToken\"]'" >/dev/null 2>&1; then
