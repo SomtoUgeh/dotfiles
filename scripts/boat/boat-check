@@ -78,7 +78,10 @@ if [ -d "\$dst/.git" ]; then
   rm -rf "\$src"
 else
   # A snapshot saved for GitHub CI (e.g. icb-base) has no clone: use the pushed tree as it is.
-  mkdir -p "\$(dirname "\$dst")" && mv "\$src" "\$dst" && cd "\$dst"
+  # Copy into the folder when it exists (mv would nest the tree one level down), else move it there.
+  if [ -d "\$dst" ]; then cp -a "\$src"/. "\$dst"/ && rm -rf "\$src"
+  else mkdir -p "\$(dirname "\$dst")" && mv "\$src" "\$dst"; fi
+  cd "\$dst"
 fi
 t1=\$(date +%s)
 ${BOAT_CHECK_INSTALL} >/tmp/boat-check-install.log 2>&1 || { cat /tmp/boat-check-install.log; exit 1; }

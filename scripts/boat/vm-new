@@ -114,15 +114,21 @@ vm "$RUN all"
 
 if [ "$BOAT_CHECK" = 1 ] && ! vm "test -s ~/.config/boat-check/key" 2>/dev/null; then
   say "boat-check key (heavy checks on throwaway machines)"
-  envids=()
+  envids=() missing=""
   for e in ${CHECK_KEY_ENVS:-$BOAT_ENV $CHECK_ENV}; do
-    i=$("$BOAT" env info "$e" --json 2>/dev/null | python3 -c 'import json,sys;t=sys.stdin.read();d=json.loads(t[t.find("{"):]);print(d.get("environment",d)["id"])' 2>/dev/null) || true
-    [ -n "$i" ] && [[ " ${envids[*]} " != *" --env $i "* ]] && envids+=(--env "$i")
+    i=$("$BOAT" env info "$e" --json 2>/dev/null | python3 -c 'import json,sys;t=sys.stdin.read();d=json.loads(t[t.find("{"):]);print(d.get("environment",d)["id"])' 2>/dev/null) || i=""
+    if [ -z "$i" ]; then missing="$missing $e"; continue; fi
+    [[ " ${envids[*]} " != *" --env $i "* ]] && envids+=(--env "$i")
   done
+  # Never make a key with a missing environment: it could not see the snapshot, or would have no scope at all.
+  if [ -n "$missing" ] || [ ${#envids[@]} -eq 0 ]; then
+    later "boat-check key: boat environment(s)${missing:- (none)} not found; make the key by hand (vm-setup $P status explains how)"
+  else
   "$BOAT" api-key create "$NAME-check-ci" --preset ci --ttl 90d "${envids[@]}" --json |
     python3 -c 'import json,sys;t=sys.stdin.read();print(json.loads(t[t.find("{"):])["secret"],end="")' |
     vm "umask 077; mkdir -p ~/.config/boat-check; cat > ~/.config/boat-check/key" ||
     later "boat-check key: vm-setup $P status explains how to make it"
+  fi
 fi
 
 say "Aside CLI sign-in (browser tasks from the VM run in Aside on the Mac)"
