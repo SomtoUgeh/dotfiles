@@ -20,8 +20,8 @@ sudo systemctl disable "$P-hostname.service" 2>/dev/null || true
 # resume (18 Nov 2026); a check copy must not have them, or it could take the VM's identity.
 rm -rf ~/.local/share/vm-heal ~/.config/autostart/vm-heal.desktop ~/.local/bin/vm-heal
 sudo rm -f /etc/cron.d/vm-heal
-# A check copy must never stop the VM it came from, or reuse its name or id.
-sudo systemctl disable --now boat-idle-stop.timer 2>/dev/null || true
+# A check copy must never act on the VM it came from, or reuse its name or id.
+sudo systemctl disable --now boat-keep-awake.timer boat-idle-stop.timer 2>/dev/null || true
 sudo rm -f /etc/boat-idle.env; rm -f ~/.config/vm-setup.env
 sudo hostnamectl set-hostname "$P-check"
 echo "clean-base: tailscaled $(systemctl is-enabled tailscaled 2>&1), t3code $(systemctl --user is-enabled t3code.service 2>&1), hostname $(hostname)"

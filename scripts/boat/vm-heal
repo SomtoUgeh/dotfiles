@@ -4,7 +4,7 @@
 # Why (18 Nov 2026): on resume boat boots the machine from its base image, then restores the
 # saved disk lazily (ascii-agents-server "[restore] ... lazyfs staging"). systemd has already
 # read its units by then, so our enabled units (tailscaled, <p>-keepalive.timer,
-# boat-idle-stop.timer, vm-setup-sync.timer) never start. On erivault the restore even came
+# boat-keep-awake.timer, vm-setup-sync.timer) never start. On erivault the restore even came
 # back with the base image's /etc, /usr and /var (Tailscale uninstalled, its node key gone,
 # our timers gone) while /home/user was intact. This script lives in /home, which always
 # survives, keeps a copy of our system files there, and puts back whatever is missing.
@@ -85,6 +85,9 @@ if ! $S test -e /etc/gshadow && [ -s "$D/gshadow" ] && [ -s /etc/group ]; then
   $S install -m 640 -o 0 -g shadow "$D/gshadow" /etc/gshadow 2>/dev/null && say "restored /etc/gshadow from the copy in /home"
 fi
 
+# Lets T3 hold its "Agents are working" sleep inhibitor. Its folder is closed to `user`.
+POLKIT_RULE=/etc/polkit-1/rules.d/50-t3code-keep-awake.rules
+has() { [ -e "$1" ] || $S test -e "$1" 2>/dev/null; }
 # Files we own outside /home. Kept in $D/system.tgz while they are all present.
 files() {
   local f
@@ -94,9 +97,9 @@ files() {
     /usr/local/sbin/$P-keepalive \
     /etc/systemd/system/$P-keepalive.service /etc/systemd/system/$P-keepalive.timer \
     /etc/systemd/system/timers.target.wants/$P-keepalive.timer \
-    /usr/local/sbin/boat-idle-stop /usr/local/bin/vm-stay /etc/boat-idle.env \
-    /etc/systemd/system/boat-idle-stop.service /etc/systemd/system/boat-idle-stop.timer \
-    /etc/systemd/system/timers.target.wants/boat-idle-stop.timer \
+    /usr/local/sbin/boat-keep-awake /usr/local/bin/vm-stay /etc/boat-idle.env \
+    /etc/systemd/system/boat-keep-awake.service /etc/systemd/system/boat-keep-awake.timer \
+    /etc/systemd/system/timers.target.wants/boat-keep-awake.timer \
     /etc/boat-check.env /etc/cron.d/vm-heal /var/lib/systemd/linger/user \
     /etc/apt/sources.list.d/tailscale.list /usr/share/keyrings/tailscale-archive-keyring.gpg \
     /etc/apt/sources.list.d/1password.list /usr/share/keyrings/1password-archive-keyring.gpg \
@@ -104,9 +107,10 @@ files() {
     /etc/systemd/system/*.d/90-t3code-protect.conf; do
     [ -e "$f" ] || [ -L "$f" ] && echo "$f"
   done
+  has $POLKIT_RULE && echo $POLKIT_RULE
 }
-WANT=(/usr/local/sbin/$P-keepalive /etc/systemd/system/$P-keepalive.timer /usr/local/sbin/boat-idle-stop
-      /etc/systemd/system/boat-idle-stop.timer /etc/boat-idle.env /etc/systemd/system/$P-hostname.service
+WANT=(/usr/local/sbin/$P-keepalive /etc/systemd/system/$P-keepalive.timer /usr/local/sbin/boat-keep-awake
+      /etc/systemd/system/boat-keep-awake.timer /etc/boat-idle.env $POLKIT_RULE /etc/systemd/system/$P-hostname.service
       /etc/cron.d/vm-heal /etc/apt/sources.list.d/ubuntu.sources)
 # Home files a restore has lost (21 Nov 2026). Kept in $D/home.tgz; put back if a key one is missing.
 home_files() {
@@ -122,8 +126,8 @@ HOME_WANT=(.gitconfig .config/systemd/user/t3code.service .t3/userdata/environme
 
 if [ "${1:-}" = --status ]; then
   echo "project $P, sandbox $BOAT_ID, host $(hostname)"
-  for f in "${WANT[@]}"; do printf '%-50s %s\n' "$f" "$([ -e "$f" ] && echo ok || echo MISSING)"; done
-  for u in tailscaled $P-keepalive.timer boat-idle-stop.timer; do printf '%-50s %s\n' "$u" "$(systemctl is-active $u)"; done
+  for f in "${WANT[@]}"; do printf '%-50s %s\n' "$f" "$(has "$f" && echo ok || echo MISSING)"; done
+  for u in tailscaled $P-keepalive.timer boat-keep-awake.timer; do printf '%-50s %s\n' "$u" "$(systemctl is-active $u)"; done
   printf '%-50s %s\n' "t3code (user)" "$(systemctl --user is-active t3code.service)"
   printf '%-50s %s\n' "tailscale" "$(tailscale status --self --peers=false 2>&1 | head -1)"
   printf '%-50s %s\n' "backup" "$(ls -l --time-style=+%F\ %R "$D/system.tgz" 2>/dev/null | awk '{print $6, $7}')"
@@ -148,7 +152,7 @@ self_check() {
 }
 
 # 1. Put back missing system files from the copy in /home.
-missing=0; for f in "${WANT[@]}"; do [ -e "$f" ] || missing=1; done
+missing=0; for f in "${WANT[@]}"; do has "$f" || missing=1; done
 if [ $missing = 1 ] && [ -s "$D/system.tgz" ]; then
   if self_ok; then
     $S tar -xzpf "$D/system.tgz" -C / --skip-old-files 2>/dev/null && say "restored missing system files from $D/system.tgz"
@@ -202,11 +206,11 @@ fi
 
 # 3. Our system timers: systemd read its units before boat restored them, so reload and start.
 if { [ -e /etc/systemd/system/$P-keepalive.timer ] && ! systemctl is-active --quiet $P-keepalive.timer; } \
-   || { [ -e /etc/systemd/system/boat-idle-stop.timer ] && ! systemctl is-active --quiet boat-idle-stop.timer; }; then
+   || { [ -e /etc/systemd/system/boat-keep-awake.timer ] && ! systemctl is-active --quiet boat-keep-awake.timer; }; then
   $S systemctl daemon-reload
-  for u in $P-hostname.service $P-keepalive.timer boat-idle-stop.timer; do
+  for u in $P-hostname.service $P-keepalive.timer boat-keep-awake.timer; do
     [ -e /etc/systemd/system/$u ] || continue
-    self_ok || continue   # the keepalive starts tailscaled and idle-stop stops "self": real VM only
+    self_ok || continue   # the keepalive starts tailscaled and keep-awake extends "self": real VM only
     systemctl is-active --quiet $u || { $S systemctl enable --now $u >/dev/null 2>&1 && say "started $u"; }
   done
 fi
@@ -229,7 +233,7 @@ if ! command -v op >/dev/null && [ -e /etc/apt/sources.list.d/1password.list ]; 
 fi
 
 # 7. Refresh the copies in /home while everything is present (at most every 6 h, or when missing).
-healthy=1; for f in "${WANT[@]}"; do [ -e "$f" ] || healthy=0; done
+healthy=1; for f in "${WANT[@]}"; do has "$f" || healthy=0; done
 if [ $healthy = 1 ]; then
   need_tgz=0; need_state=0
   { [ ! -s "$D/system.tgz" ] || [ -n "$(find "$D/system.tgz" -mmin +360 2>/dev/null)" ]; } && need_tgz=1
