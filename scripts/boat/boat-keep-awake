@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# Keep this project VM awake while it is in use. boat does the stopping: its auto-stop is a deadline,
+# TTL_MIN minutes after the last resume or the last `boat extend`. boat has no idle timer and cannot
+# see T3 (docs.boat.dev/long-running-tasks/auto-stop), so while the VM is busy this moves the deadline
+# to TTL_MIN minutes from now. A quiet VM gets no call, and boat stops it at the deadline.
+# Runs every 5 minutes from boat-keep-awake.timer as root. It never stops the VM itself: it replaced
+# boat-idle-stop, which kept its own idle clock and ran `boat stop self` (24 Nov 2026).
+# If this job breaks, the VM stops TTL_MIN minutes after its resume. It can never run on unseen.
+#
+# Busy: a hold (`vm-stay <hours>`), a start in the last 10 minutes, T3's "Agents are working" sleep
+# inhibitor (or a T3 run that works without it), a phone or desktop that opened T3 in the last 10
+# minutes, a terminal (pts) used in the last 30 minutes, or user CPU above CPU_MAX percent.
+# A VM with auto-stop off gets a deadline on the next check; `ENABLED=0` leaves it always on.
+# A longer deadline set by hand with `boat extend` is replaced on the next busy check: use vm-stay.
+# Config: /etc/boat-idle.env (BOAT_ID, TTL_MIN, CPU_MAX, ENABLED). Log: journalctl -t boat-keep-awake.
+# Last busy time and reason: /var/lib/boat-idle/last-active and last-reason. julds never has this.
+set -u
+ENV_FILE=${BOAT_IDLE_ENV:-/etc/boat-idle.env}
+# shellcheck disable=SC1090
+[ -f "$ENV_FILE" ] && . "$ENV_FILE"
+TTL_MIN=${TTL_MIN:-60}; CPU_MAX=${CPU_MAX:-40}; ENABLED=${ENABLED:-1}
+S=${BOAT_IDLE_STATE:-/var/lib/boat-idle}; mkdir -p "$S"; now=$(date +%s)
+BOAT=${BOAT:-/home/user/.ascii/bin/boat}
+T3_DB=${T3_DB:-/home/user/.t3/userdata/statev2.sqlite}
+log() { logger -t boat-keep-awake "$*"; }
+as_user() { runuser -u user -- "$@"; }
+boat() { as_user env BOAT_ID="$BOAT_ID" BOAT_NO_UPDATE=1 "$BOAT" "$@"; }
+[ "$ENABLED" = 1 ] || exit 0
+[ -n "${BOAT_ID:-}" ] || { log "BOAT_ID not set in $ENV_FILE"; exit 0; }
+
+# T3's own state: runs that work now (the test T3 uses for its inhibitor) and the last time a phone or
+# desktop connected. Linked T3 servers (the Mac, julds) are `bot` sessions and do not count. A table
+# that a T3 update renamed reads as 0, so the other signals still work.
+t3_state() {
+  as_user python3 - "$T3_DB" <<'P' 2>/dev/null || echo "0 0"
+import datetime, sqlite3, sys
+db = sqlite3.connect("file:" + sys.argv[1] + "?mode=ro", uri=True)
+def one(query):
+    try: return db.execute(query).fetchone()[0]
+    except sqlite3.Error: return None
+runs = one("select count(*) from orchestration_v2_projection_runs where status in ('preparing','starting','running')") or 0
+last = one("select max(last_connected_at) from auth_sessions where client_device_type in ('mobile','desktop') and revoked_at is null")
+try: seen = int(datetime.datetime.fromisoformat(last.replace("Z", "+00:00")).timestamp())
+except (AttributeError, ValueError): seen = 0
+print(runs, seen)
+P
+}
+
+reason=""
+hold=$(cat "$S/hold-until" 2>/dev/null || echo 0)
+up=$(cut -d. -f1 "${PROC_UPTIME:-/proc/uptime}" 2>/dev/null || echo 999999)
+if [ "$now" -lt "${hold:-0}" ]; then
+  reason="hold for $(( (hold - now) / 60 )) more min (vm-stay)"
+elif [ "$up" -lt 600 ]; then
+  # Also gives every cold resume the same window, whatever lifetime boat kept from before the stop.
+  reason="started $(( up / 60 )) min ago"
+elif systemd-inhibit --list --no-legend --no-pager 2>/dev/null | grep -q '^T3 Code[[:space:]]'; then
+  reason="T3 agents are working"
+else
+  read -r runs seen < <(t3_state)
+  if [ "${runs:-0}" -gt 0 ]; then
+    # T3 holds no inhibitor: the polkit rule from vm-setup is missing, or keep-awake is off in T3.
+    reason="$runs T3 run(s) working, without T3's sleep inhibitor"
+  elif [ $(( now - ${seen:-0} )) -lt 600 ]; then
+    reason="a phone or desktop opened T3 $(( (now - seen) / 60 )) min ago"
+  fi
+fi
+if [ -z "$reason" ]; then
+  # Terminal sessions (pts) used in the last 30 minutes. boat's desktop login on tty7 (:0) is always there; skip it.
+  active_tty=$(who -u | awk '$2 ~ /^pts/ { i=$5; if (i==".") n++; else if (i ~ /^[0-9][0-9]:[0-9][0-9]$/) { split(i,t,":"); if (t[1]*60+t[2] < 30) n++ } } END { print n+0 }')
+  [ "$active_tty" -gt 0 ] && reason="terminal session in use"
+fi
+if [ -z "$reason" ]; then
+  # CPU used right now by the user's own processes (builds, tests, agents). boat's snapshot and download
+  # work runs as root and is left out, so it cannot keep the VM awake.
+  cpu=$(top -b -n 2 -d 3 -u user | awk '/^ *PID/{blk++; next} blk==2 {s+=$9} END{printf "%d", s}')
+  [ "${cpu:-0}" -gt "$CPU_MAX" ] && reason="user CPU ${cpu}%"
+fi
+if [ -z "$reason" ]; then
+  # Quiet. Only make sure boat has a deadline: a new VM and a VM that came from boat-idle-stop have
+  # auto-stop off. A failed read counts as "has one"; the next check asks again.
+  off=$(boat info self --json 2>/dev/null | python3 -c 'import json,sys
+t = sys.stdin.read(); s = json.JSONDecoder().raw_decode(t[t.find("{"):])[0]
+print(1 if s.get("sandbox", s)["ttlSeconds"] is None else 0)' 2>/dev/null)
+  [ "$off" = 1 ] || exit 0
+  reason="auto-stop was off"
+fi
+
+[ "$reason" = "$(cat "$S/last-reason" 2>/dev/null)" ] || log "awake: $reason"
+echo "$now" > "$S/last-active"; echo "$reason" > "$S/last-reason"
+out=$(boat extend self --ttl $(( TTL_MIN * 60 )) --json 2>&1) || log "boat extend failed ($reason): ${out:0:300}"
+exit 0

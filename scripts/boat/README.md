@@ -9,7 +9,7 @@ machines started from a per-project saved snapshot through `boat-check`.
 | `base-common.sh` + `base-<project>.sh` | a new build machine | Installs the toolchain, clones the repo from a git bundle, installs deps |
 | `clean-base.sh` | a throwaway copy of a project VM | Removes the Tailscale node, T3 server, keepalive and sign-ins so the copy can be saved as `<project>-base` |
 | `vm-new` | the Mac | One command for a new project VM or a replica: creates the sandbox, runs `vm-setup`, GitHub key, Tailscale, T3 links, Mac ssh config, VM list and Executor bridge. See "New project VM" |
-| `vm-setup` | project VM (`~/.local/bin/vm-setup`, linked to this clone) | The one setup every project VM shares: base tools, zsh and prompt, T3, keepalive, git key, dotfiles, agent config, Executor, the Aside CLI (pointed at the Mac, updated daily), repos, boat-check, vm-heal, idle stop, hourly `vm-setup sync` timer. Safe to re-run. `vm-setup <p> status` shows what is done |
+| `vm-setup` | project VM (`~/.local/bin/vm-setup`, linked to this clone) | The one setup every project VM shares: base tools, zsh and prompt, T3, keepalive, git key, dotfiles, agent config, Executor, the Aside CLI (pointed at the Mac, updated daily), repos, boat-check, vm-heal, keep-awake, hourly `vm-setup sync` timer. Safe to re-run. `vm-setup <p> status` shows what is done |
 | `projects/<p>.env` (+ `<p>.sh`) | read by `vm-setup` and `vm-new` | The only per-project part: VM name, boat environment, repos and install commands, extra `~/.zshenv.local` lines, and optional `project_setup` (icb: Java, Android SDK, emulators) |
 | `link-agent-config.sh` | run by `vm-setup` (agents stage) | Clones dotfiles and p3-stack, links skills (or leaves them to Skillhub), Claude and Codex config like `install.sh`, adds `~/.claude/rules/boat-project-vm.md` |
 
@@ -137,14 +137,36 @@ unit changed. `vm-setup <p> status` lists anything still missing.
 
 ## Sleep when idle, wake on demand
 
-Project VMs (not julds) stop themselves after 45 quiet minutes and keep their disk; boat's own
-auto-stop is a timer from start and cannot see T3, so the check is ours (14 Nov 2026).
+boat stops a project VM (not julds): its auto-stop is a deadline, 60 minutes after the last resume or
+the last `boat extend`. boat has no idle timer, and only a prompt to boat's own agent moves the
+deadline, so a T3 run does not. `boat-keep-awake` moves the deadline while the VM is in use, and a
+quiet VM stops at the deadline.
+
+Until 24 Nov 2026 `boat-idle-stop` kept its own 45-minute idle clock and ran `boat stop self`. It
+stopped altschool 45 minutes after a resume: a phone or desktop with T3 open did not count as use. It
+also needed its own state and resume detection. Now the script only says "busy", and when it breaks
+the VM stops 60 minutes after its resume, where before it ran on with nobody to stop it.
 
 | File | Runs on | Does |
 | - | - | - |
-| `boat-idle-stop` | project VM (`/usr/local/sbin`, `boat-idle-stop.timer` every 5 min) | Stops the VM after `IDLE_MIN` (45) quiet minutes. Busy: an unfinished T3 run, new T3 activity, a pts terminal used in the last 30 min, user CPU over 40%, or a hold. A 15-minute gap between checks means it was resumed and starts a fresh window. Log: `journalctl -t boat-idle` |
-| `vm-stay` | project VM | `vm-stay 8` keeps it awake 8 hours; `vm-stay 0` clears it |
+| `boat-keep-awake` | project VM (`/usr/local/sbin`, `boat-keep-awake.timer` every 5 min) | While the VM is busy, runs `boat extend self` to put the deadline `TTL_MIN` (60) minutes from now. Busy: a hold, a start in the last 10 minutes, T3's sleep inhibitor (agents work), a phone or desktop that opened T3 in the last 10 minutes, a pts terminal used in the last 30 min, user CPU over 40%. Gives a VM with auto-stop off a deadline. Config `/etc/boat-idle.env` (`ENABLED=0` for always on). Log: `journalctl -t boat-keep-awake`; last busy time and reason in `/var/lib/boat-idle` |
+| `vm-stay` | project VM | `vm-stay 8` keeps it awake 8 hours; `vm-stay 0` clears it. A deadline set by hand with `boat extend` is replaced at the next busy check, so use this |
 | `vm-heal` | project VM (`~/.local/bin`) | Puts the VM back together after a resume: see "Repair after resume" below |
+
+T3 tells logind when agents work: a sleep inhibitor named "T3 Code". T3 is a user service with no
+login session, so logind refused it ("Failed to inhibit: Access denied", hundreds of times a day in
+T3's log) until `vm-setup` added `/etc/polkit-1/rules.d/50-t3code-keep-awake.rules`. The script also
+reads T3's database for runs that work, in case the inhibitor is missing, and for the last client
+connection. `systemd-inhibit --list` shows the inhibitor.
+
+After a stop boat keeps the machine for 10 minutes with every process frozen, so a resume in that time
+gets the same machine and memory back. In those 10 minutes the VM still answers on Tailscale and ssh,
+and T3 does not answer: that is a stopped VM, not a broken one.
+
+On a cold resume `/home/user` is a temporary mount (`ascii-lazyfs`) for about two minutes; boat then
+swaps the real disk in. `t3-service-launcher` waits for the swap (5 minutes at most) before it starts
+T3. A T3 that starts earlier keeps its working directory and database on the temporary mount for as
+long as it runs, and logs "Server ownership lock ... was deleted or replaced".
 
 Waking: the Mac's `com.julds.autowake` (`~/.local/bin/julds-autowake`) resumes every stopped VM in
 `~/.config/boat-vms` when T3 Code comes to the front, and wakes any VM stopped 10+ days so boat's

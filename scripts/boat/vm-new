@@ -64,6 +64,7 @@ fi
 
 if [ -z "$ID" ]; then
 say "create the sandbox"
+# Auto-stop off for the setup; boat-keep-awake gives the VM its deadline at its first check.
 ID=$("$BOAT" new --environment "$BOAT_ENV" --type "$TYPE" --name "$NAME-dev" --no-auto-stop ${FROM:+--from "$FROM"} --json |
   python3 -c 'import json,sys
 t=sys.stdin.read(); i=t.find("{"); d=json.loads(t[i:])
@@ -109,7 +110,7 @@ else
 fi
 vm "tailscale status >/dev/null" || { echo "vm-new: Tailscale is not signed in yet. Carry on with: vm-new $P${NAME_ARG:+ --name $NAME} --resume $ID" >&2; exit 1; }
 
-say "vm-setup: dotfiles, shell, agents, Executor, repos, project extras, boat-check, vm-heal, idle stop, timer"
+say "vm-setup: dotfiles, shell, agents, Executor, repos, project extras, boat-check, vm-heal, keep-awake, timer"
 vm "$RUN all"
 
 if [ "$BOAT_CHECK" = 1 ] && ! vm "test -s ~/.config/boat-check/key" 2>/dev/null; then

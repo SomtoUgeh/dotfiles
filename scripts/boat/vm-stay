@@ -1,5 +1,8 @@
 #!/bin/sh
 # Keep this VM awake for N hours (default 4): vm-stay 8. `vm-stay 0` clears the hold.
+# boat-keep-awake reads the hold and keeps boat's auto-stop deadline ahead of now while it lasts.
 h=${1:-4}; until=$(( $(date +%s) + h*3600 )); [ "$h" = 0 ] && until=0
 echo "$until" | sudo tee /var/lib/boat-idle/hold-until >/dev/null
+# Now, not at the next 5-minute check: boat's deadline can be closer than that.
+sudo systemctl start boat-keep-awake.service 2>/dev/null || echo "boat-keep-awake did not run: the hold starts at its next check" >&2
 [ "$h" = 0 ] && echo "hold cleared" || echo "awake until $(date -d @$until '+%a %H:%M %Z')"
