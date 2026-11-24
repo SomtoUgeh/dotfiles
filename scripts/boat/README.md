@@ -149,15 +149,19 @@ the VM stops 60 minutes after its resume, where before it ran on with nobody to 
 
 | File | Runs on | Does |
 | - | - | - |
-| `boat-keep-awake` | project VM (`/usr/local/sbin`, `boat-keep-awake.timer` every 5 min) | While the VM is busy, runs `boat extend self` to put the deadline `TTL_MIN` (60) minutes from now. Busy: a hold, a start in the last 10 minutes, T3's sleep inhibitor (agents work), a phone or desktop that opened T3 in the last 10 minutes, a pts terminal used in the last 30 min, user CPU over 40%. Gives a VM with auto-stop off a deadline. Config `/etc/boat-idle.env` (`ENABLED=0` for always on). Log: `journalctl -t boat-keep-awake`; last busy time and reason in `/var/lib/boat-idle` |
+| `boat-keep-awake` | project VM (`/usr/local/sbin`, `boat-keep-awake.timer` every 5 min) | While the VM is busy, runs `boat extend self` to put the deadline `TTL_MIN` (60) minutes from now. Busy: a hold, a start in the last 10 minutes, a T3 run that works and started in the last 12 hours, a phone or desktop that connected to T3 in the last 10 minutes, a pts terminal used in the last 30 min, user CPU over 40%. Gives a VM with auto-stop off a deadline. Config `/etc/boat-idle.env` (`ENABLED=0` for always on: the check then turns boat's auto-stop off). Log: `journalctl -t boat-keep-awake`; last busy time and reason in `/var/lib/boat-idle` |
 | `vm-stay` | project VM | `vm-stay 8` keeps it awake 8 hours; `vm-stay 0` clears it. A deadline set by hand with `boat extend` is replaced at the next busy check, so use this |
 | `vm-heal` | project VM (`~/.local/bin`) | Puts the VM back together after a resume: see "Repair after resume" below |
 
-T3 tells logind when agents work: a sleep inhibitor named "T3 Code". T3 is a user service with no
+The script reads T3's database: runs that work, and the last time a phone or desktop connected. A run
+older than 12 hours does not count, so a stuck row cannot keep the VM awake forever. A client that stays
+connected with no run does not count either: T3 records only the moment it connects, and the Mac app
+stays connected to every VM that is up. To read for longer than an hour with no run, use `vm-stay`.
+
+T3 also tells logind when agents work: a sleep inhibitor named "T3 Code". T3 is a user service with no
 login session, so logind refused it ("Failed to inhibit: Access denied", hundreds of times a day in
-T3's log) until `vm-setup` added `/etc/polkit-1/rules.d/50-t3code-keep-awake.rules`. The script also
-reads T3's database for runs that work, in case the inhibitor is missing, and for the last client
-connection. `systemd-inhibit --list` shows the inhibitor.
+T3's log) until `vm-setup` added `/etc/polkit-1/rules.d/50-t3code-keep-awake.rules`. The script does
+not read the inhibitor: it has no 12-hour limit.
 
 After a stop boat keeps the machine for 10 minutes with every process frozen, so a resume in that time
 gets the same machine and memory back. In those 10 minutes the VM still answers on Tailscale and ssh,

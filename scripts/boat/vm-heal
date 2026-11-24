@@ -85,7 +85,7 @@ if ! $S test -e /etc/gshadow && [ -s "$D/gshadow" ] && [ -s /etc/group ]; then
   $S install -m 640 -o 0 -g shadow "$D/gshadow" /etc/gshadow 2>/dev/null && say "restored /etc/gshadow from the copy in /home"
 fi
 
-# Lets T3 hold its sleep inhibitor, which boat-keep-awake reads. Its folder is closed to `user`.
+# Lets T3 hold its "Agents are working" sleep inhibitor. Its folder is closed to `user`.
 POLKIT_RULE=/etc/polkit-1/rules.d/50-t3code-keep-awake.rules
 has() { [ -e "$1" ] || $S test -e "$1" 2>/dev/null; }
 # Files we own outside /home. Kept in $D/system.tgz while they are all present.

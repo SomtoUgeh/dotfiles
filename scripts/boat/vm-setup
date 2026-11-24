@@ -197,11 +197,16 @@ put_t3_launcher() {
 # before the wait and reads nothing from the temporary mount after it.
 main() {
   cd /
+  out=$(readlink "/proc/$$/fd/1" 2>/dev/null); err=$(readlink "/proc/$$/fd/2" 2>/dev/null)
   for _ in $(seq 150); do
     [ "$(findmnt -n -o SOURCE --target "$HOME" 2>/dev/null)" = ascii-lazyfs ] || break
     sleep 2
   done
   cd "$HOME" || exit 1
+  # systemd opened T3's log (boot-service.log) before this script ran, so before the swap too.
+  # Open it again by name: T3 then writes to the file on the real disk.
+  case "$out" in "$HOME"/*) [ -w "$out" ] && exec >>"$out" ;; esac
+  case "$err" in "$HOME"/*) [ -w "$err" ] && exec 2>>"$err" ;; esac
   R="$HOME/.t3/runtime"
   v=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["activeVersion"])' "$R/service-state.json" 2>/dev/null)
   bin="$R/versions/$v/t3"
@@ -504,7 +509,8 @@ stage_idle() {
     sudo systemctl disable --now -q boat-idle-stop.timer 2>/dev/null || true
     sudo rm -f /usr/local/sbin/boat-idle-stop /etc/systemd/system/boat-idle-stop.service /etc/systemd/system/boat-idle-stop.timer /var/lib/boat-idle/last-check
     [ -f /etc/boat-idle.env ] && sudo sed -i '/^IDLE_MIN=/d; /^DRY_RUN=/d' /etc/boat-idle.env
-    rm -f "$HOME/.local/share/vm-heal/system.tgz"; sudo rm -f /var/lib/vm-heal-mirror/system.tgz
+    # One command: vm-heal puts a copy that is missing on one side back from the other.
+    sudo rm -f "$HOME/.local/share/vm-heal/system.tgz" /var/lib/vm-heal-mirror/system.tgz
     changed=1
   fi
   cmp -s "$BOAT_DIR/boat-keep-awake" /usr/local/sbin/boat-keep-awake || sudo install -m 755 "$BOAT_DIR/boat-keep-awake" /usr/local/sbin/boat-keep-awake
@@ -516,10 +522,10 @@ stage_idle() {
     # Never leave another sandbox's id here: keep-awake would act on that sandbox.
     sudo sed -i "s/^BOAT_ID=.*/BOAT_ID=$BOAT_ID/" /etc/boat-idle.env
   fi
-  # T3 holds a sleep inhibitor ("T3 Code", "Agents are working") while runs work, and boat-keep-awake
-  # reads it. T3 runs as a lingering user service with no login session, and logind refuses that
-  # ("Failed to inhibit: Access denied", in T3's log every few minutes) without this rule.
-  # The folder is closed to `user`, so read it with sudo.
+  # T3 holds a sleep inhibitor ("T3 Code", "Agents are working") while runs work. T3 runs as a
+  # lingering user service with no login session, and logind refuses that ("Failed to inhibit:
+  # Access denied", in T3's log every few minutes) without this rule. boat-keep-awake does not read
+  # the inhibitor. The folder is closed to `user`, so read it with sudo.
   local rule=/etc/polkit-1/rules.d/50-t3code-keep-awake.rules want
   want='// T3 Code may hold its "Agents are working" sleep inhibitor from its user service. Written by vm-setup.
 polkit.addRule(function(action, subject) {
@@ -536,6 +542,7 @@ Description=Keep this boat VM awake while it is in use (see /etc/boat-idle.env)
 [Service]
 Type=oneshot
 ExecStart=/usr/local/sbin/boat-keep-awake
+TimeoutStartSec=3min
 U
   put /etc/systemd/system/boat-keep-awake.timer sudo <<U && changed=1
 [Unit]
