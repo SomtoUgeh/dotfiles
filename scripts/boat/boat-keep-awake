@@ -7,9 +7,9 @@
 # boat-idle-stop, which kept its own idle clock and ran `boat stop self` (24 Nov 2026).
 # If this job breaks, the VM stops TTL_MIN minutes after its resume. It can never run on unseen.
 #
-# Busy: a hold (`vm-stay <hours>`), a start in the last 10 minutes, a T3 run that works and started in
-# the last 12 hours, a phone or desktop that connected to T3 in the last 10 minutes, a terminal (pts)
-# used in the last 30 minutes, or user CPU above CPU_MAX percent.
+# Busy: a hold (`vm-stay <hours>`), the first check after a resume on a new machine, a T3 run that
+# works and started in the last 12 hours, a phone or desktop that connected to T3 in the last 10
+# minutes, a terminal (pts) used in the last 30 minutes, or user CPU above CPU_MAX percent.
 # Not busy: a T3 client that stays connected with no run. T3 records only the moment it connects, and
 # the Mac app stays connected to every VM that is up.
 # A VM with auto-stop off gets a deadline on the next check. `ENABLED=0` makes the VM always on: the
@@ -67,12 +67,14 @@ P
 
 reason=""
 hold=$(cat "$S/hold-until" 2>/dev/null || echo 0)
-up=$(cut -d. -f1 "${PROC_UPTIME:-/proc/uptime}" 2>/dev/null || echo 999999)
+# A resume more than 10 minutes after the stop gets another machine, so another kernel boot id. The
+# uptime does not show a resume: boat hands over a machine that is already up for some minutes.
+boot=$(cat "${BOOT_ID_FILE:-/proc/sys/kernel/random/boot_id}" 2>/dev/null)
 if [ "$now" -lt "${hold:-0}" ]; then
   reason="hold for $(( (hold - now) / 60 )) more min (vm-stay)"
-elif [ "$up" -lt 600 ]; then
-  # Also gives every cold resume the same window, whatever lifetime boat kept from before the stop.
-  reason="started $(( up / 60 )) min ago"
+elif [ -n "$boot" ] && [ "$boot" != "$(cat "$S/boot-id" 2>/dev/null)" ]; then
+  # Gives every such resume TTL_MIN minutes, whatever lifetime boat kept from before the stop.
+  reason="resumed on a new machine"
 else
   read -r runs seen < <(t3_state)
   if [ "${runs:-0}" -gt 0 ]; then
@@ -102,5 +104,9 @@ fi
 
 [ "$reason" = "$(cat "$S/last-reason" 2>/dev/null)" ] || log "awake: $reason"
 echo "$now" > "$S/last-active"; echo "$reason" > "$S/last-reason"
-out=$(boat extend self --ttl $(( TTL_MIN * 60 )) --json 2>&1) || log "boat extend failed ($reason): ${out:0:300}"
+if out=$(boat extend self --ttl $(( TTL_MIN * 60 )) --json 2>&1); then
+  [ -z "$boot" ] || echo "$boot" > "$S/boot-id"
+else
+  log "boat extend failed ($reason): ${out:0:300}"
+fi
 exit 0

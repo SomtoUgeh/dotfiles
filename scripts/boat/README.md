@@ -149,7 +149,7 @@ the VM stops 60 minutes after its resume, where before it ran on with nobody to 
 
 | File | Runs on | Does |
 | - | - | - |
-| `boat-keep-awake` | project VM (`/usr/local/sbin`, `boat-keep-awake.timer` every 5 min) | While the VM is busy, runs `boat extend self` to put the deadline `TTL_MIN` (60) minutes from now. Busy: a hold, a start in the last 10 minutes, a T3 run that works and started in the last 12 hours, a phone or desktop that connected to T3 in the last 10 minutes, a pts terminal used in the last 30 min, user CPU over 40%. Gives a VM with auto-stop off a deadline. Config `/etc/boat-idle.env` (`ENABLED=0` for always on: the check then turns boat's auto-stop off). Log: `journalctl -t boat-keep-awake`; last busy time and reason in `/var/lib/boat-idle` |
+| `boat-keep-awake` | project VM (`/usr/local/sbin`, `boat-keep-awake.timer` every 5 min) | While the VM is busy, runs `boat extend self` to put the deadline `TTL_MIN` (60) minutes from now. Busy: a hold, the first check after a resume on a new machine, a T3 run that works and started in the last 12 hours, a phone or desktop that connected to T3 in the last 10 minutes, a pts terminal used in the last 30 min, user CPU over 40%. Gives a VM with auto-stop off a deadline. Config `/etc/boat-idle.env` (`ENABLED=0` for always on: the check then turns boat's auto-stop off). Log: `journalctl -t boat-keep-awake`; last busy time and reason in `/var/lib/boat-idle` |
 | `vm-stay` | project VM | `vm-stay 8` keeps it awake 8 hours; `vm-stay 0` clears it. A deadline set by hand with `boat extend` is replaced at the next busy check, so use this |
 | `vm-heal` | project VM (`~/.local/bin`) | Puts the VM back together after a resume: see "Repair after resume" below |
 
@@ -164,8 +164,10 @@ T3's log) until `vm-setup` added `/etc/polkit-1/rules.d/50-t3code-keep-awake.rul
 not read the inhibitor: it has no 12-hour limit.
 
 After a stop boat keeps the machine for 10 minutes with every process frozen, so a resume in that time
-gets the same machine and memory back. In those 10 minutes the VM still answers on Tailscale and ssh,
-and T3 does not answer: that is a stopped VM, not a broken one.
+gets the same machine and memory back. In those 10 minutes the VM can still show as connected on
+Tailscale and accept an ssh connection, and T3 and every command hang: that is a stopped VM, not a
+broken one. A later resume gets another machine. boat has it up some minutes before the resume, so
+the uptime does not show a resume; the kernel boot id does, and `boat-keep-awake` reads that.
 
 On a cold resume `/home/user` is a temporary mount (`ascii-lazyfs`) for about two minutes; boat then
 swaps the real disk in. `t3-service-launcher` waits for the swap (5 minutes at most) before it starts

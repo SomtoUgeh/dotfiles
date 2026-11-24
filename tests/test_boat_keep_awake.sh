@@ -62,16 +62,16 @@ db.commit()
 P
 }
 
-# A quiet VM with a deadline, up for two hours. Each case changes one thing.
+# A quiet VM with a deadline, on the machine of its last check. Each case changes one thing.
 quiet() {
   rm -f "$fixture"/{who,cpu,boat-calls,boat-fails,timeouts,log,env} "$fixture/state"/*
-  echo 3600 >"$fixture/ttl"; echo "7200.00 1.00" >"$fixture/uptime"
+  echo 3600 >"$fixture/ttl"; echo boot-1 >"$fixture/boot-id"; echo boot-1 >"$fixture/state/boot-id"
   printf 'BOAT_ID=bx_test\n' >"$fixture/env"
   make_db 0 - -
 }
 check() {
   PATH="$bin:$PATH" BOAT="$bin/boat" BOAT_IDLE_ENV="$fixture/env" BOAT_IDLE_STATE="$fixture/state" \
-    T3_DB="$fixture/t3.sqlite" PROC_UPTIME="$fixture/uptime" bash "$root/scripts/boat/boat-keep-awake"
+    T3_DB="$fixture/t3.sqlite" BOOT_ID_FILE="$fixture/boot-id" bash "$root/scripts/boat/boat-keep-awake"
 }
 extended() { grep -qx 'bx_test extend self --ttl 3600 --json' "$fixture/boat-calls" 2>/dev/null; }
 fail() { echo "FAIL: $*" >&2; exit 1; }
@@ -88,7 +88,12 @@ quiet; touch "$fixture/boat-fails"; idle "a quiet VM that boat does not answer f
 
 quiet; echo $(( now + 7200 )) >"$fixture/state/hold-until"; busy "a hold" "hold for"
 quiet; echo $(( now - 60 )) >"$fixture/state/hold-until"; idle "a hold that ended"
-quiet; echo "120.50 1.00" >"$fixture/uptime"; busy "a start 2 minutes ago" "started 2 min ago"
+# A resume on a new machine is busy once. A resume that boat did not answer for is tried again.
+quiet; echo boot-2 >"$fixture/boot-id"; busy "a resume on a new machine" "resumed on a new machine"
+rm "$fixture/boat-calls"; idle "the check after a resume"
+quiet; echo boot-2 >"$fixture/boot-id"; touch "$fixture/boat-fails"; check; rm "$fixture/boat-fails" "$fixture/boat-calls"
+busy "a resume after a failed extend" "resumed on a new machine"
+quiet; rm "$fixture/state/boot-id"; busy "the first check on a VM" "resumed on a new machine"
 
 quiet; make_db 2 - -; busy "T3 runs that work" "2 T3 run(s) working"
 quiet; make_db 1 - - 39600; busy "a T3 run that started 11 hours ago" "1 T3 run(s) working"
@@ -116,11 +121,11 @@ grep -qx 'bx_test extend self --no-auto-stop --json' "$fixture/boat-calls" || fa
 ! grep -q -- '--ttl' "$fixture/boat-calls" || fail "ENABLED=0: set a deadline"
 quiet; echo ENABLED=0 >>"$fixture/env"; echo null >"$fixture/ttl"; check
 ! grep -q 'extend' "$fixture/boat-calls" || fail "ENABLED=0 with auto-stop off: called boat extend"
-quiet; echo TTL_MIN=90 >>"$fixture/env"; echo "60.0 1.0" >"$fixture/uptime"; check
+quiet; echo TTL_MIN=90 >>"$fixture/env"; make_db 1 - -; check
 grep -qx 'bx_test extend self --ttl 5400 --json' "$fixture/boat-calls" || fail "TTL_MIN=90: wrong deadline"
 
 # A failed extend is logged with boat's answer, and the next check tries again.
-quiet; echo "60.0 1.0" >"$fixture/uptime"; touch "$fixture/boat-fails"; check
+quiet; make_db 1 - -; touch "$fixture/boat-fails"; check
 grep -q 'boat extend failed.*sandbox_not_ready' "$fixture/log" || fail "a failed extend: not logged"
 
 # The same reason twice is logged once.
