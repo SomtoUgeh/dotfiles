@@ -11,17 +11,22 @@ A=$fixture/dotfiles/agents
 mkdir -p "$HOME" "$A/skills/alpha" "$fixture/p3-stack/skills/p3one" "$fixture/p3-stack/skills/p3two" "$fixture/elsewhere/own"
 ln -s ../../../p3-stack/skills/p3one "$A/skills/p3one"
 ln -s ../../../p3-stack/skills/p3two "$A/skills/p3two"
+# A slash-only skill stays on disk; the same line outside the front matter does not count.
+mkdir -p "$A/skills/cmd" "$A/skills/notcmd"
+printf '%s\n' --- 'name: cmd' 'disable-model-invocation: true' --- body >"$A/skills/cmd/SKILL.md"
+printf '%s\n' --- 'name: notcmd' --- 'disable-model-invocation: true' >"$A/skills/notcmd/SKILL.md"
 
 link() { bash "$root/scripts/link_skills.sh" "$A" "$@"; }
 is_link_to() { [ -L "$1" ] && [ "$(readlink "$1")" = "$2" ]; }
 listing() { for x in "$1"/*; do echo "$x $(readlink "$x" || true)"; done; }
 t=$HOME/.claude/skills
 
-# A new folder gets only the p3-stack skills.
-link "$t" | grep -q 'has 2 skills on disk'
+# A new folder gets only the p3-stack and slash-only skills.
+link "$t" | grep -q 'has 3 skills on disk'
 is_link_to "$t/p3one" "$A/skills/p3one"
 is_link_to "$t/p3two" "$A/skills/p3two"
-[ ! -e "$t/alpha" ]
+is_link_to "$t/cmd" "$A/skills/cmd"
+[ ! -e "$t/alpha" ] && [ ! -e "$t/notcmd" ]
 
 # The old link of the whole folder becomes a real folder.
 rm -r "$t"

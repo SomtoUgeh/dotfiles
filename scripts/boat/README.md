@@ -25,7 +25,8 @@ per shared skill. The same stage writes the Executor bridges and registers `exec
 
 Each run of `link-agent-config` keeps the tool skill folders (`~/.agents`,
 `~/.claude`, and OpenCode, Grok and Cursor where they exist) to the skills that
-stay on disk: the p3-stack skills, through `scripts/link_skills.sh`. Every other
+stay on disk: the p3-stack skills and the slash-only skills
+(`disable-model-invocation: true`), through `scripts/link_skills.sh`. Every other
 skill loads through Executor, from the app `skills` that
 [services/skills-mcp](../../services/skills-mcp/README.md) serves at
 `mcp.julds.com`. `skill-fetch <skill>` (in `~/.local/bin`) puts a whole skill on

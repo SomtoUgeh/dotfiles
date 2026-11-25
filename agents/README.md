@@ -78,7 +78,8 @@ their separate jobs. The Claude and OpenCode `/triage` commands invoke file-todo
 mode; it does not define another lifecycle.
 
 The installer (`scripts/link_skills.sh`) puts only the skills that stay on
-disk, the p3-stack skills, in the paths below. Every other skill loads through
+disk, the p3-stack skills and the slash-only skills
+(`disable-model-invocation: true`, which run only as `/<name>`), in the paths below. Every other skill loads through
 Executor from the app `skills`; the SessionStart hook
 `agents/shared/hooks/skills_index.sh` lists the library for Claude Code and
 Codex, and `skill-fetch <skill>` puts a whole skill on disk for skills that run

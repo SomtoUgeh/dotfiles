@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Keep each tool's skill folder to the skills that stay on disk: the p3-stack
-# skills (agents/skills/<name> links into p3-stack). Every other skill loads
-# through Executor, from the app `skills` that services/skills-mcp serves.
+# skills (agents/skills/<name> links into p3-stack) and the slash-only skills
+# (front matter `disable-model-invocation: true`), because a tool runs
+# /<name> only from a skill on disk. Every other skill loads through Executor,
+# from the app `skills` that services/skills-mcp serves.
 # Real folders and links to other places stay, such as aside-browser and
 # boat's own boat and synced folders. Idempotent; install.sh and
 # scripts/boat/link-agent-config.sh run it.
@@ -10,9 +12,16 @@ set -euo pipefail
 skills=$(cd "$1/skills" && pwd)
 shift
 
+slash_only() { # <skill dir>: true when its front matter has disable-model-invocation: true
+  [ -f "$1/SKILL.md" ] && awk 'NR == 1 { if ($0 != "---") exit; next }
+    /^---[[:space:]]*$/ { exit }
+    /^disable-model-invocation:[[:space:]]*true[[:space:]]*$/ { found = 1 }
+    END { exit !found }' "$1/SKILL.md"
+}
+
 on_disk=
 for s in "$skills"/*; do
-  if [ -L "$s" ] && [[ $(readlink "$s") == */p3-stack/skills/* ]]; then
+  if { [ -L "$s" ] && [[ $(readlink "$s") == */p3-stack/skills/* ]]; } || slash_only "$s"; then
     on_disk+=$(basename "$s")$'\n'
   fi
 done
