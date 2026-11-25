@@ -15,13 +15,13 @@ Preferred workflow: `code-review`
 <target> $ARGUMENTS </target>
 
 This command is a wrapper. Its body is the `code-review` skill, which is in the
-Skillhub library. Do not load it with the skill tool.
+skill library. Do not load it with the skill tool.
 
-Load the skill through the Executor MCP server, then execute it:
+Load the skill with the Executor MCP server's `skills` tool, then execute it:
 
 ```
-tool: call
-input: {"calls": {"path": "tools.skillhub.read", "input": {"name": "code-review"}}}
+tool: skills
+input: {"app": "skills", "name": "code-review"}
 ```
 
 When the skill names another file of its folder, read that file with the same

@@ -11,7 +11,7 @@ machines started from a per-project saved snapshot through `boat-check`.
 | `vm-new` | the Mac | One command for a new project VM or a replica: creates the sandbox, runs `vm-setup`, GitHub key, Tailscale, T3 links, Mac ssh config, VM list and Executor bridge. See "New project VM" |
 | `vm-setup` | project VM (`~/.local/bin/vm-setup`, linked to this clone) | The one setup every project VM shares: base tools, zsh and prompt, T3, keepalive, git key, dotfiles, agent config, Executor, the Aside CLI (pointed at the Mac, updated daily), repos, boat-check, vm-heal, keep-awake, hourly `vm-setup sync` timer. Safe to re-run. `vm-setup <p> status` shows what is done |
 | `projects/<p>.env` (+ `<p>.sh`) | read by `vm-setup` and `vm-new` | The only per-project part: VM name, boat environment, repos and install commands, extra `~/.zshenv.local` lines, and optional `project_setup` (icb: Java, Android SDK, emulators) |
-| `link-agent-config.sh` | run by `vm-setup` (agents stage) | Clones dotfiles and p3-stack, links skills (or leaves them to Skillhub), Claude and Codex config like `install.sh`, adds `~/.claude/rules/boat-project-vm.md` |
+| `link-agent-config.sh` | run by `vm-setup` (agents stage) | Clones dotfiles and p3-stack, links the skills that stay on disk and retires Skillhub, Claude and Codex config like `install.sh`, adds `~/.claude/rules/boat-project-vm.md` |
 
 ## Agent config on a project VM
 
@@ -21,58 +21,22 @@ hour. It keeps boat's own `boat` and `synced` folders in `~/.claude/skills` and 
 per shared skill. The same stage writes the Executor bridges and registers `executor_v2` and
 `executor_v2_local` for Claude and `executor_v2` for Codex.
 
-## Skillhub on a project VM
+## Skills on a project VM
 
-A VM with no Skillhub gets one link per shared skill, as above. To make its
-tools load skills from the Skillhub library through Executor instead:
+Each run of `link-agent-config` keeps the tool skill folders (`~/.agents`,
+`~/.claude`, and OpenCode, Grok and Cursor where they exist) to the skills that
+stay on disk: the p3-stack skills, through `scripts/link_skills.sh`. Every other
+skill loads through Executor, from the app `skills` that
+[services/skills-mcp](../../services/skills-mcp/README.md) serves at
+`mcp.julds.com`. `skill-fetch <skill>` (in `~/.local/bin`) puts a whole skill on
+disk when it runs scripts. The SessionStart hook `~/.claude/hooks/skills-index.sh`
+lists the library for Claude Code; Codex gets the same hook from
+`sync_agent_config.py`.
 
-```sh
-git clone git@github.com:SomtoUgeh/skillhub.git ~/code/personal/skillhub
-cd ~/code/personal/skillhub
-bun install --frozen-lockfile --production   # bun 1.4.4: the image's 1.3.14 cannot read this bun.lock
-bun link                                     # puts skillhub into ~/.bun/bin
-skillhub login                               # confirm the code in a browser on any machine
-skillhub mode download                       # take every skill from the library, never from this dotfiles clone
-skillhub sync                                # writes ~/.skillhub/managed.json
-link-agent-config                            # removes the per-skill links
-```
-
-While `~/.skillhub/managed.json` exists, each run of `link-agent-config`
-leaves the skill folders to Skillhub. It removes only the links that it made
-itself, keeps the links that Skillhub owns and boat's `boat` and `synced`
-folders, and runs `skillhub sync`, so a change of the active set reaches the
-VM within an hour. A sync that fails does not stop the run.
-
-Before the sync, each run pulls `~/code/personal/skillhub` and runs
-`bun install`, so every VM has the `skillhub` command of the main branch.
-Then it runs `skillhub mode download`: this dotfiles clone holds a copy of the
-skills folder, and in link mode a sync links the tools to that copy, so the
-VM would keep its own version of the library. When the mode cannot be set,
-the run does not sync.
-
-Codex reads `~/.agents/skills`. While that path is one link to the shared
-folder, the script runs `skillhub adopt ~/.agents/skills --yes` before the
-sync. The path then is a real folder with only the active skills, and
-Codex loads the others through Executor, as Claude Code does. After the
-adopt, a skill that is not active is not at `~/.agents/skills/<name>`: a
-script that a skill names by that path runs only while the skill is active.
-The Codex hooks run from the dotfiles repository, not from that path.
-
-Codex needs two more steps on each VM, one time:
-
-```sh
-# The Executor entry: the bearer wrapper of the VM, no browser sign-in.
-codex mcp remove executor_v2
-codex mcp add executor_v2 -- "$HOME/.local/bin/executor-v2-mcp"
-# The hooks: start Codex, open /hooks, approve the Skillhub hook and the
-# shaping hook. Codex does not run a new or changed hook before that.
-```
-
-Do not run a plain `skillhub adopt` on a project VM: it moves `boat` and
-`synced` out of `~/.claude/skills`. The script already clears that folder.
-`skillhub uninstall --yes` removes the ledger, and the next run links every
-skill again.
-
+Skillhub is retired. The first run on a VM runs `scripts/retire_skillhub.sh`:
+`skillhub uninstall --yes`, then it removes `skillhub-sync.timer`, the
+`skillhub` command, `~/.skillhub` and the `~/code/personal/skillhub` checkout
+(a checkout with work that is not pushed stays). Later runs find nothing to do.
 ## Rebuild a base
 
 1. On julds: `git bundle create /tmp/<p>.bundle --remotes=origin --tags` in the repo, copy it to the Mac.

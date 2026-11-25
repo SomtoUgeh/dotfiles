@@ -57,7 +57,11 @@ def seed_skill_choices(current, home: Path) -> None:
             overrides.append(entry)
 
 
-MANAGED_HOOK_FILES = ("agents/shared/hooks/git_guard.py", "agents/skills/shaping/shaping-ripple.sh")
+MANAGED_HOOK_FILES = (
+    "agents/shared/hooks/git_guard.py",
+    "agents/skills/shaping/shaping-ripple.sh",
+    "agents/shared/hooks/skills_index.sh",
+)
 
 
 def resolve_hook_command(command: str, repo: Path) -> str:
@@ -65,8 +69,8 @@ def resolve_hook_command(command: str, repo: Path) -> str:
     wrapping quote cannot make Grok treat the path as relative to ~/.claude/.
 
     The hooks run from the repository. A tool's skill folder such as
-    ~/.agents/skills holds only the active skills on a machine that Skillhub
-    manages, so a hook must not run from there.
+    ~/.agents/skills holds only the skills that stay on disk (see
+    scripts/link_skills.sh), so a hook must not run from there.
     """
     for relative in MANAGED_HOOK_FILES:
         placeholder = "${DOTFILES_DIR}/" + relative
@@ -104,7 +108,8 @@ def keep_transports(current, defaults) -> None:
 def merge_hooks(current: dict, defaults: dict) -> dict:
     merged = deepcopy(current)
     events = merged.setdefault("hooks", {})
-    managed = ("git_guard.py", "shaping-ripple.sh")
+    # Skillhub's retired index hook goes with the managed ones.
+    managed = ("git_guard.py", "shaping-ripple.sh", "skills_index.sh", "skillhub index")
     for event in list(events):
         kept = []
         for group in events[event]:

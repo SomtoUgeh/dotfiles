@@ -23,6 +23,19 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${DOTFILES_DIR}/agents/shared/hooks/skills_index.sh\"",
+            "timeout": 10,
+            "additionalContextLimit": 20000
+          }
+        ]
+      }
     ]
   }
 }

@@ -1,0 +1,62 @@
+name: skills-mcp
+
+# Deploys the skills library to mcp.julds.com. A push that changes a skill
+# deploys at once; the hourly run picks up p3-stack changes and deploys only
+# when the built library differs from the live one. Executor rechecks the
+# index every 5 minutes, so a change reaches every client within about 10.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "agents/skills/**"
+      - "services/skills-mcp/**"
+      - ".github/workflows/skills-mcp.yml"
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: skills-mcp
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dotfiles/services/skills-mcp
+    steps:
+      # agents/skills links into ../../../p3-stack, so both repos sit side by side.
+      - uses: actions/checkout@v7
+        with:
+          path: dotfiles
+      - uses: actions/checkout@v7
+        with:
+          repository: SomtoUgeh/p3-stack
+          path: p3-stack
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - run: bun run check
+      - run: bun test
+      - name: Skip an hourly run when nothing changed
+        id: changed
+        run: |
+          built=$(jq -r .version src/generated/catalog.json)
+          live=$(curl -fsS https://mcp.julds.com/ | jq -r .version || echo none)
+          echo "built=$built live=$live"
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "$built" = "$live" ]; then
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.changed.outputs.deploy == 'true'
+        run: bunx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 49261d68964c258dfd9513442644e91e

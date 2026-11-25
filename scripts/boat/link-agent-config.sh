@@ -6,7 +6,7 @@
 # it once, and agent-config-sync.timer runs it after each boot and every hour,
 # so skills pushed from the Mac reach the VM without a manual step.
 set -euo pipefail
-# `bun link` puts the skillhub command into ~/.bun/bin, which is not in the timer's PATH.
+# retire_skillhub.sh needs the skillhub command from ~/.bun/bin, which is not in the timer's PATH.
 export PATH=$HOME/.bun/bin:$HOME/.local/bin:$PATH
 P=$HOME/code/personal
 D=$P/dotfiles
@@ -31,83 +31,21 @@ link() { # <source> <target>: move a real file aside once, then link
   ln -s "$1" "$2"
 }
 
-# No Skillhub on this VM: the neutral path for Codex, and one link per skill
-# in ~/.claude/skills so boat's own `boat` and `synced` folders stay where
-# boat puts them.
-link_every_skill() {
-  local s b t
-  link "$A/skills" "$HOME/.agents/skills"
-  for s in "$A"/skills/*/; do
-    b=$(basename "$s")
-    case $b in boat | synced) continue ;; esac
-    t=$HOME/.claude/skills/$b
-    if [ -e "$t" ] && [ ! -L "$t" ]; then continue; fi
-    ln -sfn "${s%/}" "$t"
-  done
-  find "$HOME/.claude/skills" -maxdepth 1 -xtype l -delete
-  skills="$(find "$HOME/.claude/skills" -maxdepth 1 -type l | wc -l) skills linked"
-}
-
-# Skillhub manages this VM: the tools load skills from the library through
-# Executor, and only the active skills are in the tool folders. Remove the
-# links that an earlier run of this script made, keep the links that Skillhub
-# owns and boat's own folders, then let Skillhub put the active set in place.
-leave_skills_to_skillhub() {
-  local owned t name removed=0 neutral=$HOME/.agents/skills
-  # A real folder there is an adopted one. Keep it.
-  if [ ! -d "$neutral" ] || [ -L "$neutral" ]; then link "$A/skills" "$neutral"; fi
-  skills="skills left as they are"
-  # Skillhub does not guess what it owns when the ledger is damaged. Nor does this script.
-  if ! owned=$(jq -r --arg f "$HOME/.claude/skills" '.folders[$f].entries // {} | keys[]' "$ledger" 2>/dev/null); then
-    echo "link-agent-config: cannot read $ledger; the skill links are left as they are" >&2
-    return
-  fi
-  for t in "$HOME"/.claude/skills/*; do
-    [ -L "$t" ] || continue
-    name=$(basename "$t")
-    [ "$(readlink "$t")" = "$A/skills/$name" ] || continue
-    if grep -qxF -- "$name" <<<"$owned"; then continue; fi
-    rm "$t"
-    removed=$((removed + 1))
-  done
-  skills="skills left to Skillhub ($removed links of this script removed)"
-  # The command follows the main branch of its checkout, so every VM runs the
-  # same version. A pull that does not fast-forward keeps the version that is there.
-  if [ -d "$P/skillhub/.git" ]; then
-    clone_or_pull skillhub "$P/skillhub"
-    if ! (cd "$P/skillhub" && bun install --silent --frozen-lockfile --production >/dev/null); then
-      echo "link-agent-config: bun install in ~/code/personal/skillhub failed; the skillhub command may be out of date" >&2
-    fi
-  fi
-  if ! command -v skillhub >/dev/null; then
-    echo "link-agent-config: the skillhub command is not on the path; the active skills were not synced" >&2
-    return
-  fi
-  # The dotfiles clone holds a copy of the skills folder. In link mode a sync
-  # links the tools to that copy, so the VM would keep its own version. In
-  # download mode every skill comes from the library. Without it, no sync.
-  if ! skillhub mode download >/dev/null; then
-    echo "link-agent-config: skillhub mode download failed; the active skills were not synced" >&2
-    return
-  fi
-  # Codex reads the neutral path. As one link to the shared folder it shows
-  # every skill. The adopt makes it a real folder with only the active skills.
-  # `skillhub uninstall --yes` puts the link back.
-  if [ -L "$neutral" ] && ! skillhub adopt "$neutral" --yes; then
-    echo "link-agent-config: skillhub adopt of ~/.agents/skills did not complete" >&2
-  fi
-  # An adopt that changes nothing does not sync, so the sync always runs.
-  if ! skillhub sync; then
-    echo "link-agent-config: skillhub sync failed; the active skills are as the last sync left them" >&2
-  fi
-}
-
-# Shared skills. The first `skillhub sync` on this VM writes the ledger, and
-# from then on Skillhub delivers the skills. `skillhub uninstall --yes` removes
-# the ledger, and the next run links every skill again.
-ledger=${SKILLHUB_HOME:-$HOME/.skillhub}/managed.json
-mkdir -p "$HOME/.claude/skills"
-if [ -f "$ledger" ]; then leave_skills_to_skillhub; else link_every_skill; fi
+# Shared skills. Each tool's skill folder holds only the skills that stay on
+# disk (the p3-stack skills); the others load through Executor, from the app
+# `skills` that services/skills-mcp serves. boat's own `boat` and `synced`
+# folders stay. Skillhub is retired: the first run removes it from the VM.
+if ! bash "$D/scripts/retire_skillhub.sh"; then
+  echo "link-agent-config: Skillhub was not fully removed; see the message above" >&2
+fi
+folders=("$HOME/.agents/skills" "$HOME/.claude/skills")
+for tool in "$HOME/.config/opencode" "$HOME/.grok" "$HOME/.cursor"; do
+  if [ -d "$tool" ]; then folders+=("$tool/skills"); fi
+done
+skills=$(bash "$D/scripts/link_skills.sh" "$A" "${folders[@]}" | tail -n 1)
+skills=${skills#link_skills: }
+mkdir -p "$HOME/.local/bin"
+ln -sfn "$D/scripts/skill-fetch" "$HOME/.local/bin/skill-fetch"
 
 # Claude Code
 link "$A/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
@@ -117,6 +55,7 @@ link "$A/claude/commands" "$HOME/.claude/commands"
 link "$A/claude/agents" "$HOME/.claude/agents"
 link "$A/claude/output-styles" "$HOME/.claude/output-styles"
 link "$A/shared/hooks/git_guard.py" "$HOME/.claude/hooks/git_guard.py"
+link "$A/shared/hooks/skills_index.sh" "$HOME/.claude/hooks/skills-index.sh"
 link "$A/skills/shaping" "$HOME/.claude/hooks/shaping"
 link "$A/claude/statusline.sh" "$HOME/.claude/statusline.sh"
 link "$A/claude/file-suggestion.sh" "$HOME/.claude/file-suggestion.sh"

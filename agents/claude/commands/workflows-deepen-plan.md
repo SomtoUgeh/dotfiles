@@ -8,13 +8,13 @@ argument-hint: "[path to plan folder, e.g., docs/plans/2026-01-30-feat-user-auth
 <plan_path> $ARGUMENTS </plan_path>
 
 This command is a wrapper. Its body is the workflows-deepen-plan skill, which is in the
-Skillhub library and not on this disk. Do not call the Skill tool for it.
+skill library and not on this disk. Do not call the Skill tool for it.
 
-Load the skill through the Executor MCP server, then execute it:
+Load the skill with the Executor MCP server's `skills` tool, then execute it:
 
 ```
-tool: call
-input: {"calls": {"path": "tools.skillhub.read", "input": {"name": "workflows-deepen-plan"}}}
+tool: skills
+input: {"app": "skills", "name": "workflows-deepen-plan"}
 ```
 
 When the skill names another file of its folder, read that file with the same

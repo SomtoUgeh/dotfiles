@@ -8,13 +8,13 @@ argument-hint: "[feature description, bug report, or improvement idea]"
 <feature_description> $ARGUMENTS </feature_description>
 
 This command is a wrapper. Its body is the workflows-plan skill, which is in the
-Skillhub library and not on this disk. Do not call the Skill tool for it.
+skill library and not on this disk. Do not call the Skill tool for it.
 
-Load the skill through the Executor MCP server, then execute it:
+Load the skill with the Executor MCP server's `skills` tool, then execute it:
 
 ```
-tool: call
-input: {"calls": {"path": "tools.skillhub.read", "input": {"name": "workflows-plan"}}}
+tool: skills
+input: {"app": "skills", "name": "workflows-plan"}
 ```
 
 When the skill names another file of its folder, read that file with the same

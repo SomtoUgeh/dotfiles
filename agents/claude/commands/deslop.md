@@ -8,13 +8,13 @@ argument-hint: "[optional: file path | paste draft | is this AI?]"
 <target> $ARGUMENTS </target>
 
 This command is a wrapper. Its body is the deslop skill, which is in the
-Skillhub library and not on this disk. Do not call the Skill tool for it.
+skill library and not on this disk. Do not call the Skill tool for it.
 
-Load the skill through the Executor MCP server, then execute it:
+Load the skill with the Executor MCP server's `skills` tool, then execute it:
 
 ```
-tool: call
-input: {"calls": {"path": "tools.skillhub.read", "input": {"name": "deslop"}}}
+tool: skills
+input: {"app": "skills", "name": "deslop"}
 ```
 
 When the skill names another file of its folder, read that file with the same

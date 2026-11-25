@@ -1,0 +1,23 @@
+{
+  "name": "skills-mcp",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun scripts/build.ts",
+    "types": "wrangler types",
+    "check": "tsc --noEmit",
+    "test": "bun test",
+    "dev": "bun run build && wrangler dev",
+    "deploy": "bun run build && bun run check && bun test && wrangler deploy"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.4.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.5",
+    "apps": "0.0.1-beta.125",
+    "typescript": "7.0.2",
+    "wrangler": "4.168.0"
+  }
+}
