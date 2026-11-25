@@ -102,26 +102,27 @@ unit changed. `vm-setup <p> status` lists anything still missing.
 
 ## Sleep when idle, wake on demand
 
-boat stops a project VM (not julds): its auto-stop is a deadline, 60 minutes after the last resume or
-the last `boat extend`. boat has no idle timer, and only a prompt to boat's own agent moves the
+boat stops a project VM (not julds): its auto-stop is a deadline, 30 minutes after the last resume or
+the last `boat extend` (`TTL_MIN` in `/etc/boat-idle.env`; 60 until 25 Nov 2026, lowered because every
+VM is a `large` at twice the base rate, about $0.07 an hour while it is up). boat has no idle timer, and only a prompt to boat's own agent moves the
 deadline, so a T3 run does not. `boat-keep-awake` moves the deadline while the VM is in use, and a
 quiet VM stops at the deadline.
 
 Until 24 Nov 2026 `boat-idle-stop` kept its own 45-minute idle clock and ran `boat stop self`. It
 stopped altschool 45 minutes after a resume: a phone or desktop with T3 open did not count as use. It
 also needed its own state and resume detection. Now the script only says "busy", and when it breaks
-the VM stops 60 minutes after its resume, where before it ran on with nobody to stop it.
+the VM stops `TTL_MIN` minutes after its resume, where before it ran on with nobody to stop it.
 
 | File | Runs on | Does |
 | - | - | - |
-| `boat-keep-awake` | project VM (`/usr/local/sbin`, `boat-keep-awake.timer` every 5 min) | While the VM is busy, runs `boat extend self` to put the deadline `TTL_MIN` (60) minutes from now. Busy: a hold, the first check after a resume on a new machine, a T3 run that works and started in the last 12 hours, a phone or desktop that connected to T3 in the last 10 minutes, a pts terminal used in the last 30 min, user CPU over 40%. Gives a VM with auto-stop off a deadline. Config `/etc/boat-idle.env` (`ENABLED=0` for always on: the check then turns boat's auto-stop off). Log: `journalctl -t boat-keep-awake`; last busy time and reason in `/var/lib/boat-idle` |
+| `boat-keep-awake` | project VM (`/usr/local/sbin`, `boat-keep-awake.timer` every 5 min) | While the VM is busy, runs `boat extend self` to put the deadline `TTL_MIN` minutes from now (30 on every project VM; the script falls back to 60 when the line is missing). Busy: a hold, the first check after a resume on a new machine, a T3 run that works and started in the last 12 hours, a phone or desktop that connected to T3 in the last 10 minutes, a pts terminal used in the last 30 min, user CPU over 40%. Gives a VM with auto-stop off a deadline. Config `/etc/boat-idle.env` (`ENABLED=0` for always on: the check then turns boat's auto-stop off). Log: `journalctl -t boat-keep-awake`; last busy time and reason in `/var/lib/boat-idle` |
 | `vm-stay` | project VM | `vm-stay 8` keeps it awake 8 hours; `vm-stay 0` clears it. A deadline set by hand with `boat extend` is replaced at the next busy check, so use this |
 | `vm-heal` | project VM (`~/.local/bin`) | Puts the VM back together after a resume: see "Repair after resume" below |
 
 The script reads T3's database: runs that work, and the last time a phone or desktop connected. A run
 older than 12 hours does not count, so a stuck row cannot keep the VM awake forever. A client that stays
 connected with no run does not count either: T3 records only the moment it connects, and the Mac app
-stays connected to every VM that is up. To read for longer than an hour with no run, use `vm-stay`.
+stays connected to every VM that is up. To read for longer than half an hour with no run, use `vm-stay`.
 
 T3 also tells logind when agents work: a sleep inhibitor named "T3 Code". T3 is a user service with no
 login session, so logind refused it ("Failed to inhibit: Access denied", hundreds of times a day in
@@ -139,9 +140,19 @@ swaps the real disk in. `t3-service-launcher` waits for the swap (5 minutes at m
 T3. A T3 that starts earlier keeps its working directory and database on the temporary mount for as
 long as it runs, and logs "Server ownership lock ... was deleted or replaced".
 
-Waking: the Mac's `com.julds.autowake` (`~/.local/bin/julds-autowake`) resumes every stopped VM in
-`~/.config/boat-vms` when T3 Code comes to the front, and wakes any VM stopped 10+ days so boat's
-14-day disk retention never runs out. `vm` on the Mac shows and wakes them. Agents use the Executor
+Waking: the Mac's `com.julds.autowake` (`~/.local/bin/julds-autowake`, not in this repo) resumes the
+VMs in `~/.config/boat-vms` that stopped in the last 24 hours (`RECENT_H`) when T3 Code comes to the
+front, and wakes any VM stopped 10+ days so boat's 14-day disk retention never runs out. Until 25 Nov
+2026 it resumed every stopped VM, 54 to 118 resumes a day, each at least an hour of machine time for
+a project nobody had open. A VM that stopped longer ago wakes by name: `vm up <name>` on the Mac, or
+`https://wake.julds.com/?vm=<name>` on the phone (the page wakes nothing else by itself; the phone
+needs Tailscale on to reach a project VM). `vm` on the Mac shows and wakes them.
+
+The script reads the VM states from `boat list --all`, so the Mac's boat CLI must be signed in to the
+account that owns the VMs (GitHub, SomtoUgeh). From 23 to 25 Nov 2026 a Google sign-in had it in an
+empty account: the list was empty, no VM was woken and nothing was logged. The hourly check now logs
+and shows "VM wake is off" when boat answers without our VMs. First check for "T3 cannot reach a VM":
+`boat list --all` on the Mac shows the six VMs. Agents use the Executor
 app `boat-vms` (`vms.list`, `vms.status`, `vms.wake`) with a key limited to `sandbox.read` and
 `sandbox.resume` on the project VMs; julds has `vm-wake` with its own such key. boat sends
 error/degraded/recovered events to Dev's Coworkers webhook.
