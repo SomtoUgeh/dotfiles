@@ -73,21 +73,11 @@ create_symlink() {
     ln -sf "$source" "$target"
 }
 
-# Link a tool's skill folder to the shared skills, unless Skillhub manages this
-# machine and the folder is a real folder. Skillhub writes its ledger at the
-# first sync, and `skillhub adopt` makes a linked folder a real one: the tool
-# then holds only the active skills of the Skillhub library and loads the
-# others through Executor. A machine with no Skillhub gets the link, so its
-# tools still see every skill, also when a tool made the folder first.
+# A tool's skill folder holds only the skills that stay on disk (the p3-stack
+# skills). Every other skill loads through Executor, from the app `skills`
+# that services/skills-mcp serves. See scripts/link_skills.sh.
 link_skill_folder() {
-    local target="$1"
-    local ledger="${SKILLHUB_HOME:-$HOME/.skillhub}/managed.json"
-
-    if [ -f "$ledger" ] && [ -d "$target" ] && [ ! -L "$target" ]; then
-        echo -e "✓ Skill folder kept as it is (Skillhub): $target"
-        return
-    fi
-    create_symlink "$AGENTS_DIR/skills" "$target"
+    bash "$DOTFILES_DIR/scripts/link_skills.sh" "$AGENTS_DIR" "$1"
 }
 
 # =============================================================================
@@ -356,12 +346,17 @@ echo "Setting up agent configurations..."
 
 AGENTS_DIR="$DOTFILES_DIR/agents"
 
-# Shared skills live at the neutral path. Codex discovers ~/.agents/skills
-# directly; Claude and OpenCode also get their native skill-path links so
-# tool-specific installers write through to the shared tree.
+# Skillhub is retired: this removes its links, hooks, command and folders once.
+bash "$DOTFILES_DIR/scripts/retire_skillhub.sh" || echo -e "${YELLOW}Skillhub was not fully removed; see the message above${NC}"
+
+# The skills that stay on disk go in the neutral path, which Codex and Grok
+# read, and in each tool's native skill path below.
 # Do not replace ~/.codex/skills: Codex may keep local-only skills there.
 mkdir -p "$HOME/.agents"
 link_skill_folder "$HOME/.agents/skills"
+for tool in "$HOME/.grok" "$HOME/.cursor"; do
+    if [ -d "$tool" ]; then link_skill_folder "$tool/skills"; fi
+done
 
 # Grok reads the same shared instructions directly, including on hosts without
 # Claude compatibility configuration. The neutral skill path is sufficient.
@@ -388,6 +383,7 @@ create_symlink "$AGENTS_DIR/claude/agents" "$HOME/.claude/agents"
 create_symlink "$AGENTS_DIR/claude/output-styles" "$HOME/.claude/output-styles"
 link_skill_folder "$HOME/.claude/skills"
 create_symlink "$AGENTS_DIR/shared/hooks/git_guard.py" "$HOME/.claude/hooks/git_guard.py"
+create_symlink "$AGENTS_DIR/shared/hooks/skills_index.sh" "$HOME/.claude/hooks/skills-index.sh"
 # The shaping hook runs from here, so it does not depend on a tool's skill folder.
 create_symlink "$AGENTS_DIR/skills/shaping" "$HOME/.claude/hooks/shaping"
 create_symlink "$AGENTS_DIR/claude/statusline.sh" "$HOME/.claude/statusline.sh"
@@ -687,6 +683,7 @@ PUBLIC_SCRIPTS=(
     enable_touchid_sudo.sh
     scan_repo.sh
     scan_remote.sh
+    skill-fetch
 )
 for script_name in "${PUBLIC_SCRIPTS[@]}"; do
     create_symlink "$DOTFILES_DIR/scripts/$script_name" "$HOME/bin/$script_name"

@@ -36,6 +36,11 @@ Context7 plugins and Codex Granola plugin are disabled in favor of the gateway.
 
 `agents/skills` is the canonical shared skill source.
 
+[`services/skills-mcp`](../services/skills-mcp/README.md) publishes it at
+`https://mcp.julds.com`: an MCP server with the MCP Skills extension, an
+Agent Skills Discovery index, and the Executor app `Skills` that serves it to
+every Executor client. A push to `main` that changes a skill deploys it.
+
 Cloudflare guidance comes only from this shared library. Do not also install
 the Cloudflare skill plugin in individual tools. `agents-sdk` covers agent
 building and MCP servers; `sandbox-stable`, `sandbox-next`, and the migration
@@ -72,12 +77,14 @@ save-and-handoff wrapper. Specialized motion skills and planning stages keep
 their separate jobs. The Claude and OpenCode `/triage` commands invoke file-todos triage
 mode; it does not define another lifecycle.
 
-The installer links it to the paths below. On a machine that Skillhub manages
-(`~/.skillhub/managed.json` exists), a path that is a real folder is left as
-it is: `skillhub adopt` makes a tool's skill folder one, and the tool then
-loads skills from the Skillhub library through Executor. `skillhub uninstall
---yes` puts the links back. Hooks run from the repository or from
-`~/.claude/hooks`, never from one of these paths.
+The installer (`scripts/link_skills.sh`) puts only the skills that stay on
+disk, the p3-stack skills, in the paths below. Every other skill loads through
+Executor from the app `skills`; the SessionStart hook
+`agents/shared/hooks/skills_index.sh` lists the library for Claude Code and
+Codex, and `skill-fetch <skill>` puts a whole skill on disk for skills that run
+scripts. Skillhub is retired: `scripts/retire_skillhub.sh` removes it. Hooks
+run from the repository or from `~/.claude/hooks`, never from one of these
+paths.
 
 - `~/.agents/skills` for Codex discovery (and as a shared agent-compatible path)
 - `~/.claude/skills` for Claude Code's native skill path

@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# skill-fetch <skill>: put a whole skill from the library on disk and print
+# its folder. For skills that run scripts or name their own files by path.
+# The library is served at mcp.julds.com (services/skills-mcp). Each version
+# gets its own folder, so a folder never mixes two versions.
+set -euo pipefail
+base=${SKILLS_URL:-https://mcp.julds.com}/.well-known/agent-skills
+cache=${XDG_CACHE_HOME:-$HOME/.cache}/skills
+name=${1:-}
+if ! [[ $name =~ ^[a-z0-9][a-z0-9-]{0,63}$ ]]; then
+  echo "usage: skill-fetch <skill>" >&2
+  exit 2
+fi
+
+latest_cached() { ls -dt "$cache/$name"/*/ 2>/dev/null | head -n 1; }
+
+if ! index=$(curl -fsS --max-time 20 "$base/index.json"); then
+  if dir=$(latest_cached) && [ -n "$dir" ]; then
+    echo "skill-fetch: the library is not reachable; using the copy in $dir" >&2
+    echo "${dir%/}"
+    exit 0
+  fi
+  echo "skill-fetch: the library at $base is not reachable" >&2
+  exit 1
+fi
+entry=$(jq -c --arg n "$name" '.skills[] | select(.name == $n)' <<<"$index")
+if [ -z "$entry" ]; then
+  echo "skill-fetch: no skill named $name" >&2
+  exit 1
+fi
+
+dir=$cache/$name/$(jq -r .version <<<"$entry")
+if [ ! -f "$dir/.complete" ]; then
+  mkdir -p "$cache/$name"
+  tmp=$(mktemp -d "$cache/$name/.download.XXXXXX")
+  trap 'rm -rf "$tmp"' EXIT
+  while IFS=$'\t' read -r path encoded; do
+    case /$path/ in */../* | */./* | //*) echo "skill-fetch: refusing the path $path" >&2; exit 1 ;; esac
+    mkdir -p "$(dirname "$tmp/$path")"
+    curl -fsS --max-time 30 -o "$tmp/$path" "$base/$name/$encoded"
+    if [ "$(head -c 2 "$tmp/$path")" = '#!' ]; then chmod +x "$tmp/$path"; fi
+  done < <(jq -r '.files[] | [., (split("/") | map(@uri) | join("/"))] | @tsv' <<<"$entry")
+  touch "$tmp/.complete"
+  rm -rf "$dir"
+  mv "$tmp" "$dir"
+  trap - EXIT
+fi
+echo "$dir"

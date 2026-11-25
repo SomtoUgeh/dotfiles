@@ -13,9 +13,9 @@ migrated service, follow the
 [Executor routing workflow](../skills/RUNTIME_TOOLS.md#executor-routing) for
 discovery, account selection, approvals, and native-tool exceptions.
 
-When no loaded skill fits a task, search the Skillhub library through Executor
-Cloud (`tools.skillhub.search`, then `tools.skillhub.read`) before working
-without one.
+When no loaded skill fits a task, search the skill library through Executor
+Cloud (`tools.skills.search_skills`, then the `skills` tool with
+`{"app": "skills", "name": "<skill>"}`) before working without one.
 
 ## Ethos
 

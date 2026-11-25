@@ -8,13 +8,13 @@ argument-hint: "[closeout|axes|full] [--base ref] [--max-priority P0|P1|P2|P3] [
 <target> $ARGUMENTS </target>
 
 This command is a wrapper. Its body is the code-review skill, which is in the
-Skillhub library and not on this disk. Do not call the Skill tool for it.
+skill library and not on this disk. Do not call the Skill tool for it.
 
-Load the skill through the Executor MCP server, then execute it:
+Load the skill with the Executor MCP server's `skills` tool, then execute it:
 
 ```
-tool: call
-input: {"calls": {"path": "tools.skillhub.read", "input": {"name": "code-review"}}}
+tool: skills
+input: {"app": "skills", "name": "code-review"}
 ```
 
 When the skill names another file of its folder, read that file with the same

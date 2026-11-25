@@ -1,0 +1,19 @@
+{
+  // Skills over MCP at mcp.julds.com. The library is agents/skills (with the
+  // p3-stack links). `bun run deploy` builds, type-checks, tests and deploys;
+  // .github/workflows/skills-mcp.yml does the same on each push to main.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "skills-mcp",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": false,
+  "routes": [{ "pattern": "mcp.julds.com", "custom_domain": true }],
+  "assets": {
+    "directory": "./dist/assets",
+    "binding": "ASSETS",
+    // Executor's skill loader refuses redirects, so no .html or slash rewrites.
+    "html_handling": "none",
+    "not_found_handling": "none"
+  },
+  "observability": { "enabled": true }
+}

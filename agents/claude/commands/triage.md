@@ -8,13 +8,13 @@ argument-hint: "[findings list or source type]"
 <target> $ARGUMENTS </target>
 
 This command is a wrapper. Its body is the file-todos skill, which is in the
-Skillhub library and not on this disk. Do not call the Skill tool for it.
+skill library and not on this disk. Do not call the Skill tool for it.
 
-Load the skill through the Executor MCP server, then execute it:
+Load the skill with the Executor MCP server's `skills` tool, then execute it:
 
 ```
-tool: call
-input: {"calls": {"path": "tools.skillhub.read", "input": {"name": "file-todos"}}}
+tool: skills
+input: {"app": "skills", "name": "file-todos"}
 ```
 
 When the skill names another file of its folder, read that file with the same

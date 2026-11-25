@@ -15,13 +15,13 @@ Preferred workflow: `resolve-todo-parallel`
 <target> $ARGUMENTS </target>
 
 This command is a wrapper. Its body is the `resolve-todo-parallel` skill, which is in the
-Skillhub library. Do not load it with the skill tool.
+skill library. Do not load it with the skill tool.
 
-Load the skill through the Executor MCP server, then execute it:
+Load the skill with the Executor MCP server's `skills` tool, then execute it:
 
 ```
-tool: call
-input: {"calls": {"path": "tools.skillhub.read", "input": {"name": "resolve-todo-parallel"}}}
+tool: skills
+input: {"app": "skills", "name": "resolve-todo-parallel"}
 ```
 
 When the skill names another file of its folder, read that file with the same
