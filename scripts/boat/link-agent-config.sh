@@ -42,7 +42,7 @@ link() { # <source> <target>: move a real file aside once, then link
 }
 
 # Shared skills. Each tool's skill folder holds only the skills that stay on
-# disk (the p3-stack skills); the others load through Executor, from the app
+# disk (the p3-stack and slash-only skills); the others load through Executor, from the app
 # `skills` that services/skills-mcp serves. boat's own `boat` and `synced`
 # folders stay. Skillhub is retired: the first run removes it from the VM.
 if ! bash "$D/scripts/retire_skillhub.sh"; then

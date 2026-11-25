@@ -74,7 +74,7 @@ create_symlink() {
 }
 
 # A tool's skill folder holds only the skills that stay on disk (the p3-stack
-# skills). Every other skill loads through Executor, from the app `skills`
+# and slash-only skills). Every other skill loads through Executor, from the app `skills`
 # that services/skills-mcp serves. See scripts/link_skills.sh.
 link_skill_folder() {
     bash "$DOTFILES_DIR/scripts/link_skills.sh" "$AGENTS_DIR" "$1"
