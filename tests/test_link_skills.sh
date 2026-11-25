@@ -90,4 +90,31 @@ retire >"$fixture/out" 2>"$fixture/err"
 [ ! -e "$HOME/.t3/projects/skillset" ]
 retire >"$fixture/out" 2>"$fixture/err"
 [ ! -s "$fixture/out" ] && [ ! -s "$fixture/err" ]
+
+# A stash, a second worktree or a git error keeps the checkout.
+kept() {
+  retire >"$fixture/out" 2>"$fixture/err"
+  [ -d "$1/.git" ] && grep -q "$1 has work that is not pushed" "$fixture/err"
+}
+repo=$HOME/code/personal/skillhub
+g clone -q "$fixture/remote.git" "$repo" 2>/dev/null
+echo draft >"$repo/notes"
+g -C "$repo" stash -q -u
+kept "$repo"
+g -C "$repo" stash drop -q
+g -C "$repo" worktree add -q "$fixture/wt" 2>/dev/null
+kept "$repo"
+g -C "$repo" worktree remove "$fixture/wt"
+g -C "$repo" checkout -q --detach
+g -C "$repo" commit -q --allow-empty -m detached
+kept "$repo"
+g -C "$repo" checkout -q -
+echo broken >"$repo/.git/index"
+kept "$repo"
+
+# State that records changes stays when the skillhub command is missing.
+mkdir -p "$HOME/.skillhub" && echo '{}' >"$HOME/.skillhub/managed.json"
+mv "$stubs/skillhub" "$fixture/skillhub.off"
+! retire 2>"$fixture/err"
+[ -f "$HOME/.skillhub/managed.json" ] && grep -q 'skillhub command is missing' "$fixture/err"
 echo "test_link_skills: ok"

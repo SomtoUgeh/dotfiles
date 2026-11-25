@@ -6,7 +6,7 @@ set -euo pipefail
 here=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd -P)
 skills=$(cd "$here/../../skills" && pwd -P)
 
-all=$(for d in "$skills"/*/; do [ -f "$d/SKILL.md" ] && basename "$d"; done)
+all=$(for d in "$skills"/*/; do if [ -f "$d/SKILL.md" ]; then basename "$d"; fi; done)
 # Folders that git ignores (boat's own boat and synced) are not in the library.
 ignored=$(git -C "$skills" check-ignore --stdin <<<"$all" 2>/dev/null || true)
 names=$(grep -vxF -f <(printf '%s\n' "$ignored") <<<"$all" || true)

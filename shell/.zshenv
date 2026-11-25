@@ -46,7 +46,7 @@ unset _op_agent
 # ============================================================================
 # Agent skills
 # ============================================================================
-# Skills come from the Skillhub library through Executor. OpenCode also reads
+# Skills come from the Executor app `skills` (services/skills-mcp). OpenCode also reads
 # ~/.claude/skills, where the Claude app syncs the skills of the Claude
 # account. Those are for Claude only, so OpenCode does not load that folder.
 export OPENCODE_DISABLE_CLAUDE_CODE_SKILLS=1
