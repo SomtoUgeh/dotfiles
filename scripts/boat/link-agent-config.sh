@@ -12,9 +12,19 @@ P=$HOME/code/personal
 D=$P/dotfiles
 A=$D/agents
 
+# Local edits (Claude Code writes settings.json through its link) ride along
+# in an autostash. An edit that conflicts with main stays in `git stash` and
+# the checkout takes main, so a conflict never leaves markers in a live file.
+ff_pull() { # <dir>
+  git -C "$1" pull -q --ff-only --autostash || return 1
+  if [ -n "$(git -C "$1" diff --name-only --diff-filter=U)" ]; then
+    git -C "$1" reset -q --hard
+    echo "link-agent-config: local edits in $1 conflict with main; they are in git stash" >&2
+  fi
+}
 clone_or_pull() { # <repo> <dir>
   if [ -d "$2/.git" ]; then
-    git -C "$2" pull -q --ff-only || echo "link-agent-config: $2 did not fast-forward; left as is" >&2
+    ff_pull "$2" || echo "link-agent-config: $2 did not fast-forward; left as is" >&2
   else
     mkdir -p "$(dirname "$2")"
     git clone -q "git@github.com:SomtoUgeh/$1.git" "$2"

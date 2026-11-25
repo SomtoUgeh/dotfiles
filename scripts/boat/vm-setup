@@ -358,7 +358,15 @@ stage_dotfiles() {
     if [ "$b" != main ] && git -C "$D" merge-base --is-ancestor HEAD origin/main; then
       git -C "$D" checkout -q main
     fi
-    git -C "$D" pull -q --ff-only || warn "dotfiles did not fast-forward; left as is"
+    # Local edits (Claude Code writes settings.json through its link) ride along
+    # in an autostash. An edit that conflicts with main stays in `git stash` and
+    # the checkout takes main, so a conflict never leaves markers in a live file.
+    if ! git -C "$D" pull -q --ff-only --autostash; then
+      warn "dotfiles did not fast-forward; left as is"
+    elif [ -n "$(git -C "$D" diff --name-only --diff-filter=U)" ]; then
+      git -C "$D" reset -q --hard
+      warn "dotfiles: local edits conflict with main; they are in git stash"
+    fi
   elif [ -d "$D" ]; then
     # vm-new pushes a plain copy before the VM can reach GitHub: turn it into a clone.
     say "dotfiles: turning the pushed copy into a git clone"
