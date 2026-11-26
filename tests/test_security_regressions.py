@@ -12,9 +12,10 @@ ROOT = Path(__file__).resolve().parents[1]
 class SecurityRegressions(unittest.TestCase):
     @unittest.skipUnless(shutil.which("zsh"), "zsh is required")
     def test_shell_ignores_project_tools_and_preserves_installed_tools(self):
-        for inherited in (False, True):
+        cases = [(f, i) for f in ("shell/.zshrc", "work/zsh/zshrc") for i in (False, True)]
+        for shell_file, inherited in cases:
             for installed in (False, True):
-                with self.subTest(inherited=inherited, installed=installed):
+                with self.subTest(shell=shell_file, inherited=inherited, installed=installed):
                     with tempfile.TemporaryDirectory() as directory:
                         base = Path(directory)
                         home = base / "home"
@@ -35,7 +36,7 @@ class SecurityRegressions(unittest.TestCase):
                                 program.chmod(0o755)
                         # Redirect platform installations into the fixture, so the
                         # host's installed tools cannot mask the missing-tool case.
-                        source = (ROOT / "shell/.zshrc").read_text()
+                        source = (ROOT / shell_file).read_text()
                         source = source.replace("/opt/homebrew", str(base / "trusted"))
                         source = source.replace("/usr/local", str(base / "trusted"))
                         source = source.replace("/Users/odera", str(home))

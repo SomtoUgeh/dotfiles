@@ -31,6 +31,12 @@ cp templates/zshrc-private.template ~/.zshrc.private
 exec zsh
 ```
 
+### Work Mac
+
+Do not run `./install.sh` on a work computer: it installs the personal identity
+and infrastructure. Follow [`work/README.md`](work/README.md) instead. It sets up
+the same shell, editors and apps, with GitLab and the work identity.
+
 ## Directory Structure
 
 The install script creates this folder layout:
@@ -92,6 +98,7 @@ dotfiles/
 │   └── boat-t3-workspace.md      # julds boat VM runbook
 ├── shell/                  # Shell configurations
 │   ├── .zshrc
+│   ├── aliases.zsh         # aliases + functions shared with work/zsh/zshrc
 │   ├── .zshrc.cloud        # Ubuntu VM Zsh
 │   ├── .zshenv
 │   └── .zprofile
@@ -120,6 +127,7 @@ dotfiles/
 │   ├── apply_github_rulesets.sh      # push branch protection to repos
 │   ├── enable_touchid_sudo.sh
 │   └── install_cloud_dotfiles.sh
+├── work/                   # Work Mac: installer, GitLab setup, Brewfile, shell, git
 ├── tests/                  # Scanner, installer and agent regression tests
 ├── macos/
 │   └── defaults.sh         # macOS system preferences

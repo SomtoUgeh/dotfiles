@@ -1,0 +1,29 @@
+# Work Mac ~/.zshenv (linked by work/install.sh). Runs for every zsh, including
+# non-interactive agent and SSH commands. Personal tools (boat, grok, OpenCode)
+# are left out on purpose. Machine-only lines go in ~/.zshenv.local.
+
+_add_to_path() {
+  local d=$1
+  [[ -d "$d" ]] || return
+  [[ ":$PATH:" == *":$d:"* ]] && return
+  export PATH="$d:$PATH"
+}
+
+_add_to_path "$HOME/bin"
+_add_to_path "$HOME/.local/bin"   # uv tools and the Claude CLI
+_add_to_path "$HOME/.bun/bin"
+_add_to_path "$HOME/.cargo/bin"
+# fnm's default Node, so non-interactive shells find node/npm.
+_add_to_path "$HOME/.local/share/fnm/aliases/default/bin"
+
+unset -f _add_to_path
+
+[ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
+
+# 1Password SSH agent for ssh-add, ssh-keygen -Y and other agent-aware tools.
+# ~/.ssh/config sets IdentityAgent for ssh itself.
+_op_agent="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+[ -S "$_op_agent" ] && export SSH_AUTH_SOCK="$_op_agent"
+unset _op_agent
+
+[ -r "$HOME/.zshenv.local" ] && . "$HOME/.zshenv.local"
