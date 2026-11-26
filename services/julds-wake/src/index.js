@@ -1,6 +1,8 @@
 // julds-wake: one-tap resume for the boat VMs (julds and the project VMs), gated by Cloudflare Access.
 // Opening the page wakes julds (or ?vm=<name>); ?peek only shows state. Each VM has its own Wake button.
 // The Worker re-verifies the Access JWT itself and fails closed if ACCESS_AUD is unset.
+import { dueWakes } from "./schedule.js";
+
 const BOAT = "https://boat.dev/api/v1/sandboxes";
 // boat's API reports a stopped VM as "archived" (the CLI shows "stopped"); treat all of these as wakeable.
 const WAKEABLE = ["stopped", "archived", "hibernated", "suspended", "paused"];
@@ -103,7 +105,7 @@ small{display:block;margin-top:16px;color:#666;text-align:center}
 </style></head><body><main>
 <h1>Boat VMs</h1><div id="list"></div>
 <button id="all" disabled>Wake all</button>
-<small>Project VMs sleep after 30 quiet minutes. T3 on your phone needs Tailscale on.</small>
+<small>Project VMs sleep after 30 quiet minutes, julds after 90. T3 on your phone needs Tailscale on for a project VM.</small>
 </main><script>
 const WAKEABLE=${JSON.stringify(WAKEABLE)};const peek=new URLSearchParams(location.search).has("peek");
 const want=new URLSearchParams(location.search).get("vm");let autoDone=false;
@@ -126,6 +128,42 @@ async function wake(name){await fetch("wake"+(name?"?vm="+encodeURIComponent(nam
 document.getElementById("all").onclick=()=>wake("");poll();setInterval(poll,4000);
 </script></body></html>`;
 
+
+// ---- Scheduled wakes (the table and its rules are in schedule.js).
+// Must match the crons in wrangler.jsonc.
+const WEEKLY_SNAPSHOT_CRON = "0 3 * * SUN";
+const T3_WAIT_MS = 10 * 60_000;
+async function scheduledWake(env, at) {
+  const due = dueWakes(at);
+  if (!due.length) return;
+  const why = due.map((w) => w.why).join(", ");
+  const julds = vmList(env).find((vm) => vm.id === env.SANDBOX_ID);
+  const woke = await wakeOne(env, julds, `schedule: ${why}`);
+  if (woke.error) return; // wakeOne has sent the alert
+  const start = Date.now();
+  let resumed = woke.state === "starting";
+  for (;;) {
+    const s = await status(env, julds);
+    // A julds that was still stopping at the first check can only be resumed once it is stopped.
+    if (!resumed && WAKEABLE.includes(s.state)) {
+      resumed = true;
+      if ((await wakeOne(env, julds, `schedule: ${why}`)).error) return;
+    }
+    if (s.t3) {
+      console.log(JSON.stringify({ scheduledWake: why, before: woke.state, t3ReadyAfterS: Math.round((Date.now() - start) / 1000) }));
+      return;
+    }
+    if (Date.now() - start > T3_WAIT_MS) {
+      await sendAlert(env, "T3 not answering after a scheduled wake", [
+        `julds was woken for: ${why}.`,
+        `After ${T3_WAIT_MS / 60_000} minutes boat reports it as "${s.state}" and T3 Connect does not answer, so the run may not start.`,
+        "", "Check: https://wake.julds.com/?peek  |  On julds: systemctl --user status t3code.service",
+      ].join("\n"));
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 15_000));
+  }
+}
 
 // Weekly dated saved snapshot (cron), keeping the newest KEEP_WEEKLY. Uses BOAT_SNAPSHOT_KEY:
 // snapshot.read + snapshot.write + sandbox.read on bx_2jd5dd8b only. Works while the VM is stopped.
@@ -182,7 +220,8 @@ async function handleBoatWebhook(req, env) {
 
 export default {
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(weeklySnapshot(env));
+    if (event.cron === WEEKLY_SNAPSHOT_CRON) ctx.waitUntil(weeklySnapshot(env));
+    else ctx.waitUntil(scheduledWake(env, new Date(event.scheduledTime)));
   },
   async fetch(req, env) {
     const u0 = new URL(req.url);

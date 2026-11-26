@@ -7,7 +7,9 @@
   "main": "src/index.js",
   "compatibility_date": "2026-10-01",
   "workers_dev": false,
-  "triggers": { "crons": ["0 3 * * SUN"] },
+  // 03:00 Sunday: weekly snapshot. :05 and :50 of every hour: wake julds before scheduled work
+  // (SCHEDULED_WAKES in src/index.js). Cron times are UTC.
+  "triggers": { "crons": ["0 3 * * SUN", "5,50 * * * *"] },
   "routes": [{ "pattern": "wake.julds.com", "custom_domain": true }],
   "send_email": [{ "name": "EMAIL", "destination_address": "smugeh@gmail.com", "allowed_sender_addresses": ["julds@alerts.julds.com"] }],
   "vars": {

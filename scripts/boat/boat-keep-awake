@@ -16,7 +16,8 @@
 # check then turns boat's auto-stop off, because boat keeps the last lifetime across resumes.
 # A longer deadline set by hand with `boat extend` is replaced on the next busy check: use vm-stay.
 # Config: /etc/boat-idle.env (BOAT_ID, TTL_MIN, CPU_MAX, ENABLED). Log: journalctl -t boat-keep-awake.
-# Last busy time and reason: /var/lib/boat-idle/last-active and last-reason. julds never has this.
+# Last busy time and reason: /var/lib/boat-idle/last-active and last-reason. Installed by keep-awake-setup:
+# every project VM through vm-setup, and julds by hand with TTL_MIN=90.
 set -u
 ENV_FILE=${BOAT_IDLE_ENV:-/etc/boat-idle.env}
 # shellcheck disable=SC1090

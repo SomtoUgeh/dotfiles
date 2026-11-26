@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# Sets up sleep when idle on this boat VM: boat-keep-awake, its 5-minute timer, vm-stay, /etc/boat-idle.env
+# and the polkit rule for T3's sleep inhibitor. See README "Sleep when idle, wake on demand".
+# Runs as `user` with sudo. Safe to re-run: it changes only what differs.
+#
+#   keep-awake-setup <sandbox id> [quiet minutes]
+#
+# vm-setup's idle stage runs it on every project VM with no minutes: a new /etc/boat-idle.env gets 30,
+# and an existing one keeps its settings. julds, the hub, runs it by hand with a longer window:
+#   ~/code/personal/dotfiles/scripts/boat/keep-awake-setup bx_2jd5dd8b 90
+# Given minutes always replace TTL_MIN. ENABLED in /etc/boat-idle.env is never changed here.
+set -euo pipefail
+
+BOAT_ID=${1:?usage: keep-awake-setup <sandbox id> [quiet minutes]}
+TTL=${2:-}
+[[ $BOAT_ID =~ ^bx_[a-z0-9]+$ ]] || { echo "keep-awake-setup: not a sandbox id: $BOAT_ID" >&2; exit 2; }
+[ -z "$TTL" ] || [[ $TTL =~ ^[0-9]+$ && $TTL -ge 10 ]] || { echo "keep-awake-setup: quiet minutes must be a number, 10 or more" >&2; exit 2; }
+DIR=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
+ENV_FILE=/etc/boat-idle.env
+say() { printf '== %s\n' "$*"; }
+# Writes stdin to the root-owned file <path> when it differs. Returns 0 only when it wrote.
+put() {
+  local new; new=$(cat)
+  if [ -f "$1" ] && [ "$(sudo cat "$1")" = "$new" ]; then return 1; fi
+  printf '%s\n' "$new" | sudo tee "$1" >/dev/null
+}
+changed=0
+
+# boat-idle-stop kept its own idle clock and ran `boat stop self`. boat-keep-awake replaced it
+# (24 Nov 2026). vm-heal's saved system files still hold the old units and would put them back,
+# so those copies go too; vm-heal saves new ones on its next run.
+if [ -e /etc/systemd/system/boat-idle-stop.timer ] || [ -e /usr/local/sbin/boat-idle-stop ]; then
+  say "keep-awake: removing boat-idle-stop"
+  sudo systemctl disable --now -q boat-idle-stop.timer 2>/dev/null || true
+  sudo rm -f /usr/local/sbin/boat-idle-stop /etc/systemd/system/boat-idle-stop.service /etc/systemd/system/boat-idle-stop.timer /var/lib/boat-idle/last-check
+  [ -f $ENV_FILE ] && sudo sed -i '/^IDLE_MIN=/d; /^DRY_RUN=/d' $ENV_FILE
+  # One command: vm-heal puts a copy that is missing on one side back from the other.
+  sudo rm -f "$HOME/.local/share/vm-heal/system.tgz" /var/lib/vm-heal-mirror/system.tgz
+  changed=1
+fi
+
+cmp -s "$DIR/boat-keep-awake" /usr/local/sbin/boat-keep-awake || sudo install -m 755 "$DIR/boat-keep-awake" /usr/local/sbin/boat-keep-awake
+cmp -s "$DIR/vm-stay" /usr/local/bin/vm-stay || sudo install -m 755 "$DIR/vm-stay" /usr/local/bin/vm-stay
+sudo mkdir -p /var/lib/boat-idle
+
+if [ ! -f $ENV_FILE ]; then
+  printf 'BOAT_ID=%s\nTTL_MIN=%s\nCPU_MAX=40\nENABLED=1\n' "$BOAT_ID" "${TTL:-30}" | sudo tee $ENV_FILE >/dev/null
+  say "keep-awake: $ENV_FILE written (${TTL:-30} quiet minutes)"
+else
+  # Never leave another sandbox's id here: keep-awake would act on that sandbox.
+  grep -qx "BOAT_ID=$BOAT_ID" $ENV_FILE || sudo sed -i "s/^BOAT_ID=.*/BOAT_ID=$BOAT_ID/" $ENV_FILE
+  if [ -n "$TTL" ] && ! grep -qx "TTL_MIN=$TTL" $ENV_FILE; then
+    if grep -q '^TTL_MIN=' $ENV_FILE; then sudo sed -i "s/^TTL_MIN=.*/TTL_MIN=$TTL/" $ENV_FILE
+    else echo "TTL_MIN=$TTL" | sudo tee -a $ENV_FILE >/dev/null; fi
+    say "keep-awake: TTL_MIN=$TTL"
+  fi
+fi
+
+# T3 holds a sleep inhibitor ("T3 Code", "Agents are working") while runs work. T3 runs as a
+# lingering user service with no login session, and logind refuses that ("Failed to inhibit:
+# Access denied", in T3's log every few minutes) without this rule. boat-keep-awake does not read
+# the inhibitor. The folder is closed to `user`, so put reads it with sudo.
+rule=/etc/polkit-1/rules.d/50-t3code-keep-awake.rules
+put $rule <<R && sudo chmod 644 $rule
+// T3 Code may hold its "Agents are working" sleep inhibitor from its user service. Written by vm-setup.
+polkit.addRule(function(action, subject) {
+  if (action.id == "org.freedesktop.login1.inhibit-block-sleep" && subject.user == "$USER") {
+    return polkit.Result.YES;
+  }
+});
+R
+
+put /etc/systemd/system/boat-keep-awake.service <<U && changed=1
+[Unit]
+Description=Keep this boat VM awake while it is in use (see /etc/boat-idle.env)
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/boat-keep-awake
+TimeoutStartSec=3min
+U
+put /etc/systemd/system/boat-keep-awake.timer <<U && changed=1
+[Unit]
+Description=Check every 5 minutes whether this boat VM is in use
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+[Install]
+WantedBy=timers.target
+U
+[ $changed = 1 ] && sudo systemctl daemon-reload
+sudo systemctl enable --now -q boat-keep-awake.timer

@@ -102,7 +102,8 @@ unit changed. `vm-setup <p> status` lists anything still missing.
 
 ## Sleep when idle, wake on demand
 
-boat stops a project VM (not julds): its auto-stop is a deadline, 30 minutes after the last resume or
+boat stops a project VM, and julds once `keep-awake-setup` has run there (90 minutes; see
+[docs/boat-t3-workspace.md](../../docs/boat-t3-workspace.md), "Idle auto-stop and waking"): its auto-stop is a deadline, 30 minutes after the last resume or
 the last `boat extend` (`TTL_MIN` in `/etc/boat-idle.env`; 60 until 25 Nov 2026, lowered because every
 VM is a `large` at twice the base rate, about $0.07 an hour while it is up). boat has no idle timer, and only a prompt to boat's own agent moves the
 deadline, so a T3 run does not. `boat-keep-awake` moves the deadline while the VM is in use, and a
@@ -115,7 +116,8 @@ the VM stops `TTL_MIN` minutes after its resume, where before it ran on with nob
 
 | File | Runs on | Does |
 | - | - | - |
-| `boat-keep-awake` | project VM (`/usr/local/sbin`, `boat-keep-awake.timer` every 5 min) | While the VM is busy, runs `boat extend self` to put the deadline `TTL_MIN` minutes from now (30 on every project VM; the script falls back to 60 when the line is missing). Busy: a hold, the first check after a resume on a new machine, a T3 run that works and started in the last 12 hours, a phone or desktop that connected to T3 in the last 10 minutes, a pts terminal used in the last 30 min, user CPU over 40%. Gives a VM with auto-stop off a deadline. Config `/etc/boat-idle.env` (`ENABLED=0` for always on: the check then turns boat's auto-stop off). Log: `journalctl -t boat-keep-awake`; last busy time and reason in `/var/lib/boat-idle` |
+| `keep-awake-setup` | project VM (vm-setup's idle stage) and julds (by hand) | `keep-awake-setup <sandbox id> [minutes]` installs `boat-keep-awake`, its timer, `vm-stay`, `/etc/boat-idle.env` and T3's polkit rule. A new config gets 30 minutes; given minutes replace `TTL_MIN`. julds: `keep-awake-setup bx_2jd5dd8b 90` |
+| `boat-keep-awake` | project VM and julds (`/usr/local/sbin`, `boat-keep-awake.timer` every 5 min) | While the VM is busy, runs `boat extend self` to put the deadline `TTL_MIN` minutes from now (30 on every project VM, 90 on julds; the script falls back to 60 when the line is missing). Busy: a hold, the first check after a resume on a new machine, a T3 run that works and started in the last 12 hours, a phone or desktop that connected to T3 in the last 10 minutes, a pts terminal used in the last 30 min, user CPU over 40%. Gives a VM with auto-stop off a deadline. Config `/etc/boat-idle.env` (`ENABLED=0` for always on: the check then turns boat's auto-stop off). Log: `journalctl -t boat-keep-awake`; last busy time and reason in `/var/lib/boat-idle` |
 | `vm-stay` | project VM | `vm-stay 8` keeps it awake 8 hours; `vm-stay 0` clears it. A deadline set by hand with `boat extend` is replaced at the next busy check, so use this |
 | `vm-heal` | project VM (`~/.local/bin`) | Puts the VM back together after a resume: see "Repair after resume" below |
 
@@ -153,8 +155,9 @@ account that owns the VMs (GitHub, SomtoUgeh). From 23 to 25 Nov 2026 a Google s
 empty account: the list was empty, no VM was woken and nothing was logged. The hourly check now logs
 and shows "VM wake is off" when boat answers without our VMs. First check for "T3 cannot reach a VM":
 `boat list --all` on the Mac shows the six VMs. Agents use the Executor
-app `boat-vms` (`vms.list`, `vms.status`, `vms.wake`) with a key limited to `sandbox.read` and
-`sandbox.resume` on the project VMs; julds has `vm-wake` with its own such key. boat sends
+app `boat-vms` (`vms.list`, `vms.status`, `vms.wake`, julds included; `vms.wake` on julds waits until
+its T3 answers through T3 Connect) with a key limited to `sandbox.read` and `sandbox.resume` on the
+VMs (a key made before 26 Nov 2026 covers only the project VMs: julds then shows `no access`); julds has `vm-wake` with its own such key. boat sends
 error/degraded/recovered events to Dev's Coworkers webhook.
 
 A new project VM also needs: this Mac's key in its `~/.ssh/authorized_keys` and a Host entry
