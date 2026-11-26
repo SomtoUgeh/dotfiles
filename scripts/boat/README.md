@@ -117,11 +117,12 @@ the VM stops `TTL_MIN` minutes after its resume, where before it ran on with nob
 | File | Runs on | Does |
 | - | - | - |
 | `keep-awake-setup` | project VM (vm-setup's idle stage) and julds (by hand) | `keep-awake-setup <sandbox id> [minutes]` installs `boat-keep-awake`, its timer, `vm-stay`, `/etc/boat-idle.env` and T3's polkit rule. A new config gets 30 minutes; given minutes replace `TTL_MIN`. julds: `keep-awake-setup bx_2jd5dd8b 90` |
-| `boat-keep-awake` | project VM and julds (`/usr/local/sbin`, `boat-keep-awake.timer` every 5 min) | While the VM is busy, runs `boat extend self` to put the deadline `TTL_MIN` minutes from now (30 on every project VM, 90 on julds; the script falls back to 60 when the line is missing). Busy: a hold, the first check after a resume on a new machine, a T3 run that works and started in the last 12 hours, a phone or desktop that connected to T3 in the last 10 minutes, a pts terminal used in the last 30 min, user CPU over 40%. Gives a VM with auto-stop off a deadline. Config `/etc/boat-idle.env` (`ENABLED=0` for always on: the check then turns boat's auto-stop off). Log: `journalctl -t boat-keep-awake`; last busy time and reason in `/var/lib/boat-idle` |
-| `vm-stay` | project VM | `vm-stay 8` keeps it awake 8 hours; `vm-stay 0` clears it. A deadline set by hand with `boat extend` is replaced at the next busy check, so use this |
+| `boat-keep-awake` | project VM and julds (`/usr/local/sbin`, `boat-keep-awake.timer` every 5 min) | While the VM is busy, runs `boat extend self` to put the deadline `TTL_MIN` minutes from now (30 on every project VM, 90 on julds; the script falls back to 60 when the line is missing). Busy: a hold, the first check after a resume on a new machine, a T3 run that works and started in the last 12 hours, a T3 scheduled task due within `TTL_MIN` minutes, a phone or desktop that connected to T3 in the last 10 minutes, a pts terminal used in the last 30 min, user CPU over 40%. Gives a VM with auto-stop off a deadline. Config `/etc/boat-idle.env` (`ENABLED=0` for always on: the check then turns boat's auto-stop off). Log: `journalctl -t boat-keep-awake`; last busy time and reason in `/var/lib/boat-idle` |
+| `vm-stay` | project VM and julds (`/usr/local/bin`) | `vm-stay 8` keeps it awake 8 hours; `vm-stay 0` clears it. A deadline set by hand with `boat extend` is replaced at the next busy check, so use this |
 | `vm-heal` | project VM (`~/.local/bin`) | Puts the VM back together after a resume: see "Repair after resume" below |
 
-The script reads T3's database: runs that work, and the last time a phone or desktop connected. A run
+The script reads T3's database: runs that work, the next scheduled task with a time (so boat cannot
+stop the VM just before T3 starts it), and the last time a phone or desktop connected. A run
 older than 12 hours does not count, so a stuck row cannot keep the VM awake forever. A client that stays
 connected with no run does not count either: T3 records only the moment it connects, and the Mac app
 stays connected to every VM that is up. To read for longer than half an hour with no run, use `vm-stay`.

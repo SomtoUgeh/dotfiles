@@ -14,14 +14,19 @@ set -euo pipefail
 BOAT_ID=${1:?usage: keep-awake-setup <sandbox id> [quiet minutes]}
 TTL=${2:-}
 [[ $BOAT_ID =~ ^bx_[a-z0-9]+$ ]] || { echo "keep-awake-setup: not a sandbox id: $BOAT_ID" >&2; exit 2; }
-[ -z "$TTL" ] || [[ $TTL =~ ^[0-9]+$ && $TTL -ge 10 ]] || { echo "keep-awake-setup: quiet minutes must be a number, 10 or more" >&2; exit 2; }
+if [ -n "$TTL" ]; then
+  [[ $TTL =~ ^[0-9]+$ ]] || TTL=0
+  TTL=$(( 10#$TTL )) # reads 090 as 90, not as a bad octal number
+  [ "$TTL" -ge 10 ] || { echo "keep-awake-setup: quiet minutes must be a number, 10 or more" >&2; exit 2; }
+fi
 DIR=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 ENV_FILE=/etc/boat-idle.env
 say() { printf '== %s\n' "$*"; }
 # Writes stdin to the root-owned file <path> when it differs. Returns 0 only when it wrote.
+# The test runs with sudo: `user` cannot see into some folders (polkit's rules.d).
 put() {
   local new; new=$(cat)
-  if [ -f "$1" ] && [ "$(sudo cat "$1")" = "$new" ]; then return 1; fi
+  if sudo test -f "$1" && [ "$(sudo cat "$1")" = "$new" ]; then return 1; fi
   printf '%s\n' "$new" | sudo tee "$1" >/dev/null
 }
 changed=0
