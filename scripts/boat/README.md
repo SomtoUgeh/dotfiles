@@ -58,7 +58,10 @@ unanchored `dist/` also matches package folders inside `node_modules`, and the
 saved snapshot then has broken packages.
 
 Secrets stay in the boat environment (`boat env set-file`), never in a snapshot.
-Add a secret file only after the base is saved.
+Add a secret file only after the base is saved. A VM that sleeps must get each secret
+file from its own environment: at resume boat deletes a secret file that the environment
+does not grant, also a copy put on the disk by hand (julds lost its Executor tokens this way
+on 26 Nov 2026).
 
 ## boat-check
 
@@ -144,8 +147,10 @@ T3. A T3 that starts earlier keeps its working directory and database on the tem
 long as it runs, and logs "Server ownership lock ... was deleted or replaced".
 
 Waking: the Mac's `com.julds.autowake` (`~/.local/bin/julds-autowake`, not in this repo) resumes the
-VMs in `~/.config/boat-vms` that stopped in the last 24 hours (`RECENT_H`) when T3 Code comes to the
-front, and wakes any VM stopped 10+ days so boat's 14-day disk retention never runs out. Until 25 Nov
+VMs in `~/.config/boat-vms` that stopped in the last 24 hours (`RECENT_H`) at the start of a session:
+T3 Code comes to the front after 60+ minutes away, and wake sweeps run only in its first 5 minutes
+(26 Nov 2026; before, T3 in front woke a VM again within a minute of its idle stop, 73 wakes a day).
+A VM that sleeps during a session stays asleep until `vm up`, wake.julds.com or `vms.wake`. It also wakes any VM stopped 10+ days so boat's 14-day disk retention never runs out. Until 25 Nov
 2026 it resumed every stopped VM, 54 to 118 resumes a day, each at least an hour of machine time for
 a project nobody had open. A VM that stopped longer ago wakes by name: `vm up <name>` on the Mac, or
 `https://wake.julds.com/?vm=<name>` on the phone (the page wakes nothing else by itself; the phone
