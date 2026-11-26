@@ -1,0 +1,9 @@
+# ~/.zshrc.private on the work Mac. Not tracked; sourced by work/zsh/zshrc.
+# Company values belong here, never in the dotfiles repository.
+
+# Default GitLab host for glab outside a repository
+# export GITLAB_HOST="gitlab.example.com"
+
+# Corporate proxy or certificate bundle, if the company uses one
+# export HTTPS_PROXY=""
+# export NODE_EXTRA_CA_CERTS=""

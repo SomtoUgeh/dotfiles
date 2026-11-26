@@ -1,0 +1,71 @@
+# Work Mac Homebrew bundle. Install with:
+#   brew bundle install --file=work/Brewfile
+#
+# The personal Brewfile at the repo root is a different list on purpose. This
+# one holds the shared core tools and the daily apps, and nothing personal
+# (VPN, cloud accounts, chat apps, VM tooling).
+#
+# Casks only: no `mas` lines, so no personal Apple ID is needed on a work Mac.
+# Apps marked "check first" need a company licence or an approval.
+
+# =============================================================================
+# CLI
+# =============================================================================
+brew "bat"
+brew "eza"
+brew "fzf"
+brew "ripgrep"
+brew "tree"
+brew "trash"                  # `rm` is aliased to trash
+brew "jq"
+brew "tmux"
+brew "direnv"
+
+brew "git"
+brew "git-delta"              # git pager (git/.gitconfig)
+brew "glab"                   # GitLab CLI (work/setup_gitlab.sh)
+
+brew "ast-grep"
+brew "fnm"                    # Node versions; work/install.sh installs the LTS
+brew "uv"                     # Python, and runs the Claude git guard hook
+brew "starship"
+brew "zsh"
+brew "pam-reattach"           # Touch ID for sudo inside tmux
+
+# =============================================================================
+# Apps
+# =============================================================================
+cask "1password"
+cask "1password-cli"
+
+cask "zed"
+cask "visual-studio-code"
+cask "cmux"                   # terminal; reads config/ghostty/config
+cask "claude"
+
+cask "raycast"
+cask "hiddenbar"              # Hidden Bar
+cask "alt-tab"
+cask "alcove"
+cask "betterdisplay"
+
+cask "readdle-spark"          # Spark Desktop. Classic Spark is App Store only.
+cask "spotify"
+cask "slack"
+cask "google-chrome"
+
+cask "font-jetbrains-mono-nerd-font"
+cask "font-zed-mono-nerd-font"
+
+# =============================================================================
+# Check first: uncomment after the licence or policy check
+# =============================================================================
+# cask "orbstack"             # free for personal use only; work use needs a licence
+# cask "tableplus"            # paid licence
+# cask "cleanshot"            # paid licence
+# cask "granola"              # records meetings: check the company AI policy
+# cask "notion"
+# cask "zoom"
+# brew "gh"                   # only if you also work on GitHub repos
+# brew "watchman"             # React Native / Metro
+# brew "postgresql@18"        # prefer the project's container

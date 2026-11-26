@@ -1,0 +1,33 @@
+# Work Mac ~/.gitconfig (linked by work/install.sh).
+#
+# Shared settings (aliases, delta, rebase, rerere) come from git/.gitconfig,
+# which work/install.sh links as ~/.config/git/config. Git reads that file
+# first, so the identity rules below win over it.
+#
+# Its personal includeIf rules point at ~/.gitconfig-personal. That file must
+# not exist on the work Mac, so they have no effect. work/install.sh warns if
+# it finds one.
+#
+# Identity is folder-driven. Commits outside these folders fail with
+# "Author identity unknown" (user.useConfigOnly), instead of using a guessed
+# email. ~/.gitconfig-work is written by work/setup_gitlab.sh and is not tracked.
+
+[user]
+	useConfigOnly = true
+
+[include]
+	path = ~/.gitconfig.local
+
+# Work repositories
+[includeIf "gitdir:~/code/work/"]
+	path = ~/.gitconfig-work
+# Agent worktree pools outside ~/code/work. On the work Mac these hold work
+# repositories, so they use the work identity.
+[includeIf "gitdir:~/.codex/worktrees/"]
+	path = ~/.gitconfig-work
+[includeIf "gitdir:~/.grok/worktrees/"]
+	path = ~/.gitconfig-work
+[includeIf "gitdir:~/.opencode/worktrees/"]
+	path = ~/.gitconfig-work
+[includeIf "gitdir:~/.t3/worktrees/"]
+	path = ~/.gitconfig-work
