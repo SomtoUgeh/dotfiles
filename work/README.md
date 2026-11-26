@@ -12,7 +12,8 @@ personal Mac. It does not get the personal identity or infrastructure.
 | Shared git settings (`git/.gitconfig` as `~/.config/git/config`) | `~/.gitconfig-personal`, the SomtoUgeh keys, `gh-personal` |
 | Zed and cmux/Ghostty config | Zed `ssh_connections` to the personal VMs, VS Code, Cursor |
 | Claude Code: shared instructions, `bro` style, roles, status line, git guard | The personal Executor gateway, skills index hook, plugins |
-| Raycast, Hidden Bar, AltTab, Alcove, BetterDisplay, Spark, Spotify, Slack | Dropbox, Discord, Telegram, WhatsApp, Surfshark, Tailscale |
+| Raycast, Hidden Bar, AltTab, Alcove, BetterDisplay, Mole, Hex, Spark, Spotify, Slack, Zoom | Dropbox, Discord, Telegram, WhatsApp, Surfshark, Tailscale |
+| T3 Code (Nightly), Paper, Bionic, with work accounts | The personal accounts and T3 environment links of those apps |
 | GitLab: `glab`, two SSH keys, signed commits | Cloud CLIs (`hcloud`, `rclone`, `gcloud`), Executor, Codex config |
 
 Files: [`install.sh`](install.sh), [`setup_gitlab.sh`](setup_gitlab.sh),
@@ -80,20 +81,31 @@ zsh -i -c 'alias gs; node --version; starship --version'
 test ! -e ~/.gitconfig-personal && echo "no personal identity"
 ```
 
-## Phase 2 (user, the agent guides): apps
+## Phase 2 (user, the agent guides): apps and accounts
 
-- **Raycast**: on the personal Mac, Raycast Settings > Advanced > Export. On
-  the work Mac, import the file and pick only the extensions, hotkeys and
-  snippets wanted at work. Personal quicklinks and snippets come along if
-  everything is imported.
-- **Hidden Bar**: set by hand (start at login, the items to hide).
-- **Spark**: the Brewfile installs Spark Desktop, which needs no App Store
-  sign-in. Classic Spark is App Store only. Sign in when the work email exists.
-- **Spotify, Slack, Chrome, Claude**: sign in.
+Rule for accounts: an app that holds work data gets a work account, created
+with the work email (or the company's SSO). Personal accounts stay off this
+Mac, except for apps that hold no work data (Spotify). The agent asks the user
+before each sign-in and never types a password.
+
+| App | Account | Notes |
+| --- | --- | --- |
+| Raycast | Work account, or none | Export on the personal Mac (Settings > Advanced > Export). Import only the extensions, hotkeys and snippets wanted at work; personal quicklinks and snippets come along otherwise. |
+| Hidden Bar | None | Set by hand: start at login, the items to hide. |
+| Spark | Work email | Spark Desktop needs no App Store sign-in. Classic Spark is App Store only. |
+| Slack, Zoom | Company SSO | Zoom installs from a `.pkg`, so it needs the password: run the bundle in Terminal if it failed. |
+| Claude, Claude Code | Work account, if the company provides one | Claude Code signs in on first `claude` run. |
+| T3 Code (Nightly) | None of its own | It uses the Claude Code and Codex sign-ins on this Mac. Do not link this Mac to the personal T3 environments (Settings > Labs > Linked environments, device hosts): a link lets one Mac run agents on the other. |
+| Paper | Work account, if the team uses Paper | Designs live in Paper's cloud. Keep personal files in the personal account. |
+| Bionic | None needed for local models | Models run on this Mac and take a lot of disk space. Sign in only for features that need an account. |
+| Hex | None | On-device dictation. It asks for the Microphone and Accessibility permissions. |
+| Mole | None | It cleans caches and logs. Check with IT before a deep clean on a managed Mac. |
+| Spotify | Personal | No work data. |
 
 Before you uncomment the "check first" lines in `work/Brewfile`, ask the
 company. OrbStack, TablePlus and CleanShot need licences for work use.
-Granola records meetings.
+Granola records meetings. Aside's AI reads every page you open, including
+pages signed in to work accounts.
 
 ## Phase 3 (user, in Terminal): macOS settings
 

@@ -38,17 +38,24 @@ brew "pam-reattach"           # Touch ID for sudo inside tmux
 cask "zed"
 cask "cmux"                   # terminal; reads config/ghostty/config
 cask "claude"
+cask "t3-code@nightly"        # T3 Code (Nightly)
 
 cask "raycast"
 cask "hiddenbar"              # Hidden Bar
 cask "alt-tab"
 cask "alcove"
 cask "betterdisplay"
+cask "mole-app"               # Mole (not `mole`, its CLI)
+cask "anomaly-hex"            # Hex: on-device dictation
 
 cask "readdle-spark"          # Spark Desktop. Classic Spark is App Store only.
 cask "spotify"
 cask "slack"
 cask "google-chrome"
+cask "zoom"                   # .pkg: needs the password, so run the bundle in Terminal
+
+cask "paper-design"           # Paper (not `paper`, a wallpaper app)
+cask "lm-studio-bionic"       # Bionic: agent for local open models
 
 cask "font-jetbrains-mono-nerd-font"
 cask "font-zed-mono-nerd-font"
@@ -63,7 +70,7 @@ cask "font-zed-mono-nerd-font"
 # cask "cleanshot"            # paid licence
 # cask "granola"              # records meetings: check the company AI policy
 # cask "notion"
-# cask "zoom"
+# cask "aside"                # AI browser: it reads every page, including work logins
 # brew "gh"                   # only if you also work on GitHub repos
 # brew "watchman"             # React Native / Metro
 # brew "postgresql@18"        # prefer the project's container
