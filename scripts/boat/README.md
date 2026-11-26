@@ -58,7 +58,10 @@ unanchored `dist/` also matches package folders inside `node_modules`, and the
 saved snapshot then has broken packages.
 
 Secrets stay in the boat environment (`boat env set-file`), never in a snapshot.
-Add a secret file only after the base is saved.
+Add a secret file only after the base is saved. A VM that sleeps must get each secret
+file from its own environment: at resume boat deletes a secret file that the environment
+does not grant, also a copy put on the disk by hand (julds lost its Executor tokens this way
+on 26 Nov 2026).
 
 ## boat-check
 
