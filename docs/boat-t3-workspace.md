@@ -21,8 +21,8 @@ T3 Code (desktop, web at app.t3.codes, iPhone) shows the VM as **julds** through
 | Provider | boat.dev, $20/mo plan (Julds Limited, GB VAT, Julds Amex), renews monthly from 24 Nov 2026, auto-refill off |
 | Account | smugeh@gmail.com, signed in through GitHub (SomtoUgeh) |
 | Sandbox | `bx_2jd5dd8b`, boat name `julds`, hostname `julds` (cloud-init `preserve_hostname: true`), `default` size (4 vCPU Ryzen 9 9950X, 8 GB, 50 GB data disk), Ubuntu 24.04 x86_64 |
-| Stopping | boat's own auto-stop is off (`--no-auto-stop`); our idle check stops it after 30 idle minutes (below) |
-| boat env `base` | GitHub injection off (`boat env set base --github false`); boat CLI credentials still injected (lets the VM stop and snapshot itself) |
+| Stopping | boat's auto-stop, which `boat-keep-awake` pushes back while julds is busy; julds stops after 90 quiet minutes (below) |
+| boat env `julds` | Since 26 Nov 2026. The same settings as `base` (GitHub injection off; boat CLI credentials injected, so the VM can stop and snapshot itself), plus the shared secret files `.config/executor-v2/cloud.token`, `.config/executor-v2/mac.token` and `.config/op/service-account-token`. Before, julds used `base`, which has no secret files, and these files were put on the disk by hand. At the first resume boat deleted them, because `base` withholds them, and Executor stopped working on julds. Keep secrets out of `base`: the CI sandboxes use it. To change a file: `boat env set-file julds <path>`, then `boat env upgrade julds` |
 | T3 | `t3` nightly (keep it on the same build as the Mac), user systemd service `t3code`, linger on, T3 Connect as admin@julds.com |
 | Mac CLI | `boat` in `~/.ascii/bin` (also linked from `~/.local/bin`; on PATH via `shell/.zshenv`) |
 
@@ -127,6 +127,7 @@ Switched on 26 Nov 2026 (julds was always on from 14 Nov). Setup, in this order:
 
 1. In `services/julds-wake/wrangler.jsonc` `JULDS_SLEEPS` is `"1"`, deployed. This turns on the Worker's scheduled wakes and the "julds after 90" line on the page. With `"0"` the Worker never wakes julds on a schedule; set it back to `"0"` only together with `ENABLED=0`, or a julds stopped on purpose would be resumed with no deadline.
 2. On julds: `~/code/personal/dotfiles/scripts/boat/keep-awake-setup bx_2jd5dd8b 90`.
+3. julds moved to the boat environment `julds` (row above): `boat stop bx_2jd5dd8b`, then `boat resume bx_2jd5dd8b --environment julds`. boat accepts `--environment` only on a stopped sandbox. After the move, each resume puts the secret files back.
 
 A new item under "Work that starts with nobody at julds" needs its wake before it relies on julds. The October `julds-idle-check` (`julds-idle.timer`, user systemd, written for the old sandbox) was deleted on 26 Nov 2026.
 
