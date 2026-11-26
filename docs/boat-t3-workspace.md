@@ -121,7 +121,23 @@ The VM cannot run iOS Simulators, so T3 on `julds` uses the Mac as an SSH **devi
 
 ## Idle auto-stop and waking
 
-**Stop.** `~/.local/bin/julds-idle-check` runs every 5 minutes (`julds-idle.timer`, user systemd). After 30 idle minutes it saves the named snapshot `julds-latest` and runs `boat stop self`. The script exports `BOAT_ID=bx_2jd5dd8b`, because `boat ... self` needs it and the systemd timer does not inherit it (before 24 Oct 2026 every idle stop failed with "self can only be used inside a sandbox shell"). Active means any of: agent processes used CPU, an agent has an open TCP connection, system CPU >= 10%, an SSH login, or less than 20 minutes since boot. Log: `~/.local/state/julds-idle/log`. Pause with `touch ~/.local/state/julds-idle/disabled`.
+**Stop.** julds uses the same `boat-keep-awake` as the project VMs (`scripts/boat/README.md`, "Sleep when idle, wake on demand"), with a 90-minute window (`TTL_MIN=90` in `/etc/boat-idle.env`) because it is the hub: boat stops julds 90 minutes after its last resume or its last busy check. Busy: a T3 run that works, a T3 scheduled task due in the next 90 minutes, a phone or desktop that connected to T3 in the last 10 minutes, a terminal used in the last 30 minutes, user CPU over 40%, or a hold. `vm-stay 8` holds it awake for 8 hours, `vm-stay 0` clears the hold. `ENABLED=0` in `/etc/boat-idle.env` makes it always on again (the next check turns boat's auto-stop off). Log: `journalctl -t boat-keep-awake`.
+
+Until it is switched on, julds stays always on (the decision of 14 Nov 2026). Switch it on only when every item under "Work that starts with nobody at julds" below has its wake, in this order:
+
+1. In `services/julds-wake/wrangler.jsonc` set `JULDS_SLEEPS` to `"1"` and deploy the Worker. This turns on its scheduled wakes and the "julds after 90" line on the page. With `"0"` the Worker never wakes julds on a schedule: a julds stopped on purpose before step 2 would run on with no deadline.
+2. On julds: `~/code/personal/dotfiles/scripts/boat/keep-awake-setup bx_2jd5dd8b 90`.
+
+The October `julds-idle-check` (`julds-idle.timer`, user systemd, disabled since 4 Nov 2026, written for the old sandbox) is retired: delete `~/.local/bin/julds-idle-check` and `~/.config/systemd/user/julds-idle.*` at the same time.
+
+**Work that starts with nobody at julds.** Each of these wakes julds first. A new one needs its own wake before it relies on julds.
+
+- Morning brief: Chief of Staff (Coworkers) posts the T3 webhook task "Morning brief (Chief of Staff trigger)" at 08:00 London through T3 Connect. T3 Connect holds a request while julds is asleep and delivers it when julds is back, up to the task's `maxDeliveryAgeMinutes` (120). The julds-wake Worker wakes julds at 07:50 and 08:05 London and emails when T3 does not answer within 10 minutes.
+- T3 scheduled tasks on julds: "p3-stack weekly upstream sync", Mondays 09:00 UTC (fixed_time, server time). The Worker wakes julds at 08:50 and 09:05 UTC, and `boat-keep-awake` keeps an awake julds up from 90 minutes before the task is due. For a new T3 scheduled task or bot routine on julds, add an entry to `services/julds-wake/src/schedule.js`. Not verified: whether T3 runs a fixed_time task it missed while asleep.
+- Agents that use the Executor app `t3-code-julds` (Dev and Lami Engineering in Coworkers, Aside, others): while julds sleeps, its tools are missing from Executor, and the project VMs cannot be reached through julds's T3 links. They first call the Executor app `boat-vms`: `vms.wake({ name: "julds" })` resumes julds and waits until T3 answers.
+- `t3-events` on the Mac polls julds as a `bot` session, which never keeps it awake, and retries an asleep julds with back-off.
+- `vm-wake` on julds runs on julds, so it needs julds awake first.
+- Boat alerts (webhook to the Worker) and the weekly snapshot (Worker cron) run in the Worker and work while julds sleeps.
 
 **Wake.** A stopped VM has no machine, so nothing wakes it by itself; T3 shows it offline until it is resumed.
 
@@ -140,7 +156,7 @@ The VM cannot run iOS Simulators, so T3 on `julds` uses the Mac as an SSH **devi
 **Reliability setup (30 Oct 2026).**
 - `t3 service protect --yes`: memory protection for T3, ssh and tailscaled (`90-t3code-protect.conf` drop-ins under /etc/systemd/system and ~/.config/systemd/user).
 - `~/.boat/pre-stop`: boat runs it before every stop; it stops t3code.service cleanly so its SQLite state is checkpointed, then a transient timer restarts T3 after 20 s in case the stop is refused or the VM is re-woken on the same machine. A wake within 10 min of a stop reuses the machine without a reboot, and boat can hold it paused for minutes while it supersedes the stop.
-- `julds-idle-check` logs `WARNING: still running 120s after stop request` if a stop does not complete (boat refuses stops whose snapshot fails, keeps the VM up unbilled, retries and emails).
+- boat refuses a stop whose snapshot fails, keeps the VM up unbilled, retries and emails.
 - Fixed hostname `julds` from `/etc/systemd/system/julds-hostname.service` (boat does not snapshot /etc/hostname). T3 now labels the environment `julds`.
 - `~/.boatignore` leaves `.npm/` and `.bun/install/cache/` (~9.7 GB) out of snapshots. Unused Docker images were pruned (they are not restored anyway).
 - T3 channel: nightly. The Mac app pushes server updates to the VM ("Server update prepared"), so client and server stay on the same version; the activeVersion launcher drop-in keeps an update from stranding the service. Moving to stable would need the stable Mac app and may be refused by the DB.
@@ -152,7 +168,7 @@ Away from the Mac, everything on the VM works except the `executor` (Mac local) 
 
 ## Data retention
 
-boat deletes a stopped sandbox's disk 14 days after the stop (email on day 11). The idle check and `julds-down` refresh the named snapshot `julds-latest` before every stop; named snapshots never expire and 10 are included in the plan. If the disk ever expires, recover with `boat new --from julds-latest --no-auto-stop`, then update the sandbox id in `julds-up`, `julds-down`, `julds-tunnel`, `julds-autowake`, the bridge plist, the wake key and this runbook.
+boat deletes a stopped sandbox's disk 14 days after the stop (email on day 11). The Mac's `julds-autowake` wakes a VM stopped 10 days or more, so this does not happen while the Mac runs. `julds-down` refreshes the named snapshot `julds-latest` before its stop (an idle stop does not), and the Worker saves `julds-weekly-YYYY-MM-DD` every Sunday; named snapshots never expire and 10 are included in the plan. If the disk ever expires, recover with `boat new --from julds-latest --no-auto-stop`, then update the sandbox id in `julds-up`, `julds-down`, `julds-tunnel`, `julds-autowake`, the bridge plist, the wake key and this runbook.
 
 ## Gotchas
 
@@ -169,7 +185,7 @@ boat deletes a stopped sandbox's disk 14 days after the stop (email on day 11). 
 - `boat ssh <id> -- cmd < file` hangs because stdin never closes; pass small files as inline base64. Use `python3 -u` under `timeout`, or the output is lost.
 - Stop only between agent turns: a stop ends running processes (no hibernate). Enabled systemd services start again on resume.
 - Security: agents run with full access and can use claude.ai connectors (Gmail, Calendar, Docs), the `gh` login, the 1Password service account, the Mac's desktop tools through `executor` (1Password and Playwright need approval), and boat's account-level CLI. Patterns to adopt later: credentials kept outside the sandbox (Cloudflare outbound Workers for Sandboxes, boat's secret proxy) and a repo-scoped GitHub token.
-- Scheduled or always-on work (T3 Scheduled Tasks on julds, proactive agents) does not run while the VM is stopped; run it from the Mac's T3, from Cloudflare (Agents SDK / Pi Durable), or pause the idle check during those windows.
+- Scheduled or always-on work (T3 Scheduled Tasks on julds, proactive agents) does not run while the VM is stopped. Give it a wake first: see "Work that starts with nobody at julds" above.
 
 ## History
 

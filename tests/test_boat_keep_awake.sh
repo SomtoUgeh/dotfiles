@@ -44,9 +44,10 @@ chmod +x "$bin"/*
 
 # <runs that work> <seconds since a client connected, or -> <seconds since a linked T3 server connected, or ->
 # [seconds since the runs started, default 60] [client type, default mobile]
+# [minutes until a scheduled task is due, or -; a disabled task is always due in 5 minutes]
 make_db() {
   rm -f "$fixture/t3.sqlite"
-  python3 - "$fixture/t3.sqlite" "$1" "$2" "$3" "${4:-60}" "${5:-mobile}" <<'P'
+  python3 - "$fixture/t3.sqlite" "$1" "$2" "$3" "${4:-60}" "${5:-mobile}" "${6:--}" <<'P'
 import datetime, sqlite3, sys
 db = sqlite3.connect(sys.argv[1])
 db.execute("create table orchestration_v2_projection_runs (status text, requested_at text)")
@@ -58,6 +59,9 @@ rows = [("running", ago(sys.argv[5]))] * int(sys.argv[2]) + [("completed", ago(6
 db.executemany("insert into orchestration_v2_projection_runs values (?, ?)", rows)
 if sys.argv[3] != "-": db.execute("insert into auth_sessions values (?, ?, null)", (sys.argv[6], ago(sys.argv[3])))
 if sys.argv[4] != "-": db.execute("insert into auth_sessions values ('bot', ?, null)", (ago(sys.argv[4]),))
+db.execute("create table scheduled_tasks (title text, enabled integer, next_run_at text)")
+db.execute("insert into scheduled_tasks values ('off', 0, ?), ('webhook', 1, null)", (ago(-300),))
+if sys.argv[7] != "-": db.execute("insert into scheduled_tasks values ('weekly', 1, ?)", (ago(-60 * int(sys.argv[7])),))
 db.commit()
 P
 }
@@ -98,6 +102,14 @@ quiet; rm "$fixture/state/boot-id"; busy "the first check on a VM" "resumed on a
 quiet; make_db 2 - -; busy "T3 runs that work" "2 T3 run(s) working"
 quiet; make_db 1 - - 39600; busy "a T3 run that started 11 hours ago" "1 T3 run(s) working"
 quiet; make_db 1 - - 46800; idle "a T3 run stuck for 13 hours"
+
+# A scheduled task keeps the VM awake from TTL_MIN (60 here) minutes before it is due.
+quiet; make_db 0 - - 60 mobile 45; busy "a scheduled task due in 45 minutes" "scheduled task is due in 45 min"
+quiet; make_db 0 - - 60 mobile -5; busy "a scheduled task due 5 minutes ago" "scheduled task is due in 0 min"
+quiet; make_db 0 - - 60 mobile 90; idle "a scheduled task due in 90 minutes"
+quiet; make_db 0 - - 60 mobile -30; idle "a scheduled task that T3 missed 30 minutes ago"
+quiet; echo TTL_MIN=120 >>"$fixture/env"; make_db 0 - - 60 mobile 90; check
+grep -qx 'bx_test extend self --ttl 7200 --json' "$fixture/boat-calls" || fail "a scheduled task due in 90 minutes, TTL_MIN=120: not busy"
 
 quiet; make_db 0 120 -; busy "a phone that connected 2 minutes ago" "connected to T3 2 min ago"
 quiet; make_db 0 120 - 60 tablet; busy "a tablet that connected 2 minutes ago" "connected to T3 2 min ago"

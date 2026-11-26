@@ -1,6 +1,8 @@
 // julds-wake: one-tap resume for the boat VMs (julds and the project VMs), gated by Cloudflare Access.
 // Opening the page wakes julds (or ?vm=<name>); ?peek only shows state. Each VM has its own Wake button.
 // The Worker re-verifies the Access JWT itself and fails closed if ACCESS_AUD is unset.
+import { dueWakes } from "./schedule.js";
+
 const BOAT = "https://boat.dev/api/v1/sandboxes";
 // boat's API reports a stopped VM as "archived" (the CLI shows "stopped"); treat all of these as wakeable.
 const WAKEABLE = ["stopped", "archived", "hibernated", "suspended", "paused"];
@@ -81,12 +83,12 @@ async function wakeOne(env, vm, email) {
   console.log(JSON.stringify({ wake: vm.name, by: email, boatStatus: r.status }));
   if (r.status >= 300) {
     await sendAlert(env, `wake failed: ${vm.name}`, `Resume of ${vm.name} (${vm.id}) returned ${r.status}: ${r.body.message || ""}`);
-    return { ...before, error: r.body.message || `resume failed (${r.status})` };
+    return { ...before, error: r.body.message || `resume failed (${r.status})`, alerted: true };
   }
   return { ...before, state: "starting" };
 }
 
-const PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8">
+const page = (env) => `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Wake VMs">
 <meta name="theme-color" content="#0b0b0c"><title>Wake VMs</title>
@@ -103,7 +105,7 @@ small{display:block;margin-top:16px;color:#666;text-align:center}
 </style></head><body><main>
 <h1>Boat VMs</h1><div id="list"></div>
 <button id="all" disabled>Wake all</button>
-<small>Project VMs sleep after 30 quiet minutes. T3 on your phone needs Tailscale on.</small>
+<small>Project VMs sleep after 30 quiet minutes${juldsSleeps(env) ? ", julds after 90" : ""}. T3 on your phone needs Tailscale on for a project VM.</small>
 </main><script>
 const WAKEABLE=${JSON.stringify(WAKEABLE)};const peek=new URLSearchParams(location.search).has("peek");
 const want=new URLSearchParams(location.search).get("vm");let autoDone=false;
@@ -126,6 +128,65 @@ async function wake(name){await fetch("wake"+(name?"?vm="+encodeURIComponent(nam
 document.getElementById("all").onclick=()=>wake("");poll();setInterval(poll,4000);
 </script></body></html>`;
 
+
+// ---- Scheduled wakes (the table and its rules are in schedule.js).
+// Must match the crons in wrangler.jsonc.
+const WEEKLY_SNAPSHOT_CRON = "0 3 * * SUN";
+const T3_WAIT_MS = 10 * 60_000;
+// Each round is at most two fetches (boat, then T3 Connect once julds runs): 15 rounds stay well
+// under the 50 subrequests a Workers Free invocation may make.
+const T3_POLL_MS = 40_000;
+// JULDS_SLEEPS=1 only once keep-awake-setup has run on julds. Before that julds has no deadline, so
+// a resume of a julds that was stopped on purpose would keep it up for good.
+const juldsSleeps = (env) => env.JULDS_SLEEPS === "1";
+const wakeFailed = (env, why, text) =>
+  sendAlert(env, "scheduled wake failed", [`julds was to be woken for: ${why}.`, text, "", "Check: https://wake.julds.com/?peek"].join("\n"));
+async function scheduledWake(env, at) {
+  const due = dueWakes(at);
+  if (!due.length || !juldsSleeps(env)) return;
+  const why = due.map((w) => w.why).join(", ");
+  try {
+    await wakeAndWait(env, why);
+  } catch (e) {
+    await wakeFailed(env, why, `The wake stopped with an error: ${e?.message || String(e)}`);
+  }
+}
+async function wakeAndWait(env, why) {
+  const julds = vmList(env).find((vm) => vm.id === env.SANDBOX_ID);
+  const woke = await wakeOne(env, julds, `schedule: ${why}`);
+  if (woke.error) {
+    // A failed resume has its own alert. A failed status read has none yet.
+    if (!woke.alerted) await wakeFailed(env, why, `boat did not report julds's state: ${woke.error}.`);
+    return;
+  }
+  const start = Date.now();
+  let resumed = woke.state === "starting";
+  for (;;) {
+    const s = await status(env, julds);
+    // A julds that was still stopping at the first check can only be resumed once it is stopped.
+    if (!resumed && WAKEABLE.includes(s.state)) {
+      resumed = true;
+      const again = await wakeOne(env, julds, `schedule: ${why}`);
+      if (again.error) {
+        if (!again.alerted) await wakeFailed(env, why, `boat did not report julds's state: ${again.error}.`);
+        return;
+      }
+    }
+    if (s.t3) {
+      console.log(JSON.stringify({ scheduledWake: why, before: woke.state, t3ReadyAfterS: Math.round((Date.now() - start) / 1000) }));
+      return;
+    }
+    if (Date.now() - start > T3_WAIT_MS) {
+      await sendAlert(env, "T3 not answering after a scheduled wake", [
+        `julds was woken for: ${why}.`,
+        `After ${T3_WAIT_MS / 60_000} minutes boat reports it as "${s.state}" and T3 Connect does not answer, so the run may not start.`,
+        "", "Check: https://wake.julds.com/?peek  |  On julds: systemctl --user status t3code.service",
+      ].join("\n"));
+      return;
+    }
+    await new Promise((r) => setTimeout(r, T3_POLL_MS));
+  }
+}
 
 // Weekly dated saved snapshot (cron), keeping the newest KEEP_WEEKLY. Uses BOAT_SNAPSHOT_KEY:
 // snapshot.read + snapshot.write + sandbox.read on bx_2jd5dd8b only. Works while the VM is stopped.
@@ -182,7 +243,8 @@ async function handleBoatWebhook(req, env) {
 
 export default {
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(weeklySnapshot(env));
+    if (event.cron === WEEKLY_SNAPSHOT_CRON) ctx.waitUntil(weeklySnapshot(env));
+    else ctx.waitUntil(scheduledWake(env, new Date(event.scheduledTime)));
   },
   async fetch(req, env) {
     const u0 = new URL(req.url);
@@ -190,7 +252,7 @@ export default {
     const auth = await verifyAccess(req, env);
     if (!auth.ok) return new Response(`Forbidden: ${auth.why}`, { status: 403 });
     const url = new URL(req.url);
-    if (req.method === "GET" && url.pathname === "/") return new Response(PAGE, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+    if (req.method === "GET" && url.pathname === "/") return new Response(page(env), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
     if (req.method === "GET" && url.pathname === "/status") return json(await allStatus(env));
     if (req.method === "POST" && url.pathname === "/wake") {
       const origin = req.headers.get("origin");

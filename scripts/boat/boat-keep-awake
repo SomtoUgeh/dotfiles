@@ -8,15 +8,17 @@
 # If this job breaks, the VM stops TTL_MIN minutes after its resume. It can never run on unseen.
 #
 # Busy: a hold (`vm-stay <hours>`), the first check after a resume on a new machine, a T3 run that
-# works and started in the last 12 hours, a phone or desktop that connected to T3 in the last 10
-# minutes, a terminal (pts) used in the last 30 minutes, or user CPU above CPU_MAX percent.
+# works and started in the last 12 hours, a T3 scheduled task due in the next TTL_MIN minutes, a phone
+# or desktop that connected to T3 in the last 10 minutes, a terminal (pts) used in the last 30 minutes,
+# or user CPU above CPU_MAX percent.
 # Not busy: a T3 client that stays connected with no run. T3 records only the moment it connects, and
 # the Mac app stays connected to every VM that is up.
 # A VM with auto-stop off gets a deadline on the next check. `ENABLED=0` makes the VM always on: the
 # check then turns boat's auto-stop off, because boat keeps the last lifetime across resumes.
 # A longer deadline set by hand with `boat extend` is replaced on the next busy check: use vm-stay.
 # Config: /etc/boat-idle.env (BOAT_ID, TTL_MIN, CPU_MAX, ENABLED). Log: journalctl -t boat-keep-awake.
-# Last busy time and reason: /var/lib/boat-idle/last-active and last-reason. julds never has this.
+# Last busy time and reason: /var/lib/boat-idle/last-active and last-reason. Installed by keep-awake-setup:
+# every project VM through vm-setup, and julds by hand with TTL_MIN=90.
 set -u
 ENV_FILE=${BOAT_IDLE_ENV:-/etc/boat-idle.env}
 # shellcheck disable=SC1090
@@ -44,24 +46,34 @@ if [ "$ENABLED" != 1 ]; then
   exit 0
 fi
 
-# T3's own state: runs that work now and the last time a phone or desktop connected. A run older
+# T3's own state: runs that work now, the next scheduled task that is due, and the last time a phone
+# or desktop connected. A scheduled task keeps the VM awake from TTL_MIN minutes before it is due, so
+# boat cannot stop the VM just before T3 starts it. A run older
 # than 12 hours does not count, so a stuck row cannot keep the VM awake forever; T3's "Agents are
 # working" sleep inhibitor has no such limit, so it is not read here. Linked T3 servers (the Mac,
 # julds) are `bot` sessions and do not count. A table that a T3 update renamed reads as 0, so the
 # other signals still work.
 t3_state() {
-  as_user python3 - "$T3_DB" <<'P' 2>/dev/null || echo "0 0"
+  as_user python3 - "$T3_DB" "$TTL_MIN" <<'P' 2>/dev/null || echo "0 0 -"
 import datetime, sqlite3, sys
 db = sqlite3.connect("file:" + sys.argv[1] + "?mode=ro", uri=True)
 def one(query, *args):
     try: return db.execute(query, args).fetchone()[0]
     except sqlite3.Error: return None
-since = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=12)).strftime("%Y-%m-%dT%H:%M:%S")
+utc = datetime.datetime.now(datetime.timezone.utc)
+iso = lambda t: t.strftime("%Y-%m-%dT%H:%M:%S")
+since = iso(utc - datetime.timedelta(hours=12))
 runs = one("select count(*) from orchestration_v2_projection_runs where status in ('preparing','starting','running') and requested_at > ?", since) or 0
 last = one("select max(last_connected_at) from auth_sessions where client_device_type <> 'bot' and revoked_at is null")
 try: seen = int(datetime.datetime.fromisoformat(last.replace("Z", "+00:00")).timestamp())
 except (AttributeError, ValueError): seen = 0
-print(runs, seen)
+# Due from 10 minutes ago (T3 has not started it yet) to TTL_MIN minutes from now. Webhook tasks
+# have no time. Prints the minutes to the task, or - when none is due.
+due = one("select min(next_run_at) from scheduled_tasks where enabled = 1 and next_run_at > ? and next_run_at <= ?",
+          iso(utc - datetime.timedelta(minutes=10)), iso(utc + datetime.timedelta(minutes=int(sys.argv[2]))))
+try: due = max(0, round((datetime.datetime.fromisoformat(due.replace("Z", "+00:00")) - utc).total_seconds() / 60))
+except (AttributeError, ValueError): due = "-"
+print(runs, seen, due)
 P
 }
 
@@ -76,9 +88,11 @@ elif [ -n "$boot" ] && [ "$boot" != "$(cat "$S/boot-id" 2>/dev/null)" ]; then
   # Gives every such resume TTL_MIN minutes, whatever lifetime boat kept from before the stop.
   reason="resumed on a new machine"
 else
-  read -r runs seen < <(t3_state)
+  read -r runs seen due < <(t3_state)
   if [ "${runs:-0}" -gt 0 ]; then
     reason="$runs T3 run(s) working"
+  elif [ "${due:--}" != - ]; then
+    reason="a T3 scheduled task is due in $due min"
   elif [ $(( now - ${seen:-0} )) -lt 600 ]; then
     reason="a phone or desktop connected to T3 $(( (now - seen) / 60 )) min ago"
   fi

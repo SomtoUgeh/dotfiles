@@ -7,7 +7,9 @@
   "main": "src/index.js",
   "compatibility_date": "2026-10-01",
   "workers_dev": false,
-  "triggers": { "crons": ["0 3 * * SUN"] },
+  // 03:00 Sunday: weekly snapshot. :05 and :50 of every hour: wake julds before scheduled work
+  // (SCHEDULED_WAKES in src/schedule.js; they run only with JULDS_SLEEPS "1"). Cron times are UTC.
+  "triggers": { "crons": ["0 3 * * SUN", "5,50 * * * *"] },
   "routes": [{ "pattern": "wake.julds.com", "custom_domain": true }],
   "send_email": [{ "name": "EMAIL", "destination_address": "smugeh@gmail.com", "allowed_sender_addresses": ["julds@alerts.julds.com"] }],
   "vars": {
@@ -19,6 +21,8 @@
     "ACCESS_TEAM": "julds",
     "ACCESS_AUD": "a58dcb77b7b1abccaa4abcb095aaa29c1b2d651e87a385fd27dc1bd0490d6e99",
     "ALLOWED_EMAILS": "work@somtougeh.com,smugeh@gmail.com",
+    // "1" once julds sleeps (keep-awake-setup bx_2jd5dd8b 90 has run): turns on the scheduled wakes.
+    "JULDS_SLEEPS": "0",
     "T3_RELAY_URL": "https://prod-30d01c3c481664ad.t3coderelay.com/.well-known/t3/environment"
   }
 }
