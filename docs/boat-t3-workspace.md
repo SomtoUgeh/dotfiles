@@ -123,12 +123,12 @@ The VM cannot run iOS Simulators, so T3 on `julds` uses the Mac as an SSH **devi
 
 **Stop.** julds uses the same `boat-keep-awake` as the project VMs (`scripts/boat/README.md`, "Sleep when idle, wake on demand"), with a 90-minute window (`TTL_MIN=90` in `/etc/boat-idle.env`) because it is the hub: boat stops julds 90 minutes after its last resume or its last busy check. Busy: a T3 run that works, a T3 scheduled task due in the next 90 minutes, a phone or desktop that connected to T3 in the last 10 minutes, a terminal used in the last 30 minutes, user CPU over 40%, or a hold. `vm-stay 8` holds it awake for 8 hours, `vm-stay 0` clears the hold. `ENABLED=0` in `/etc/boat-idle.env` makes it always on again (the next check turns boat's auto-stop off). Log: `journalctl -t boat-keep-awake`.
 
-Until it is switched on, julds stays always on (the decision of 14 Nov 2026). Switch it on only when every item under "Work that starts with nobody at julds" below has its wake, in this order:
+Switched on 26 Nov 2026 (julds was always on from 14 Nov). Setup, in this order:
 
-1. In `services/julds-wake/wrangler.jsonc` set `JULDS_SLEEPS` to `"1"` and deploy the Worker. This turns on its scheduled wakes and the "julds after 90" line on the page. With `"0"` the Worker never wakes julds on a schedule: a julds stopped on purpose before step 2 would run on with no deadline.
+1. In `services/julds-wake/wrangler.jsonc` `JULDS_SLEEPS` is `"1"`, deployed. This turns on the Worker's scheduled wakes and the "julds after 90" line on the page. With `"0"` the Worker never wakes julds on a schedule; set it back to `"0"` only together with `ENABLED=0`, or a julds stopped on purpose would be resumed with no deadline.
 2. On julds: `~/code/personal/dotfiles/scripts/boat/keep-awake-setup bx_2jd5dd8b 90`.
 
-The October `julds-idle-check` (`julds-idle.timer`, user systemd, disabled since 4 Nov 2026, written for the old sandbox) is retired: delete `~/.local/bin/julds-idle-check` and `~/.config/systemd/user/julds-idle.*` at the same time.
+A new item under "Work that starts with nobody at julds" needs its wake before it relies on julds. The October `julds-idle-check` (`julds-idle.timer`, user systemd, written for the old sandbox) was deleted on 26 Nov 2026.
 
 **Work that starts with nobody at julds.** Each of these wakes julds first. A new one needs its own wake before it relies on julds.
 
