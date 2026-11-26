@@ -103,7 +103,7 @@ small{display:block;margin-top:16px;color:#666;text-align:center}
 </style></head><body><main>
 <h1>Boat VMs</h1><div id="list"></div>
 <button id="all" disabled>Wake all</button>
-<small>Project VMs sleep after 45 quiet minutes. T3 on your phone needs Tailscale on.</small>
+<small>Project VMs sleep after 30 quiet minutes. T3 on your phone needs Tailscale on.</small>
 </main><script>
 const WAKEABLE=${JSON.stringify(WAKEABLE)};const peek=new URLSearchParams(location.search).has("peek");
 const want=new URLSearchParams(location.search).get("vm");let autoDone=false;

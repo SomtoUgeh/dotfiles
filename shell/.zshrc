@@ -388,3 +388,8 @@ boat() {
 # Android / Java toolchain for ICB (added 2026-11-15)
 export JAVA_HOME=/opt/homebrew/opt/openjdk@25
 export ANDROID_HOME="$HOME/Library/Android/sdk"
+
+# Added by LM Studio CLI (lms)
+export PATH="$PATH:/Users/somto/.lmstudio/bin"
+# End of LM Studio CLI section
+
