@@ -35,11 +35,7 @@ brew "pam-reattach"           # Touch ID for sudo inside tmux
 # =============================================================================
 # Apps
 # =============================================================================
-cask "1password"
-cask "1password-cli"
-
 cask "zed"
-cask "visual-studio-code"
 cask "cmux"                   # terminal; reads config/ghostty/config
 cask "claude"
 
@@ -60,6 +56,8 @@ cask "font-zed-mono-nerd-font"
 # =============================================================================
 # Check first: uncomment after the licence or policy check
 # =============================================================================
+# cask "1password"            # only if the company uses 1Password; then
+# cask "1password-cli"        #   setup_gitlab.sh --keys 1password
 # cask "orbstack"             # free for personal use only; work use needs a licence
 # cask "tableplus"            # paid licence
 # cask "cleanshot"            # paid licence

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Runs work/install.sh --links-only and work/setup_gitlab.sh against a temporary
-# home. op, glab and ssh are stubs: no network, no 1Password, no GitLab.
+# home. op, glab, ssh and ssh-add are stubs: no network, no 1Password, no
+# GitLab, and nothing is written to the real Keychain or ssh-agent.
 set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd -P)
 fixture=$(mktemp -d)
@@ -99,12 +100,13 @@ sock_dir=$(mktemp -d /tmp/wsock.XXXX)
 trap 'rm -rf "$fixture" "$sock_dir"' EXIT
 python3 -c 'import socket,sys; socket.socket(socket.AF_UNIX).bind(sys.argv[1])' "$sock_dir/a.sock"
 export PATH="$stubs:$PATH" STUB_STATE=$state OP_AGENT_SOCK=$sock_dir/a.sock OP_SSH_SIGN=$stubs/op-ssh-sign
-gl() { bash "$root/work/setup_gitlab.sh" --host gitlab.example.com --email me@example.com --name "Test User" "$@"; }
+gl() { bash "$root/work/setup_gitlab.sh" --host gitlab.example.com --email me@example.com --name "Test User" --keys 1password "$@"; }
 
 # Usage errors.
 set +e
 bash "$root/work/setup_gitlab.sh" --host gitlab.example.com >/dev/null 2>&1; [ $? = 2 ] || fail "missing --email accepted"
 gl --host 'bad host/x' >/dev/null 2>&1; [ $? = 2 ] || fail "bad --host accepted"
+gl --keys keychain >/dev/null 2>&1; [ $? = 2 ] || fail "unknown --keys accepted"
 set -e
 
 printf 'Host other\n    HostName other.example.com\n' > "$HOME/.ssh/config"
@@ -143,5 +145,55 @@ gl >/dev/null 2>&1 || fail "second apply failed"
 printf '[user]\n\temail = mine@example.com\n' > "$HOME/.gitconfig-work"
 gl >/dev/null 2>&1 || true
 grep -q 'mine@example.com' "$HOME/.gitconfig-work" || fail "own ~/.gitconfig-work overwritten"
+
+# --- work/setup_gitlab.sh --keys file (the default) --------------------------
+export HOME=$fixture/home-file
+mkdir -p "$HOME"
+bash "$root/work/install.sh" --links-only >/dev/null
+state=$fixture/state-file
+mkdir -p "$state"
+export STUB_STATE=$state SSH_AUTH_SOCK=$fixture/macos-agent
+# ssh-add stub: checks that the askpass helper returns the key's real
+# passphrase, then lists the loaded keys like ssh-add -l.
+cat > "$stubs/ssh-add" <<'EOF'
+#!/usr/bin/env bash
+state=$STUB_STATE
+case "$1" in
+  --apple-use-keychain)
+    key=${!#}
+    pass=$("$SSH_ASKPASS") || exit 1
+    ssh-keygen -y -P "$pass" -f "$key" >/dev/null 2>&1 || { echo "wrong passphrase" >&2; exit 1; }
+    echo "$key" >> "$state/agent" ;;
+  -l) while read -r key; do ssh-keygen -lf "$key.pub"; done < "$state/agent" 2>/dev/null ;;
+  *) exit 0 ;;
+esac
+EOF
+chmod +x "$stubs/ssh-add"
+glf() { bash "$root/work/setup_gitlab.sh" --host gitlab.example.com --email me@example.com --name "Test User" "$@"; }
+
+set +e; glf --check >/dev/null 2>&1; rc=$?; set -e
+[ "$rc" = 1 ] && [ ! -e "$HOME/.ssh/gitlab_auth_ed25519" ] || fail "file --check created keys"
+glf >"$fixture/file.log" 2>&1 || { cat "$fixture/file.log"; fail "file apply failed"; }
+for k in gitlab_auth_ed25519 gitlab_sign_ed25519; do
+  [ "$(stat -f %Lp "$HOME/.ssh/$k")" = 600 ] || fail "$k is not 0600"
+  ! ssh-keygen -y -P "" -f "$HOME/.ssh/$k" >/dev/null 2>&1 || fail "$k has no passphrase"
+done
+[ "$(wc -l < "$state/agent" | tr -d ' ')" = 2 ] || fail "keys not added to the agent with the Keychain"
+grep -q '^    IdentityFile ~/.ssh/gitlab_auth_ed25519$' "$HOME/.ssh/config.d/gitlab-work" || fail "SSH config does not use the key file"
+grep -q 'UseKeychain yes' "$HOME/.ssh/config.d/gitlab-work" || fail "SSH config lacks UseKeychain"
+! grep -q 'IdentityAgent\|1Password' "$HOME/.ssh/config.d/gitlab-work" || fail "file mode uses the 1Password agent"
+! grep -q 'op-ssh-sign' "$HOME/.gitconfig-work" || fail "file mode signs with 1Password"
+[ ! -e "$HOME/.config/1Password" ] || fail "file mode wrote 1Password config"
+grep -q 'signing key is loaded in the ssh-agent' "$fixture/file.log" || fail "signing key check did not pass"
+[ "$(grep -o '"usage"' "$state/glab-keys" | wc -l | tr -d ' ')" = 2 ] || fail "file keys not uploaded"
+before=$(cat "$HOME/.ssh/gitlab_sign_ed25519.pub")
+glf --check >/dev/null 2>&1 || fail "file --check after apply is not current"
+glf >/dev/null 2>&1 || fail "second file apply failed"
+[ "$(cat "$HOME/.ssh/gitlab_sign_ed25519.pub")" = "$before" ] || fail "file key regenerated"
+[ "$(grep -o '"usage"' "$state/glab-keys" | wc -l | tr -d ' ')" = 2 ] || fail "file keys uploaded twice"
+
+# 1Password's agent socket in SSH_AUTH_SOCK would hide the file keys.
+set +e; SSH_AUTH_SOCK=$OP_AGENT_SOCK glf >/dev/null 2>&1; rc=$?; set -e
+[ "$rc" = 1 ] || fail "file mode accepted the 1Password agent"
 
 echo "test_work_setup: ok"

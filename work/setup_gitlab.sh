@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 #
-# Sets up GitLab access and signed commits on the work Mac, with keys held in
-# the work 1Password vault. Private keys never touch the disk.
+# Sets up GitLab access and signed commits on the work Mac.
 #
 #   work/setup_gitlab.sh --email you@company.com [options]
 #
@@ -10,6 +9,10 @@
 #   --ssh-host HOST   SSH endpoint when it differs from --host
 #   --ssh-port PORT   SSH port when it is not 22
 #   --name NAME       commit name (default: user.name in ~/.gitconfig.local)
+#   --keys STORE      where the private keys live (default: file)
+#                       file       ~/.ssh, each key with a random passphrase
+#                                  kept in the macOS Keychain
+#                       1password  a 1Password vault; nothing private on disk
 #   --vault VAULT     1Password vault for the keys (default: Employee)
 #   --account ACCT    1Password account, when the app has more than one
 #   --no-upload       do not upload the public keys to GitLab
@@ -17,14 +20,17 @@
 #   --force           also overwrite an existing ~/.gitconfig-work
 #
 # What it does:
-#   1. creates (or reuses) two SSH keys in the vault: gitlab_auth_ed25519 and
-#      gitlab_sign_ed25519
+#   1. creates (or reuses) two Ed25519 keys, gitlab_auth_ed25519 and
+#      gitlab_sign_ed25519, in the chosen store
 #   2. writes their public halves to ~/.ssh, and ~/.ssh/allowed_signers_work
 #   3. writes ~/.ssh/config.d/gitlab-work and includes it from ~/.ssh/config
-#   4. adds the vault to ~/.config/1Password/ssh/agent.toml
+#   4. 1password: adds the vault to ~/.config/1Password/ssh/agent.toml
 #   5. writes ~/.gitconfig-work (identity and signing for ~/code/work)
 #   6. signs glab in to the host (browser login) and uploads both public keys
-#   7. checks SSH access and the identity inside ~/code/work
+#   7. checks SSH access, the signing key, and the identity in ~/code/work
+#
+# To move from file keys to 1Password later, run again with --keys 1password.
+# The new keys are uploaded; delete the old ones in GitLab and ~/.ssh.
 #
 # Exit status: 0 when everything is in place, 1 when something failed or
 # (with --check) would change, 2 for a usage error.
@@ -37,12 +43,13 @@ SSH_HOST=""
 SSH_PORT=""
 EMAIL=""
 NAME=""
+KEYS=file
 VAULT=Employee
 ACCOUNT=""
 UPLOAD=1
 MODE=apply
 
-usage() { sed -n '2,31p' "$0"; }
+usage() { sed -n '2,36p' "$0"; }
 need_value() { [ "$#" -ge 2 ] && [ -n "$2" ] || { echo "$1 needs a value" >&2; exit 2; }; }
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -51,6 +58,7 @@ while [ "$#" -gt 0 ]; do
     --ssh-host) need_value "$@"; SSH_HOST="$2"; shift 2 ;;
     --ssh-port) need_value "$@"; SSH_PORT="$2"; shift 2 ;;
     --name)     need_value "$@"; NAME="$2"; shift 2 ;;
+    --keys)     need_value "$@"; KEYS="$2"; shift 2 ;;
     --vault)    need_value "$@"; VAULT="$2"; shift 2 ;;
     --account)  need_value "$@"; ACCOUNT="$2"; shift 2 ;;
     --no-upload) UPLOAD=0; shift ;;
@@ -74,6 +82,10 @@ fi
 if [ -n "$SSH_PORT" ]; then
   case "$SSH_PORT" in *[!0-9]*) echo "--ssh-port must be a number" >&2; exit 2 ;; esac
 fi
+case "$KEYS" in
+  file|1password) ;;
+  *) echo "--keys must be file or 1password" >&2; exit 2 ;;
+esac
 if [ -z "$NAME" ]; then
   NAME="$(git config --file "$HOME/.gitconfig.local" user.name 2>/dev/null || true)"
 fi
@@ -108,7 +120,8 @@ op_() { op "$@" ${op_acct[@]+"${op_acct[@]}"} </dev/null; }
 
 # Writes content to a file with mode 0600 unless it already matches.
 write_file() {
-  local path="$1" content="$2" label="$(short "$1")"
+  local path="$1" content="$2" label
+  label="$(short "$1")"
   if [ -f "$path" ] && [ "$(cat "$path")" = "$content" ]; then grn "  = $label"; return; fi
   change "$label would be written" || return
   if mkdir -p "$(dirname "$path")" && printf '%s\n' "$content" > "$path" && chmod 600 "$path"; then
@@ -118,63 +131,130 @@ write_file() {
   fi
 }
 
+# Prints "type base64" of a public key line.
+key_body() { printf '%s\n' "$1" | awk 'NR == 1 { print $1" "$2 }'; }
+
+# Creates a file key with a random passphrase and stores that passphrase in
+# the login Keychain through ssh-add, so no prompt is needed later. The
+# passphrase is never printed. It is passed to ssh-keygen as an argument,
+# which other processes of this user can see for the moment the command runs.
+create_file_key() {
+  local path="$1" pass askpass_dir
+  pass="$(openssl rand -base64 24)" || return 1
+  ssh-keygen -q -t ed25519 -C "$EMAIL" -f "$path" -N "$pass" </dev/null || return 1
+  askpass_dir="$(mktemp -d)" || return 1
+  printf '#!/bin/sh\nprintf "%%s\\n" "$GITLAB_KEY_PASS"\n' > "$askpass_dir/askpass"
+  chmod 700 "$askpass_dir/askpass"
+  GITLAB_KEY_PASS="$pass" SSH_ASKPASS="$askpass_dir/askpass" SSH_ASKPASS_REQUIRE=force DISPLAY=:0 \
+    ssh-add --apple-use-keychain -q "$path" </dev/null
+  local rc=$?
+  rm -rf "$askpass_dir"
+  if [ "$rc" -ne 0 ]; then
+    # Unusable without the stored passphrase. Nothing was uploaded yet.
+    rm -f "$path" "$path.pub"
+    return 1
+  fi
+}
+
 # =============================================================================
-hdr "Prerequisites"
-for tool in op glab git ssh; do
+hdr "Prerequisites (keys: $KEYS)"
+tools=(glab git ssh)
+if [ "$KEYS" = 1password ]; then tools+=(op); else tools+=(ssh-keygen ssh-add openssl); fi
+for tool in "${tools[@]}"; do
   if command -v "$tool" >/dev/null 2>&1; then grn "  $tool: found"
   else red "  $tool missing — run work/install.sh first"; fail=1; fi
 done
-if [ -S "$AGENT_SOCK" ]; then grn "  1Password SSH agent: running"
-else red "  1Password SSH agent not running — turn it on in 1Password: Settings > Developer > SSH agent"; fail=1; fi
-if [ -x "$SSH_SIGN" ]; then grn "  op-ssh-sign: found"
-else red "  op-ssh-sign missing — is the 1Password app installed?"; fail=1; fi
-[ "$fail" -ne 0 ] && { echo; red "Prerequisites unmet. Nothing changed."; exit 1; }
-if op_ vault get "$VAULT" >/dev/null 2>&1; then grn "  vault '$VAULT': readable"
+if [ "$KEYS" = 1password ]; then
+  if [ -S "$AGENT_SOCK" ]; then grn "  1Password SSH agent: running"
+  else red "  1Password SSH agent not running — turn it on in 1Password: Settings > Developer > SSH agent"; fail=1; fi
+  if [ -x "$SSH_SIGN" ]; then grn "  op-ssh-sign: found"
+  else red "  op-ssh-sign missing — install 1Password (brew install --cask 1password 1password-cli)"; fail=1; fi
 else
-  red "  op cannot read vault '$VAULT'."
-  red "  Turn on Settings > Developer > Integrate with 1Password CLI, check the vault name (--vault),"
-  red "  and pass --account when the app has more than one account (op account list)."
-  exit 1
+  # The macOS ssh-agent must hold the keys. The work shell points
+  # SSH_AUTH_SOCK at 1Password whenever its agent is running.
+  if [ -n "${SSH_AUTH_SOCK:-}" ] && [ "$SSH_AUTH_SOCK" = "$AGENT_SOCK" ]; then
+    red "  SSH_AUTH_SOCK points at 1Password. Use --keys 1password, or turn off its SSH agent."; fail=1
+  else
+    grn "  ssh-agent: macOS"
+  fi
+fi
+[ "$fail" -ne 0 ] && { echo; red "Prerequisites unmet. Nothing changed."; exit 1; }
+if [ "$KEYS" = 1password ]; then
+  if op_ vault get "$VAULT" >/dev/null 2>&1; then grn "  vault '$VAULT': readable"
+  else
+    red "  op cannot read vault '$VAULT'."
+    red "  Turn on Settings > Developer > Integrate with 1Password CLI, check the vault name (--vault),"
+    red "  and pass --account when the app has more than one account (op account list)."
+    exit 1
+  fi
 fi
 
 # =============================================================================
-hdr "SSH keys in 1Password ($VAULT)"
 AUTH_PUB=""
 SIGN_PUB=""
-for item in "$AUTH_ITEM" "$SIGN_ITEM"; do
-  if op_ item get "$item" --vault "$VAULT" >/dev/null 2>&1; then
-    grn "  = $item exists"
-  elif change "$item would be created (Ed25519)"; then
-    if op_ item create --category "SSH Key" --title "$item" --vault "$VAULT" --ssh-generate-key ed25519 >/dev/null 2>&1; then
-      grn "  + $item created"
-    else
-      red "  ✗ could not create $item"; fail=1; continue
-    fi
-  else
-    continue
-  fi
-  if ! pub="$(op_ read "op://$VAULT/$item/public key" 2>/dev/null)" || [ -z "$pub" ]; then
-    red "  ✗ could not read the public key of $item"; fail=1; continue
-  fi
-  pub="$(printf '%s\n' "$pub" | awk 'NR == 1 { print $1" "$2 }')"
-  if [ "$item" = "$AUTH_ITEM" ]; then AUTH_PUB="$pub"; else SIGN_PUB="$pub"; fi
-done
-
-hdr "Files in ~/.ssh"
 [ "$MODE" = check ] || { mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"; }
-[ -n "$AUTH_PUB" ] && write_file "$HOME/.ssh/$AUTH_ITEM.pub" "$AUTH_PUB $EMAIL"
-[ -n "$SIGN_PUB" ] && write_file "$HOME/.ssh/$SIGN_ITEM.pub" "$SIGN_PUB $EMAIL"
+
+if [ "$KEYS" = 1password ]; then
+  hdr "SSH keys in 1Password ($VAULT)"
+  for item in "$AUTH_ITEM" "$SIGN_ITEM"; do
+    if op_ item get "$item" --vault "$VAULT" >/dev/null 2>&1; then
+      grn "  = $item exists"
+    elif change "$item would be created (Ed25519)"; then
+      if op_ item create --category "SSH Key" --title "$item" --vault "$VAULT" --ssh-generate-key ed25519 >/dev/null 2>&1; then
+        grn "  + $item created"
+      else
+        red "  ✗ could not create $item"; fail=1; continue
+      fi
+    else
+      continue
+    fi
+    if ! pub="$(op_ read "op://$VAULT/$item/public key" 2>/dev/null)" || [ -z "$pub" ]; then
+      red "  ✗ could not read the public key of $item"; fail=1; continue
+    fi
+    pub="$(key_body "$pub")"
+    if [ "$item" = "$AUTH_ITEM" ]; then AUTH_PUB="$pub"; else SIGN_PUB="$pub"; fi
+  done
+  hdr "Public keys in ~/.ssh"
+  [ -n "$AUTH_PUB" ] && write_file "$HOME/.ssh/$AUTH_ITEM.pub" "$AUTH_PUB $EMAIL"
+  [ -n "$SIGN_PUB" ] && write_file "$HOME/.ssh/$SIGN_ITEM.pub" "$SIGN_PUB $EMAIL"
+else
+  hdr "SSH keys in ~/.ssh"
+  for item in "$AUTH_ITEM" "$SIGN_ITEM"; do
+    path="$HOME/.ssh/$item"
+    if [ -f "$path" ] && [ -f "$path.pub" ]; then
+      grn "  = $item exists"
+    elif [ -e "$path" ] || [ -e "$path.pub" ]; then
+      red "  ✗ only half of $item is in ~/.ssh. Remove the other file, then run again."; fail=1; continue
+    elif change "$item would be created (Ed25519, passphrase in the Keychain)"; then
+      if create_file_key "$path"; then grn "  + $item created, passphrase in the Keychain"
+      else red "  ✗ could not create $item"; fail=1; continue; fi
+    else
+      continue
+    fi
+    pub="$(key_body "$(cat "$path.pub")")"
+    if [ "$item" = "$AUTH_ITEM" ]; then AUTH_PUB="$pub"; else SIGN_PUB="$pub"; fi
+  done
+fi
 [ -n "$SIGN_PUB" ] && write_file "$HOME/.ssh/allowed_signers_work" "$EMAIL namespaces=\"git\" $SIGN_PUB"
 
-ssh_block="# $MARKER. Rerun it to change this file.
+hdr "SSH config"
+ssh_block="# $MARKER (--keys $KEYS). Rerun it to change this file.
 Host $HOST
     HostName ${SSH_HOST:-$HOST}
     User git"
 [ -n "$SSH_PORT" ] && ssh_block="$ssh_block
     Port $SSH_PORT"
-ssh_block="$ssh_block
+if [ "$KEYS" = 1password ]; then
+  ssh_block="$ssh_block
     IdentityAgent \"$AGENT_SOCK_CONFIG\"
-    IdentityFile ~/.ssh/$AUTH_ITEM.pub
+    IdentityFile ~/.ssh/$AUTH_ITEM.pub"
+else
+  ssh_block="$ssh_block
+    IdentityFile ~/.ssh/$AUTH_ITEM
+    AddKeysToAgent yes
+    UseKeychain yes"
+fi
+ssh_block="$ssh_block
     IdentitiesOnly yes"
 write_file "$HOME/.ssh/config.d/gitlab-work" "$ssh_block"
 
@@ -192,35 +272,40 @@ elif change "~/.ssh/config would include config.d/gitlab-work"; then
 fi
 
 # =============================================================================
-hdr "1Password SSH agent"
-agent_toml="$HOME/.config/1Password/ssh/agent.toml"
-entry="[[ssh-keys]]
+if [ "$KEYS" = 1password ]; then
+  hdr "1Password SSH agent"
+  agent_toml="$HOME/.config/1Password/ssh/agent.toml"
+  entry="[[ssh-keys]]
 vault = \"$VAULT\""
-[ -n "$ACCOUNT" ] && entry="$entry
+  [ -n "$ACCOUNT" ] && entry="$entry
 account = \"$ACCOUNT\""
-if [ -f "$agent_toml" ] && grep -qF "vault = \"$VAULT\"" "$agent_toml"; then
-  grn "  = agent.toml serves vault '$VAULT'"
-elif change "agent.toml would serve vault '$VAULT'"; then
-  mkdir -p "$(dirname "$agent_toml")"
-  if [ -f "$agent_toml" ]; then
-    printf '\n%s\n' "$entry" >> "$agent_toml"
-  else
-    printf '# Which vaults the 1Password SSH agent serves. %s.\n\n%s\n' "$MARKER" "$entry" > "$agent_toml"
-  fi && grn "  + agent.toml serves vault '$VAULT' (restart 1Password if keys do not appear)" \
-     || { red "  ✗ could not write agent.toml"; fail=1; }
+  if [ -f "$agent_toml" ] && grep -qF "vault = \"$VAULT\"" "$agent_toml"; then
+    grn "  = agent.toml serves vault '$VAULT'"
+  elif change "agent.toml would serve vault '$VAULT'"; then
+    mkdir -p "$(dirname "$agent_toml")"
+    if [ -f "$agent_toml" ]; then
+      printf '\n%s\n' "$entry" >> "$agent_toml"
+    else
+      printf '# Which vaults the 1Password SSH agent serves. %s.\n\n%s\n' "$MARKER" "$entry" > "$agent_toml"
+    fi && grn "  + agent.toml serves vault '$VAULT' (restart 1Password if keys do not appear)" \
+       || { red "  ✗ could not write agent.toml"; fail=1; }
+  fi
 fi
 
 # =============================================================================
 hdr "Git identity"
-gitconfig_work="# $MARKER. Applies in ~/code/work and the agent worktree folders.
+signing_program=""
+[ "$KEYS" = 1password ] && signing_program="
+[gpg \"ssh\"]
+	program = $SSH_SIGN"
+gitconfig_work="# $MARKER (--keys $KEYS). Applies in ~/code/work and the agent worktree folders.
 [user]
 	name = $NAME
 	email = $EMAIL
 	signingkey = ~/.ssh/$SIGN_ITEM.pub
 [gpg]
-	format = ssh
+	format = ssh$signing_program
 [gpg \"ssh\"]
-	program = $SSH_SIGN
 	allowedSignersFile = ~/.ssh/allowed_signers_work
 [commit]
 	gpgsign = true
@@ -287,10 +372,10 @@ if [ "$MODE" = check ]; then
 else
   out="$(ssh -T -o BatchMode=yes -o ConnectTimeout=10 "git@$HOST" 2>&1)"
   if [[ "$out" == *"Welcome to GitLab"* ]]; then
-    grn "  ✓ ssh: $(printf '%s' "$out" | grep -o 'Welcome to GitLab[^!]*!')"
+    grn "  ✓ ssh: ${out%%$'\n'*}"
   else
-    red "  ✗ ssh git@$HOST did not greet you: $(printf '%s' "$out" | head -1)"
-    red "    Approve the 1Password prompt, and check that the auth key is on GitLab."
+    red "  ✗ ssh git@$HOST did not greet you: ${out%%$'\n'*}"
+    red "    Check that the auth key is on GitLab$([ "$KEYS" = 1password ] && printf ', and approve the 1Password prompt')."
     fail=1
   fi
   probe="$(mktemp -d "$HOME/code/work/.setup-check.XXXXXX")"
@@ -305,15 +390,25 @@ else
     red "    Check that ~/.gitconfig links to work/git/gitconfig (run work/install.sh)."
     fail=1
   fi
-  if grep -rl 'PRIVATE KEY' "$HOME/.ssh" >/dev/null 2>&1; then
-    red "  ✗ a private key file is in ~/.ssh"; fail=1
+  if [ "$KEYS" = 1password ]; then
+    if grep -rl 'PRIVATE KEY' "$HOME/.ssh" >/dev/null 2>&1; then
+      red "  ✗ a private key file is in ~/.ssh"; fail=1
+    else
+      grn "  ✓ no private keys in ~/.ssh"
+    fi
   else
-    grn "  ✓ no private keys in ~/.ssh"
+    # git signs through the agent, so the signing key must be loaded there.
+    sign_fp="$(ssh-keygen -lf "$HOME/.ssh/$SIGN_ITEM.pub" 2>/dev/null | awk '{ print $2 }')"
+    if [ -n "$sign_fp" ] && [[ "$(ssh-add -l 2>/dev/null)" == *"$sign_fp"* ]]; then
+      grn "  ✓ the signing key is loaded in the ssh-agent"
+    else
+      red "  ✗ the signing key is not in the ssh-agent. Run: ssh-add --apple-load-keychain"; fail=1
+    fi
   fi
 fi
 
 hdr "Manual step"
-echo "  Sign a test commit in a work repo and approve the 1Password prompt:"
+echo "  Sign a test commit in a work repo:"
 echo "    git commit --allow-empty -m 'signing test' && git log --show-signature -1"
 echo "  GitLab shows 'Verified' on the commit after you push it."
 

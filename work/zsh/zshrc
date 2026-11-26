@@ -72,6 +72,10 @@ command -v direnv >/dev/null && eval "$(direnv hook zsh)"
 
 source ~/.orbstack/shell/init.zsh 2>/dev/null || :
 
+# File-held GitLab keys (setup_gitlab.sh --keys file): load them from the
+# Keychain into the macOS ssh-agent after a restart, so git can sign commits.
+[[ -f "$HOME/.ssh/gitlab_sign_ed25519" ]] && ssh-add --apple-load-keychain -q 2>/dev/null
+
 if [[ -f "$HOME/.ripgreprc" ]]; then
   export RIPGREP_CONFIG_PATH="$HOME/.ripgreprc"
 fi

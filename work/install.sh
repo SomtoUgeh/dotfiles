@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# Work Mac installer. Sets up the same shell, editors and apps as the personal
+# Work Mac installer. Sets up the same shell, Zed and apps as the personal
 # Mac, without the personal identity or infrastructure. See work/README.md.
 #
-#   work/install.sh               full install (Homebrew bundle, Node, links)
+#   work/install.sh               full install (Homebrew, bundle, Node, links)
 #   work/install.sh --links-only  links and rendered files only; no downloads
 #
 # Safe to run again. It never pushes, never signs in to anything, and writes no
@@ -11,6 +11,9 @@
 #
 # Left out on purpose: the personal Executor gateway, boat VMs, the gh-personal
 # account, Codex/OpenCode/Grok config, Tailscale, and the personal Brewfile.
+#
+# Without a terminal (an agent's shell), Homebrew comes from its signed .pkg:
+# the macOS Installer window opens and the user types the password there.
 
 set -euo pipefail
 
@@ -91,17 +94,57 @@ chmod 700 "$HOME/.ssh"
 # =============================================================================
 # Homebrew
 # =============================================================================
-if [ "$LINKS_ONLY" = 0 ]; then
-    hdr "Homebrew"
-    if ! command -v brew >/dev/null 2>&1; then
-        if [ -x /opt/homebrew/bin/brew ]; then
-            eval "$(/opt/homebrew/bin/brew shellenv)"
-        else
-            echo -e "${RED}Homebrew is not installed.${NC} Install it in a real terminal (it asks for your password):"
-            echo '  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
-            exit 1
-        fi
+HOMEBREW_PKG_URL="https://github.com/Homebrew/brew/releases/latest/download/Homebrew.pkg"
+# The Developer ID team that signs Homebrew.pkg (checked 26 Nov 2026, 7.0.16).
+# If Homebrew changes its signer, the install stops here. Confirm the new team
+# at https://docs.brew.sh/Installation before you change this value.
+HOMEBREW_TEAM_ID="927JGANW46"
+
+install_homebrew() {
+    if [ -t 0 ]; then
+        # A terminal: the official script asks for the password itself.
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        return
     fi
+    local dir pkg signature
+    dir="$(mktemp -d)"
+    pkg="$dir/Homebrew.pkg"
+    echo "Downloading $HOMEBREW_PKG_URL ..."
+    if ! curl -fsSL -o "$pkg" "$HOMEBREW_PKG_URL"; then
+        echo -e "${RED}Could not download the Homebrew package.${NC}" >&2; rm -rf "$dir"; return 1
+    fi
+    # Gatekeeper accepts only a notarized package with a valid Developer ID.
+    signature="$(pkgutil --check-signature "$pkg" 2>/dev/null || true)"
+    if ! spctl -a -t install "$pkg" 2>/dev/null || [[ "$signature" != *"($HOMEBREW_TEAM_ID)"* ]]; then
+        echo -e "${RED}Homebrew.pkg is not signed by team $HOMEBREW_TEAM_ID. Not installed.${NC}" >&2
+        rm -rf "$dir"; return 1
+    fi
+    echo -e "${YELLOW}The macOS Installer opens. Follow it, type your password there, then close it.${NC}"
+    open -W "$pkg"
+    rm -rf "$dir"
+    [ -x /opt/homebrew/bin/brew ]
+}
+
+if [ "$LINKS_ONLY" = 0 ]; then
+    hdr "Command Line Tools"
+    if xcode-select -p >/dev/null 2>&1; then
+        ok "Command Line Tools installed"
+    else
+        xcode-select --install 2>/dev/null || true
+        echo -e "${RED}Install the Command Line Tools in the window that opened, then run this again.${NC}" >&2
+        exit 1
+    fi
+
+    hdr "Homebrew"
+    if ! command -v brew >/dev/null 2>&1 && [ ! -x /opt/homebrew/bin/brew ]; then
+        install_homebrew || {
+            echo -e "${RED}Homebrew is not installed.${NC} In a terminal, run:" >&2
+            echo '  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"' >&2
+            exit 1
+        }
+    fi
+    command -v brew >/dev/null 2>&1 || eval "$(/opt/homebrew/bin/brew shellenv)"
+    ok "Homebrew $(brew --version | awk 'NR == 1 { print $2 }')"
     # Non-fatal: one failing cask must not stop the rest. Some casks need sudo,
     # which fails without a terminal; rerun the bundle in a terminal to finish.
     if brew bundle install --file="$WORK_DIR/Brewfile"; then
@@ -162,22 +205,6 @@ render_file "$HOME/.config/zed/settings.json" "// $MARKER from config/zed/settin
 // Rerun work/install.sh to refresh it. Zed edits here stay on this Mac.
 $zed_settings"
 create_symlink "$DOTFILES_DIR/config/zed/keymap.json" "$HOME/.config/zed/keymap.json"
-
-hdr "VS Code"
-vscode_user="$HOME/Library/Application Support/Code/User"
-create_symlink "$DOTFILES_DIR/config/vscode/vscode-settings.json" "$vscode_user/settings.json"
-create_symlink "$DOTFILES_DIR/config/vscode/vscode-keybindings.json" "$vscode_user/keybindings.json"
-code_cli="/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"
-if [ -x "$code_cli" ]; then
-    create_symlink "$code_cli" "$HOME/bin/code"
-fi
-if [ "$LINKS_ONLY" = 0 ] && [ -x "$code_cli" ]; then
-    while IFS= read -r ext || [ -n "$ext" ]; do
-        case "$ext" in ''|'#'*) continue ;; esac
-        "$code_cli" --install-extension "$ext" --force >/dev/null 2>&1 || warn "extension failed: $ext"
-    done < "$DOTFILES_DIR/config/vscode/extensions.txt"
-    ok "VS Code extensions processed"
-fi
 
 # =============================================================================
 # Node (LTS) via fnm
@@ -247,8 +274,9 @@ create_symlink "$WORK_DIR/setup_gitlab.sh" "$HOME/bin/setup_gitlab.sh"
 hdr "Done"
 cat <<'EOF'
 Next (see work/README.md):
-  1. work/setup_gitlab.sh --host <gitlab-host> --email <work-email>
-  2. Sign in to the apps (Raycast, Spark, Spotify, Slack) and set Hidden Bar.
-  3. In a real terminal: ./macos/defaults.sh, then enable_touchid_sudo.sh
-  4. exec zsh
+  1. Sign in to the apps (Raycast, Spark, Spotify, Slack) and set Hidden Bar.
+  2. In a real terminal: ./macos/defaults.sh, then enable_touchid_sudo.sh
+  3. exec zsh
+  4. When you have the work email and GitLab access:
+     work/setup_gitlab.sh --host <gitlab-host> --email <work-email>
 EOF
